@@ -27,7 +27,7 @@ namespace djs {
 
         template<typename T>
         Value(Kind kind, T as) : kind(kind), as(static_cast<As>(as)) {};
-        Value(NativeFunction as) : kind(Kind::NativeFunction), as({ .native_function = as }) {};
+        explicit Value(NativeFunction as) : kind(Kind::NativeFunction), as({ .native_function = as }) {};
 
     public:
 
@@ -39,7 +39,7 @@ namespace djs {
         auto is_null() const -> bool;
 
         static auto native_function(NativeFunction f) -> Value {
-            return { f };
+            return Value { f };
         }
     };
 }
