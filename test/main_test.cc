@@ -24,5 +24,5 @@ TEST_CASE("Value::native_function()") {
 TEST_CASE("Instruction::LoadValue()") {
     auto bc = Instruction::LoadValue(1, Value::null());
     REQUIRE(bc.destination == 1);
-    REQUIRE(bc.arg1.as_value().is_null());
+    REQUIRE(bc.arg1.as<Value>().is_null());
 }

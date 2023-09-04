@@ -2,18 +2,28 @@
 
 #include "./Value.hpp"
 #include "./Opcodes.hpp"
+#include <type_traits>
+
 namespace djs {
     using RegisterIndex = size_t;
+
+    template <typename T>
+    concept IsOperand =
+        std::is_same_v<T, Value> || std::is_same_v<T, RegisterIndex>;
 
     /// @brief An instruction can have 0-2 Value, Register operands.
     ///        This class represents a common representation for these.
     struct Operand {
     public:
-        auto as_value() const -> Value {
-            return _o.value;
-        }
-        auto as_register_index() const -> RegisterIndex {
-            return _o.reg;
+        template <IsOperand T>
+        auto as() const -> T {
+            if constexpr (std::is_same_v<T, Value>) {
+                return static_cast<Value>(_o.value);
+            } else if constexpr(std::is_same_v<T, RegisterIndex>) {
+                return static_cast<RegisterIndex>(_o.reg);
+            } else {
+                static_assert(false, "T must be a Value or RegisterIndex");
+            }
         }
     private:
         const union _O {
