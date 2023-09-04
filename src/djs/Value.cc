@@ -3,19 +3,19 @@
 namespace djs {
 
 auto Value::undefined() -> Value {
-    return { Kind::Undefined, 0 };
+    return { Type::Undefined, 0 };
 }
 
 auto Value::is_undefined() const -> bool {
-    return kind == Kind::Undefined;
+    return type == Type::Undefined;
 }
 
 auto Value::null() -> Value {
-    return { Kind::Null, 0 };
+    return { Type::Null, 0 };
 }
 
 auto Value::is_null() const -> bool {
-    return kind == Kind::Null;
+    return type == Type::Null;
 }
 
 };

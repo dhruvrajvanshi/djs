@@ -6,7 +6,7 @@
 #include <djs/Forward.hpp>
 
 namespace djs {
-    enum class ValueKind {
+    enum class ValueType {
         Undefined,
         Null,
         NativeFunction,
@@ -16,8 +16,8 @@ namespace djs {
     class Value {
 
     private:
-        using Kind = ValueKind;
-        const Kind kind;
+        using Type = ValueType;
+        const Type type;
         const union As {
             // Void is not allowed here
             uint8_t undefined;
@@ -26,8 +26,8 @@ namespace djs {
         } as;
 
         template<typename T>
-        Value(Kind kind, T as) : kind(kind), as(static_cast<As>(as)) {};
-        explicit Value(NativeFunction as) : kind(Kind::NativeFunction), as({ .native_function = as }) {};
+        Value(Type type, T as) : type(type), as(static_cast<As>(as)) {};
+        explicit Value(NativeFunction as) : type(Type::NativeFunction), as({ .native_function = as }) {};
 
     public:
 
