@@ -1,7 +1,7 @@
 #pragma once
 
 #include "./Value.hpp"
-
+#include "./Opcodes.hpp"
 namespace djs {
     using RegisterIndex = size_t;
 
@@ -42,19 +42,25 @@ namespace djs {
     };
 
     struct Instruction {
+        #define OPCODE_1(name, arg1) name,
+        #define OPCODE_2(name, arg1, arg2) name,
         enum class Opcode {
-            LoadValue,
-            Plus,
+            EACH_OPCODE(OPCODE_1, OPCODE_2)
         };
+        #undef OPCODE_1
+        #undef OPCODE_2
 
         const Opcode opcode;
         const RegisterIndex destination;
         const Operand arg1;
         const Operand arg2;
 
-        /// Factory functions for constructing opcodes
-        #define OPCODE_1(name, op, arg_type) \
-            static Instruction [[clang::mustuse]] ##name(RegisterIndex destination, arg_type value) { \
+        /// Generate Factory functions for constructing opcodes
+        /// auto Bytecode::LoadValue(Value) -> Instruction
+        /// ... and so on for each bytecode
+
+        #define OPCODE_1(op, arg_type) \
+            static Instruction op(RegisterIndex destination, arg_type value) { \
             return { \
                 Opcode::##op, \
                 destination, \
@@ -62,8 +68,8 @@ namespace djs {
                 nullptr \
             }; \
         }
-        #define OPCODE_2(name, op, arg1_type, arg2_type) \
-            static Instruction [[clang::mustuse]] ##name(RegisterIndex destination, arg1_type arg1, arg2_type arg2) { \
+        #define OPCODE_2(op, arg1_type, arg2_type) \
+            static Instruction op(RegisterIndex destination, arg1_type arg1, arg2_type arg2) { \
             return { \
                 Opcode::##op, \
                 destination, \
@@ -71,11 +77,9 @@ namespace djs {
                 arg2 \
             }; \
         }
-
-        OPCODE_1(load_value, LoadValue, Value)
-        OPCODE_2(plus, Plus, RegisterIndex, RegisterIndex)
-
+        EACH_OPCODE(OPCODE_1, OPCODE_2)
         #undef OPCODE_1
+        #undef OPCODE_2
     };
 
 
