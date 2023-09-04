@@ -1,12 +1,14 @@
 #include <cstdint>
 
 namespace djs {
+    enum class ValueKind {
+        Undefined,
+        Null
+    };
     class Value {
+
     private:
-        enum class Kind {
-            Undefined,
-            Null
-        };
+        using Kind = ValueKind;
         const Kind kind;
         const union As {
             // Void is not allowed here
