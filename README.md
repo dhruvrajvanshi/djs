@@ -14,6 +14,6 @@ cmake -S . -B build --preset conan-default
 cmake --build build --config Release
 
 # Run tests
-./build/test/Release/hello_test
+./build/test/Release/main_test
 
 ```

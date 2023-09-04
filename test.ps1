@@ -1,4 +1,4 @@
-cmake --build build --config Release
+cmake --build build --config Debug
 
 # Run tests
-./build/test/Release/hello_test
+./build/test/Debug/main_test
