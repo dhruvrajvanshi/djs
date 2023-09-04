@@ -9,4 +9,5 @@ add_executable(
 target_link_libraries(
   main_test
   Catch2::Catch2WithMain
+  djs
 )
