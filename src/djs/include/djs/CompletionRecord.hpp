@@ -1,5 +1,5 @@
 #pragma once
-#include "djs/Forward.hpp"
+#include "./Forward.hpp"
 #include <optional>
 
 namespace djs {

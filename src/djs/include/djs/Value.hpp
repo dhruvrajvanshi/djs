@@ -3,7 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <span>
-#include <djs/Forward.hpp>
+#include "./Forward.hpp"
 
 namespace djs {
     enum class ValueType {
