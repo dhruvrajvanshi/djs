@@ -1,7 +1,7 @@
 #pragma once
-#include "./Bytecode.hpp"
 #include "./CompletionRecord.hpp"
 #include "./Function.hpp"
+#include "./Instruction.hpp"
 #include "./Value.hpp"
 #include <stack>
 

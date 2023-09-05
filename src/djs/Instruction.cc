@@ -1,4 +1,4 @@
-#include "djs/Bytecode.hpp"
+#include "djs/Instruction.hpp"
 
 auto std::to_string(djs::Instruction::Opcode opcode) -> std::string {
   using O = djs::Instruction::Opcode;

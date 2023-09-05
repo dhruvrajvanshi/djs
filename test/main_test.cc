@@ -1,6 +1,6 @@
-#include "djs/Bytecode.hpp"
 #include "djs/CompletionRecord.hpp"
 #include "djs/Function.hpp"
+#include "djs/Instruction.hpp"
 #include "djs/VM.hpp"
 #include "djs/Value.hpp"
 #include <catch2/catch_test_macros.hpp>

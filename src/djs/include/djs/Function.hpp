@@ -1,6 +1,6 @@
 #pragma once
-#include "./Bytecode.hpp"
 #include "./Common.hpp"
+#include "./Instruction.hpp"
 
 #include <string>
 #include <vector>
