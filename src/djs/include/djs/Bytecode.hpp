@@ -80,6 +80,8 @@ struct Instruction {
 #undef GEN_FACTORY_2
 };
 
+using Opcode = Instruction::Opcode;
+
 } // namespace djs
 
 namespace std {
