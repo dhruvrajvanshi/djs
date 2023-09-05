@@ -10,6 +10,7 @@ class VM {
 public:
   VM();
   auto execute(const Function &) -> CompletionRecord;
+  ~VM();
 
 private:
   struct CallFrame {
@@ -28,12 +29,20 @@ private:
       return *this;
     }
   };
+  Vec<Value> gc_roots;
   // Instructions are const, the pointer can be updated update
   const Instruction *instruction_pointer = nullptr;
   std::stack<CallFrame> call_stack;
 
   auto advance_instruction_pointer() -> Instruction;
   auto dispatch(Instruction) -> std::optional<CompletionRecord>;
+
+  auto run_gc() -> void;
+
+public:
+  // Abstract Operations
+  // https://262.ecma-international.org/14.0/#sec-makebasicobject
+  auto MakeBasicObject() -> Value;
 };
 
 } // namespace djs

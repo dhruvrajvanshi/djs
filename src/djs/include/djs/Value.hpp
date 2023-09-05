@@ -47,6 +47,11 @@ public:
   static auto native_function(NativeFunction f) -> Value {
     return Value{Type::NativeFunction, {.native_function = f}};
   }
+
+  auto as_object() -> Object * {
+    assert(type == Type::Object, "as_object called on non object value");
+    return as.object;
+  }
 };
 static_assert(std::is_copy_assignable_v<Value>);
 static_assert(std::is_copy_constructible_v<Value>);

@@ -1,3 +1,10 @@
+#include "./CompletionRecord.hpp"
+#include "./Value.hpp"
+
 namespace djs {
-struct Object {};
+
+struct Object {
+  Value prototype;
+  bool extensible;
+};
 } // namespace djs

@@ -1,6 +1,7 @@
 #include "djs/VM.hpp"
 #include "djs/Common.hpp"
 #include "djs/CompletionRecord.hpp"
+#include "djs/Object.hpp"
 #include "djs/Opcodes.hpp"
 
 namespace djs {
@@ -66,5 +67,23 @@ auto VM::dispatch(Instruction instruction) -> std::optional<CompletionRecord> {
     panic("Unhandled opcode: " + std::to_string(instruction.opcode));
   }
 }
+
+auto VM::MakeBasicObject() -> Value {
+  auto obj = new Object{.prototype = Value::null(), .extensible = true};
+  auto value = Value::object(obj);
+  gc_roots.push_back(value);
+  return value;
+}
+
+auto VM::run_gc() -> void {
+  for (auto value : gc_roots) {
+    if (value.is_object()) {
+      auto object = value.as_object();
+      delete object;
+    }
+  }
+}
+
+VM::~VM() { run_gc(); }
 
 } // namespace djs

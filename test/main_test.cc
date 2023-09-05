@@ -38,3 +38,8 @@ TEST_CASE("VM::execute(const Function&)") {
 
   REQUIRE(result.value_or_panic().is_null());
 }
+
+TEST_CASE("VM::MakeBasicObject()") {
+  auto vm = VM{};
+  REQUIRE(vm.MakeBasicObject().is_object());
+}

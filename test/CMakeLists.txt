@@ -11,3 +11,5 @@ target_link_libraries(
   Catch2::Catch2WithMain
   djs
 )
+target_compile_options(main_test PRIVATE -fsanitize=address)
+target_link_options(main_test PRIVATE -fsanitize=address)
