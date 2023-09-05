@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 
 /**
  * @brief Helper macro for generating code for each opcode
@@ -29,6 +28,6 @@
         }
     }
  */
-#define EACH_OPCODE(OPCODE_1, OPCODE_2) \
-    OPCODE_1(LoadValue, Value) \
-    OPCODE_2(Plus, RegisterIndex, RegisterIndex)
+#define EACH_OPCODE(OPCODE_1, OPCODE_2)                                        \
+  OPCODE_1(LoadValue, Value)                                                   \
+  OPCODE_2(Plus, RegisterIndex, RegisterIndex)
