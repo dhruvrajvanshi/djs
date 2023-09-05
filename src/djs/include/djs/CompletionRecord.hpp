@@ -17,7 +17,7 @@ struct CompletionRecord {
   }
 
   auto value_or_panic() -> Value {
-    assert<void>(value.has_value(), "No value");
+    assert(value.has_value(), "No value");
     return value.value();
   }
 
@@ -33,8 +33,8 @@ private:
     case Kind::Normal:
     case Kind::Throw:
     case Kind::Return:
-      assert<void>(value.has_value(),
-                   "Normal/Throw/Return completions must contain a value");
+      assert(value.has_value(),
+             "Normal/Throw/Return completions must contain a value");
       break;
     case Kind::Break:
     case Kind::Continue:

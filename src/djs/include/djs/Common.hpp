@@ -31,14 +31,14 @@ concept Printable = requires(T t, std::ostream s) {
   { (s << t) };
 };
 
-template <typename T, Printable M> auto panic(M s) -> T {
+template <Printable M> [[noreturn]] auto panic(M s) -> void {
   std::cerr << "PANIC: " << s << std::endl;
   std::abort();
 }
 
-template <typename T, Printable M> auto assert(bool condition, M message) -> T {
+template <Printable M> auto assert(bool condition, M message) -> void {
   if (!condition) {
-    return panic<T>(message);
+    panic(message);
   }
 }
 
