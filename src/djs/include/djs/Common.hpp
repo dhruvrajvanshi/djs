@@ -18,7 +18,7 @@ template <typename T, Printable M> auto panic(M s) -> T {
 }
 
 template <typename T, Printable M> auto assert(bool condition, M message) -> T {
-  if (condition) {
+  if (!condition) {
     return panic<T>(message);
   }
 }
