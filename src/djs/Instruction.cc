@@ -1,4 +1,5 @@
 #include "djs/Instruction.hpp"
+#include "djs/Common.hpp"
 
 auto std::to_string(djs::Instruction::Opcode opcode) -> std::string {
   using O = djs::Instruction::Opcode;
@@ -9,4 +10,5 @@ auto std::to_string(djs::Instruction::Opcode opcode) -> std::string {
   switch (opcode) { EACH_OPCODE(GEN_CASE, GEN_CASE) }
 
 #undef GEN_CASE
+  djs::panic("Unreachable");
 }
