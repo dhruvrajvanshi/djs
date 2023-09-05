@@ -8,10 +8,10 @@
 namespace djs {
 
 struct BasicBlock {
-  const std::vector<Instruction> instructions;
+  std::vector<Instruction> instructions;
 };
 struct Function {
-  const std::vector<BasicBlock> basic_blocks;
+  std::vector<BasicBlock> basic_blocks;
 };
 
 }; // namespace djs

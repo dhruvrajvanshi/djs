@@ -25,7 +25,7 @@ public:
   }
 
 private:
-  const union _O {
+  union _O {
     std::nullptr_t null;
     Value value;
     RegisterIndex reg;
