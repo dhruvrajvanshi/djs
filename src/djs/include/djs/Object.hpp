@@ -9,8 +9,8 @@ struct VM;
 using GetPrototypeOfType = CompletionRecord (*)(VM *, Object *);
 struct Object : public GCBase {
   struct Slots {
-    Value prototype;
-    bool extensible;
+    Value Prototype;
+    bool Extensible;
     GetPrototypeOfType GetPrototypeOf;
   };
   static CompletionRecord OrdinaryGetPrototypeOf(VM *, Object *);

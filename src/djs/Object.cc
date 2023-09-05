@@ -4,7 +4,7 @@
 namespace djs {
 
 auto Object::OrdinaryGetPrototypeOf(VM *, Object *obj) -> CompletionRecord {
-  return CompletionRecord::normal(obj->slots.prototype);
+  return CompletionRecord::normal(obj->slots.Prototype);
 }
 
 } // namespace djs
