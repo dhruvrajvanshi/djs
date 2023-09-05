@@ -21,8 +21,6 @@ namespace djs {
                 return static_cast<Value>(_o.value);
             } else if constexpr(std::is_same_v<T, RegisterIndex>) {
                 return static_cast<RegisterIndex>(_o.reg);
-            } else {
-                static_assert(false, "T must be a Value or RegisterIndex");
             }
         }
     private:
