@@ -1,8 +1,9 @@
 #pragma once
-#include "./Forward.hpp"
+#include "./Value.hpp"
 #include <optional>
 
 namespace djs {
+
 struct CompletionRecord {
   enum class Kind { Normal, Return, Throw, Break, Continue };
   const Kind kind;
@@ -12,4 +13,5 @@ struct CompletionRecord {
     return {Kind::Normal, value};
   }
 };
+
 } // namespace djs
