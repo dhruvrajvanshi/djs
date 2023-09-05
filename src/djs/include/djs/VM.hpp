@@ -1,6 +1,7 @@
 #pragma once
 #include "./CompletionRecord.hpp"
 #include "./Function.hpp"
+#include "./GCBase.hpp"
 #include "./Instruction.hpp"
 #include "./Value.hpp"
 #include <stack>
@@ -29,7 +30,7 @@ private:
       return *this;
     }
   };
-  Vec<Value> gc_roots;
+  Vec<GCBase*> gc_roots;
   // Instructions are const, the pointer can be updated update
   const Instruction *instruction_pointer = nullptr;
   std::stack<CallFrame> call_stack;
