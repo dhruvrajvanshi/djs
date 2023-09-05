@@ -1,5 +1,7 @@
 #pragma once
 #include <iostream>
+#include <optional>
+#include <vector>
 
 #define NOCOPY(T)                                                              \
   T(const T &) = delete;                                                       \
@@ -35,4 +37,25 @@ template <typename T, Printable M> auto assert(bool condition, M message) -> T {
     return panic<T>(message);
   }
 }
+
+template <typename T>
+constexpr const bool IsCopyable =
+    std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;
+template <typename T>
+concept Copyable = IsCopyable<T>;
+
+template <typename T>
+constexpr const bool IsMovable =
+    std::is_move_constructible_v<T> && std::is_move_assignable_v<T>;
+
+template <typename T>
+concept Movable = IsMovable<T>;
+
+template <typename T>
+concept CopyableOrMovable = IsMovable<T> || IsCopyable<T>;
+
+template <CopyableOrMovable T> using Vec = std::vector<T>;
+
+template <typename T> using Opt = std::optional<T>;
+
 } // namespace djs

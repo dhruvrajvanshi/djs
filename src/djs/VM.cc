@@ -64,8 +64,8 @@ auto VM::dispatch(Instruction instruction) -> std::optional<CompletionRecord> {
     return CompletionRecord::ret(result);
   } break;
   default:
-    return panic<std::optional<CompletionRecord>>(
-        "Unhandled opcode: " + std::to_string(instruction.opcode));
+    return panic<Opt<CompletionRecord>>("Unhandled opcode: " +
+                                        std::to_string(instruction.opcode));
   }
 }
 

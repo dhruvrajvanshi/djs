@@ -14,10 +14,10 @@ public:
 private:
   struct CallFrame {
     const Function *function;
-    std::vector<Value> locals;
+    Vec<Value> locals;
 
     explicit CallFrame(const Function *function) : function(function) {
-      locals = std::vector<Value>();
+      locals = Vec<Value>();
       locals.reserve(function->local_count);
       locals.assign(function->local_count, Value::undefined());
     }
