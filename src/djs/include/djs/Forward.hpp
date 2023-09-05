@@ -1,6 +1,6 @@
 #pragma once
 namespace djs {
-    class VM;
-    class Value;
-    class CompletionRecord;
-}
+class VM;
+class Value;
+class CompletionRecord;
+} // namespace djs
