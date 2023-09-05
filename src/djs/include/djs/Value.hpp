@@ -1,5 +1,6 @@
 #pragma once
 
+#include "./Common.hpp"
 #include "./Forward.hpp"
 #include <cstdint>
 #include <functional>
@@ -31,6 +32,8 @@ private:
       : type(Type::NativeFunction), as({.native_function = as}){};
 
 public:
+  DEFAULT_CONSTRUCTORS(Value)
+
   static auto undefined() -> Value;
   auto is_undefined() const -> bool;
 

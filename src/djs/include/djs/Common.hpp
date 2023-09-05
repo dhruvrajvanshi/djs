@@ -5,6 +5,13 @@
   T(const T &) = delete;                                                       \
   T &operator=(T) = delete;
 
+#define DEFAULT_CONSTRUCTORS(Value)                                            \
+  Value(const Value &v) = default;                                             \
+  Value &operator=(const Value &) = default;                                   \
+  Value(const Value &&v) = default;                                            \
+  Value &operator=(const Value &&v) = default;                                 \
+  ~Value() = default;
+
 namespace djs {
 
 template <typename T>
