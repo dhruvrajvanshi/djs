@@ -2,6 +2,7 @@
 
 #include "./Opcodes.hpp"
 #include "./Value.hpp"
+#include <string>
 #include <type_traits>
 
 namespace djs {
@@ -80,3 +81,7 @@ struct Instruction {
 };
 
 } // namespace djs
+
+namespace std {
+auto to_string(djs::Instruction::Opcode) -> std::string;
+}
