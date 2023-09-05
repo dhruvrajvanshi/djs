@@ -4,6 +4,7 @@ add_library(
     Value.cc
     VM.cc
     Instruction.cc
+    Object.cc
 )
 target_include_directories(
     djs
