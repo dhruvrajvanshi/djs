@@ -14,6 +14,10 @@
   Value &operator=(const Value &&v) = default;                                 \
   ~Value() = default;
 
+#define DEFAULT_COPY(Value)                                                    \
+  Value(const Value &v) = default;                                             \
+  Value &operator=(const Value &) = default;
+
 #define DEFAULT_MOVE(Value)                                                    \
   Value &operator=(const Value &&v) = default;                                 \
   Value &operator=(const Value &&v) = default;

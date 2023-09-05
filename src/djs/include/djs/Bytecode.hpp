@@ -15,7 +15,6 @@ concept IsOperand =
 /// @brief An instruction can have 0-2 Value, Register operands.
 ///        This class represents a common representation for these.
 struct Operand {
-public:
   template <IsOperand T> auto as() const -> T {
     if constexpr (std::is_same_v<T, Value>) {
       return static_cast<Value>(_o.value);
@@ -29,26 +28,19 @@ private:
     std::nullptr_t null;
     Value value;
     RegisterIndex reg;
-  } _o;
-  // These constructors enable implicit conversion from
-  // raw values to Operands.
-  // e.g.
-  // Value value = ...
-  // Operand value_operand = value
-  // instead of
-  // Operand value_operand = { .value = value }
-  // This is required so that OPCODE_* macros in Instruction class
-  // can initialize Opcodes without having to refer to the union labels.
-  //
-  // They're private, to avoid accidental conversion to
-  // Operand
-  Operand(std::nullptr_t v) : _o({.null = v}) {}
-  Operand(Value v) : _o({.value = v}) {}
-  Operand(RegisterIndex reg) : _o({.reg = reg}) {}
-  // Instruction needs access to these implicit conversion constructors
-  // because OPCODE_* macros rely on these conversions
+  };
+  _O _o;
+
+  Operand(_O o) : _o(o) {}
+
+  static auto make(std::nullptr_t v) -> Operand { return {{.null = v}}; }
+  static auto make(Value v) -> Operand { return {{.value = v}}; }
+  static auto make(RegisterIndex reg) -> Operand { return {{.reg = reg}}; }
+  // because OPCODE_* macros rely on make functions
   friend class Instruction;
 };
+static_assert(IsCopyable<Operand>);
+static_assert(IsMovable<Operand>);
 
 struct Instruction {
 #define OPCODE_1(name, arg1) name,
@@ -57,10 +49,10 @@ struct Instruction {
 #undef OPCODE_1
 #undef OPCODE_2
 
-  const Opcode opcode;
-  const Operand arg0;
-  const Operand arg1;
-  const Operand arg2;
+  Opcode opcode;
+  Operand arg0;
+  Operand arg1;
+  Operand arg2;
 
   /// Generate Factory functions for constructing opcodes
   /// auto Bytecode::LoadValue(Value) -> Instruction
@@ -68,17 +60,21 @@ struct Instruction {
 
 #define GEN_FACTORY_1(op, arg_type)                                            \
   static Instruction op(arg_type value) {                                      \
-    return {Opcode::op, value, nullptr, nullptr};                              \
+    return {Opcode::op, Operand::make(value), Operand::make(nullptr),          \
+            Operand::make(nullptr)};                                           \
   }
 #define GEN_FACTORY_2(op, arg1_type, arg2_type)                                \
   static Instruction op(arg1_type arg1, arg2_type arg2) {                      \
-    return {Opcode::op, arg1, arg2, nullptr};                                  \
+    return {Opcode::op, Operand::make(arg1), Operand::make(arg2),              \
+            Operand::make(nullptr)};                                           \
   }
 
   EACH_OPCODE(GEN_FACTORY_1, GEN_FACTORY_2)
 #undef GEN_FACTORY_1
 #undef GEN_FACTORY_2
 };
+static_assert(IsCopyable<Instruction>);
+static_assert(IsMovable<Instruction>);
 
 using Opcode = Instruction::Opcode;
 
