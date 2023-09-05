@@ -72,7 +72,7 @@ namespace djs {
         #define OPCODE_1(op, arg_type) \
             static Instruction op(RegisterIndex destination, arg_type value) { \
             return { \
-                Opcode::##op, \
+                Opcode::op, \
                 destination, \
                 value, \
                 nullptr \
@@ -81,7 +81,7 @@ namespace djs {
         #define OPCODE_2(op, arg1_type, arg2_type) \
             static Instruction op(RegisterIndex destination, arg1_type arg1, arg2_type arg2) { \
             return { \
-                Opcode::##op, \
+                Opcode::op, \
                 destination, \
                 arg1, \
                 arg2 \
