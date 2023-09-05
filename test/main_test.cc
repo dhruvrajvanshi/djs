@@ -1,5 +1,7 @@
 #include "djs/Bytecode.hpp"
 #include "djs/CompletionRecord.hpp"
+#include "djs/Function.hpp"
+#include "djs/VM.hpp"
 #include "djs/Value.hpp"
 #include <catch2/catch_test_macros.hpp>
 
@@ -23,4 +25,16 @@ TEST_CASE("Instruction::LoadValue()") {
   auto bc = Instruction::LoadValue(1, Value::null());
   REQUIRE(bc.arg0.as<RegisterIndex>() == 1);
   REQUIRE(bc.arg1.as<Value>().is_null());
+}
+
+TEST_CASE("VM::execute(const Function&)") {
+  using I = Instruction;
+  auto bb = BasicBlock{{I::LoadValue(0, Value::null()), I::Return(0)}};
+  auto fn = Function{{bb}, 1};
+
+  auto vm = VM();
+
+  auto result = vm.execute(fn);
+
+  REQUIRE(result.value_or_panic().is_null());
 }

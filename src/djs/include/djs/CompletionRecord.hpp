@@ -12,17 +12,23 @@ struct CompletionRecord {
     return {Kind::Normal, value};
   }
 
+  static auto ret(Value value) -> CompletionRecord {
+    return {Kind::Return, value};
+  }
+
   auto value_or_panic() -> Value {
     assert<void>(value.has_value(), "No value");
     return value.value();
   }
 
+  auto kind() -> Kind { return _kind; }
+
 private:
-  const Kind kind;
+  const Kind _kind;
   const std::optional<Value> value;
 
   CompletionRecord(const Kind &kind, const std::optional<Value> &value)
-      : kind(kind), value(value) {
+      : _kind(kind), value(value) {
     switch (kind) {
     case Kind::Normal:
     case Kind::Throw:

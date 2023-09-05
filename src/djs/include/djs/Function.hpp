@@ -12,6 +12,7 @@ struct BasicBlock {
 };
 struct Function {
   std::vector<BasicBlock> basic_blocks;
+  size_t local_count;
 };
 
 }; // namespace djs

@@ -3,7 +3,7 @@
 
 #define NOCOPY(T)                                                              \
   T(const T &) = delete;                                                       \
-  T &operator=(T) = delete;
+  T &operator=(const T &) = delete;
 
 #define DEFAULT_CONSTRUCTORS(Value)                                            \
   Value(const Value &v) = default;                                             \
@@ -11,6 +11,12 @@
   Value(const Value &&v) = default;                                            \
   Value &operator=(const Value &&v) = default;                                 \
   ~Value() = default;
+
+#define DEFAULT_MOVE(Value)                                                    \
+  Value &operator=(const Value &&v) = default;                                 \
+  Value &operator=(const Value &&v) = default;
+
+#define DEFAULT_DESTRUCTOR(Value) ~Value() = default;
 
 namespace djs {
 
