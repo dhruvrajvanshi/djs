@@ -29,5 +29,5 @@
     }
  */
 #define EACH_OPCODE(OPCODE_1, OPCODE_2)                                        \
-  OPCODE_1(LoadValue, Value)                                                   \
-  OPCODE_2(Plus, RegisterIndex, RegisterIndex)
+  OPCODE_2(LoadValue, RegisterIndex, Value)                                    \
+  OPCODE_1(Return, RegisterIndex)

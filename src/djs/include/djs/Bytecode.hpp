@@ -57,7 +57,7 @@ struct Instruction {
 #undef OPCODE_2
 
   const Opcode opcode;
-  const RegisterIndex destination;
+  const Operand arg0;
   const Operand arg1;
   const Operand arg2;
 
@@ -65,18 +65,18 @@ struct Instruction {
   /// auto Bytecode::LoadValue(Value) -> Instruction
   /// ... and so on for each bytecode
 
-#define OPCODE_1(op, arg_type)                                                 \
-  static Instruction op(RegisterIndex destination, arg_type value) {           \
-    return {Opcode::op, destination, value, nullptr};                          \
+#define GEN_FACTORY_1(op, arg_type)                                            \
+  static Instruction op(arg_type value) {                                      \
+    return {Opcode::op, value, nullptr, nullptr};                              \
   }
-#define OPCODE_2(op, arg1_type, arg2_type)                                     \
-  static Instruction op(RegisterIndex destination, arg1_type arg1,             \
-                        arg2_type arg2) {                                      \
-    return {Opcode::op, destination, arg1, arg2};                              \
+#define GEN_FACTORY_2(op, arg1_type, arg2_type)                                \
+  static Instruction op(arg1_type arg1, arg2_type arg2) {                      \
+    return {Opcode::op, arg1, arg2, nullptr};                                  \
   }
-  EACH_OPCODE(OPCODE_1, OPCODE_2)
-#undef OPCODE_1
-#undef OPCODE_2
+
+  EACH_OPCODE(GEN_FACTORY_1, GEN_FACTORY_2)
+#undef GEN_FACTORY_1
+#undef GEN_FACTORY_2
 };
 
 } // namespace djs
