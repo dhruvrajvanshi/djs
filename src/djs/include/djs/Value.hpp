@@ -14,6 +14,7 @@ enum class ValueType {
   NativeFunction,
   Object,
   String,
+  Boolean,
 };
 using NativeFunction = CompletionRecord (*)(VM &, std::span<Value>);
 
@@ -28,6 +29,7 @@ private:
     // Void is not allowed here
     uint8_t undefined;
     uint8_t null;
+    bool boolean;
     NativeFunction native_function;
     Object *object;
     String *string;
@@ -63,6 +65,15 @@ public:
   auto as_string() const -> String * {
     ASSERT(type == Type::String, "as_string called on a non string type: {}");
     return as.string;
+  }
+
+  static auto boolean(bool b) -> Value {
+    return {Type::Boolean, {.boolean = b}};
+  }
+  auto is_boolean() const -> bool { return type == Type::Boolean; }
+  auto as_boolean() const -> bool {
+    ASSERT(type == Type::Boolean, "as_boolean called on non boolean type");
+    return as.boolean;
   }
 };
 static_assert(std::is_copy_assignable_v<Value>);
