@@ -1,6 +1,7 @@
 #include "djs/CompletionRecord.hpp"
 #include "djs/Function.hpp"
 #include "djs/Instruction.hpp"
+#include "djs/String.hpp"
 #include "djs/VM.hpp"
 #include "djs/Value.hpp"
 #include <catch2/catch_test_macros.hpp>
@@ -15,7 +16,7 @@ TEST_CASE("Value::null()") {
 }
 
 TEST_CASE("Value::native_function()") {
-  Value::native_function([](auto&, auto) -> auto {
+  Value::native_function([](auto &, auto) -> auto {
     return CompletionRecord::normal(Value::undefined());
   });
 }
@@ -41,4 +42,12 @@ TEST_CASE("VM::execute(const Function&)") {
 TEST_CASE("VM::MakeBasicObject()") {
   auto vm = VM{};
   REQUIRE(vm.MakeBasicObject().is_object());
+}
+
+TEST_CASE("Value::string()") {
+  String s = String(std::string("foo"));
+  auto value = Value::string(&s);
+  REQUIRE(value.is_string());
+  REQUIRE(value.as_string() == &s);
+  REQUIRE(value.as_string()->contents == "foo");
 }
