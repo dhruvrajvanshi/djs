@@ -11,7 +11,7 @@ namespace djs {
 class VM {
 public:
   VM();
-  auto execute(const Function &) -> CompletionRecord;
+  auto execute(const Function &) -> ValueCompletionRecord;
   ~VM();
 
 private:
@@ -44,7 +44,7 @@ private:
   std::stack<CallFrame> call_stack;
 
   auto advance_instruction_pointer() -> Instruction;
-  auto dispatch(Instruction) -> std::optional<CompletionRecord>;
+  auto dispatch(Instruction) -> std::optional<ValueCompletionRecord>;
 
   auto run_gc() -> void;
 

@@ -18,7 +18,7 @@ TEST_CASE("Value::null()") {
 
 TEST_CASE("Value::native_function()") {
   Value::native_function([](auto &, auto) -> auto {
-    return CompletionRecord::normal(Value::undefined());
+    return ValueCompletionRecord::normal(Value::undefined());
   });
 }
 

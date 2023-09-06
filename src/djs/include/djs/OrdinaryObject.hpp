@@ -7,8 +7,8 @@ namespace djs {
 struct Object;
 class VM;
 
-CompletionRecord OrdinaryGetPrototypeOf(VM *, Object *);
-CompletionRecord OrdinaryGetOwnProperty(VM *, Object *, PropertyKey);
-CompletionRecord OrdinaryIsExtensible(VM *, Object *);
+ValueCompletionRecord OrdinaryGetPrototypeOf(VM *, Object *);
+ValueCompletionRecord OrdinaryGetOwnProperty(VM *, Object *, PropertyKey);
+ValueCompletionRecord OrdinaryIsExtensible(VM *, Object *);
 
 } // namespace djs

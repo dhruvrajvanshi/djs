@@ -5,18 +5,18 @@
 
 namespace djs {
 
-struct CompletionRecord {
+template <typename T> struct CompletionRecord {
   enum class Kind { Normal, Return, Throw, Break, Continue };
 
-  static auto normal(Value value) -> CompletionRecord {
+  static auto normal(T value) -> CompletionRecord<T> {
     return {Kind::Normal, value};
   }
 
-  static auto ret(Value value) -> CompletionRecord {
+  static auto ret(T value) -> CompletionRecord<T> {
     return {Kind::Return, value};
   }
 
-  auto value_or_panic() -> Value {
+  auto value_or_panic() -> T {
     ASSERT(value.has_value(), "No value");
     return value.value();
   }
@@ -25,9 +25,9 @@ struct CompletionRecord {
 
 private:
   const Kind _kind;
-  const std::optional<Value> value;
+  const std::optional<T> value;
 
-  CompletionRecord(const Kind &kind, const std::optional<Value> &value)
+  CompletionRecord(const Kind &kind, const std::optional<T> &value)
       : _kind(kind), value(value) {
     switch (kind) {
     case Kind::Normal:
@@ -42,5 +42,7 @@ private:
     }
   };
 };
+
+using ValueCompletionRecord = CompletionRecord<Value>;
 
 } // namespace djs

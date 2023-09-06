@@ -16,7 +16,7 @@ enum class ValueType {
   String,
   Boolean,
 };
-using NativeFunction = CompletionRecord (*)(VM &, std::span<Value>);
+using NativeFunction = ValueCompletionRecord (*)(VM &, std::span<Value>);
 
 struct Object;
 struct String;
