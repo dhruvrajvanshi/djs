@@ -15,8 +15,8 @@ TEST_CASE("Value::null()") {
 }
 
 TEST_CASE("Value::native_function()") {
-  Value::native_function([](VM &, std::span<Value> args) -> CompletionRecord {
-    return {CompletionRecord::normal(Value::undefined())};
+  Value::native_function([](auto&, auto) -> auto {
+    return CompletionRecord::normal(Value::undefined());
   });
 }
 
