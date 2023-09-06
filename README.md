@@ -1,3 +1,7 @@
+# Dhruv's JS Interpreter
+I'm writing this JS interpreter for experimentation, but mostly for fun :)
+This is hopelessly incomplete :^)
+
 ## Running tests
 ```sh
 # Setup conan profile
