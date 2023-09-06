@@ -1,6 +1,8 @@
 #include "./CompletionRecord.hpp"
 #include "./GCBase.hpp"
+#include "./PropertyDescriptor.hpp"
 #include "./Value.hpp"
+#include <unordered_map>
 
 namespace djs {
 
@@ -16,6 +18,8 @@ struct Object : public GCBase {
   static CompletionRecord OrdinaryGetPrototypeOf(VM *, Object *);
 
   Slots slots;
+  std::unordered_map<std::string, PropertyDescriptor> properties;
+
   Object(Slots slots) : slots(slots) {}
 
   ~Object() {}

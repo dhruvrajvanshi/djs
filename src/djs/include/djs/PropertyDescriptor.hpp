@@ -5,10 +5,10 @@
 namespace djs {
 
 struct PropertyDescriptor {
-  Value Get;
-  Value Set;
-  Opt<Value> Value;
-  bool Writable;
+  Value get;
+  Value set;
+  Opt<Value> value;
+  bool writable;
 };
 
 } // namespace djs
