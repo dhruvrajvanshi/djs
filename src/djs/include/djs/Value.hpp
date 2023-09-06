@@ -33,7 +33,7 @@ private:
     String *string;
   } as;
   Type type;
-  Value(Type type, As as) : type(type), as(as) {}
+  Value(Type type, As as) : as(as), type(type) {}
 
 public:
   static auto undefined() -> Value;
