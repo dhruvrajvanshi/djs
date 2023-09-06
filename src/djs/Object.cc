@@ -7,7 +7,8 @@ auto Object::Slots::ordinary() -> Slots {
   return {.Prototype = Value::null(),
           .Extensible = true,
           .GetPrototypeOf = OrdinaryGetPrototypeOf,
-          .GetOwnProperty = OrdinaryGetOwnProperty};
+          .GetOwnProperty = OrdinaryGetOwnProperty,
+          .IsExtensible = OrdinaryIsExtensible};
 }
 
 } // namespace djs

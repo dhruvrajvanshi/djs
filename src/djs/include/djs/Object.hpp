@@ -11,6 +11,7 @@ class VM;
 
 using GetPrototypeOfType = decltype(OrdinaryGetPrototypeOf) *;
 using GetOwnPropertyType = decltype(OrdinaryGetOwnProperty) *;
+using IsExtensibleType = decltype(OrdinaryIsExtensible) *;
 
 struct Object : public GCBase {
   struct Slots {
@@ -18,6 +19,7 @@ struct Object : public GCBase {
     bool Extensible;
     GetPrototypeOfType GetPrototypeOf;
     GetOwnPropertyType GetOwnProperty;
+    IsExtensibleType IsExtensible;
 
     static auto ordinary() -> Slots;
   };
@@ -30,5 +32,4 @@ struct Object : public GCBase {
   ~Object() {}
 };
 
-namespace abstract_ops {}
 } // namespace djs
