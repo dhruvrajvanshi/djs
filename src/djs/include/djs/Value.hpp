@@ -16,7 +16,7 @@ enum class ValueType {
 };
 using NativeFunction = CompletionRecord (*)(VM &, std::span<Value>);
 
-class Object;
+struct Object;
 
 class Value {
 

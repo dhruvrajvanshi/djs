@@ -4,7 +4,7 @@
 
 namespace djs {
 
-struct VM;
+class VM;
 
 using GetPrototypeOfType = CompletionRecord (*)(VM *, Object *);
 struct Object : public GCBase {
