@@ -8,16 +8,18 @@ concept Printable = requires(T t, std::ostream s) {
   { (s << t) };
 };
 
-template <Printable M> [[noreturn]] auto PANIC(M s) -> void {
-  std::cerr << "PANIC: " << s << std::endl;
-  std::abort();
-}
+#define PANIC(s)                                                               \
+  do {                                                                         \
+    std::cerr << "PANIC: " << __FILE__ << ": " << s << std::endl;              \
+    std::abort();                                                              \
+  } while (false);
 
-template <Printable M> auto ASSERT(bool condition, M message) -> void {
-  if (!condition) {
-    PANIC(message);
-  }
-}
+#define ASSERT(condition, message)                                             \
+  do {                                                                         \
+    if (!(condition)) {                                                        \
+      PANIC(message);                                                          \
+    }                                                                          \
+  } while (false);
 
 namespace djs {
 template <typename T>
