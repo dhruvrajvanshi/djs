@@ -1,6 +1,7 @@
 #pragma once
 #include <iostream>
 #include <optional>
+#include <unordered_map>
 #include <vector>
 
 template <typename T>
@@ -41,5 +42,12 @@ concept CopyableOrMovable = IsMovable<T> || IsCopyable<T>;
 template <CopyableOrMovable T> using Vec = std::vector<T>;
 
 template <typename T> using Opt = std::optional<T>;
+
+template <typename T>
+concept Hashable = requires(T a) {
+  { std::hash<T>{}(a) } -> std::convertible_to<std::size_t>;
+};
+
+template <Hashable K, typename V> using HashMap = std::unordered_map<K, V>;
 
 } // namespace djs
