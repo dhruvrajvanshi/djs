@@ -7,13 +7,6 @@
   T(const T &) = delete;                                                       \
   T &operator=(const T &) = delete;
 
-#define DEFAULT_CONSTRUCTORS(Value)                                            \
-  Value(const Value &v) = default;                                             \
-  Value &operator=(const Value &) = default;                                   \
-  Value(const Value &&v) = default;                                            \
-  Value &operator=(const Value &&v) = default;                                 \
-  ~Value() = default;
-
 #define DEFAULT_COPY(Value)                                                    \
   Value(const Value &v) = default;                                             \
   Value &operator=(const Value &) = default;
