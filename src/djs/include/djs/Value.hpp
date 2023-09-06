@@ -22,7 +22,6 @@ class Value {
 
 private:
   using Type = ValueType;
-  Type type;
   union As {
     // Void is not allowed here
     uint8_t undefined;
@@ -30,6 +29,7 @@ private:
     NativeFunction native_function;
     Object *object;
   } as;
+  Type type;
   Value(Type type, As as) : type(type), as(as) {}
 
 public:
