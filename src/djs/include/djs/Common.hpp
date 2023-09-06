@@ -3,20 +3,6 @@
 #include <optional>
 #include <vector>
 
-#define DELETE_COPY(T)                                                         \
-  T(const T &) = delete;                                                       \
-  T &operator=(const T &) = delete;
-
-#define DEFAULT_COPY(Value)                                                    \
-  Value(const Value &v) = default;                                             \
-  Value &operator=(const Value &) = default;
-
-#define DEFAULT_MOVE(Value)                                                    \
-  Value &operator=(const Value &&v) = default;                                 \
-  Value &operator=(const Value &&v) = default;
-
-#define DEFAULT_DESTRUCTOR(Value) ~Value() = default;
-
 template <typename T>
 concept Printable = requires(T t, std::ostream s) {
   { (s << t) };

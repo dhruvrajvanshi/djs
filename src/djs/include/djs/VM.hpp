@@ -24,16 +24,19 @@ private:
       locals.assign(function->local_count, Value::undefined());
     }
 
-    DELETE_COPY(CallFrame)
-
-    CallFrame &operator=(CallFrame &that) {
+    CallFrame &operator=(CallFrame &&that) noexcept {
       function = that.function;
       locals = std::move(that.locals);
       return *this;
     }
+
+    CallFrame(CallFrame &&that) noexcept { *this = std::move(that); }
   };
   static_assert(!std::is_copy_assignable_v<CallFrame>);
   static_assert(!std::is_copy_constructible_v<CallFrame>);
+  static_assert(std::is_move_constructible_v<CallFrame>);
+  static_assert(std::is_move_assignable_v<CallFrame>);
+
   Vec<GCBase *> gc_roots;
   // Instructions are const, the pointer can be updated update
   const Instruction *instruction_pointer = nullptr;
