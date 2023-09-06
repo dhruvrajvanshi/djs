@@ -12,6 +12,15 @@ struct PropertyKey {
   explicit PropertyKey(Value value) : value(value) {
     ASSERT(value.is_string(), "PropertyKey must be a string");
   }
+
+  auto operator==(const PropertyKey &that) const -> bool {
+    ASSERT(value.is_string(), "PropertyKey must be a string");
+    if (!that.value.is_string()) {
+      return false;
+    }
+    return this->value.as_string()->contents ==
+           that.value.as_string()->contents;
+  }
 };
 
 } // namespace djs

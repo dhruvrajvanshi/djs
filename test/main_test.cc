@@ -1,6 +1,7 @@
 #include "djs/CompletionRecord.hpp"
 #include "djs/Function.hpp"
 #include "djs/Instruction.hpp"
+#include "djs/Object.hpp"
 #include "djs/String.hpp"
 #include "djs/VM.hpp"
 #include "djs/Value.hpp"
@@ -50,4 +51,14 @@ TEST_CASE("Value::string()") {
   REQUIRE(value.is_string());
   REQUIRE(value.as_string() == &s);
   REQUIRE(value.as_string()->contents == "foo");
+}
+
+TEST_CASE("OrdinaryGetOwnProperty returns null when property doesn't exist") {
+  auto vm = VM{};
+  auto obj = vm.MakeBasicObject().as_object();
+  auto &slots = obj->slots;
+  auto completion =
+      slots.GetOwnProperty(&vm, obj, PropertyKey(vm.make_string("foo")));
+
+  REQUIRE(completion.value_or_panic().is_undefined());
 }

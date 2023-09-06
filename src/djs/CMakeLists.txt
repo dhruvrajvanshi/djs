@@ -6,6 +6,7 @@ add_library(
     Instruction.cc
     Object.cc
     GCBase.cc
+    OrdinaryObject.cc
 )
 target_include_directories(
     djs

@@ -69,9 +69,7 @@ auto VM::dispatch(Instruction instruction) -> std::optional<CompletionRecord> {
 }
 
 auto VM::MakeBasicObject() -> Value {
-  auto obj = new Object({.Prototype = Value::null(),
-                         .Extensible = true,
-                         .GetPrototypeOf = Object::OrdinaryGetPrototypeOf});
+  auto obj = new Object(Object::Slots::ordinary());
   gc_roots.push_back(obj);
   return Value::object(obj);
 }

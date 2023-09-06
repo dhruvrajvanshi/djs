@@ -3,8 +3,11 @@
 
 namespace djs {
 
-auto Object::OrdinaryGetPrototypeOf(VM *, Object *obj) -> CompletionRecord {
-  return CompletionRecord::normal(obj->slots.Prototype);
+auto Object::Slots::ordinary() -> Slots {
+  return {.Prototype = Value::null(),
+          .Extensible = true,
+          .GetPrototypeOf = OrdinaryGetPrototypeOf,
+          .GetOwnProperty = OrdinaryGetOwnProperty};
 }
 
 } // namespace djs

@@ -3,6 +3,7 @@
 #include "./Function.hpp"
 #include "./GCBase.hpp"
 #include "./Instruction.hpp"
+#include "./String.hpp"
 #include "./Value.hpp"
 #include <stack>
 
@@ -51,6 +52,14 @@ public:
   // Abstract Operations
   // https://262.ecma-international.org/14.0/#sec-makebasicobject
   auto MakeBasicObject() -> Value;
+
+  // End abstract operations
+
+  auto make_string(StringLike auto s) -> Value {
+    auto str = new String(s);
+    gc_roots.push_back(str);
+    return Value::string(str);
+  }
 };
 
 } // namespace djs

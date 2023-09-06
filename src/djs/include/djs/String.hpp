@@ -7,7 +7,7 @@ namespace djs {
 struct String : public GCBase {
   std::string contents;
 
-  String(std::string contents) : contents(std::move(contents)) {}
+  String(StringLike auto contents) : contents(std::move(contents)) {}
   ~String() {}
 };
 
