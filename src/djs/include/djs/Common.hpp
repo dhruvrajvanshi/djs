@@ -24,24 +24,25 @@
 
 #define DEFAULT_DESTRUCTOR(Value) ~Value() = default;
 
-namespace djs {
-
 template <typename T>
 concept Printable = requires(T t, std::ostream s) {
   { (s << t) };
 };
 
-template <Printable M> [[noreturn]] auto panic(M s) -> void {
+template <Printable M> [[noreturn]] auto PANIC(M s) -> void {
   std::cerr << "PANIC: " << s << std::endl;
   std::abort();
 }
 
-template <Printable M> auto assert(bool condition, M message) -> void {
+template <Printable M> auto ASSERT(bool condition, M message) -> void {
   if (!condition) {
-    panic(message);
+    PANIC(message);
   }
 }
 
+
+
+namespace djs {
 template <typename T>
 constexpr const bool IsCopyable =
     std::is_copy_constructible_v<T> && std::is_copy_assignable_v<T>;

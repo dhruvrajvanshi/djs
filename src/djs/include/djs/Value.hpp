@@ -49,7 +49,7 @@ public:
   }
 
   auto as_object() -> Object * {
-    assert(type == Type::Object, "as_object called on non object value");
+    ASSERT(type == Type::Object, "as_object called on non object value");
     return as.object;
   }
 };
