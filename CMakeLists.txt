@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 
 if(MSVC)
+  add_compile_options(/W4)
 else()
   add_compile_options(-Wall -Werror)
 endif()
