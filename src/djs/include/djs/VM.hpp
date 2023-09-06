@@ -24,13 +24,17 @@ private:
       locals.assign(function->local_count, Value::undefined());
     }
 
+    DELETE_COPY(CallFrame)
+
     CallFrame &operator=(CallFrame &that) {
       function = that.function;
       locals = std::move(that.locals);
       return *this;
     }
   };
-  Vec<GCBase*> gc_roots;
+  static_assert(!std::is_copy_assignable_v<CallFrame>);
+  static_assert(!std::is_copy_constructible_v<CallFrame>);
+  Vec<GCBase *> gc_roots;
   // Instructions are const, the pointer can be updated update
   const Instruction *instruction_pointer = nullptr;
   std::stack<CallFrame> call_stack;
