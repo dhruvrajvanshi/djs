@@ -3,7 +3,7 @@
 #include <optional>
 #include <vector>
 
-#define NOCOPY(T)                                                              \
+#define DELETE_COPY(T)                                                         \
   T(const T &) = delete;                                                       \
   T &operator=(const T &) = delete;
 
@@ -32,8 +32,6 @@ template <Printable M> auto ASSERT(bool condition, M message) -> void {
     PANIC(message);
   }
 }
-
-
 
 namespace djs {
 template <typename T>
