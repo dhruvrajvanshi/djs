@@ -48,6 +48,16 @@ concept Hashable = requires(T a) {
   { std::hash<T>{}(a) } -> std::convertible_to<std::size_t>;
 };
 
-template <Hashable K, typename V> using HashMap = std::unordered_map<K, V>;
+template <typename T, typename U>
+concept EqComparable = requires(T t, U u) {
+  { t == u } -> std::convertible_to<bool>;
+};
+
+template <typename K, typename V>
+  requires Hashable<K> && EqComparable<K, K>
+using HashMap = std::unordered_map<K, V>;
+
+template <typename T>
+concept StringLike = std::is_convertible_v<T, std::string_view>;
 
 } // namespace djs
