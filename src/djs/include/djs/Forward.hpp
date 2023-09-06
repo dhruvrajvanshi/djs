@@ -2,5 +2,5 @@
 namespace djs {
 class VM;
 class Value;
-class CompletionRecord;
+struct CompletionRecord;
 } // namespace djs

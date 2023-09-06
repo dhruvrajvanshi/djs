@@ -37,7 +37,7 @@ private:
   static auto make(Value v) -> Operand { return {{.value = v}}; }
   static auto make(RegisterIndex reg) -> Operand { return {{.reg = reg}}; }
   // because OPCODE_* macros rely on make functions
-  friend class Instruction;
+  friend struct Instruction;
 };
 static_assert(IsCopyable<Operand>);
 static_assert(IsMovable<Operand>);
