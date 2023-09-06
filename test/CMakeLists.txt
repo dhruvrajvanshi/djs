@@ -14,6 +14,6 @@ target_link_libraries(
 
 if(MSVC)
 else()
-  target_compile_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=leak)
-  target_link_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=leak)
+  target_compile_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=leak -fsanitize=address)
+  target_link_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=leak -fsanitize=address)
 endif()
