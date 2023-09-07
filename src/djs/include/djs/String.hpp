@@ -5,10 +5,13 @@
 namespace djs {
 
 struct String : public GCBase {
-  std::string contents;
-
   String(StringLike auto contents) : contents(std::move(contents)) {}
   ~String() {}
+
+  auto text() -> std::string_view { return std::string_view(contents); }
+
+private:
+  std::string contents;
 };
 
 } // namespace djs

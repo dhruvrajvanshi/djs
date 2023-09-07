@@ -13,6 +13,7 @@ class VM;
 using GetPrototypeOfType = decltype(OrdinaryGetPrototypeOf) *;
 using GetOwnPropertyType = decltype(OrdinaryGetOwnProperty) *;
 using IsExtensibleType = decltype(OrdinaryIsExtensible) *;
+using DefineOwnPropertyType = decltype(OrdinaryDefineOwnProperty) *;
 
 struct Object : public GCBase {
   struct Slots {
@@ -20,6 +21,7 @@ struct Object : public GCBase {
     bool Extensible;
     GetPrototypeOfType GetPrototypeOf;
     GetOwnPropertyType GetOwnProperty;
+    DefineOwnPropertyType DefineOwnProperty;
     IsExtensibleType IsExtensible;
 
     static auto ordinary() -> Slots;
@@ -33,8 +35,11 @@ struct Object : public GCBase {
   ~Object() {}
 
   auto GetPrototypeOf(VM *) -> CompletionRecord<Value>;
-  auto GetOwnProperty(VM *, PropertyKey) -> CompletionRecord<Value>;
+  auto GetOwnProperty(VM *, PropertyKey)
+      -> CompletionRecord<Opt<PropertyDescriptor>>;
   auto IsExtensible(VM *) -> CompletionRecord<bool>;
+  auto DefineOwnProperty(VM *, PropertyKey, PropertyDescriptor)
+      -> CompletionRecord<bool>;
 };
 
 } // namespace djs

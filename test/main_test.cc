@@ -50,7 +50,7 @@ TEST_CASE("Value::string()") {
   auto value = Value::string(&s);
   REQUIRE(value.is_string());
   REQUIRE(value.as_string() == &s);
-  REQUIRE(value.as_string()->contents == "foo");
+  REQUIRE(value.as_string()->text() == "foo");
 }
 
 TEST_CASE("OrdinaryGetOwnProperty returns null when property doesn't exist") {
@@ -60,5 +60,5 @@ TEST_CASE("OrdinaryGetOwnProperty returns null when property doesn't exist") {
   auto completion =
       slots.GetOwnProperty(&vm, obj, PropertyKey(vm.make_string("foo")));
 
-  REQUIRE(completion.value_or_panic().is_undefined());
+  REQUIRE_FALSE(completion.value_or_panic().has_value());
 }

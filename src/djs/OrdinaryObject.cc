@@ -9,15 +9,21 @@ auto OrdinaryGetPrototypeOf(VM *, Object *obj) -> ValueCompletionRecord {
 }
 
 auto OrdinaryGetOwnProperty(VM *, Object *obj, PropertyKey property_key)
-    -> ValueCompletionRecord {
+    -> CompletionRecord<Opt<PropertyDescriptor>> {
   if (!obj->properties.contains(property_key)) {
-    return ValueCompletionRecord::normal(Value::undefined());
+    return CompletionRecord<Opt<PropertyDescriptor>>::normal(
+        Opt<PropertyDescriptor>{});
   }
   PANIC("Unimplemented");
 }
 
 auto OrdinaryIsExtensible(VM *, Object *obj) -> CompletionRecord<bool> {
   return CompletionRecord<bool>::normal(obj->slots.Extensible);
+}
+
+auto OrdinaryDefineOwnProperty(VM *, Object *, PropertyKey, PropertyDescriptor)
+    -> CompletionRecord<bool> {
+  PANIC("Unimplemented")
 }
 
 } // namespace djs

@@ -3,6 +3,7 @@
 #include "./Common.hpp"
 #include "./String.hpp"
 #include "./Value.hpp"
+#include <string_view>
 
 namespace djs {
 
@@ -18,8 +19,7 @@ struct PropertyKey {
     if (!that.value.is_string()) {
       return false;
     }
-    return this->value.as_string()->contents ==
-           that.value.as_string()->contents;
+    return this->value.as_string()->text() == that.value.as_string()->text();
   }
 };
 
@@ -28,6 +28,6 @@ struct PropertyKey {
 template <> struct std::hash<djs::PropertyKey> {
   auto operator()(const djs::PropertyKey &key) const -> std::size_t {
     ASSERT(key.value.is_string(), "PropertyKey must be a string");
-    return std::hash<string>()(key.value.as_string()->contents);
+    return std::hash<std::string_view>()(key.value.as_string()->text());
   }
 };
