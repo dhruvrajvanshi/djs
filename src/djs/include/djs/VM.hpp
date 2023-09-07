@@ -60,6 +60,13 @@ public:
     gc_roots.push_back(str);
     return Value::string(str);
   }
+
+  auto make_array() -> Value;
+
+private:
+  template <typename T = Object>
+    requires std::is_assignable_v<Object, T>
+  auto make_basic_object() -> T *;
 };
 
 } // namespace djs

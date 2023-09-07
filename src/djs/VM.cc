@@ -1,4 +1,5 @@
 #include "djs/VM.hpp"
+#include "djs/Array.hpp"
 #include "djs/Common.hpp"
 #include "djs/CompletionRecord.hpp"
 #include "djs/Object.hpp"
@@ -69,9 +70,20 @@ auto VM::dispatch(Instruction instruction)
   }
 }
 
-auto VM::MakeBasicObject() -> Value {
-  auto obj = new Object(Object::Slots::ordinary());
+template <typename T>
+  requires std::is_assignable_v<Object, T>
+auto VM::make_basic_object() -> T * {
+  auto obj = new T(Object::Slots::ordinary());
   gc_roots.push_back(obj);
+  return obj;
+}
+
+auto VM::MakeBasicObject() -> Value {
+  return Value::object(make_basic_object<Object>());
+}
+
+auto VM::make_array() -> Value {
+  auto obj = VM::make_basic_object<Array>();
   return Value::object(obj);
 }
 
