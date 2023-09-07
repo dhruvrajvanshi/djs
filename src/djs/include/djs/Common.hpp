@@ -2,6 +2,7 @@
 #include <iostream>
 #include <optional>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
 template <typename T>
@@ -9,11 +10,13 @@ concept Printable = requires(T t, std::ostream s) {
   { (s << t) };
 };
 
-#define PANIC(s)                                                               \
+#define PANIC(s, ...)                                                          \
   do {                                                                         \
-    std::cerr << "PANIC: " << __FILE__ << ": " << s << std::endl;              \
+    std::cerr << "PANIC: " << __FILE__ << "(" << __LINE__                      \
+              << "): " << s __VA_OPT__(<<) __VA_ARGS__ << std::endl;           \
     std::abort();                                                              \
-  } while (false);
+  } while (false);                                                             \
+  std::unreachable();
 
 #define ASSERT(condition, message)                                             \
   do {                                                                         \
@@ -21,6 +24,8 @@ concept Printable = requires(T t, std::ostream s) {
       PANIC(message);                                                          \
     }                                                                          \
   } while (false);
+
+#define TODO(name) PANIC("Unimplemented: ", name)
 
 namespace djs {
 template <typename T>
