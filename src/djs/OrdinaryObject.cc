@@ -16,8 +16,8 @@ auto OrdinaryGetOwnProperty(VM *, Object *obj, PropertyKey property_key)
   PANIC("Unimplemented");
 }
 
-auto OrdinaryIsExtensible(VM *, Object *obj) -> ValueCompletionRecord {
-  return ValueCompletionRecord::normal(Value::boolean(obj->slots.Extensible));
+auto OrdinaryIsExtensible(VM *, Object *obj) -> CompletionRecord<bool> {
+  return CompletionRecord<bool>::normal(obj->slots.Extensible);
 }
 
 } // namespace djs

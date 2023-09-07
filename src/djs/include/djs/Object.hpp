@@ -30,6 +30,10 @@ struct Object : public GCBase {
   explicit Object(Slots slots) : slots(slots), properties{} {}
 
   ~Object() {}
+
+  auto GetPrototypeOf(VM *) -> CompletionRecord<Value>;
+  auto GetOwnProperty(VM *, PropertyKey) -> CompletionRecord<Value>;
+  auto IsExtensible(VM *) -> CompletionRecord<bool>;
 };
 
 } // namespace djs

@@ -9,6 +9,6 @@ class VM;
 
 ValueCompletionRecord OrdinaryGetPrototypeOf(VM *, Object *);
 ValueCompletionRecord OrdinaryGetOwnProperty(VM *, Object *, PropertyKey);
-ValueCompletionRecord OrdinaryIsExtensible(VM *, Object *);
+CompletionRecord<bool> OrdinaryIsExtensible(VM *, Object *);
 
 } // namespace djs
