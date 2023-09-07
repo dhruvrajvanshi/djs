@@ -1,15 +1,23 @@
-enable_testing()
+Include(FetchContent)
 
-find_package(Catch2 3 REQUIRED)
+FetchContent_Declare(
+  Catch2
+  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+  GIT_TAG        v3.4.0)
+
+FetchContent_MakeAvailable(Catch2)
 
 add_executable(
   main_test
   main_test.cc
 )
-target_link_libraries(
-  main_test
-  Catch2::Catch2WithMain
-  djs
+target_link_libraries(main_test PRIVATE Catch2::Catch2WithMain djs)
+
+enable_testing()
+
+add_test(
+  NAME main_test
+  COMMAND $<TARGET_FILE:main_test> --success
 )
 
 if(MSVC)
