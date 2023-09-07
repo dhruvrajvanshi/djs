@@ -60,4 +60,11 @@ using HashMap = std::unordered_map<K, V>;
 template <typename T>
 concept StringLike = std::is_convertible_v<T, std::string_view>;
 
+template <typename T>
+using RValueOf = typename std::remove_reference<T>::type &&;
+
+template <typename T> constexpr auto move(T &&t) noexcept -> RValueOf<T> {
+  return static_cast<RValueOf<T>>(t);
+}
+
 } // namespace djs
