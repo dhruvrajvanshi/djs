@@ -5,9 +5,9 @@
 
 namespace djs {
 
+enum class CompletionKind { Normal, Return, Throw, Break, Continue };
 template <typename T> struct CompletionRecord {
-  enum class Kind { Normal, Return, Throw, Break, Continue };
-
+  using Kind = CompletionKind;
   static auto normal(T value) -> CompletionRecord<T> {
     return {Kind::Normal, value};
   }
