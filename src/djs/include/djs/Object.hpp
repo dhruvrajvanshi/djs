@@ -1,3 +1,4 @@
+#pragma once
 #include "./CompletionRecord.hpp"
 #include "./GCBase.hpp"
 #include "./OrdinaryObject.hpp"
