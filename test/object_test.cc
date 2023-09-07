@@ -9,8 +9,8 @@ TEST_CASE("Object.DefineOwnProperty") {
   auto key_foo = PropertyKey(vm.make_string("foo"));
   auto completion = obj->DefineOwnProperty(&vm, key_foo,
                                            PropertyDescriptor{
-                                               .get = Value::null(),
-                                               .set = Value::null(),
+                                               .get = std::nullopt,
+                                               .set = std::nullopt,
                                                .value = vm.make_string("bar"),
                                                .writable = false,
                                            });
