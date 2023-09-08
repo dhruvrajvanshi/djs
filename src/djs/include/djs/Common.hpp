@@ -13,7 +13,7 @@ concept Printable = requires(T t, std::ostream s) {
 #define PANIC(s, ...)                                                          \
   do {                                                                         \
     std::cerr << "PANIC: " << __FILE__ << "(" << __LINE__                      \
-              << "): " << s __VA_OPT__(<<) __VA_ARGS__ << std::endl;           \
+              << "): " << s __VA_ARGS__ << std::endl;                          \
     std::abort();                                                              \
   } while (false);                                                             \
   std::unreachable();
