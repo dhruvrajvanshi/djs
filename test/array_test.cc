@@ -1,9 +1,9 @@
 #include "djs.hpp"
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
 
 using namespace djs;
-TEST_CASE("Array creation") {
+TEST(VM, make_array) {
   auto vm = VM();
   auto arr = vm.make_array().as_object();
-  REQUIRE(dynamic_cast<Array *>(arr) != nullptr);
+  ASSERT_NE(dynamic_cast<Array *>(arr), nullptr);
 }

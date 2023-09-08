@@ -1,26 +1,19 @@
 Include(FetchContent)
-
 FetchContent_Declare(
-  Catch2
-  GIT_REPOSITORY https://github.com/catchorg/Catch2.git
-  GIT_TAG        v3.4.0)
-
-FetchContent_MakeAvailable(Catch2)
-
+  googletest
+  GIT_REPOSITORY https://github.com/google/googletest.git
+  GIT_TAG        v1.14.0)
+FetchContent_MakeAvailable(googletest)
 add_executable(
   main_test
   main_test.cc
   array_test.cc
   object_test.cc
 )
-target_link_libraries(main_test PRIVATE Catch2::Catch2WithMain djs)
+target_link_libraries(main_test PRIVATE djs GTest::gtest_main)
+include(GoogleTest)
 
-enable_testing()
-
-add_test(
-  NAME main_test
-  COMMAND $<TARGET_FILE:main_test> --success
-)
+gtest_discover_tests(main_test)
 
 if(MSVC)
 else()

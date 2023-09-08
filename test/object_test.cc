@@ -1,8 +1,10 @@
 #include "djs.hpp"
-#include <catch2/catch_test_macros.hpp>
+#include <gtest/gtest.h>
+
+#define REQUIRE(x) EXPECT_TRUE(x)
 
 using namespace djs;
-TEST_CASE("Object.DefineOwnProperty") {
+TEST(Object, DefineOwnProperty) {
   auto vm = VM();
   auto *obj = vm.MakeBasicObject().as_object();
 
@@ -24,5 +26,5 @@ TEST_CASE("Object.DefineOwnProperty") {
   REQUIRE(descriptor.value.has_value());
   auto value = *descriptor.value;
 
-  REQUIRE(value.as_string()->text() == "bar");
+  ASSERT_EQ(value.as_string()->text(), "bar");
 }
