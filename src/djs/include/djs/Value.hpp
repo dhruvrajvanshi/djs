@@ -19,6 +19,7 @@ enum class ValueType {
 using NativeFunction = ValueCompletionRecord (*)(VM &, std::span<Value>);
 
 struct Object;
+struct Function;
 struct String;
 
 class Value {
@@ -53,9 +54,11 @@ public:
     return Value{Type::NativeFunction, {.native_function = f}};
   }
 
-  auto as_object() -> Object * {
+  template <typename T> auto as_object() -> T * {
     ASSERT(type == Type::Object, "as_object called on non object value");
-    return as.object;
+    auto *t = dynamic_cast<T *>(this->as.object);
+    ASSERT(t != nullptr, typeid(T).name());
+    return t;
   }
 
   static auto string(String *str) -> Value {

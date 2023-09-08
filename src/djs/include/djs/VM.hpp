@@ -64,6 +64,7 @@ public:
   }
 
   auto make_array() -> Value;
+  auto make_function() -> Value;
 
 private:
   template <typename T = Object>

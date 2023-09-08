@@ -56,7 +56,7 @@ TEST(Value, CanCreateString) {
 
 TEST(GetOwnProperty, ReturnsNullWhenPropertyDoesntExist) {
   auto vm = VM{};
-  auto obj = vm.MakeBasicObject().as_object();
+  auto obj = vm.MakeBasicObject().as_object<Object>();
   auto &slots = obj->slots;
   auto completion =
       slots.GetOwnProperty(&vm, obj, PropertyKey(vm.make_string("foo")));

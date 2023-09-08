@@ -11,12 +11,16 @@ namespace djs {
 struct BasicBlock {
   Vec<Instruction> instructions;
 };
-struct Function : Object {
-  Vec<BasicBlock> basic_blocks;
-  size_t local_count;
+struct Function : public Object {
+  Vec<BasicBlock> basic_blocks{};
+  size_t local_count = 0;
   Function(Vec<BasicBlock> blocks, size_t local_count)
       : Object(function_slots()), basic_blocks(std::move(blocks)),
         local_count(local_count) {}
+
+  Function() : Object(function_slots()){};
+
+  auto Call(VM *, Value thisArg, Value arguments) -> Value;
 
 private:
   static auto function_slots() -> Slots {

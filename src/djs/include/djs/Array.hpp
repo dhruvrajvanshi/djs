@@ -5,9 +5,12 @@
 namespace djs {
 
 struct Array : public Object {
-  Vec<Value> values;
+  Vec<Value> values{};
 
-  Array(Slots slots) : Object(std::move(slots)){};
+  Array() : Object(array_slots()){};
+
+private:
+  static auto array_slots() -> Slots { return Slots::ordinary(); }
 };
 
 } // namespace djs

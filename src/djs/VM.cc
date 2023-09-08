@@ -73,17 +73,24 @@ auto VM::dispatch(Instruction instruction)
 template <typename T>
   requires std::is_assignable_v<Object, T>
 auto VM::make_basic_object() -> T * {
-  auto obj = new T(Object::Slots::ordinary());
+  auto obj = new T();
   gc_roots.push_back(obj);
   return obj;
 }
 
 auto VM::MakeBasicObject() -> Value {
-  return Value::object(make_basic_object<Object>());
+  auto obj = make_basic_object<Object>();
+  obj->slots = Object::Slots::ordinary();
+  return Value::object(obj);
 }
 
 auto VM::make_array() -> Value {
-  auto obj = VM::make_basic_object<Array>();
+  auto obj = make_basic_object<Array>();
+  return Value::object(obj);
+}
+
+auto VM::make_function() -> Value {
+  auto obj = make_basic_object<Function>();
   return Value::object(obj);
 }
 

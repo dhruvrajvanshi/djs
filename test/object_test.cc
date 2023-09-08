@@ -6,7 +6,7 @@
 using namespace djs;
 TEST(Object, DefineOwnProperty) {
   auto vm = VM();
-  auto *obj = vm.MakeBasicObject().as_object();
+  auto *obj = vm.MakeBasicObject().as_object<Object>();
 
   auto key_foo = PropertyKey(vm.make_string("foo"));
   auto completion = obj->DefineOwnProperty(&vm, key_foo,

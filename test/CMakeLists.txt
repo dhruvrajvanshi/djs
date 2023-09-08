@@ -8,6 +8,7 @@ add_executable(
   main_test
   main_test.cc
   array_test.cc
+  function_test.cc
   object_test.cc
 )
 target_link_libraries(main_test PRIVATE djs GTest::gtest_main)

@@ -1,13 +1,14 @@
 
 add_library(
     djs
-    Value.cc
-    VM.cc
+    Array.cc
+    GCBase.cc
+    Function.cc
     Instruction.cc
     Object.cc
-    GCBase.cc
     OrdinaryObject.cc
-    Array.cc
+    Value.cc
+    VM.cc
 )
 target_include_directories(
     djs
