@@ -14,7 +14,7 @@ auto VM::execute(const Function &function) -> ValueCompletionRecord {
   ASSERT(function.basic_blocks[0].instructions.size() > 0, "Empty BasicBlock");
 
   instruction_pointer = &function.basic_blocks[0].instructions[0];
-  call_stack.push(CallFrame(&function));
+  call_stack.push(ExecutionContext(&function));
   while (!call_stack.empty()) {
     auto instruction = advance_instruction_pointer();
     auto dispatch_result_opt = dispatch(instruction);

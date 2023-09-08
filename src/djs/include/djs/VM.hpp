@@ -15,33 +15,35 @@ public:
   ~VM();
 
 private:
-  struct CallFrame {
+  struct ExecutionContext {
     const Function *function;
     Vec<Value> locals;
 
-    explicit CallFrame(const Function *function) : function(function) {
+    explicit ExecutionContext(const Function *function) : function(function) {
       locals = Vec<Value>();
       locals.reserve(function->local_count);
       locals.assign(function->local_count, Value::undefined());
     }
 
-    CallFrame &operator=(CallFrame &&that) noexcept {
+    ExecutionContext &operator=(ExecutionContext &&that) noexcept {
       function = that.function;
       locals = std::move(that.locals);
       return *this;
     }
 
-    CallFrame(CallFrame &&that) noexcept { *this = std::move(that); }
+    ExecutionContext(ExecutionContext &&that) noexcept {
+      *this = std::move(that);
+    }
   };
-  static_assert(!std::is_copy_assignable_v<CallFrame>);
-  static_assert(!std::is_copy_constructible_v<CallFrame>);
-  static_assert(std::is_move_constructible_v<CallFrame>);
-  static_assert(std::is_move_assignable_v<CallFrame>);
+  static_assert(!std::is_copy_assignable_v<ExecutionContext>);
+  static_assert(!std::is_copy_constructible_v<ExecutionContext>);
+  static_assert(std::is_move_constructible_v<ExecutionContext>);
+  static_assert(std::is_move_assignable_v<ExecutionContext>);
 
   Vec<GCBase *> gc_roots;
   // Instructions are const, the pointer can be updated update
   const Instruction *instruction_pointer = nullptr;
-  std::stack<CallFrame> call_stack;
+  std::stack<ExecutionContext> call_stack;
 
   auto advance_instruction_pointer() -> Instruction;
   auto dispatch(Instruction) -> std::optional<ValueCompletionRecord>;
