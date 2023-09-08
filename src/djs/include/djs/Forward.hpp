@@ -2,6 +2,6 @@
 namespace djs {
 class VM;
 class Value;
-template <typename T> struct CompletionRecord;
-using ValueCompletionRecord = CompletionRecord<Value>;
+template <typename T> struct Completion;
+using ValueCompletionRecord = Completion<Value>;
 } // namespace djs

@@ -1,5 +1,5 @@
 #pragma once
-#include "./CompletionRecord.hpp"
+#include "./Completion.hpp"
 #include "./Function.hpp"
 #include "./GCBase.hpp"
 #include "./Instruction.hpp"

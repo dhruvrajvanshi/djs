@@ -1,6 +1,6 @@
 #pragma once
 
-#include "./CompletionRecord.hpp"
+#include "./Completion.hpp"
 #include "./PropertyDescriptor.hpp"
 #include "./PropertyKey.hpp"
 
@@ -9,10 +9,10 @@ struct Object;
 class VM;
 
 ValueCompletionRecord OrdinaryGetPrototypeOf(VM *, Object *);
-CompletionRecord<Opt<PropertyDescriptor>> OrdinaryGetOwnProperty(VM *, Object *,
-                                                                 PropertyKey);
-CompletionRecord<bool> OrdinaryIsExtensible(VM *, Object *);
-CompletionRecord<bool> OrdinaryDefineOwnProperty(VM *, Object *, PropertyKey,
-                                                 PropertyDescriptor);
+Completion<Opt<PropertyDescriptor>> OrdinaryGetOwnProperty(VM *, Object *,
+                                                           PropertyKey);
+Completion<bool> OrdinaryIsExtensible(VM *, Object *);
+Completion<bool> OrdinaryDefineOwnProperty(VM *, Object *, PropertyKey,
+                                           PropertyDescriptor);
 
 } // namespace djs

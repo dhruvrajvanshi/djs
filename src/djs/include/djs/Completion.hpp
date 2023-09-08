@@ -14,22 +14,18 @@
 namespace djs {
 
 enum class CompletionKind { Normal, Return, Throw, Break, Continue };
-template <typename T> struct CompletionRecord {
+template <typename T> struct Completion {
   using Kind = CompletionKind;
 
-  CompletionRecord(T value)
+  Completion(T value)
       : _kind(Kind::Normal), value(std::move(value)),
         abrupt_value(std::nullopt) {}
 
-  CompletionRecord(Kind kind, Opt<T> value, Opt<Value> abrupt_value)
+  Completion(Kind kind, Opt<T> value, Opt<Value> abrupt_value)
       : _kind(kind), value(value), abrupt_value(abrupt_value) {}
-  static auto normal(T value) -> CompletionRecord<T> {
-    return {Kind::Normal, value};
-  }
+  static auto normal(T value) -> Completion<T> { return {Kind::Normal, value}; }
 
-  static auto ret(T value) -> CompletionRecord<T> {
-    return {Kind::Return, value};
-  }
+  static auto ret(T value) -> Completion<T> { return {Kind::Return, value}; }
 
   auto value_or_panic() -> T {
     ASSERT(value.has_value(), "No value");
@@ -42,7 +38,7 @@ template <typename T> struct CompletionRecord {
 
   /// @brief  Return a copy of  this abrupt completion record
   ///         as a CompletionRecord<U>. Panics if the record is not abrupt.
-  template <typename U> auto copy_abrupt_as() -> CompletionRecord<U> {
+  template <typename U> auto copy_abrupt_as() -> Completion<U> {
     ASSERT(is_abrupt(), "copy_abrupt_as called on a normal completion");
     switch (_kind) {
     case Kind::Break:
@@ -67,7 +63,7 @@ private:
   std::optional<T> value;
   std::optional<Value> abrupt_value;
 
-  CompletionRecord(const Kind &kind, const std::optional<T> &value)
+  Completion(const Kind &kind, const std::optional<T> &value)
       : _kind(kind), value(value), abrupt_value(Opt<Value>{}) {
     switch (kind) {
     case Kind::Normal:
@@ -83,10 +79,10 @@ private:
   };
 };
 
-auto make_normal(auto t) -> CompletionRecord<decltype(t)> {
-  return CompletionRecord<decltype(t)>(t);
+auto make_normal(auto t) -> Completion<decltype(t)> {
+  return Completion<decltype(t)>(t);
 }
 
-using ValueCompletionRecord = CompletionRecord<Value>;
+using ValueCompletionRecord = Completion<Value>;
 
 } // namespace djs

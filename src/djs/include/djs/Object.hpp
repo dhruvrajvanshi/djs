@@ -1,5 +1,5 @@
 #pragma once
-#include "./CompletionRecord.hpp"
+#include "./Completion.hpp"
 #include "./GCBase.hpp"
 #include "./OrdinaryObject.hpp"
 #include "./PropertyDescriptor.hpp"
@@ -34,12 +34,11 @@ struct Object : public GCBase {
 
   ~Object() {}
 
-  auto GetPrototypeOf(VM *) -> CompletionRecord<Value>;
-  auto GetOwnProperty(VM *, PropertyKey)
-      -> CompletionRecord<Opt<PropertyDescriptor>>;
-  auto IsExtensible(VM *) -> CompletionRecord<bool>;
+  auto GetPrototypeOf(VM *) -> Completion<Value>;
+  auto GetOwnProperty(VM *, PropertyKey) -> Completion<Opt<PropertyDescriptor>>;
+  auto IsExtensible(VM *) -> Completion<bool>;
   auto DefineOwnProperty(VM *, PropertyKey, PropertyDescriptor)
-      -> CompletionRecord<bool>;
+      -> Completion<bool>;
 };
 
 } // namespace djs

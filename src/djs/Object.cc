@@ -1,5 +1,5 @@
 #include "djs/Object.hpp"
-#include "djs/CompletionRecord.hpp"
+#include "djs/Completion.hpp"
 
 namespace djs {
 
@@ -12,19 +12,19 @@ auto Object::Slots::ordinary() -> Slots {
           .IsExtensible = OrdinaryIsExtensible};
 }
 
-auto Object::GetPrototypeOf(VM *vm) -> CompletionRecord<Value> {
+auto Object::GetPrototypeOf(VM *vm) -> Completion<Value> {
   return slots.GetPrototypeOf(vm, this);
 }
 auto Object::GetOwnProperty(VM *vm, PropertyKey key)
-    -> CompletionRecord<Opt<PropertyDescriptor>> {
+    -> Completion<Opt<PropertyDescriptor>> {
   return slots.GetOwnProperty(vm, this, key);
 }
 auto Object::DefineOwnProperty(VM *vm, PropertyKey key,
                                PropertyDescriptor descriptor)
-    -> CompletionRecord<bool> {
+    -> Completion<bool> {
   return slots.DefineOwnProperty(vm, this, move(key), move(descriptor));
 }
-auto Object::IsExtensible(VM *vm) -> CompletionRecord<bool> {
+auto Object::IsExtensible(VM *vm) -> Completion<bool> {
   return slots.IsExtensible(vm, this);
 }
 

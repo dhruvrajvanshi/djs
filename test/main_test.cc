@@ -1,4 +1,4 @@
-#include "djs/CompletionRecord.hpp"
+#include "djs/Completion.hpp"
 #include "djs/Function.hpp"
 #include "djs/Instruction.hpp"
 #include "djs/Object.hpp"

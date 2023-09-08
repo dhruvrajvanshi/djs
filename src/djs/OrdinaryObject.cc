@@ -9,7 +9,7 @@ auto OrdinaryGetPrototypeOf(VM *, Object *obj) -> ValueCompletionRecord {
 }
 
 auto OrdinaryGetOwnProperty(VM *, Object *obj, PropertyKey property_key)
-    -> CompletionRecord<Opt<PropertyDescriptor>> {
+    -> Completion<Opt<PropertyDescriptor>> {
   if (!obj->properties.contains(property_key)) {
     return make_normal<Opt<PropertyDescriptor>>(std::nullopt);
   }
@@ -17,8 +17,8 @@ auto OrdinaryGetOwnProperty(VM *, Object *obj, PropertyKey property_key)
   return make_normal<Opt<PropertyDescriptor>>(obj->properties[property_key]);
 }
 
-auto OrdinaryIsExtensible(VM *, Object *obj) -> CompletionRecord<bool> {
-  return CompletionRecord<bool>::normal(obj->slots.Extensible);
+auto OrdinaryIsExtensible(VM *, Object *obj) -> Completion<bool> {
+  return Completion<bool>::normal(obj->slots.Extensible);
 }
 
 /// https://262.ecma-international.org/14.0/#sec-validateandapplypropertydescriptor
@@ -26,10 +26,10 @@ auto ValidateAndApplyPropertyDescriptor(VM *vm, Object *o, PropertyKey k,
                                         bool extensible,
                                         PropertyDescriptor desc,
                                         Opt<PropertyDescriptor> current)
-    -> CompletionRecord<bool> {
+    -> Completion<bool> {
   if (!current) {
     if (!extensible)
-      return CompletionRecord<bool>::normal(false);
+      return Completion<bool>::normal(false);
     if (desc.IsAccessorDescriptor()) {
       TODO("AccessorProperties");
     } else {
@@ -44,7 +44,7 @@ auto ValidateAndApplyPropertyDescriptor(VM *vm, Object *o, PropertyKey k,
 /// https://262.ecma-international.org/14.0/#sec-ordinarydefineownproperty
 auto OrdinaryDefineOwnProperty(VM *vm, Object *self, PropertyKey key,
                                PropertyDescriptor descriptor)
-    -> CompletionRecord<bool> {
+    -> Completion<bool> {
   auto current = self->GetOwnProperty(vm, key);
   RETURN_IF_ABRUPT(current, bool);
 
