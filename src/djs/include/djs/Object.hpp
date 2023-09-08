@@ -14,7 +14,6 @@ using GetPrototypeOfType = decltype(OrdinaryGetPrototypeOf) *;
 using GetOwnPropertyType = decltype(OrdinaryGetOwnProperty) *;
 using IsExtensibleType = decltype(OrdinaryIsExtensible) *;
 using DefineOwnPropertyType = decltype(OrdinaryDefineOwnProperty) *;
-using CallType = Completion<Value> (*)(VM *, Value thisArg, Value arguments);
 
 struct Object : public GCBase {
   struct Slots {
@@ -24,7 +23,6 @@ struct Object : public GCBase {
     GetOwnPropertyType GetOwnProperty;
     DefineOwnPropertyType DefineOwnProperty;
     IsExtensibleType IsExtensible;
-    Opt<CallType> Call;
 
     static auto ordinary() -> Slots;
   };

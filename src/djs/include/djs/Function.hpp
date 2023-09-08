@@ -1,5 +1,6 @@
 #pragma once
 #include "./Common.hpp"
+#include "./Completion.hpp"
 #include "./Instruction.hpp"
 #include "./Object.hpp"
 
@@ -20,7 +21,7 @@ struct Function : public Object {
 
   Function() : Object(function_slots()){};
 
-  auto Call(VM *, Value thisArg, Value arguments) -> Value;
+  auto Call(VM *, Value thisArg, Value arguments) -> Completion<Value>;
 
 private:
   static auto function_slots() -> Slots {

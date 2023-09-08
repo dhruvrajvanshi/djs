@@ -9,7 +9,8 @@ namespace djs {
 
 VM::VM() {}
 
-auto VM::execute(const Function &function) -> ValueCompletionRecord {
+auto VM::execute(const Function &function, Value thisArg, Value args)
+    -> ValueCompletionRecord {
   ASSERT(function.basic_blocks.size() > 0, "Empty function");
   ASSERT(function.basic_blocks[0].instructions.size() > 0, "Empty BasicBlock");
 

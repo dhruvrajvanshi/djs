@@ -13,5 +13,5 @@ TEST(Function, CallingNoArgFunction) {
 
   auto result = fn->Call(&vm, Value::null(), vm.make_array());
 
-  EXPECT_TRUE(result.as_boolean());
+  EXPECT_TRUE(result.value_or_panic().as_boolean());
 }

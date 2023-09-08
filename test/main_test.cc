@@ -36,7 +36,7 @@ TEST(VM, CanExecuteFunctionInstance) {
 
   auto vm = VM();
 
-  auto result = vm.execute(fn);
+  auto result = vm.execute(fn, Value::null(), vm.make_array());
 
   REQUIRE(result.value_or_panic().is_null());
 }

@@ -11,7 +11,8 @@ namespace djs {
 class VM {
 public:
   VM();
-  auto execute(const Function &) -> ValueCompletionRecord;
+  auto execute(const Function &, Value thisArg, Value args)
+      -> ValueCompletionRecord;
   ~VM();
 
 private:
