@@ -18,6 +18,14 @@ gtest_discover_tests(main_test)
 
 if(MSVC)
 else()
-  target_compile_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=leak -fsanitize=address)
-  target_link_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=leak -fsanitize=address)
+  target_compile_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=address)
+  target_link_options(main_test PRIVATE  -fsanitize=undefined -fsanitize=address)
+endif()
+
+include(CheckCXXCompilerFlag)
+check_cxx_compiler_flag(-fsanitize=leak HAS_FSANITIZE_LEAK)
+
+if(HAS_FSANITIZE_LEAK)
+  target_compile_options(main_test PRIVATE  -fsanitize=leak)
+  target_link_options(main_test PRIVATE  -fsanitize=leak)
 endif()
