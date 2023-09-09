@@ -1,0 +1,50 @@
+
+#pragma once
+#include <string>
+#include "../Common.hpp"
+#include "./ParseNode.hpp"
+
+namespace djs {
+struct Expression: public ParseNode {
+  enum Kind {
+    Call,
+    Var
+  };
+  Kind kind;
+
+  template <typename T>
+    requires std::is_assignable_v<Expression, T>
+  auto as() const -> const T& {
+    return dynamic_cast<const T&>(*this);
+  }
+};
+struct CallExpression : public Expression {
+  std::unique_ptr<Expression> callee;
+  Vec<Expression> arguments;
+};
+
+struct VarExpression : public Expression {
+  std::string name;
+};
+
+} // namespace djs
+
+namespace std {
+auto to_string(const djs::Expression& e) -> std::string {
+  switch (e.kind) {
+    using enum djs::Expression::Kind;
+    case Call: {
+      auto& c = e.as<djs::CallExpression>();
+      return "Call"s + "("s + to_string(c.callee) + to_string(c.arguments) + ")";
+    }
+
+    case Var: {
+      auto& c = e.as<djs::VarExpression>();
+      return "Var"s + "("s + to_string(c.name) + ")";
+    }
+
+  }
+}
+} // namespace std
+
+    

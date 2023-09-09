@@ -1,13 +1,14 @@
 #pragma once
-#include "../Common.hpp"
+#include "./ParseNode.hpp"
+#include "./ast.gen.hpp"
 #include <string>
 
 namespace djs {
-class ParseNode {};
-struct Parameter {
+
+struct Parameter : ParseNode {
   std::string name;
 };
-struct ParameterList {
+struct ParameterList : ParseNode {
   Vec<Parameter> names;
 };
 
