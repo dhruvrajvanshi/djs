@@ -8,6 +8,7 @@ add_executable(
   main_test
   main_test.cc
   array_test.cc
+  common_test.cc
   function_test.cc
   object_test.cc
 )

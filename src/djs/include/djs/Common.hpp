@@ -1,5 +1,6 @@
 #pragma once
 #include <iostream>
+#include <memory>
 #include <optional>
 #include <unordered_map>
 #include <utility>
@@ -78,4 +79,35 @@ concept HasToString = requires(const T &t) {
 };
 } // namespace djs
 
-namespace std {} // namespace std
+namespace std {
+
+template <djs::HasToString T>
+auto to_string(const std::optional<T> &o) -> std::string {
+  if (o.has_value()) {
+    return to_string(*o);
+  } else {
+    return "null";
+  }
+}
+
+template <djs::HasToString T>
+auto to_string(const std::vector<T> &v) -> std::string {
+  auto result = "{"s;
+  auto first = true;
+  for (const auto &item : v) {
+    if (first) {
+      result += to_string(item);
+      first = false;
+    } else {
+      result += ", " + to_string(item);
+    }
+  }
+  return result + "}";
+}
+
+template <djs::HasToString T>
+auto to_string(const std::unique_ptr<T> &u) -> std::string {
+  return std::to_string(*u);
+}
+
+} // namespace std
