@@ -22,7 +22,7 @@ auto OrdinaryIsExtensible(VM *, Object *obj) -> Completion<bool> {
 }
 
 /// https://262.ecma-international.org/14.0/#sec-validateandapplypropertydescriptor
-auto ValidateAndApplyPropertyDescriptor(VM *vm, Object *o, PropertyKey k,
+auto ValidateAndApplyPropertyDescriptor(VM *, Object *o, PropertyKey k,
                                         bool extensible,
                                         PropertyDescriptor desc,
                                         Opt<PropertyDescriptor> current)
