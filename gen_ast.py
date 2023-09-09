@@ -10,10 +10,14 @@ statements = {
     ('Opt<std::unique_ptr<Expression>>', 'value'),
   ]
 };
+def to_string_signature(base_name) -> str:
+  return f"auto to_string(const djs::{base_name}& e) -> std::string"
 
 def to_string_impl(base_name, exprs):
     def args_cat(args):
-        return ' + '.join([f'to_string(c.{name})' for (_, name) in args])
+        return ' + '.join([
+            f'to_string(*c.{name})' if ty.startswith('std::unique_ptr') else f'to_string(c.{name})'
+            for (ty, name) in args])
     cases = [
         f"""case {name}: {{
       auto& c = e.as<djs::{name}{base_name}>();
@@ -23,15 +27,14 @@ def to_string_impl(base_name, exprs):
         for name, args in exprs.items()
     ]
     cases = '\n    '.join(cases)
+    sig = to_string_signature(base_name)
     return f"""
-namespace std {{
-auto to_string(const djs::{base_name}& e) -> std::string {{
+{sig} {{
   switch (e.kind) {{
     using enum djs::{base_name}::Kind;
     {cases}
   }}
 }}
-}} // namespace std
 """
 
 
@@ -44,9 +47,24 @@ def main() -> None:
 #include <string>
 #include "../Common.hpp"
 #include "./ParseNode.hpp"
+namespace djs {
 """
   code += gen("Expression", exprs)
   code += gen("Statement", statements)
+
+  code += "} // namespace djs"
+
+  sig1 = to_string_signature("Expression")
+  sig2 = to_string_signature("Statement")
+  code += f"""
+namespace std {{
+{sig1};
+{sig2};
+{to_string_impl("Expression", exprs)}
+
+{to_string_impl("Statement", statements)}
+}} // namespace std
+"""
   print(code)
 
 def gen(base_name, exprs) -> str:
@@ -54,30 +72,53 @@ def gen(base_name, exprs) -> str:
 
     kind_names = ',\n    '.join(exprs.keys())
     return f"""
-namespace djs {{
 struct {base_name}: public ParseNode {{
   enum Kind {{
     {kind_names}
   }};
   Kind kind;
 
+  {base_name}(SourceLocation location): ParseNode(location) {{}}
+
   template <typename T>
     requires std::is_assignable_v<{base_name}, T>
   auto as() const -> const T& {{
-    return dynamic_cast<const T&>(*this);
+    const auto& self = this;
+    return dynamic_cast<const T&>(*self);
   }}
 }};
 {expr_structs}
-}} // namespace djs
-{to_string_impl(base_name, exprs)}
-    """
+"""
 
-def gen_expr_struct(base_name, e, args) -> str:
+def unwrap_unique_ptr(n) -> str:
+  return n.removeprefix('std::unique_ptr<').removesuffix('>')
+
+def is_unique_ptr(n) -> bool:
+  return n.startswith('std::unique_ptr<')
+
+def gen_expr_struct(base_name, e, args: list[(str, str)]) -> str:
     args_fields = ';\n  '.join([
         f'{t} {name}'for t, name in args
     ])
+
+    params = ', '.join(['SourceLocation location'] + [
+        unwrap_unique_ptr(arg_t) + ' ' + arg_n if is_unique_ptr(arg_t)
+        else f'{arg_t} {arg_n}'
+        for (arg_t, arg_n) in args
+    ])
+    field_initializers = ', '.join([f'{base_name}(location)'] + [
+        f'{arg_n}(std::make_unique<' + unwrap_unique_ptr(arg_t) + f'>({arg_n}))' if is_unique_ptr(arg_t)
+        else f'{arg_n}(std::move({arg_n}))'
+        for (arg_t, arg_n) in args
+    ])
+
+    all_args_constructor = f"""
+  {e}{base_name}({params}): {field_initializers} {{}}
+"""
     return f"""struct {e}{base_name} : public {base_name} {{
   {args_fields};
+
+  {all_args_constructor}
 }};
 """
 
