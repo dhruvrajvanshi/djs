@@ -79,7 +79,7 @@ private:
   };
 };
 
-auto make_normal(auto t) -> Completion<decltype(t)> {
+template <typename T> auto make_normal(T t) -> Completion<T> {
   return Completion<decltype(t)>(t);
 }
 
