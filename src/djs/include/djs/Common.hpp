@@ -72,4 +72,24 @@ template <typename T> constexpr auto move(T &&t) noexcept -> RValueOf<T> {
   return static_cast<RValueOf<T>>(t);
 }
 
+template <typename T>
+concept HasToString = requires(const T &t) {
+  { std::to_string(t) } -> std::convertible_to<std::string>;
+};
 } // namespace djs
+
+namespace std {
+template <typename T> auto to_string(const std::vector<T> &ts) -> std::string {
+  std::string result;
+  for (const auto &item : ts) {
+    result += to_string(item);
+  }
+  return result;
+}
+auto to_string(const std::string &s) -> std::string { return s; }
+template <typename T>
+auto to_string(const std::unique_ptr<T> &s) -> std::string {
+  return to_string(*s);
+}
+
+} // namespace std
