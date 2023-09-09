@@ -12,6 +12,8 @@ struct SourceLocation {
 
 struct ParseNode {
   SourceLocation location;
+  ParseNode(SourceLocation location) : location(location){};
+  virtual ~ParseNode(){};
 };
 
 }; // namespace djs
