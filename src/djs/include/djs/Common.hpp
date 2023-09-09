@@ -87,6 +87,15 @@ template <typename T> auto to_string(const std::vector<T> &ts) -> std::string {
   return result;
 }
 auto to_string(const std::string &s) -> std::string { return s; }
+
+template <typename T> auto to_string(const std::optional<T> &t) -> std::string {
+  if (auto &value = t) {
+    return to_string(value);
+  } else {
+    return "null";
+  }
+}
+
 template <typename T>
 auto to_string(const std::unique_ptr<T> &s) -> std::string {
   return to_string(*s);
