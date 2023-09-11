@@ -27,7 +27,7 @@ struct CallExpression : public Expression {
   std::unique_ptr<Expression> callee;
   Vec<Expression> arguments;
 
-  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, Vec<Expression> arguments): Expression(location), callee(callee), arguments(std::move(arguments)) {}
+  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, Vec<Expression> arguments): Expression(location), callee(std::move(callee)), arguments(std::move(arguments)) {}
 };
 
 struct VarExpression : public Expression {
@@ -53,9 +53,9 @@ struct Statement: public ParseNode {
   }
 };
 struct ReturnStatement : public Statement {
-  std::unique_ptr<Expression> value;
+  Opt<std::unique_ptr<Expression>> value;
 
-  ReturnStatement(SourceLocation location, std::unique_ptr<Expression> value): Statement(location), value(std::move(value)) {}
+  ReturnStatement(SourceLocation location, Opt<std::unique_ptr<Expression>> value): Statement(location), value(std::move(value)) {}
 };
 
 } // namespace djs

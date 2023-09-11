@@ -42,9 +42,6 @@ struct {base_name}: public ParseNode {{
 {expr_structs}
 """
 
-def unwrap_unique_ptr(n) -> str:
-  return n.removeprefix('std::unique_ptr<').removesuffix('>')
-
 def is_boxed(annotation) -> bool:
   return hasattr(annotation, '__origin__') and annotation.__origin__ == Box
 
@@ -71,7 +68,7 @@ def annotation_to_cpptype(annotation, unwrap_unique_ptr: bool=False) -> str:
           or annotation.__args__[1] == None.__class__
         ):
         inner = annotation.__args__[0] if annotation.__args__[1] == None.__class__ else annotation.__args__[1]
-        return go(inner)
+        return f'Opt<{go(inner)}>'
       else:
         raise TypeError(annotation)
     else:
@@ -89,9 +86,7 @@ def gen_expr_struct(base_name: str, cls: type) -> str:
     ])
     field_initializers = ', '.join([f'{base_name}(location)'] + [
         f'{arg_n}(std::move({arg_n}))'
-        if not is_boxed(t)
-        else f'{arg_n}({arg_n})'
-        for (arg_n, t) in cls.__annotations__.items()
+        for (arg_n, _) in cls.__annotations__.items()
     ])
 
     all_args_constructor = f"""
