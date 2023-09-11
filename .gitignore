@@ -3,3 +3,4 @@
 /CMakePresets.json
 /out
 /.vscode
+*.pyc

@@ -6,7 +6,6 @@
 #include <string>
 #include "../Common.hpp"
 #include "./ParseNode.hpp"
-
 namespace djs {
 struct Expression: public ParseNode {
   enum Kind {
@@ -15,72 +14,48 @@ struct Expression: public ParseNode {
   };
   Kind kind;
 
+  Expression(SourceLocation location): ParseNode(location) {}
+
   template <typename T>
     requires std::is_assignable_v<Expression, T>
   auto as() const -> const T& {
-    return dynamic_cast<const T&>(*this);
+    const auto& self = this;
+    return dynamic_cast<const T&>(*self);
   }
 };
 struct CallExpression : public Expression {
   std::unique_ptr<Expression> callee;
   Vec<Expression> arguments;
+
+  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, Vec<Expression> arguments): Expression(location), callee(callee), arguments(std::move(arguments)) {}
 };
 
 struct VarExpression : public Expression {
   std::string name;
+
+  VarExpression(SourceLocation location, std::string name): Expression(location), name(std::move(name)) {}
 };
 
-} // namespace djs
 
-namespace std {
-auto to_string(const djs::Expression& e) -> std::string {
-  switch (e.kind) {
-    using enum djs::Expression::Kind;
-    case Call: {
-      auto& c = e.as<djs::CallExpression>();
-      return "Call"s + "("s + to_string(c.callee) + to_string(c.arguments) + ")";
-    }
-
-    case Var: {
-      auto& c = e.as<djs::VarExpression>();
-      return "Var"s + "("s + to_string(c.name) + ")";
-    }
-
-  }
-}
-} // namespace std
-
-    
-namespace djs {
 struct Statement: public ParseNode {
   enum Kind {
     Return
   };
   Kind kind;
 
+  Statement(SourceLocation location): ParseNode(location) {}
+
   template <typename T>
     requires std::is_assignable_v<Statement, T>
   auto as() const -> const T& {
-    return dynamic_cast<const T&>(*this);
+    const auto& self = this;
+    return dynamic_cast<const T&>(*self);
   }
 };
 struct ReturnStatement : public Statement {
-  Opt<std::unique_ptr<Expression>> value;
+  std::unique_ptr<Expression> value;
+
+  ReturnStatement(SourceLocation location, std::unique_ptr<Expression> value): Statement(location), value(std::move(value)) {}
 };
 
 } // namespace djs
-
-namespace std {
-auto to_string(const djs::Statement& e) -> std::string {
-  switch (e.kind) {
-    using enum djs::Statement::Kind;
-    case Return: {
-      auto& c = e.as<djs::ReturnStatement>();
-      return "Return"s + "("s + to_string(c.value) + ")";
-    }
-
-  }
-}
-} // namespace std
-
-    

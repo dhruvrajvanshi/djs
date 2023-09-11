@@ -1,42 +1,5 @@
-exprs = {
-    'Call': [
-        ('std::unique_ptr<Expression>', 'callee'),
-        ('Vec<Expression>', 'arguments')
-    ],
-    'Var': [('std::string', 'name'), ]
-};
-statements = {
-  'Return': [
-    ('Opt<std::unique_ptr<Expression>>', 'value'),
-  ]
-};
-def to_string_signature(base_name) -> str:
-  return f"auto to_string(const djs::{base_name}& e) -> std::string"
-
-def to_string_impl(base_name, exprs):
-    def args_cat(args):
-        return ' + '.join([
-            f'to_string(*c.{name})' if ty.startswith('std::unique_ptr') else f'to_string(c.{name})'
-            for (ty, name) in args])
-    cases = [
-        f"""case {name}: {{
-      auto& c = e.as<djs::{name}{base_name}>();
-      return "{name}"s + "("s + {args_cat(args)} + ")";
-    }}
-"""
-        for name, args in exprs.items()
-    ]
-    cases = '\n    '.join(cases)
-    sig = to_string_signature(base_name)
-    return f"""
-{sig} {{
-  switch (e.kind) {{
-    using enum djs::{base_name}::Kind;
-    {cases}
-  }}
-}}
-"""
-
+from typing import ForwardRef, Union
+from src.djs.include.djs.syntax.ast import Expression, Statement, TreeRoot, Box
 
 def main() -> None:
   code = """
@@ -47,30 +10,19 @@ def main() -> None:
 #include <string>
 #include "../Common.hpp"
 #include "./ParseNode.hpp"
-namespace djs {
-"""
-  code += gen("Expression", exprs)
-  code += gen("Statement", statements)
+namespace djs {"""
+  code += gen(Expression)
+  code += gen(Statement)
 
   code += "} // namespace djs"
 
-  sig1 = to_string_signature("Expression")
-  sig2 = to_string_signature("Statement")
-  code += f"""
-namespace std {{
-{sig1};
-{sig2};
-{to_string_impl("Expression", exprs)}
-
-{to_string_impl("Statement", statements)}
-}} // namespace std
-"""
   print(code)
 
-def gen(base_name, exprs) -> str:
-    expr_structs = '\n'.join([gen_expr_struct(base_name, e, a) for e, a in exprs.items()])
+def gen(base: type[TreeRoot]) -> str:
+    base_name = base.__name__
+    expr_structs = '\n'.join([gen_expr_struct(base_name, c) for c in base.classes()])
 
-    kind_names = ',\n    '.join(exprs.keys())
+    kind_names = ',\n    '.join([ c.__name__ for c in  base.classes() ])
     return f"""
 struct {base_name}: public ParseNode {{
   enum Kind {{
@@ -93,29 +45,59 @@ struct {base_name}: public ParseNode {{
 def unwrap_unique_ptr(n) -> str:
   return n.removeprefix('std::unique_ptr<').removesuffix('>')
 
-def is_unique_ptr(n) -> bool:
-  return n.startswith('std::unique_ptr<')
+def is_boxed(annotation) -> bool:
+  return hasattr(annotation, '__origin__') and annotation.__origin__ == Box
 
-def gen_expr_struct(base_name, e, args: list[(str, str)]) -> str:
+def annotation_to_cpptype(annotation, unwrap_unique_ptr: bool=False) -> str:
+  def go(annotation):
+    if annotation == str:
+      return 'std::string'
+    elif isinstance(annotation, ForwardRef):
+      return go(annotation._evaluate(globals(), locals(), frozenset()))
+    elif isinstance(annotation, type):
+      return annotation.__name__
+    elif hasattr(annotation, '__origin__'):
+      if annotation.__origin__ == Box:
+        if unwrap_unique_ptr:
+          return go(annotation.__args__[0])
+        else:
+          return f'std::unique_ptr<{go(annotation.__args__[0])}>'
+      elif annotation.__origin__ == list:
+        return f'Vec<{annotation.__args__[0]}>'
+      elif annotation.__origin__ == Union \
+        and len(annotation.__args__) == 2 \
+        and (
+          annotation.__args__[0] == None.__class__ \
+          or annotation.__args__[1] == None.__class__
+        ):
+        inner = annotation.__args__[0] if annotation.__args__[1] == None.__class__ else annotation.__args__[1]
+        return go(inner)
+      else:
+        raise TypeError(annotation)
+    else:
+      raise TypeError(annotation)
+  return go(annotation)
+
+def gen_expr_struct(base_name: str, cls: type) -> str:
     args_fields = ';\n  '.join([
-        f'{t} {name}'for t, name in args
+        f'{annotation_to_cpptype(annotation)} {name}' for name, annotation in cls.__annotations__.items()
     ])
 
     params = ', '.join(['SourceLocation location'] + [
-        unwrap_unique_ptr(arg_t) + ' ' + arg_n if is_unique_ptr(arg_t)
-        else f'{arg_t} {arg_n}'
-        for (arg_t, arg_n) in args
+        f'{annotation_to_cpptype(annotation)} {arg_n}'
+        for (arg_n, annotation) in cls.__annotations__.items()
     ])
     field_initializers = ', '.join([f'{base_name}(location)'] + [
-        f'{arg_n}(std::make_unique<' + unwrap_unique_ptr(arg_t) + f'>({arg_n}))' if is_unique_ptr(arg_t)
-        else f'{arg_n}(std::move({arg_n}))'
-        for (arg_t, arg_n) in args
+        f'{arg_n}(std::move({arg_n}))'
+        if not is_boxed(t)
+        else f'{arg_n}({arg_n})'
+        for (arg_n, t) in cls.__annotations__.items()
     ])
 
     all_args_constructor = f"""
-  {e}{base_name}({params}): {field_initializers} {{}}
-"""
-    return f"""struct {e}{base_name} : public {base_name} {{
+  {cls.__name__}{base_name}({params}): {field_initializers} {{}}
+""".strip()
+    return f"""struct {cls.__name__}{base_name} : public {base_name} {{
   {args_fields};
 
   {all_args_constructor}
