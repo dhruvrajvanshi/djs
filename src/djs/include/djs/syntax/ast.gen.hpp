@@ -16,7 +16,7 @@ struct Expression: public ParseNode {
   };
   Kind kind;
 
-  Expression(SourceLocation location): ParseNode(location) {}
+  Expression(SourceLocation location, Kind kind): ParseNode(location), kind(kind) {}
 
   template <typename T>
     requires std::is_assignable_v<Expression, T>
@@ -29,15 +29,15 @@ struct CallExpression : public Expression {
   std::unique_ptr<Expression> callee;
   NodeList<Expression> arguments;
 
-  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, NodeList<Expression> arguments): Expression(location), callee(std::move(callee)), arguments(std::move(arguments)) {}
+  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, NodeList<Expression> arguments): Expression(location, Kind::Call), callee(std::move(callee)), arguments(std::move(arguments)) {}
 
   friend std::ostream& operator<<(std::ostream& os, const CallExpression& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const CallExpression& self) {
-  os << "Call" << "(\n";
-  os << "  " << self.callee << ',';
-  os << "  " << self.arguments << ',';
+  os << "Call" << "(";
+  os << self.callee << ',';
+  os << self.arguments << ',';
   os << ")" << std::endl;
   return os;
 }
@@ -45,14 +45,14 @@ std::ostream& operator<<(std::ostream& os, const CallExpression& self) {
 struct VarExpression : public Expression {
   std::string name;
 
-  VarExpression(SourceLocation location, std::string name): Expression(location), name(std::move(name)) {}
+  VarExpression(SourceLocation location, std::string name): Expression(location, Kind::Var), name(std::move(name)) {}
 
   friend std::ostream& operator<<(std::ostream& os, const VarExpression& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const VarExpression& self) {
-  os << "Var" << "(\n";
-  os << "  " << self.name << ',';
+  os << "Var" << "(";
+  os << self.name << ',';
   os << ")" << std::endl;
   return os;
 }
@@ -72,7 +72,7 @@ struct Statement: public ParseNode {
   };
   Kind kind;
 
-  Statement(SourceLocation location): ParseNode(location) {}
+  Statement(SourceLocation location, Kind kind): ParseNode(location), kind(kind) {}
 
   template <typename T>
     requires std::is_assignable_v<Statement, T>
@@ -84,14 +84,14 @@ struct Statement: public ParseNode {
 struct ReturnStatement : public Statement {
   Opt<std::unique_ptr<Expression>> value;
 
-  ReturnStatement(SourceLocation location, Opt<std::unique_ptr<Expression>> value): Statement(location), value(std::move(value)) {}
+  ReturnStatement(SourceLocation location, Opt<std::unique_ptr<Expression>> value): Statement(location, Kind::Return), value(std::move(value)) {}
 
   friend std::ostream& operator<<(std::ostream& os, const ReturnStatement& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const ReturnStatement& self) {
-  os << "Return" << "(\n";
-  os << "  " << self.value << ',';
+  os << "Return" << "(";
+  os << self.value << ',';
   os << ")" << std::endl;
   return os;
 }

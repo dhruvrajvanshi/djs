@@ -14,9 +14,9 @@ struct NodeList {
 
 template <typename T>
 std::ostream &operator<<(std::ostream &os, const NodeList<T> &l) {
-  os << "{\n";
+  os << "{";
   for (const auto &item : l.items) {
-    os << "  " << item << ",\n";
+    os << item << ", ";
   }
   os << "}";
   return os;

@@ -44,7 +44,7 @@ struct {base_name}: public ParseNode {{
   }};
   Kind kind;
 
-  {base_name}(SourceLocation location): ParseNode(location) {{}}
+  {base_name}(SourceLocation location, Kind kind): ParseNode(location), kind(kind) {{}}
 
   template <typename T>
     requires std::is_assignable_v<{base_name}, T>
@@ -99,7 +99,7 @@ def gen_expr_struct(base_name: str, cls: type) -> str:
         f'{annotation_to_cpptype(annotation)} {arg_n}'
         for (arg_n, annotation) in cls.__annotations__.items()
     ])
-    field_initializers = ', '.join([f'{base_name}(location)'] + [
+    field_initializers = ', '.join([f'{base_name}(location, Kind::{cls.__name__})'] + [
         f'{arg_n}(std::move({arg_n}))'
         for (arg_n, _) in cls.__annotations__.items()
     ])
@@ -110,13 +110,13 @@ def gen_expr_struct(base_name: str, cls: type) -> str:
 
     stream_output_operator_signature = f"std::ostream& operator<<(std::ostream& os, const {cls.__name__}{base_name}& self)";
     stream_out_members = "\n  ".join([
-  f"""os << "  " << self.{name} << ',';"""
+  f"""os << self.{name} << ',';"""
       for name in
       cls.__annotations__.keys()
     ])
     stream_output_operator = f"""
   {stream_output_operator_signature} {{
-  os << "{cls.__name__}" << "(\\n";
+  os << "{cls.__name__}" << "(";
   {stream_out_members}
   os << ")" << std::endl;
   return os;

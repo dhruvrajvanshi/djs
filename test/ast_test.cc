@@ -13,3 +13,12 @@ TEST(Expression, CanConstructCallExpression) {
                  std::make_unique<Expression>(VarExpression(location, "foo")),
                  {}};
 }
+
+TEST(Expression, print) {
+  auto location = SourceLocation{fs::path{}, 1};
+  const Expression &expr = CallExpression{
+      location,
+      std::make_unique<Expression>(VarExpression(location, "foo")),
+      {}};
+  std::cout << expr;
+}

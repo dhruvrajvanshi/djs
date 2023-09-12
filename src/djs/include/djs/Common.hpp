@@ -49,6 +49,22 @@ template <CopyableOrMovable T> using Vec = std::vector<T>;
 
 template <typename T> using Opt = std::optional<T>;
 
+template <Printable T>
+std::ostream &operator<<(std::ostream &os, const std::unique_ptr<T> &t) {
+  os << *t;
+  return os;
+}
+template <Printable T>
+std::ostream &operator<<(std::ostream &os, const Opt<T> &t) {
+  if (t.has_value()) {
+    const T &v = *t;
+    os << v;
+  } else {
+    os << "null";
+  }
+  return os;
+}
+
 template <typename T>
 concept Hashable = requires(T a) {
   { std::hash<T>{}(a) } -> std::convertible_to<std::size_t>;
