@@ -7,8 +7,8 @@
 #include <vector>
 
 template <typename T>
-concept Printable = requires(T t, std::ostream s) {
-  { (s << t) };
+concept Printable = requires(const T &t, std::ostream &s) {
+  { (s << t) } -> std::convertible_to<std::ostream &>;
 };
 
 #define PANIC(s, ...)                                                          \
