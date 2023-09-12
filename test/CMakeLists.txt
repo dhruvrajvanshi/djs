@@ -11,6 +11,7 @@ add_executable(
   common_test.cc
   function_test.cc
   object_test.cc
+  ast_test.cc
 )
 target_link_libraries(main_test PRIVATE djs GTest::gtest_main)
 include(GoogleTest)
