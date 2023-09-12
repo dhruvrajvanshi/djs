@@ -8,7 +8,9 @@ def main() -> None:
 /// DO NOT EDIT BY HAND
 
 #include <string>
+#include "./ast_common.hpp"
 #include "../Common.hpp"
+#include "./NodeList.hpp"
 #include "./ParseNode.hpp"
 namespace djs {"""
   code += gen(Expression)
@@ -23,6 +25,18 @@ def gen(base: type[TreeRoot]) -> str:
     expr_structs = '\n'.join([gen_expr_struct(base_name, c) for c in base.classes()])
 
     kind_names = ',\n    '.join([ c.__name__ for c in  base.classes() ])
+    ostream_cases = '\n'.join([
+      f'    case {base_name}::Kind::{c.__name__}: ' + \
+        f'os << e.as<{c.__name__}{base_name}>(); return os;'
+      for c in base.classes()
+    ])
+    base_ostream_operator = f"""
+std::ostream& operator<<(std::ostream& os, const {base_name}& e) {{
+  switch (e.kind) {{
+{ostream_cases}
+  }}
+}}
+"""
     return f"""
 struct {base_name}: public ParseNode {{
   enum Kind {{
@@ -40,6 +54,7 @@ struct {base_name}: public ParseNode {{
   }}
 }};
 {expr_structs}
+{base_ostream_operator}
 """
 
 def is_boxed(annotation) -> bool:
@@ -60,7 +75,7 @@ def annotation_to_cpptype(annotation, unwrap_unique_ptr: bool=False) -> str:
         else:
           return f'std::unique_ptr<{go(annotation.__args__[0])}>'
       elif annotation.__origin__ == list:
-        return f'Vec<{annotation.__args__[0]}>'
+        return f'NodeList<{annotation.__args__[0]}>'
       elif annotation.__origin__ == Union \
         and len(annotation.__args__) == 2 \
         and (
@@ -92,11 +107,31 @@ def gen_expr_struct(base_name: str, cls: type) -> str:
     all_args_constructor = f"""
   {cls.__name__}{base_name}({params}): {field_initializers} {{}}
 """.strip()
+
+    stream_output_operator_signature = f"std::ostream& operator<<(std::ostream& os, const {cls.__name__}{base_name}& self)";
+    stream_out_members = "\n  ".join([
+  f"""os << "  " << self.{name} << ',';"""
+      for name in
+      cls.__annotations__.keys()
+    ])
+    stream_output_operator = f"""
+  {stream_output_operator_signature} {{
+  os << "{cls.__name__}" << "(\\n";
+  {stream_out_members}
+  os << ")" << std::endl;
+  return os;
+}}
+""".strip()
+
     return f"""struct {cls.__name__}{base_name} : public {base_name} {{
   {args_fields};
 
   {all_args_constructor}
+
+  friend {stream_output_operator_signature};
 }};
+
+{stream_output_operator}
 """
 
 if __name__ == '__main__':

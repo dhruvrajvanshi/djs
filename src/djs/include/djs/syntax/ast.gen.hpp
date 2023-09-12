@@ -4,7 +4,9 @@
 /// DO NOT EDIT BY HAND
 
 #include <string>
+#include "./ast_common.hpp"
 #include "../Common.hpp"
+#include "./NodeList.hpp"
 #include "./ParseNode.hpp"
 namespace djs {
 struct Expression: public ParseNode {
@@ -25,16 +27,43 @@ struct Expression: public ParseNode {
 };
 struct CallExpression : public Expression {
   std::unique_ptr<Expression> callee;
-  Vec<Expression> arguments;
+  NodeList<Expression> arguments;
 
-  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, Vec<Expression> arguments): Expression(location), callee(std::move(callee)), arguments(std::move(arguments)) {}
+  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, NodeList<Expression> arguments): Expression(location), callee(std::move(callee)), arguments(std::move(arguments)) {}
+
+  friend std::ostream& operator<<(std::ostream& os, const CallExpression& self);
 };
+
+std::ostream& operator<<(std::ostream& os, const CallExpression& self) {
+  os << "Call" << "(\n";
+  os << "  " << self.callee << ',';
+  os << "  " << self.arguments << ',';
+  os << ")" << std::endl;
+  return os;
+}
 
 struct VarExpression : public Expression {
   std::string name;
 
   VarExpression(SourceLocation location, std::string name): Expression(location), name(std::move(name)) {}
+
+  friend std::ostream& operator<<(std::ostream& os, const VarExpression& self);
 };
+
+std::ostream& operator<<(std::ostream& os, const VarExpression& self) {
+  os << "Var" << "(\n";
+  os << "  " << self.name << ',';
+  os << ")" << std::endl;
+  return os;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const Expression& e) {
+  switch (e.kind) {
+    case Expression::Kind::Call: os << e.as<CallExpression>(); return os;
+    case Expression::Kind::Var: os << e.as<VarExpression>(); return os;
+  }
+}
 
 
 struct Statement: public ParseNode {
@@ -56,6 +85,22 @@ struct ReturnStatement : public Statement {
   Opt<std::unique_ptr<Expression>> value;
 
   ReturnStatement(SourceLocation location, Opt<std::unique_ptr<Expression>> value): Statement(location), value(std::move(value)) {}
+
+  friend std::ostream& operator<<(std::ostream& os, const ReturnStatement& self);
 };
+
+std::ostream& operator<<(std::ostream& os, const ReturnStatement& self) {
+  os << "Return" << "(\n";
+  os << "  " << self.value << ',';
+  os << ")" << std::endl;
+  return os;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const Statement& e) {
+  switch (e.kind) {
+    case Statement::Kind::Return: os << e.as<ReturnStatement>(); return os;
+  }
+}
 
 } // namespace djs
