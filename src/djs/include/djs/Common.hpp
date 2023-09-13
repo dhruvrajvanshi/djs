@@ -71,10 +71,6 @@ concept StringLike = std::is_convertible_v<T, std::string_view>;
 template <typename T>
 using RValueOf = typename std::remove_reference<T>::type &&;
 
-template <typename T> constexpr auto move(T &&t) noexcept -> RValueOf<T> {
-  return static_cast<RValueOf<T>>(t);
-}
-
 template <typename T>
 concept HasToString = requires(const T &t) {
   { std::to_string(t) } -> std::convertible_to<std::string>;

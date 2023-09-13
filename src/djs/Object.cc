@@ -22,7 +22,8 @@ auto Object::GetOwnProperty(VM *vm, PropertyKey key)
 auto Object::DefineOwnProperty(VM *vm, PropertyKey key,
                                PropertyDescriptor descriptor)
     -> Completion<bool> {
-  return slots.DefineOwnProperty(vm, this, move(key), move(descriptor));
+  return slots.DefineOwnProperty(vm, this, std::move(key),
+                                 std::move(descriptor));
 }
 auto Object::IsExtensible(VM *vm) -> Completion<bool> {
   return slots.IsExtensible(vm, this);
