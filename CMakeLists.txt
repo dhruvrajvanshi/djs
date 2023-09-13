@@ -4,6 +4,8 @@ project(simplejs C CXX)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_EXPORT_COMPILE_COMMANDS true)
 
+enable_testing()
+
 if(MSVC)
   add_compile_options(/W4)
 else()
