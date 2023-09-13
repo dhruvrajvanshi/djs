@@ -60,8 +60,13 @@ std::ostream& operator<<(std::ostream& os, const VarExpression& self) {
 
 std::ostream& operator<<(std::ostream& os, const Expression& e) {
   switch (e.kind) {
-    case Expression::Kind::Call: os << e.as<CallExpression>(); return os;
-    case Expression::Kind::Var: os << e.as<VarExpression>(); return os;
+    case Expression::Kind::Call:
+      os << e.as<CallExpression>();
+      return os;
+    case Expression::Kind::Var:
+      os << e.as<VarExpression>();
+      return os;
+    default: std::unreachable();
   }
 }
 
@@ -99,7 +104,10 @@ std::ostream& operator<<(std::ostream& os, const ReturnStatement& self) {
 
 std::ostream& operator<<(std::ostream& os, const Statement& e) {
   switch (e.kind) {
-    case Statement::Kind::Return: os << e.as<ReturnStatement>(); return os;
+    case Statement::Kind::Return:
+      os << e.as<ReturnStatement>();
+      return os;
+    default: std::unreachable();
   }
 }
 

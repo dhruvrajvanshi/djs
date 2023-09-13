@@ -26,14 +26,16 @@ def gen(base: type[TreeRoot]) -> str:
 
     kind_names = ',\n    '.join([ c.__name__ for c in  base.classes() ])
     ostream_cases = '\n'.join([
-      f'    case {base_name}::Kind::{c.__name__}: ' + \
-        f'os << e.as<{c.__name__}{base_name}>(); return os;'
+      f'    case {base_name}::Kind::{c.__name__}:\n' + \
+        f'      os << e.as<{c.__name__}{base_name}>();\n' + \
+        '      return os;'
       for c in base.classes()
     ])
     base_ostream_operator = f"""
 std::ostream& operator<<(std::ostream& os, const {base_name}& e) {{
   switch (e.kind) {{
 {ostream_cases}
+    default: std::unreachable();
   }}
 }}
 """
