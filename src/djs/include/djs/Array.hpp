@@ -1,6 +1,8 @@
-#include "./Common.hpp"
+#pragma once
+
 #include "./Object.hpp"
 #include "./Value.hpp"
+#include "dlib/Vec.hpp"
 
 namespace djs {
 

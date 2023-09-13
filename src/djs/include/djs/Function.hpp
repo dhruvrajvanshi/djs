@@ -1,8 +1,8 @@
 #pragma once
-#include "./Common.hpp"
 #include "./Completion.hpp"
 #include "./Instruction.hpp"
 #include "./Object.hpp"
+#include "dlib/Vec.hpp"
 
 #include <string>
 #include <vector>

@@ -1,5 +1,6 @@
 #pragma once
 #include "./ParseNode.hpp"
+#include "dlib/Vec.hpp"
 #include <type_traits>
 
 namespace djs {

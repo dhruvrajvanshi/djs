@@ -3,6 +3,7 @@
 #include "./Completion.hpp"
 #include "./PropertyDescriptor.hpp"
 #include "./PropertyKey.hpp"
+#include "dlib/Opt.hpp"
 
 namespace djs {
 struct Object;

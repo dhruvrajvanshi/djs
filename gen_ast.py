@@ -8,8 +8,9 @@ def main() -> None:
 /// DO NOT EDIT BY HAND
 
 #include <string>
-#include "./ast_common.hpp"
-#include "../Common.hpp"
+#include <utility>
+#include "dlib/Box.hpp"
+#include "dlib/Opt.hpp"
 #include "./NodeList.hpp"
 #include "./ParseNode.hpp"
 namespace djs {"""
@@ -75,7 +76,7 @@ def annotation_to_cpptype(annotation, unwrap_unique_ptr: bool=False) -> str:
         if unwrap_unique_ptr:
           return go(annotation.__args__[0])
         else:
-          return f'std::unique_ptr<{go(annotation.__args__[0])}>'
+          return f'Box<{go(annotation.__args__[0])}>'
       elif annotation.__origin__ == list:
         return f'NodeList<{annotation.__args__[0]}>'
       elif annotation.__origin__ == Union \

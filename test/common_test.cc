@@ -1,4 +1,6 @@
-#include "djs/Common.hpp"
+#include "dlib/Box.hpp"
+#include "dlib/Opt.hpp"
+#include "dlib/Vec.hpp"
 #include <gtest/gtest.h>
 
 TEST(to_string, CanStringifyVec) {
@@ -15,6 +17,6 @@ TEST(to_string, CanStringifyOpt) {
 }
 
 TEST(to_string, CanStringifyUniquePtr) {
-  auto u = std::make_unique<int>(1);
+  auto u = djs::make_box<int>(1);
   ASSERT_EQ("1", std::to_string(u));
 }

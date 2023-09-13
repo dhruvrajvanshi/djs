@@ -1,5 +1,7 @@
 
 #include "djs/syntax/ast.hpp"
+#include "dlib/Box.hpp"
+
 #include <gtest/gtest.h>
 
 using namespace djs;
@@ -9,16 +11,13 @@ TEST(Expression, CanConstructCallExpression) {
       fs::path{},
       1,
   };
-  CallExpression{location,
-                 std::make_unique<Expression>(VarExpression(location, "foo")),
-                 {}};
+  CallExpression{
+      location, make_box<Expression>(VarExpression(location, "foo")), {}};
 }
 
 TEST(Expression, print) {
   auto location = SourceLocation{fs::path{}, 1};
   const Expression &expr = CallExpression{
-      location,
-      std::make_unique<Expression>(VarExpression(location, "foo")),
-      {}};
+      location, make_box<Expression>(VarExpression(location, "foo")), {}};
   std::cout << expr;
 }

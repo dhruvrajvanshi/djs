@@ -1,5 +1,6 @@
 #pragma once
 #include "./GCBase.hpp"
+#include "dlib/Traits.hpp"
 #include <string>
 
 namespace djs {

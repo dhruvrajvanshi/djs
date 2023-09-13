@@ -1,6 +1,7 @@
 #pragma once
-#include "./Common.hpp"
+#include "./Assertions.hpp"
 #include "./Value.hpp"
+#include "dlib/Opt.hpp"
 #include <optional>
 
 #define RETURN_IF_ABRUPT(c, t)                                                 \
@@ -60,10 +61,10 @@ template <typename T> struct Completion {
 
 private:
   Kind _kind;
-  std::optional<T> value;
-  std::optional<Value> abrupt_value;
+  Opt<T> value;
+  Opt<Value> abrupt_value;
 
-  Completion(const Kind &kind, const std::optional<T> &value)
+  Completion(const Kind &kind, const Opt<T> &value)
       : _kind(kind), value(value), abrupt_value(Opt<Value>{}) {
     switch (kind) {
     case Kind::Normal:

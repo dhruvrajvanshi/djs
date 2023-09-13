@@ -1,5 +1,5 @@
 #include "djs/Instruction.hpp"
-#include "djs/Common.hpp"
+#include "djs/Assertions.hpp"
 
 auto std::to_string(djs::Instruction::Opcode opcode) -> std::string {
   using O = djs::Instruction::Opcode;

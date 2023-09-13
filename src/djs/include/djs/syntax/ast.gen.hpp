@@ -4,8 +4,9 @@
 /// DO NOT EDIT BY HAND
 
 #include <string>
-#include "./ast_common.hpp"
-#include "../Common.hpp"
+#include <utility>
+#include "dlib/Box.hpp"
+#include "dlib/Opt.hpp"
 #include "./NodeList.hpp"
 #include "./ParseNode.hpp"
 namespace djs {
@@ -26,10 +27,10 @@ struct Expression: public ParseNode {
   }
 };
 struct CallExpression : public Expression {
-  std::unique_ptr<Expression> callee;
+  Box<Expression> callee;
   NodeList<Expression> arguments;
 
-  CallExpression(SourceLocation location, std::unique_ptr<Expression> callee, NodeList<Expression> arguments): Expression(location, Kind::Call), callee(std::move(callee)), arguments(std::move(arguments)) {}
+  CallExpression(SourceLocation location, Box<Expression> callee, NodeList<Expression> arguments): Expression(location, Kind::Call), callee(std::move(callee)), arguments(std::move(arguments)) {}
 
   friend std::ostream& operator<<(std::ostream& os, const CallExpression& self);
 };
@@ -87,9 +88,9 @@ struct Statement: public ParseNode {
   }
 };
 struct ReturnStatement : public Statement {
-  Opt<std::unique_ptr<Expression>> value;
+  Opt<Box<Expression>> value;
 
-  ReturnStatement(SourceLocation location, Opt<std::unique_ptr<Expression>> value): Statement(location, Kind::Return), value(std::move(value)) {}
+  ReturnStatement(SourceLocation location, Opt<Box<Expression>> value): Statement(location, Kind::Return), value(std::move(value)) {}
 
   friend std::ostream& operator<<(std::ostream& os, const ReturnStatement& self);
 };

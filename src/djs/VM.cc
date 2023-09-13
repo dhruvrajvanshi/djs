@@ -1,6 +1,6 @@
 #include "djs/VM.hpp"
 #include "djs/Array.hpp"
-#include "djs/Common.hpp"
+#include "djs/Assertions.hpp"
 #include "djs/Completion.hpp"
 #include "djs/Object.hpp"
 #include "djs/Opcodes.hpp"

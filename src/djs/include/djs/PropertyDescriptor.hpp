@@ -1,6 +1,7 @@
 #pragma once
 
 #include "./Value.hpp"
+#include "dlib/Opt.hpp"
 
 namespace djs {
 

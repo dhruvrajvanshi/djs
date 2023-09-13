@@ -1,5 +1,6 @@
 #pragma once
 #include "./Printable.hpp"
+#include "./Traits.hpp"
 #include <memory>
 
 namespace djs {
@@ -16,3 +17,12 @@ std::ostream &operator<<(std::ostream &os, const Box<T> &t) {
   return os;
 }
 } // namespace djs
+
+namespace std {
+
+template <djs::HasToString T>
+auto to_string(const djs::Box<T> &u) -> std::string {
+  return std::to_string(*u);
+}
+
+} // namespace std

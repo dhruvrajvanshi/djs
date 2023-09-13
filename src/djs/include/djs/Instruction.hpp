@@ -2,6 +2,7 @@
 
 #include "./Opcodes.hpp"
 #include "./Value.hpp"
+#include "dlib/Traits.hpp"
 #include <string>
 #include <type_traits>
 

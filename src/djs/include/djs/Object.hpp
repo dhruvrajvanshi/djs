@@ -5,6 +5,7 @@
 #include "./PropertyDescriptor.hpp"
 #include "./PropertyKey.hpp"
 #include "./Value.hpp"
+#include "dlib/HashMap.hpp"
 
 namespace djs {
 

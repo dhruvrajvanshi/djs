@@ -1,6 +1,7 @@
 #pragma once
 
 #include "./Printable.hpp"
+#include "./Traits.hpp"
 #include <optional>
 
 namespace djs {
@@ -18,3 +19,16 @@ std::ostream &operator<<(std::ostream &os, const djs::Opt<T> &t) {
 }
 
 } // namespace djs
+
+namespace std {
+
+template <djs::HasToString T>
+auto to_string(const djs::Opt<T> &o) -> std::string {
+  if (o.has_value()) {
+    return to_string(*o);
+  } else {
+    return "null";
+  }
+}
+
+} // namespace std
