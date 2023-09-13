@@ -45,12 +45,6 @@ concept CopyableOrMovable = IsMovable<T> || IsCopyable<T>;
 
 template <CopyableOrMovable T> using Vec = std::vector<T>;
 
-template <Printable T>
-std::ostream &operator<<(std::ostream &os, const std::unique_ptr<T> &t) {
-  os << *t;
-  return os;
-}
-
 template <typename T>
 concept Hashable = requires(T a) {
   { std::hash<T>{}(a) } -> std::convertible_to<std::size_t>;
