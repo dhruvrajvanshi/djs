@@ -1,4 +1,6 @@
 #pragma once
+#include "dlib/Opt.hpp"
+#include "dlib/Printable.hpp"
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -6,11 +8,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-template <typename T>
-concept Printable = requires(const T &t, std::ostream &s) {
-  { (s << t) } -> std::convertible_to<std::ostream &>;
-};
 
 #define PANIC(s, ...)                                                          \
   do {                                                                         \
@@ -48,21 +45,9 @@ concept CopyableOrMovable = IsMovable<T> || IsCopyable<T>;
 
 template <CopyableOrMovable T> using Vec = std::vector<T>;
 
-template <typename T> using Opt = std::optional<T>;
-
 template <Printable T>
 std::ostream &operator<<(std::ostream &os, const std::unique_ptr<T> &t) {
   os << *t;
-  return os;
-}
-template <Printable T>
-std::ostream &operator<<(std::ostream &os, const Opt<T> &t) {
-  if (t.has_value()) {
-    const T &v = *t;
-    os << v;
-  } else {
-    os << "null";
-  }
   return os;
 }
 
