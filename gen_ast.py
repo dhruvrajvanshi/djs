@@ -41,7 +41,7 @@ std::ostream& operator<<(std::ostream& os, const {base_name}& e) {{
 """
     return f"""
 struct {base_name}: public ParseNode {{
-  enum Kind {{
+  enum class Kind {{
     {kind_names}
   }};
   Kind kind;

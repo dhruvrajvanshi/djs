@@ -10,7 +10,7 @@
 #include "./ParseNode.hpp"
 namespace djs {
 struct Expression: public ParseNode {
-  enum Kind {
+  enum class Kind {
     Call,
     Var
   };
@@ -72,7 +72,7 @@ std::ostream& operator<<(std::ostream& os, const Expression& e) {
 
 
 struct Statement: public ParseNode {
-  enum Kind {
+  enum class Kind {
     Return
   };
   Kind kind;
