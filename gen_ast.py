@@ -1,5 +1,6 @@
-from typing import ForwardRef, Union
-from src.djs.include.djs.syntax.ast import Expression, Statement, VariantRoot, Box, Pattern
+from typing import ForwardRef, Optional, Union
+import types
+from src.djs.include.djs.syntax.ast import Expression, Statement, VariantRoot, Box, Pattern, StructRoot, FormalParams
 
 def main() -> None:
   code = """
@@ -17,11 +18,31 @@ namespace djs {"""
   code += gen(Expression)
   code += gen(Statement)
   code += gen(Pattern)
+  code += gen_struct_root(FormalParams)
 
   code += "} // namespace djs"
 
   print(code)
 
+def gen_field(name: str, ty: type) -> str:
+  return f'{annotation_to_cpptype(ty)} {name};'
+def gen_struct_root(cl: type[StructRoot]) -> str:
+  fields = '\n'.join(['  ' + gen_field(name, typ) for (name, typ) in cl.fields().items()])
+  constructor_params = ', '.join(
+    ['SourceLocation location'] +
+    [f'{annotation_to_cpptype(typ)} {name}' for (name, typ) in cl.fields().items()])
+  constructor_init = ', '.join(
+    ['ParseNode(location)'] + [
+      f'{name}({name})' for name, _ in cl.fields().items()
+    ])
+  constructor = f'{cl.__name__}({constructor_params}): {constructor_init} {{}}'
+  return f"""
+struct {cl.__name__}: public ParseNode {{
+{fields}
+
+  {constructor}
+}};
+""".strip()
 def gen(base: type[VariantRoot]) -> str:
     base_name = base.__name__
     expr_structs = '\n'.join([gen_expr_struct(base_name, c) for c in base.classes()])
@@ -66,12 +87,16 @@ def is_boxed(annotation) -> bool:
 
 def annotation_to_cpptype(annotation, unwrap_unique_ptr: bool=False) -> str:
   def go(annotation):
-    if annotation == str:
+    if isinstance(annotation, str):
+      return annotation;
+    elif annotation == str:
       return 'std::string'
     elif isinstance(annotation, ForwardRef):
       return go(annotation._evaluate(globals(), locals(), frozenset()))
     elif isinstance(annotation, type):
       return annotation.__name__
+    elif inner:= as_nullable(annotation):
+      return f'Opt<{go(inner)}>'
     elif hasattr(annotation, '__origin__'):
       if annotation.__origin__ == Box:
         if unwrap_unique_ptr:
@@ -79,20 +104,30 @@ def annotation_to_cpptype(annotation, unwrap_unique_ptr: bool=False) -> str:
         else:
           return f'Box<{go(annotation.__args__[0])}>'
       elif annotation.__origin__ == list:
-        return f'NodeList<{annotation.__args__[0]}>'
-      elif annotation.__origin__ == Union \
-        and len(annotation.__args__) == 2 \
-        and (
-          annotation.__args__[0] == None.__class__ \
-          or annotation.__args__[1] == None.__class__
-        ):
-        inner = annotation.__args__[0] if annotation.__args__[1] == None.__class__ else annotation.__args__[1]
-        return f'Opt<{go(inner)}>'
+        return f'NodeList<{go(annotation.__args__[0])}>'
       else:
         raise TypeError(annotation)
     else:
       raise TypeError(annotation)
   return go(annotation)
+
+def as_nullable(annotation: type) -> type | None:
+  if isinstance(annotation, types.UnionType) \
+    and len(annotation.__args__) == 2 \
+    and (
+      annotation.__args__[0] == None.__class__ \
+      or annotation.__args__[1] == None.__class__
+    ):
+    return annotation.__args__[0] if annotation.__args__[1] == None.__class__ else annotation.__args__[1]
+  elif hasattr(annotation, '__origin__') and annotation.__origin__ == Union \
+    and len(annotation.__args__) == 2 \
+    and (
+      annotation.__args__[0] == None.__class__ \
+      or annotation.__args__[1] == None.__class__
+    ):
+    return annotation.__args__[0] if annotation.__args__[1] == None.__class__ else annotation.__args__[1]
+  else:
+    return None
 
 def gen_expr_struct(base_name: str, cls: type) -> str:
     args_fields = ';\n  '.join([

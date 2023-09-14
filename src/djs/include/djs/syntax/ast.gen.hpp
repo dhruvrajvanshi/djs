@@ -153,4 +153,9 @@ std::ostream& operator<<(std::ostream& os, const Pattern& e) {
   }
 }
 
-} // namespace djs
+struct FormalParams: public ParseNode {
+  NodeList<Pattern> params;
+  Opt<Pattern> rest_param;
+
+  FormalParams(SourceLocation location, NodeList<Pattern> params, Opt<Pattern> rest_param): ParseNode(location), params(params), rest_param(rest_param) {}
+};} // namespace djs

@@ -1,4 +1,4 @@
-from .ast_utils import VariantRoot, Box
+from .ast_utils import VariantRoot, Box, StructRoot
 
 class Expression(VariantRoot):
   class Call:
@@ -14,3 +14,7 @@ class Statement(VariantRoot):
 class Pattern(VariantRoot):
   class Identifier:
     name: str
+
+class FormalParams(StructRoot):
+  params: list[Pattern]
+  rest_param: Pattern | None
