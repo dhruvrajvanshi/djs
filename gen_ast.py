@@ -1,5 +1,5 @@
 from typing import ForwardRef, Union
-from src.djs.include.djs.syntax.ast import Expression, Statement, TreeRoot, Box, Pattern
+from src.djs.include.djs.syntax.ast import Expression, Statement, VariantRoot, Box, Pattern
 
 def main() -> None:
   code = """
@@ -22,7 +22,7 @@ namespace djs {"""
 
   print(code)
 
-def gen(base: type[TreeRoot]) -> str:
+def gen(base: type[VariantRoot]) -> str:
     base_name = base.__name__
     expr_structs = '\n'.join([gen_expr_struct(base_name, c) for c in base.classes()])
 
