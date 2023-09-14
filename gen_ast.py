@@ -216,8 +216,6 @@ def gen_variant_struct(base_name: str, cls: type, interface: bool) -> str:
   {args_fields};
 
   {all_args_constructor}
-
-  friend {stream_output_operator_signature};
 }};
 
 {stream_output_operator_signature};

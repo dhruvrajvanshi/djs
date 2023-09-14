@@ -38,8 +38,6 @@ struct IdentifierPattern : public Pattern {
   std::string name;
 
   IdentifierPattern(SourceLocation location, std::string name);
-
-  friend std::ostream& operator<<(std::ostream& os, const IdentifierPattern& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const IdentifierPattern& self);
@@ -74,8 +72,6 @@ struct CallExpression : public Expression {
   NodeList<Expression> arguments;
 
   CallExpression(SourceLocation location, Box<Expression> callee, NodeList<Expression> arguments);
-
-  friend std::ostream& operator<<(std::ostream& os, const CallExpression& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const CallExpression& self);
@@ -84,8 +80,6 @@ struct VarExpression : public Expression {
   std::string name;
 
   VarExpression(SourceLocation location, std::string name);
-
-  friend std::ostream& operator<<(std::ostream& os, const VarExpression& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const VarExpression& self);
@@ -112,8 +106,6 @@ struct ReturnStatement : public Statement {
   Opt<Box<Expression>> value;
 
   ReturnStatement(SourceLocation location, Opt<Box<Expression>> value);
-
-  friend std::ostream& operator<<(std::ostream& os, const ReturnStatement& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const ReturnStatement& self);
@@ -124,8 +116,6 @@ struct FunctionStatement : public Statement {
   Box<Block> body;
 
   FunctionStatement(SourceLocation location, std::string name, FormalParams params, Box<Block> body);
-
-  friend std::ostream& operator<<(std::ostream& os, const FunctionStatement& self);
 };
 
 std::ostream& operator<<(std::ostream& os, const FunctionStatement& self);
