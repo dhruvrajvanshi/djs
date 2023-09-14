@@ -7,9 +7,8 @@ class Expression(VariantRoot):
   class Var:
      name: str
 
-class Statement(VariantRoot):
-  class Return:
-    value: Box['Expression'] | None
+class Block(StructRoot):
+  statements: list['Statement']
 
 class Pattern(VariantRoot):
   class Identifier:
@@ -18,3 +17,13 @@ class Pattern(VariantRoot):
 class FormalParams(StructRoot):
   params: list[Pattern]
   rest_param: Pattern | None
+
+
+class Statement(VariantRoot):
+  class Return:
+    value: Box['Expression'] | None
+
+  class Function:
+    name: str
+    params: FormalParams
+    body: Box[Block]

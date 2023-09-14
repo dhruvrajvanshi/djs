@@ -9,6 +9,7 @@ add_library(
     OrdinaryObject.cc
     Value.cc
     VM.cc
+    syntax/ast.gen.cc
 )
 target_include_directories(
     djs
