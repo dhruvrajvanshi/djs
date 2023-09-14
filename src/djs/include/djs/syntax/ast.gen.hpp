@@ -112,4 +112,45 @@ std::ostream& operator<<(std::ostream& os, const Statement& e) {
   }
 }
 
+
+struct Pattern: public ParseNode {
+  enum class Kind {
+    Identifier
+  };
+  Kind kind;
+
+  Pattern(SourceLocation location, Kind kind): ParseNode(location), kind(kind) {}
+
+  template <typename T>
+    requires std::is_assignable_v<Pattern, T>
+  auto as() const -> const T& {
+    const auto& self = this;
+    return dynamic_cast<const T&>(*self);
+  }
+};
+struct IdentifierPattern : public Pattern {
+  std::string name;
+
+  IdentifierPattern(SourceLocation location, std::string name): Pattern(location, Kind::Identifier), name(std::move(name)) {}
+
+  friend std::ostream& operator<<(std::ostream& os, const IdentifierPattern& self);
+};
+
+std::ostream& operator<<(std::ostream& os, const IdentifierPattern& self) {
+  os << "Identifier" << "(";
+  os << self.name << ',';
+  os << ")" << std::endl;
+  return os;
+}
+
+
+std::ostream& operator<<(std::ostream& os, const Pattern& e) {
+  switch (e.kind) {
+    case Pattern::Kind::Identifier:
+      os << e.as<IdentifierPattern>();
+      return os;
+    default: std::unreachable();
+  }
+}
+
 } // namespace djs

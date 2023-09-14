@@ -10,3 +10,7 @@ class Expression(TreeRoot):
 class Statement(TreeRoot):
   class Return:
     value: Box['Expression'] | None
+
+class Pattern(TreeRoot):
+  class Identifier:
+    name: str

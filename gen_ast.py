@@ -1,5 +1,5 @@
 from typing import ForwardRef, Union
-from src.djs.include.djs.syntax.ast import Expression, Statement, TreeRoot, Box
+from src.djs.include.djs.syntax.ast import Expression, Statement, TreeRoot, Box, Pattern
 
 def main() -> None:
   code = """
@@ -16,6 +16,7 @@ def main() -> None:
 namespace djs {"""
   code += gen(Expression)
   code += gen(Statement)
+  code += gen(Pattern)
 
   code += "} // namespace djs"
 
