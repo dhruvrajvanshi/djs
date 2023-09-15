@@ -17,7 +17,7 @@ TEST(Expression, CanConstructCallExpression) {
 
 TEST(Expression, print) {
   auto location = SourceLocation{fs::path{}, 1};
-  const Expression &expr = CallExpression{
-      location, make_box<Expression>(VarExpression(location, "foo")), {}};
+  const Expression &expr =
+      CallExpression{location, make_box<VarExpression>(location, "foo"), {}};
   std::cout << expr;
 }
