@@ -234,7 +234,7 @@ def gen_variant_struct(base_name: str, cls: type, interface: bool) -> str:
   {stream_output_operator_signature} {{
   os << "{cls.__name__}" << "(";
   {stream_out_members}
-  os << ")" << std::endl;
+  os << ")";
   return os;
 }}
 """.strip()

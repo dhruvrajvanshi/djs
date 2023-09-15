@@ -14,7 +14,7 @@ IdentifierPattern::IdentifierPattern(SourceLocation location, std::string name):
 std::ostream& operator<<(std::ostream& os, const IdentifierPattern& self) {
   os << "Identifier" << "(";
   os << self.name << ',';
-  os << ")" << std::endl;
+  os << ")";
   return os;
 }
 std::ostream& operator<<(std::ostream& os, const Pattern& e) {
@@ -39,7 +39,7 @@ std::ostream& operator<<(std::ostream& os, const CallExpression& self) {
   os << "Call" << "(";
   os << self.callee << ',';
   os << self.arguments << ',';
-  os << ")" << std::endl;
+  os << ")";
   return os;
 }
 
@@ -48,7 +48,7 @@ VarExpression::VarExpression(SourceLocation location, std::string name): Express
 std::ostream& operator<<(std::ostream& os, const VarExpression& self) {
   os << "Var" << "(";
   os << self.name << ',';
-  os << ")" << std::endl;
+  os << ")";
   return os;
 }
 std::ostream& operator<<(std::ostream& os, const Expression& e) {
@@ -68,7 +68,7 @@ ReturnStatement::ReturnStatement(SourceLocation location, Opt<Box<Expression>> v
 std::ostream& operator<<(std::ostream& os, const ReturnStatement& self) {
   os << "Return" << "(";
   os << self.value << ',';
-  os << ")" << std::endl;
+  os << ")";
   return os;
 }
 
@@ -79,7 +79,7 @@ std::ostream& operator<<(std::ostream& os, const FunctionStatement& self) {
   os << self.name << ',';
   os << self.params << ',';
   os << self.body << ',';
-  os << ")" << std::endl;
+  os << ")";
   return os;
 }
 std::ostream& operator<<(std::ostream& os, const Statement& e) {
