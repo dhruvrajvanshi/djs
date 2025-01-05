@@ -6,6 +6,7 @@ use crate::token::{Token, TokenKind};
 
 #[derive(Clone)]
 pub struct Lexer<'src> {
+    line: u32,
     source: &'src str,
     start_offset: u32,
     input: CharIndices<'src>,
@@ -14,6 +15,7 @@ pub struct Lexer<'src> {
 impl<'src> Lexer<'src> {
     pub fn new(input: &'src str) -> Self {
         Lexer {
+            line: 1,
             start_offset: 0,
             source: input,
             input: input.char_indices(),
@@ -57,6 +59,7 @@ impl<'src> Lexer<'src> {
                 start: self.current_offset(),
                 end: self.current_offset(),
             },
+            line: self.line,
             text: &self.source[start_index..end_index],
         }
     }
@@ -86,6 +89,9 @@ impl<'src> Lexer<'src> {
                     offset <= u32::MAX as usize,
                     "The lexer only supports files up to 4GB"
                 );
+                if c == '\n' {
+                    self.line += 1;
+                }
                 c
             }
             None => EOF_CHAR,
