@@ -1,6 +1,12 @@
 use djs_syntax::Span;
 
 #[derive(Debug)]
+pub struct SourceFile<'src> {
+    pub span: Span,
+    pub stmts: Vec<Stmt<'src>>,
+}
+
+#[derive(Debug)]
 pub struct Stmt<'src> {
     pub span: Span,
     pub kind: StmtKind<'src>,
