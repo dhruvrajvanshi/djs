@@ -17,7 +17,7 @@ pub enum Stmt<'src> {
 pub enum Expr<'src> {
     Var(Span, &'src str),
     BinOp(Span, Box<Expr<'src>>, BinOp, Box<Expr<'src>>),
-    ArrowFn(Span, ParamList<'src>, ExprOrBlock<'src>),
+    ArrowFn(Span, ParamList<'src>, ArrowFnBody<'src>),
 }
 impl Expr<'_> {
     pub fn span(&self) -> Span {
@@ -36,15 +36,15 @@ pub struct ParamList<'src> {
 }
 
 #[derive(Debug)]
-pub enum ExprOrBlock<'src> {
+pub enum ArrowFnBody<'src> {
     Expr(Box<Expr<'src>>),
     Block(Block<'src>),
 }
-impl ExprOrBlock<'_> {
+impl ArrowFnBody<'_> {
     pub fn span(&self) -> Span {
         match self {
-            ExprOrBlock::Expr(expr) => expr.span(),
-            ExprOrBlock::Block(block) => block.span,
+            ArrowFnBody::Expr(expr) => expr.span(),
+            ArrowFnBody::Block(block) => block.span,
         }
     }
 }
