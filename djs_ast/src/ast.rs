@@ -7,29 +7,26 @@ pub struct SourceFile<'src> {
 }
 
 #[derive(Debug)]
-pub struct Stmt<'src> {
-    pub span: Span,
-    pub kind: StmtKind<'src>,
+pub enum Stmt<'src> {
+    Expr(Span, Box<Expr<'src>>),
+    Block(Span, Block<'src>),
+    Return(Span, Option<Box<Expr<'src>>>),
 }
 
 #[derive(Debug)]
-pub enum StmtKind<'src> {
-    Expr(Box<Expr<'src>>),
-    Block(Block<'src>),
-    Return(Option<Box<Expr<'src>>>),
+pub enum Expr<'src> {
+    Var(Span, &'src str),
+    BinOp(Span, Box<Expr<'src>>, BinOp, Box<Expr<'src>>),
+    ArrowFn(Span, ParamList<'src>, ExprOrBlock<'src>),
 }
-
-#[derive(Debug)]
-pub struct Expr<'src> {
-    pub span: Span,
-    pub kind: ExprKind<'src>,
-}
-
-#[derive(Debug)]
-pub enum ExprKind<'src> {
-    Var(&'src str),
-    BinOp(Box<Expr<'src>>, BinOp, Box<Expr<'src>>),
-    ArrowFn(ParamList<'src>, ExprOrBlock<'src>),
+impl Expr<'_> {
+    pub fn span(&self) -> Span {
+        match self {
+            Expr::Var(span, _) => *span,
+            Expr::BinOp(span, _, _, _) => *span,
+            Expr::ArrowFn(span, _, _) => *span,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -46,7 +43,7 @@ pub enum ExprOrBlock<'src> {
 impl ExprOrBlock<'_> {
     pub fn span(&self) -> Span {
         match self {
-            ExprOrBlock::Expr(expr) => expr.span,
+            ExprOrBlock::Expr(expr) => expr.span(),
             ExprOrBlock::Block(block) => block.span,
         }
     }
