@@ -34,6 +34,7 @@ impl<'src> Lexer<'src> {
             '}' => self.lex_single_char_token(TokenKind::RBrace),
             '(' => self.lex_single_char_token(TokenKind::LParen),
             ')' => self.lex_single_char_token(TokenKind::RParen),
+            ';' => self.lex_single_char_token(TokenKind::Semi),
             '=' => {
                 self.advance();
                 if self.current_char() == '>' {

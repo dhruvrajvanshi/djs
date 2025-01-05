@@ -1,6 +1,6 @@
 use std::mem;
 
-use djs_ast::{Expr, ExprKind, ExprOrBlock, Param, ParamList};
+use djs_ast::{Expr, ExprKind, ExprOrBlock, Param, ParamList, SourceFile, Stmt, StmtKind};
 use djs_syntax::Span;
 
 use crate::{
@@ -8,7 +8,7 @@ use crate::{
     token::{Token, TokenKind},
 };
 
-struct Parser<'src> {
+pub struct Parser<'src> {
     lexer: Lexer<'src>,
     current_token: Token<'src>,
 }
@@ -30,6 +30,39 @@ impl<'src> Parser<'src> {
             lexer,
             current_token,
         }
+    }
+
+    pub fn parse_source_file(&mut self) -> Result<SourceFile<'src>> {
+        let mut stmts = Vec::new();
+        let start = self.current_token.span;
+        while self.current_token.kind != T::EndOfFile {
+            let stmt = self.parse_stmt()?;
+            stmts.push(stmt);
+        }
+        let stop = self.current_token.span;
+        Ok(SourceFile {
+            span: Span::between(start, stop),
+            stmts,
+        })
+    }
+
+    fn parse_stmt(&mut self) -> Result<Stmt<'src>> {
+        self.parse_expr_stmt()
+    }
+
+    fn parse_expr_stmt(&mut self) -> Result<Stmt<'src>> {
+        let expr = self.parse_expr()?;
+        self.expect_semi()?;
+        Ok(Stmt {
+            span: expr.span,
+            kind: StmtKind::Expr(Box::new(expr)),
+        })
+    }
+
+    fn expect_semi(&mut self) -> Result<()> {
+        // TODO: Handle ASI
+        self.expect(T::Semi)?;
+        Ok(())
     }
 
     pub(super) fn parse_expr(&mut self) -> Result<Expr<'src>> {
