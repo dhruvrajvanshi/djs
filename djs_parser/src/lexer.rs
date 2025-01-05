@@ -34,6 +34,22 @@ impl<'src> Lexer<'src> {
             '}' => self.lex_single_char_token(TokenKind::RBrace),
             '(' => self.lex_single_char_token(TokenKind::LParen),
             ')' => self.lex_single_char_token(TokenKind::RParen),
+            '=' => {
+                self.advance();
+                if self.current_char() == '>' {
+                    self.advance();
+                    Token {
+                        kind: TokenKind::FatArrow,
+                        span: Span {
+                            start: start_offset,
+                            end: self.current_offset(),
+                        },
+                        text: "=>",
+                    }
+                } else {
+                    todo!()
+                }
+            }
             _ => {
                 if is_identifier_start(self.current_char()) {
                     return self.lex_identifier();
