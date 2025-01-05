@@ -17,5 +17,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "djs_parser"
+version = "0.1.0"
+dependencies = [
+ "djs_syntax",
+]
+
+[[package]]
 name = "djs_syntax"
 version = "0.1.0"
