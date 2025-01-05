@@ -1,4 +1,4 @@
-use djs_parser::{token::TokenKind, Lexer};
+use djs_parser::{lexer::Lexer, token::TokenKind};
 use std::env::args;
 
 fn main() {
