@@ -1,13 +1,13 @@
 use djs_syntax::Span;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Token<'src> {
     pub kind: TokenKind,
     pub span: Span,
     pub text: &'src str,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TokenKind {
     Ident,
     LBrace,
@@ -15,6 +15,8 @@ pub enum TokenKind {
 
     LParen,
     RParen,
+
+    FatArrow,
 
     EndOfFile,
 }
