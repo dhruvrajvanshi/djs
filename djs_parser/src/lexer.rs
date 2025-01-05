@@ -7,12 +7,14 @@ use crate::token::{Token, TokenKind};
 #[derive(Clone)]
 pub struct Lexer<'src> {
     source: &'src str,
+    start_offset: u32,
     input: CharIndices<'src>,
 }
 
 impl<'src> Lexer<'src> {
     pub fn new(input: &'src str) -> Self {
         Lexer {
+            start_offset: 0,
             source: input,
             input: input.char_indices(),
         }
@@ -20,16 +22,9 @@ impl<'src> Lexer<'src> {
 
     pub fn next_token(&mut self) -> Token<'src> {
         self.skip_whitespace();
-        let start_offset = self.current_offset();
+        self.start_offset = self.current_offset();
         match self.current_char() {
-            EOF_CHAR => Token {
-                kind: TokenKind::EndOfFile,
-                span: Span {
-                    start: start_offset,
-                    end: self.current_offset(),
-                },
-                text: "",
-            },
+            EOF_CHAR => self.make_token(TokenKind::EndOfFile),
             '{' => self.lex_single_char_token(TokenKind::LBrace),
             '}' => self.lex_single_char_token(TokenKind::RBrace),
             '(' => self.lex_single_char_token(TokenKind::LParen),
@@ -39,14 +34,7 @@ impl<'src> Lexer<'src> {
                 self.advance();
                 if self.current_char() == '>' {
                     self.advance();
-                    Token {
-                        kind: TokenKind::FatArrow,
-                        span: Span {
-                            start: start_offset,
-                            end: self.current_offset(),
-                        },
-                        text: "=>",
-                    }
+                    self.make_token(TokenKind::FatArrow)
                 } else {
                     todo!()
                 }
@@ -59,17 +47,23 @@ impl<'src> Lexer<'src> {
             }
         }
     }
-    fn lex_single_char_token(&mut self, kind: TokenKind) -> Token<'src> {
-        let start = self.current_offset();
-        self.advance();
+
+    fn make_token(&self, kind: TokenKind) -> Token<'src> {
+        let start_index = self.start_offset as usize;
+        let end_index = self.current_offset() as usize;
         Token {
             kind,
             span: Span {
-                start,
+                start: self.current_offset(),
                 end: self.current_offset(),
             },
-            text: &self.source[start as usize..self.current_offset() as usize],
+            text: &self.source[start_index..end_index],
         }
+    }
+
+    fn lex_single_char_token(&mut self, kind: TokenKind) -> Token<'src> {
+        self.advance();
+        self.make_token(kind)
     }
 
     fn skip_whitespace(&mut self) {
@@ -79,19 +73,10 @@ impl<'src> Lexer<'src> {
     }
 
     fn lex_identifier(&mut self) -> Token<'src> {
-        let start = self.current_offset();
         while is_identifier_char(self.current_char()) {
             self.advance();
         }
-        let span = Span {
-            start,
-            end: self.current_offset(),
-        };
-        Token {
-            kind: TokenKind::Ident,
-            span,
-            text: &self.source[span.start()..span.end()],
-        }
+        self.make_token(TokenKind::Ident)
     }
 
     fn advance(&mut self) -> char {
