@@ -2,10 +2,10 @@ use crate::token::Token;
 use djs_syntax::Span;
 use std::str::CharIndices;
 
-mod token;
+pub mod token;
 
 #[derive(Clone)]
-struct Lexer<'src> {
+pub struct Lexer<'src> {
     source: &'src str,
     input: CharIndices<'src>,
 }
