@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = ["djs", "djs_syntax"]
+
+[workspace.package]
+authors = ["Dhruv <dhruv@rajv.dev>"]
+edition = "2021"
+license = "AGPL-3.0"
