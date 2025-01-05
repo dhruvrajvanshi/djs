@@ -1,0 +1,9 @@
+[package]
+name = "djs_parser"
+version = "0.1.0"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+djs_syntax = { path = "../djs_syntax" }
