@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["djs", "djs_syntax"]
+members = ["djs", "djs_ast", "djs_syntax"]
 
 [workspace.package]
 authors = ["Dhruv <dhruv@rajv.dev>"]
