@@ -1,5 +1,6 @@
 use djs_syntax::Span;
 
+#[derive(Debug)]
 pub struct Token<'src> {
     pub kind: TokenKind,
     pub span: Span,
