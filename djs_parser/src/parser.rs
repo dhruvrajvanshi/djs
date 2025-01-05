@@ -1,6 +1,6 @@
 use std::mem;
 
-use djs_ast::{Expr, ExprOrBlock, Param, ParamList, SourceFile, Stmt};
+use djs_ast::{ArrowFnBody, Expr, Param, ParamList, SourceFile, Stmt};
 use djs_syntax::Span;
 
 use crate::{
@@ -127,12 +127,12 @@ impl<'src> Parser<'src> {
         ))
     }
 
-    fn parse_expr_or_block(&mut self) -> Result<ExprOrBlock<'src>> {
+    fn parse_expr_or_block(&mut self) -> Result<ArrowFnBody<'src>> {
         match self.current_token.kind {
             T::LBrace => {
                 todo!()
             }
-            _ => Ok(ExprOrBlock::Expr(Box::new(self.parse_expr()?))),
+            _ => Ok(ArrowFnBody::Expr(Box::new(self.parse_expr()?))),
         }
     }
 
