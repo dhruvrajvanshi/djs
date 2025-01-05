@@ -37,6 +37,14 @@ pub enum ExprOrBlock<'src> {
     Expr(Box<Expr<'src>>),
     Block(Block<'src>),
 }
+impl ExprOrBlock<'_> {
+    pub fn span(&self) -> Span {
+        match self {
+            ExprOrBlock::Expr(expr) => expr.span,
+            ExprOrBlock::Block(block) => block.span,
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct Block<'src> {
