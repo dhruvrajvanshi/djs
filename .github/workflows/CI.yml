@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [ "main", "dev" ]
+  pull_request:
+    branches: [ "main", "dev" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Rust
+      run: |
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+        rustup default stable
+
+    - name: Install the coverage tool
+      run: cargo install cargo-llvm-cov
+
+    - name: Run tests
+      run: cargo llvm-cov --lcov --output-path lcov.info
+
+    - name: Codecov
+      # You may pin to the exact commit or the version.
+      # uses: codecov/codecov-action@81cd2dc8148241f03f5839d295e000b8f761e378
+      uses: codecov/codecov-action@v5
+      env:
+        CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      with:
+        # Repository upload token - get it from codecov.io. Required only for private repositories
+        # token: # optional
+        # Specify whether the Codecov output should be verbose
+        verbose: true
+        fail_ci_if_error: true
