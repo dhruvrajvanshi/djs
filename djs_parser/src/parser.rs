@@ -1,6 +1,6 @@
 use std::mem;
 
-use djs_ast::{Expr, ExprKind, ExprOrBlock, Param, ParamList, SourceFile, Stmt, StmtKind};
+use djs_ast::{Expr, ExprOrBlock, Param, ParamList, SourceFile, Stmt};
 use djs_syntax::Span;
 
 use crate::{
@@ -57,10 +57,7 @@ impl<'src> Parser<'src> {
     fn parse_expr_stmt(&mut self) -> Result<Stmt<'src>> {
         let expr = self.parse_expr()?;
         self.expect_semi()?;
-        Ok(Stmt {
-            span: expr.span,
-            kind: StmtKind::Expr(Box::new(expr)),
-        })
+        Ok(Stmt::Expr(expr.span(), Box::new(expr)))
     }
 
     fn expect_semi(&mut self) -> Result<()> {
@@ -87,10 +84,7 @@ impl<'src> Parser<'src> {
         match self.current_token.kind {
             T::Ident => {
                 let tok = self.advance();
-                Ok(Expr {
-                    span: tok.span,
-                    kind: ExprKind::Var(tok.text),
-                })
+                Ok(Expr::Var(tok.span, tok.text))
             }
             T::LParen => {
                 let mut snapshot1 = self.clone();
@@ -126,10 +120,11 @@ impl<'src> Parser<'src> {
         self.expect(T::FatArrow)?;
         let body = self.parse_expr_or_block()?;
 
-        Ok(Expr {
-            span: Span::between(params.span, body.span()),
-            kind: ExprKind::ArrowFn(params, body),
-        })
+        Ok(Expr::ArrowFn(
+            Span::between(params.span, body.span()),
+            params,
+            body,
+        ))
     }
 
     fn parse_expr_or_block(&mut self) -> Result<ExprOrBlock<'src>> {
@@ -187,7 +182,7 @@ impl<'src> Parser<'src> {
 
 #[cfg(test)]
 mod tests {
-    use djs_ast::ExprKind;
+    use djs_ast::Expr;
 
     use super::*;
 
@@ -196,7 +191,7 @@ mod tests {
         let source = "x";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        assert!(matches!(expr.kind, ExprKind::Var("x")));
+        assert!(matches!(expr, Expr::Var(_, "x")));
     }
 
     #[test]
@@ -204,7 +199,7 @@ mod tests {
         let source = "(x)";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        assert!(matches!(expr.kind, ExprKind::Var("x")));
+        assert!(matches!(expr, Expr::Var(_, "x")));
     }
 
     #[test]
@@ -212,7 +207,7 @@ mod tests {
         let source = "(x) => x";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        assert!(matches!(expr.kind, ExprKind::ArrowFn(..)));
+        assert!(matches!(expr, Expr::ArrowFn(..)));
     }
 
     #[test]
@@ -228,7 +223,7 @@ mod tests {
         let stmt1 = &source_file.stmts[0];
         let stmt2 = &source_file.stmts[1];
 
-        assert!(matches!(stmt1.kind, StmtKind::Expr(..)));
-        assert!(matches!(stmt2.kind, StmtKind::Expr(..)));
+        assert!(matches!(stmt1, Stmt::Expr(_, box Expr::Var(_, "x"))));
+        assert!(matches!(stmt2, Stmt::Expr(_, box Expr::Var(_, "y"))));
     }
 }
