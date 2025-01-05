@@ -5,6 +5,7 @@ pub struct Token<'src> {
     pub kind: TokenKind,
     pub span: Span,
     pub text: &'src str,
+    pub line: u32,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

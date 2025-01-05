@@ -8,8 +8,10 @@ use crate::{
     token::{Token, TokenKind},
 };
 
+#[derive(Clone)]
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
+    last_token: Option<Token<'src>>,
     current_token: Token<'src>,
 }
 pub type Result<T> = std::result::Result<T, ParseError>;
@@ -20,6 +22,7 @@ type T = TokenKind;
 pub enum ParseError {
     UnexpectedToken,
     UnexpectedEOF,
+    MissingSemi,
 }
 
 impl<'src> Parser<'src> {
@@ -27,6 +30,7 @@ impl<'src> Parser<'src> {
         let mut lexer = Lexer::new(source);
         let current_token = lexer.next_token();
         Parser {
+            last_token: None,
             lexer,
             current_token,
         }
@@ -61,8 +65,22 @@ impl<'src> Parser<'src> {
 
     fn expect_semi(&mut self) -> Result<()> {
         // TODO: Handle ASI
-        self.expect(T::Semi)?;
-        Ok(())
+        if self.current_token.kind == T::Semi {
+            self.advance();
+            return Ok(());
+        }
+        if self.current_token.kind == T::RBrace || self.current_token.kind == T::EndOfFile {
+            return Ok(());
+        }
+        if self.current_token.line
+            > self
+                .last_token
+                .expect("expect_semi must be called after consuming at least 1 token")
+                .line
+        {
+            return Ok(());
+        }
+        Err(ParseError::MissingSemi)
     }
 
     pub(super) fn parse_expr(&mut self) -> Result<Expr<'src>> {
@@ -149,20 +167,14 @@ impl<'src> Parser<'src> {
         })
     }
 
-    fn clone(&self) -> Self {
-        Self {
-            lexer: self.lexer.clone(),
-            current_token: self.current_token,
-        }
-    }
-
     fn commit(&mut self, snapshot: Self) {
-        self.lexer = snapshot.lexer;
-        self.current_token = snapshot.current_token;
+        *self = snapshot;
     }
 
     fn advance(&mut self) -> Token<'src> {
-        mem::replace(&mut self.current_token, self.lexer.next_token())
+        let last_token = mem::replace(&mut self.current_token, self.lexer.next_token());
+        self.last_token = Some(last_token);
+        last_token
     }
     fn expect(&mut self, kind: TokenKind) -> Result<Token<'src>> {
         if self.current_token.kind == kind {
@@ -201,5 +213,22 @@ mod tests {
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
         assert!(matches!(expr.kind, ExprKind::ArrowFn(..)));
+    }
+
+    #[test]
+    fn auto_inserts_semicolon_when_the_next_statement_is_on_a_new_line() {
+        let source = "
+            x
+            y
+        ";
+        let mut parser = Parser::new(source);
+        let source_file = parser.parse_source_file().unwrap();
+
+        assert!(source_file.stmts.len() == 2);
+        let stmt1 = &source_file.stmts[0];
+        let stmt2 = &source_file.stmts[1];
+
+        assert!(matches!(stmt1.kind, StmtKind::Expr(..)));
+        assert!(matches!(stmt2.kind, StmtKind::Expr(..)));
     }
 }
