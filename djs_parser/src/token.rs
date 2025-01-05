@@ -12,5 +12,9 @@ pub enum TokenKind {
     Ident,
     LBrace,
     RBrace,
+
+    LParen,
+    RParen,
+
     EndOfFile,
 }
