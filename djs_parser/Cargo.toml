@@ -7,3 +7,4 @@ license.workspace = true
 
 [dependencies]
 djs_syntax = { path = "../djs_syntax" }
+djs_ast = { path = "../djs_ast" }
