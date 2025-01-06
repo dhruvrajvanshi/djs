@@ -80,7 +80,7 @@ impl<'src> Parser<'src> {
         Err(ParseError::MissingSemi)
     }
 
-    pub(super) fn parse_expr(&mut self) -> Result<Expr<'src>> {
+    pub(super) fn parse_primary_expr(&mut self) -> Result<Expr<'src>> {
         match self.current_token.kind {
             T::Ident => {
                 let tok = self.advance();
@@ -113,6 +113,57 @@ impl<'src> Parser<'src> {
         let expr = self.parse_expr()?;
         self.expect(T::RParen)?;
         Ok(expr)
+    }
+
+    fn parse_expr(&mut self) -> Result<Expr<'src>> {
+        let lhs = self.parse_member_expr_or_higher()?;
+        self.parse_call_expr_tail(lhs)
+    }
+
+    fn parse_member_expr_or_higher(&mut self) -> Result<Expr<'src>> {
+        let lhs = self.parse_primary_expr()?;
+        self.parse_member_expr_tail(lhs)
+    }
+
+    fn parse_member_expr_tail(&mut self, lhs: Expr<'src>) -> Result<Expr<'src>> {
+        match self.current_token.kind {
+            T::LSquare => {
+                self.advance();
+                let prop = self.parse_expr()?;
+                self.expect(T::RSquare)?;
+                let span = Span::between(lhs.span(), prop.span());
+                let member_expr = Expr::Member(span, Box::new(lhs), Box::new(prop));
+                self.parse_member_expr_tail(member_expr)
+            }
+            _ => Ok(lhs),
+        }
+    }
+
+    fn parse_call_expr_tail(&mut self, lhs: Expr<'src>) -> Result<Expr<'src>> {
+        match self.current_token.kind {
+            T::LParen => {
+                self.advance();
+                let args = self.parse_arg_list()?;
+                let end_tok = self.expect(T::RParen)?;
+                let span = Span::between(lhs.span(), end_tok.span);
+                let call_expr = Expr::Call(span, Box::new(lhs), args);
+                self.parse_call_expr_tail(call_expr)
+            }
+            _ => Ok(lhs),
+        }
+    }
+    fn parse_arg_list(&mut self) -> Result<Vec<Expr<'src>>> {
+        let mut args = Vec::new();
+        loop {
+            if matches!(self.current_token.kind, T::RParen | T::EndOfFile) {
+                break;
+            }
+            args.push(self.parse_expr()?);
+            if self.current_token.kind == T::Comma {
+                self.advance();
+            }
+        }
+        Ok(args)
     }
 
     fn parse_arrow_fn(&mut self) -> Result<Expr<'src>> {
@@ -225,5 +276,46 @@ mod tests {
 
         assert!(matches!(stmt1, Stmt::Expr(_, box Expr::Var(_, "x"))));
         assert!(matches!(stmt2, Stmt::Expr(_, box Expr::Var(_, "y"))));
+    }
+
+    #[test]
+    fn parses_function_calls() {
+        let source = "f(x, y, z)";
+        let mut parser = Parser::new(source);
+        let expr = parser.parse_expr().unwrap();
+        match &expr {
+            Expr::Call(_, f, args) => {
+                assert!(matches!(**f, Expr::Var(_, "f")));
+                assert!(matches!(
+                    args.as_slice(),
+                    [Expr::Var(_, "x"), Expr::Var(_, "y"), Expr::Var(_, "z")]
+                ));
+            }
+            _ => panic!("Expected a call expression"),
+        }
+    }
+
+    #[test]
+    fn parses_chained_member_call() {
+        let source = "a[b][c]()(d, e)";
+        let mut parser = Parser::new(source);
+        let expr = parser.parse_expr().unwrap();
+        use Expr::*;
+        let Call(_, outer_callee, args) = expr else {
+            panic!("Expected a call expression")
+        };
+        assert!(matches!(args.as_slice(), [Var(_, "d"), Var(_, "e")]));
+        assert!(matches!(*outer_callee, Call(..)));
+        let Call(_, inner_callee, args) = *outer_callee else {
+            panic!("Expected a call expression")
+        };
+        assert!(matches!(args.as_slice(), []));
+        let Member(_, obj, box Var(_, "c")) = *inner_callee else {
+            panic!("Expected a member expression")
+        };
+        let Member(_, obj, box Var(_, "b")) = *obj else {
+            panic!("Expected a member expression")
+        };
+        assert!(matches!(*obj, Var(_, "a")));
     }
 }
