@@ -32,6 +32,9 @@ impl<'src> Lexer<'src> {
             '(' => self.lex_single_char_token(TokenKind::LParen),
             ')' => self.lex_single_char_token(TokenKind::RParen),
             ';' => self.lex_single_char_token(TokenKind::Semi),
+            '[' => self.lex_single_char_token(TokenKind::LSquare),
+            ']' => self.lex_single_char_token(TokenKind::RSquare),
+            ',' => self.lex_single_char_token(TokenKind::Comma),
             '=' => {
                 self.advance();
                 if self.current_char() == '>' {
@@ -41,11 +44,11 @@ impl<'src> Lexer<'src> {
                     todo!()
                 }
             }
-            _ => {
+            c => {
                 if is_identifier_start(self.current_char()) {
                     return self.lex_identifier();
                 }
-                todo!()
+                todo!("Unexpected character: {c}");
             }
         }
     }
