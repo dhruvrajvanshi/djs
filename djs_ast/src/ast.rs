@@ -18,6 +18,8 @@ pub enum Expr<'src> {
     Var(Span, &'src str),
     BinOp(Span, Box<Expr<'src>>, BinOp, Box<Expr<'src>>),
     ArrowFn(Span, ParamList<'src>, ArrowFnBody<'src>),
+    Call(Span, Box<Expr<'src>>, Vec<Expr<'src>>),
+    Member(Span, Box<Expr<'src>>, Box<Expr<'src>>),
 }
 impl Expr<'_> {
     pub fn span(&self) -> Span {
@@ -25,6 +27,8 @@ impl Expr<'_> {
             Expr::Var(span, _) => *span,
             Expr::BinOp(span, _, _, _) => *span,
             Expr::ArrowFn(span, _, _) => *span,
+            Expr::Call(span, _, _) => *span,
+            Expr::Member(span, _, _) => *span,
         }
     }
 }

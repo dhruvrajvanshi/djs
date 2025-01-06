@@ -16,6 +16,9 @@ pub enum TokenKind {
 
     LParen,
     RParen,
+    LSquare,
+    RSquare,
+    Comma,
     Semi,
 
     FatArrow,
