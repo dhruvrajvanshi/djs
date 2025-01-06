@@ -271,11 +271,19 @@ mod tests {
         let source_file = parser.parse_source_file().unwrap();
 
         assert!(source_file.stmts.len() == 2);
-        let stmt1 = &source_file.stmts[0];
-        let stmt2 = &source_file.stmts[1];
 
-        assert!(matches!(stmt1, Stmt::Expr(_, box Expr::Var(_, "x"))));
-        assert!(matches!(stmt2, Stmt::Expr(_, box Expr::Var(_, "y"))));
+        let Stmt::Expr(_, x) = &source_file.stmts[0] else {
+            panic!("Expected an expression statement")
+        };
+        let Expr::Var(_, "x") = **x else {
+            panic!("Expected a variable expression")
+        };
+        let Stmt::Expr(_, y) = &source_file.stmts[1] else {
+            panic!("Expected an expression statement")
+        };
+        let Expr::Var(_, "y") = **y else {
+            panic!("Expected a variable expression")
+        };
     }
 
     #[test]
@@ -310,12 +318,14 @@ mod tests {
             panic!("Expected a call expression")
         };
         assert!(matches!(args.as_slice(), []));
-        let Member(_, obj, box Var(_, "c")) = *inner_callee else {
+        let Member(_, obj, c) = *inner_callee else {
             panic!("Expected a member expression")
         };
-        let Member(_, obj, box Var(_, "b")) = *obj else {
+        assert!(matches!(*c, Var(_, "c")));
+        let Member(_, obj, b) = *obj else {
             panic!("Expected a member expression")
         };
+        assert!(matches!(*b, Var(_, "b")));
         assert!(matches!(*obj, Var(_, "a")));
     }
 }
