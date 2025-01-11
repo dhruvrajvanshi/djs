@@ -11,6 +11,16 @@ pub enum Stmt<'src> {
     Expr(Span, Box<Expr<'src>>),
     Block(Span, Block<'src>),
     Return(Span, Option<Box<Expr<'src>>>),
+    VarDecl(Span, DeclType, Ident<'src>, Option<Box<Expr<'src>>>),
+}
+
+pub type Ident<'src> = &'src str;
+
+#[derive(Debug)]
+pub enum DeclType {
+    Let,
+    Const,
+    Var,
 }
 
 #[derive(Debug)]
