@@ -21,7 +21,7 @@ pub enum Stmt<'src> {
     Expr(Span, Box<Expr<'src>>),
     Block(Span, Block<'src>),
     Return(Span, Option<Expr<'src>>),
-    VarDecl(Span, DeclType, Ident<'src>, Option<Expr<'src>>),
+    VarDecl(Span, DeclType, Pattern<'src>, Option<Expr<'src>>),
 }
 impl Stmt<'_> {
     pub fn span(&self) -> Span {
@@ -50,6 +50,18 @@ impl Expr<'_> {
             Expr::ArrowFn(span, ..) => *span,
             Expr::Call(span, ..) => *span,
             Expr::Member(span, ..) => *span,
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Pattern<'src> {
+    Var(Span, Ident<'src>),
+}
+impl Pattern<'_> {
+    pub fn span(&self) -> Span {
+        match self {
+            Pattern::Var(span, ..) => *span,
         }
     }
 }
