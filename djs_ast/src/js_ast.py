@@ -7,7 +7,7 @@ ast_items = [
         ["Expr", ["Box", "Expr"]],
         ["Block", "Block"],
         ["Return", ["Option", "Expr"]],
-        ["VarDecl", "DeclType", "Ident", ["Option", "Expr"]],
+        ["VarDecl", "DeclType", "Pattern", ["Option", "Expr"]],
     ],
     [
         "ast",
@@ -19,6 +19,7 @@ ast_items = [
         ["Call", ["Box", "Expr"], ["Vec", "Expr"]],
         ["Member", ["Box", "Expr"], ["Box", "Expr"]],
     ],
+    ["ast", "enum", "Pattern", ["Var", "Ident"]],
     [
         "ast",
         "struct",

@@ -20,6 +20,10 @@ pub trait Visitor<'a>: Sized {
         walk_expr(self, node)
     }
 
+    fn visit_pattern(&mut self, node: &Pattern) {
+        walk_pattern(self, node)
+    }
+
     fn visit_param_list(&mut self, node: &ParamList) {
         walk_param_list(self, node)
     }
@@ -57,6 +61,7 @@ pub fn walk_stmt<'a, V: Visitor<'a>>(visitor: &mut V, node: &Stmt) {
             }
         }
         Stmt::VarDecl(_, f0, f1, f2) => {
+            visitor.visit_pattern(f1);
             if let Some(item) = f2 {
                 visitor.visit_expr(item);
             }
@@ -85,6 +90,12 @@ pub fn walk_expr<'a, V: Visitor<'a>>(visitor: &mut V, node: &Expr) {
             visitor.visit_expr(f0);
             visitor.visit_expr(f1);
         }
+    }
+}
+
+pub fn walk_pattern<'a, V: Visitor<'a>>(visitor: &mut V, node: &Pattern) {
+    match node {
+        Pattern::Var(_, f0) => {}
     }
 }
 
