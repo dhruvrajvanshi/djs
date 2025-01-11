@@ -1,4 +1,4 @@
-from ast import ast_items
+from js_ast import ast_items
 
 ast_names = set(item[2] for item in ast_items if item[0] == "ast")
 
@@ -19,7 +19,7 @@ def gen_type(type):
 
 if __name__ == "__main__":
     print("// This file is generated automatically")
-    print("// python3 djs_ast/gen_ast.py > djs_ast/src/ast.rs")
+    print("// python3 djs_ast/gen_ast.py > djs_ast/src/ast.rs && cargo fmt -- djs_ast/src/ast.rs")
     print("// DO NOT EDIT")
     print("use djs_syntax::Span;\n")
     print("pub type Ident<'src> = &'src str;")
