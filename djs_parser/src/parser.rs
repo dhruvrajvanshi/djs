@@ -58,8 +58,35 @@ impl<'src> Parser<'src> {
     fn parse_stmt(&mut self) -> Result<Stmt<'src>> {
         match self.current()?.kind {
             T::Let | T::Const | T::Var => self.parse_var_decl(),
+            T::If => self.parse_if_stmt(),
             _ => self.parse_expr_stmt(),
         }
+    }
+
+    fn parse_if_stmt(&mut self) -> Result<Stmt<'src>> {
+        let start = self.expect(T::If)?.span;
+        self.expect(T::LParen)?;
+        let cond = self.parse_expr()?;
+        self.expect(T::RParen)?;
+        let then_branch = Box::new(self.parse_stmt()?);
+        let else_branch = if self.current()?.kind == T::Else {
+            self.advance()?;
+            Some(Box::new(self.parse_stmt()?))
+        } else {
+            None
+        };
+        Ok(Stmt::If(
+            Span::between(
+                start,
+                else_branch
+                    .as_ref()
+                    .map(|it| it.span())
+                    .unwrap_or(then_branch.span()),
+            ),
+            Box::new(cond),
+            then_branch,
+            else_branch,
+        ))
     }
 
     fn parse_var_decl(&mut self) -> Result<Stmt<'src>> {
@@ -439,6 +466,26 @@ mod tests {
                 assert!(matches!(init, Expr::Var(.., "y")));
             }
             _ => panic!("Expected a variable declaration"),
+        }
+    }
+
+    #[test]
+    fn parses_if_stmt() {
+        let source = "if (x) y; else z;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        if let Stmt::If(_, cond, then_branch, Some(else_branch)) = stmt {
+            assert!(matches!(*cond, Expr::Var(.., "x")));
+            let Stmt::Expr(.., e) = *then_branch else {
+                panic!("Expected an expression statement");
+            };
+            assert!(matches!(*e, Expr::Var(.., "y")));
+            let Stmt::Expr(.., e) = *else_branch else {
+                panic!("Expected an expression statement");
+            };
+            assert!(matches!(*e, Expr::Var(.., "z")));
+        } else {
+            panic!("Expected an if statement");
         }
     }
 }
