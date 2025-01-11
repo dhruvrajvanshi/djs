@@ -11,9 +11,12 @@ pub struct Token<'src> {
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum TokenKind {
     Ident,
+    Let,
+    Var,
+    Const,
+
     LBrace,
     RBrace,
-
     LParen,
     RParen,
     LSquare,
