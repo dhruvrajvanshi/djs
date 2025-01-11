@@ -11,6 +11,11 @@ pub struct Lexer<'src> {
     start_offset: u32,
     input: CharIndices<'src>,
 }
+#[derive(Debug, Clone, Copy)]
+pub enum Error {
+    UnexpectedCharacter(char),
+}
+pub type Result<T> = std::result::Result<T, Error>;
 
 impl<'src> Lexer<'src> {
     pub fn new(input: &'src str) -> Self {
@@ -22,11 +27,11 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    pub fn next_token(&mut self) -> Token<'src> {
+    pub fn next_token(&mut self) -> Result<Token<'src>> {
         self.skip_whitespace();
         self.start_offset = self.current_offset();
         match self.current_char() {
-            EOF_CHAR => self.make_token(TokenKind::EndOfFile),
+            EOF_CHAR => Ok(self.make_token(TokenKind::EndOfFile)),
             '{' => self.lex_single_char_token(TokenKind::LBrace),
             '}' => self.lex_single_char_token(TokenKind::RBrace),
             '(' => self.lex_single_char_token(TokenKind::LParen),
@@ -39,16 +44,17 @@ impl<'src> Lexer<'src> {
                 self.advance();
                 if self.current_char() == '>' {
                     self.advance();
-                    self.make_token(TokenKind::FatArrow)
+                    Ok(self.make_token(TokenKind::FatArrow))
                 } else {
-                    todo!()
+                    Ok(self.make_token(TokenKind::Eq))
                 }
             }
             c => {
                 if is_identifier_start(self.current_char()) {
-                    return self.lex_identifier();
+                    Ok(self.lex_identifier())
+                } else {
+                    Err(Error::UnexpectedCharacter(c))
                 }
-                todo!("Unexpected character: {c}");
             }
         }
     }
@@ -67,9 +73,9 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    fn lex_single_char_token(&mut self, kind: TokenKind) -> Token<'src> {
+    fn lex_single_char_token(&mut self, kind: TokenKind) -> Result<Token<'src>> {
         self.advance();
-        self.make_token(kind)
+        Ok(self.make_token(kind))
     }
 
     fn skip_whitespace(&mut self) {
@@ -134,13 +140,13 @@ mod test {
     #[test]
     fn test_lexes_empty_file() {
         let mut lexer = Lexer::new("");
-        assert_eq!(lexer.next_token().kind, TokenKind::EndOfFile);
+        assert_eq!(lexer.next_token().unwrap().kind, TokenKind::EndOfFile);
     }
 
     #[test]
     fn test_lexes_identifier() {
         let mut lexer = Lexer::new("a");
-        let tok = lexer.next_token();
+        let tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::Ident);
         assert_eq!(tok.text, "a");
     }
@@ -148,17 +154,17 @@ mod test {
     #[test]
     fn skips_whitespace_before_identifier() {
         let mut lexer = Lexer::new("  a");
-        let tok = lexer.next_token();
+        let tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::Ident);
         assert_eq!(tok.text, "a");
 
-        assert_eq!(lexer.next_token().kind, TokenKind::EndOfFile);
+        assert_eq!(lexer.next_token().unwrap().kind, TokenKind::EndOfFile);
     }
 
     #[test]
     fn test_lexes_identifier_with_underscores() {
         let mut lexer = Lexer::new("a_b_c");
-        let tok = lexer.next_token();
+        let tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::Ident);
         assert_eq!(tok.text, "a_b_c");
     }
@@ -166,19 +172,19 @@ mod test {
     #[test]
     fn lexes_single_char_tokens() {
         let mut lexer = Lexer::new("{}()");
-        let mut tok = lexer.next_token();
+        let mut tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::LBrace);
         assert_eq!(tok.text, "{");
 
-        tok = lexer.next_token();
+        tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::RBrace);
         assert_eq!(tok.text, "}");
 
-        tok = lexer.next_token();
+        tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::LParen);
         assert_eq!(tok.text, "(");
 
-        tok = lexer.next_token();
+        tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::RParen);
         assert_eq!(tok.text, ")");
     }
