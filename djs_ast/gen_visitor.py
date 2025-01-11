@@ -36,10 +36,6 @@ if __name__ == "__main__":
     p("// This file is generated automatically")
     p("// python3 djs_ast/gen_visitor.py > djs_ast/src/visitor.rs && cargo fmt -- djs_ast/src/visitor.rs")
     p("// DO NOT EDIT")
-    p()
-    p("// Since this file is auto generated, we turn off the unused_variables lint to avoid")
-    p("// having to add special cases for generated pattern names which are unused.")
-    p("#![allow(unused_variables)]")
     p("use crate::ast::*;\n")
     p("pub trait Visitor<'a>: Sized {")
     for [_, item_ty, item_name, *_] in root_items:
