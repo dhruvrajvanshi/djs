@@ -1,31 +1,42 @@
+// This file is generated automatically
+// python3 djs_ast/gen_ast.py > djs_ast/src/ast.rs
+// DO NOT EDIT
 use djs_syntax::Span;
+
+pub type Ident<'src> = &'src str;
 
 #[derive(Debug)]
 pub struct SourceFile<'src> {
     pub span: Span,
     pub stmts: Vec<Stmt<'src>>,
 }
+impl SourceFile<'_> {
+    pub fn span(&self) -> Span {
+        self.span
+    }
+}
 
 #[derive(Debug)]
 pub enum Stmt<'src> {
     Expr(Span, Box<Expr<'src>>),
     Block(Span, Block<'src>),
-    Return(Span, Option<Box<Expr<'src>>>),
-    VarDecl(Span, DeclType, Ident<'src>, Option<Box<Expr<'src>>>),
+    Return(Span, Option<Expr<'src>>),
+    VarDecl(Span, DeclType, Ident<'src>, Option<Expr<'src>>),
 }
-
-pub type Ident<'src> = &'src str;
-
-#[derive(Debug)]
-pub enum DeclType {
-    Let,
-    Const,
-    Var,
+impl Stmt<'_> {
+    pub fn span(&self) -> Span {
+        match self {
+            Stmt::Expr(span, ..) => *span,
+            Stmt::Block(span, ..) => *span,
+            Stmt::Return(span, ..) => *span,
+            Stmt::VarDecl(span, ..) => *span,
+        }
+    }
 }
 
 #[derive(Debug)]
 pub enum Expr<'src> {
-    Var(Span, &'src str),
+    Var(Span, Ident<'src>),
     BinOp(Span, Box<Expr<'src>>, BinOp, Box<Expr<'src>>),
     ArrowFn(Span, ParamList<'src>, ArrowFnBody<'src>),
     Call(Span, Box<Expr<'src>>, Vec<Expr<'src>>),
@@ -34,11 +45,11 @@ pub enum Expr<'src> {
 impl Expr<'_> {
     pub fn span(&self) -> Span {
         match self {
-            Expr::Var(span, _) => *span,
-            Expr::BinOp(span, _, _, _) => *span,
-            Expr::ArrowFn(span, _, _) => *span,
-            Expr::Call(span, _, _) => *span,
-            Expr::Member(span, _, _) => *span,
+            Expr::Var(span, ..) => *span,
+            Expr::BinOp(span, ..) => *span,
+            Expr::ArrowFn(span, ..) => *span,
+            Expr::Call(span, ..) => *span,
+            Expr::Member(span, ..) => *span,
         }
     }
 }
@@ -48,17 +59,22 @@ pub struct ParamList<'src> {
     pub span: Span,
     pub params: Vec<Param<'src>>,
 }
+impl ParamList<'_> {
+    pub fn span(&self) -> Span {
+        self.span
+    }
+}
 
 #[derive(Debug)]
 pub enum ArrowFnBody<'src> {
-    Expr(Box<Expr<'src>>),
-    Block(Block<'src>),
+    Expr(Span, Box<Expr<'src>>),
+    Block(Span, Block<'src>),
 }
 impl ArrowFnBody<'_> {
     pub fn span(&self) -> Span {
         match self {
-            ArrowFnBody::Expr(expr) => expr.span(),
-            ArrowFnBody::Block(block) => block.span,
+            ArrowFnBody::Expr(span, ..) => *span,
+            ArrowFnBody::Block(span, ..) => *span,
         }
     }
 }
@@ -68,11 +84,21 @@ pub struct Block<'src> {
     pub span: Span,
     pub stmts: Vec<Stmt<'src>>,
 }
+impl Block<'_> {
+    pub fn span(&self) -> Span {
+        self.span
+    }
+}
 
 #[derive(Debug)]
 pub struct Param<'src> {
     pub span: Span,
-    pub name: &'src str,
+    pub name: Ident<'src>,
+}
+impl Param<'_> {
+    pub fn span(&self) -> Span {
+        self.span
+    }
 }
 
 #[derive(Debug)]
@@ -81,4 +107,11 @@ pub enum BinOp {
     Sub,
     Mul,
     Div,
+}
+
+#[derive(Debug)]
+pub enum DeclType {
+    Let,
+    Const,
+    Var,
 }

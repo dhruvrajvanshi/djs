@@ -81,7 +81,7 @@ impl<'src> Parser<'src> {
         let ident = self.expect(T::Ident)?;
         let init = if self.current()?.kind == T::Eq {
             self.advance()?;
-            Some(Box::new(self.parse_expr()?))
+            Some(self.parse_expr()?)
         } else {
             None
         };
@@ -228,12 +228,13 @@ impl<'src> Parser<'src> {
                     stmts.push(stmt);
                 }
                 let stop = self.expect(T::RBrace)?;
-                Ok(ArrowFnBody::Block(Block {
-                    span: Span::between(start.span, stop.span),
-                    stmts,
-                }))
+                let span = Span::between(start.span, stop.span);
+                Ok(ArrowFnBody::Block(span, Block { span, stmts }))
             }
-            _ => Ok(ArrowFnBody::Expr(Box::new(self.parse_expr()?))),
+            _ => {
+                let expr = self.parse_expr()?;
+                Ok(ArrowFnBody::Expr(expr.span(), Box::new(expr)))
+            }
         }
     }
 
@@ -389,7 +390,7 @@ mod tests {
         let source = "() => { x; y }";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        let Expr::ArrowFn(_, _, ArrowFnBody::Block(block)) = expr else {
+        let Expr::ArrowFn(_, _, ArrowFnBody::Block(_, block)) = expr else {
             panic!("Expected an arrow fn expression")
         };
         let [Stmt::Expr(_, first_stmt), Stmt::Expr(_, second_stmt)] = block.stmts.as_slice() else {
@@ -406,7 +407,7 @@ mod tests {
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
             Stmt::VarDecl(_, DeclType::Let, "x", Some(init)) => {
-                assert!(matches!(*init, Expr::Var(.., "y")));
+                assert!(matches!(init, Expr::Var(.., "y")));
             }
             _ => panic!("Expected a variable declaration"),
         }
@@ -416,7 +417,7 @@ mod tests {
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
             Stmt::VarDecl(_, DeclType::Const, "x", Some(init)) => {
-                assert!(matches!(*init, Expr::Var(.., "y")));
+                assert!(matches!(init, Expr::Var(.., "y")));
             }
             _ => panic!("Expected a variable declaration"),
         }
@@ -426,7 +427,7 @@ mod tests {
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
             Stmt::VarDecl(_, DeclType::Var, "x", Some(init)) => {
-                assert!(matches!(*init, Expr::Var(.., "y")));
+                assert!(matches!(init, Expr::Var(.., "y")));
             }
             _ => panic!("Expected a variable declaration"),
         }
