@@ -4,7 +4,7 @@ use djs_ast::{ArrowFnBody, Expr, Param, ParamList, SourceFile, Stmt};
 use djs_syntax::Span;
 
 use crate::{
-    lexer::Lexer,
+    lexer::{self, Lexer},
     token::{Token, TokenKind},
 };
 
@@ -12,17 +12,18 @@ use crate::{
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
     last_token: Option<Token<'src>>,
-    current_token: Token<'src>,
+    current_token: lexer::Result<Token<'src>>,
 }
-pub type Result<T> = std::result::Result<T, ParseError>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 type T = TokenKind;
 
 #[derive(Debug)]
-pub enum ParseError {
+pub enum Error {
     UnexpectedToken,
     UnexpectedEOF,
     MissingSemi,
+    Lexer(lexer::Error),
 }
 
 impl<'src> Parser<'src> {
@@ -36,14 +37,18 @@ impl<'src> Parser<'src> {
         }
     }
 
+    pub fn current(&self) -> Result<&Token<'src>> {
+        self.current_token.as_ref().map_err(|e| Error::Lexer(*e))
+    }
+
     pub fn parse_source_file(&mut self) -> Result<SourceFile<'src>> {
         let mut stmts = Vec::new();
-        let start = self.current_token.span;
-        while self.current_token.kind != T::EndOfFile {
+        let start = self.current()?.span;
+        while self.current()?.kind != T::EndOfFile {
             let stmt = self.parse_stmt()?;
             stmts.push(stmt);
         }
-        let stop = self.current_token.span;
+        let stop = self.current()?.span;
         Ok(SourceFile {
             span: Span::between(start, stop),
             stmts,
@@ -62,14 +67,14 @@ impl<'src> Parser<'src> {
 
     fn expect_semi(&mut self) -> Result<()> {
         // TODO: Handle ASI
-        if self.current_token.kind == T::Semi {
-            self.advance();
+        if self.current()?.kind == T::Semi {
+            self.advance()?;
             return Ok(());
         }
-        if self.current_token.kind == T::RBrace || self.current_token.kind == T::EndOfFile {
+        if matches!(self.current()?.kind, T::RBrace | T::EndOfFile) {
             return Ok(());
         }
-        if self.current_token.line
+        if self.current()?.line
             > self
                 .last_token
                 .expect("expect_semi must be called after consuming at least 1 token")
@@ -77,13 +82,13 @@ impl<'src> Parser<'src> {
         {
             return Ok(());
         }
-        Err(ParseError::MissingSemi)
+        Err(Error::MissingSemi)
     }
 
     pub(super) fn parse_primary_expr(&mut self) -> Result<Expr<'src>> {
-        match self.current_token.kind {
+        match self.current()?.kind {
             T::Ident => {
-                let tok = self.advance();
+                let tok = self.advance()?;
                 Ok(Expr::Var(tok.span, tok.text))
             }
             T::LParen => {
@@ -101,10 +106,10 @@ impl<'src> Parser<'src> {
                         Ok(expr)
                     }
 
-                    _ => Err(ParseError::UnexpectedToken),
+                    _ => Err(Error::UnexpectedToken),
                 }
             }
-            _ => Err(ParseError::UnexpectedToken),
+            _ => Err(Error::UnexpectedToken),
         }
     }
 
@@ -126,9 +131,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_member_expr_tail(&mut self, lhs: Expr<'src>) -> Result<Expr<'src>> {
-        match self.current_token.kind {
+        match self.current()?.kind {
             T::LSquare => {
-                self.advance();
+                self.advance()?;
                 let prop = self.parse_expr()?;
                 self.expect(T::RSquare)?;
                 let span = Span::between(lhs.span(), prop.span());
@@ -140,9 +145,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_call_expr_tail(&mut self, lhs: Expr<'src>) -> Result<Expr<'src>> {
-        match self.current_token.kind {
+        match self.current()?.kind {
             T::LParen => {
-                self.advance();
+                self.advance()?;
                 let args = self.parse_arg_list()?;
                 let end_tok = self.expect(T::RParen)?;
                 let span = Span::between(lhs.span(), end_tok.span);
@@ -155,12 +160,12 @@ impl<'src> Parser<'src> {
     fn parse_arg_list(&mut self) -> Result<Vec<Expr<'src>>> {
         let mut args = Vec::new();
         loop {
-            if matches!(self.current_token.kind, T::RParen | T::EndOfFile) {
+            if matches!(self.current()?.kind, T::RParen | T::EndOfFile) {
                 break;
             }
             args.push(self.parse_expr()?);
-            if self.current_token.kind == T::Comma {
-                self.advance();
+            if self.current()?.kind == T::Comma {
+                self.advance()?;
             }
         }
         Ok(args)
@@ -179,7 +184,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expr_or_block(&mut self) -> Result<ArrowFnBody<'src>> {
-        match self.current_token.kind {
+        match self.current()?.kind {
             T::LBrace => {
                 todo!()
             }
@@ -191,16 +196,16 @@ impl<'src> Parser<'src> {
         let start = self.expect(T::LParen)?;
         let mut params = Vec::new();
         loop {
-            match self.current_token.kind {
+            match self.current()?.kind {
                 T::Ident => {
-                    let tok = self.advance();
+                    let tok = self.advance()?;
                     params.push(Param {
                         span: tok.span,
                         name: tok.text,
                     });
                 }
                 T::RParen => break,
-                _ => return Err(ParseError::UnexpectedToken),
+                _ => return Err(Error::UnexpectedToken),
             }
         }
         let stop = self.expect(T::RParen)?;
@@ -217,17 +222,22 @@ impl<'src> Parser<'src> {
         *self = snapshot;
     }
 
-    fn advance(&mut self) -> Token<'src> {
-        let last_token = mem::replace(&mut self.current_token, self.lexer.next_token());
+    fn advance(&mut self) -> Result<Token<'src>> {
+        let last_token = mem::replace(&mut self.current_token, self.lexer.next_token())?;
         self.last_token = Some(last_token);
-        last_token
+        Ok(last_token)
     }
     fn expect(&mut self, kind: TokenKind) -> Result<Token<'src>> {
-        if self.current_token.kind == kind {
-            Ok(self.advance())
+        if self.current()?.kind == kind {
+            Ok(self.advance()?)
         } else {
-            Err(ParseError::UnexpectedToken)
+            Err(Error::UnexpectedToken)
         }
+    }
+}
+impl From<lexer::Error> for Error {
+    fn from(e: lexer::Error) -> Self {
+        Error::Lexer(e)
     }
 }
 
