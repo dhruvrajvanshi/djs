@@ -22,6 +22,7 @@ pub enum TokenKind {
     Semi,
 
     FatArrow,
+    Eq,
 
     EndOfFile,
 }
