@@ -96,6 +96,8 @@ impl<'src> Lexer<'src> {
             "let" => TokenKind::Let,
             "var" => TokenKind::Var,
             "const" => TokenKind::Const,
+            "if" => TokenKind::If,
+            "else" => TokenKind::Else,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)
