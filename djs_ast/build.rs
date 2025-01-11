@@ -1,13 +1,15 @@
 use core::panic;
-use std::{fs, path::Path, process::Command};
+use std::{env, fs, path::Path, process::Command};
 
 fn main() {
+    let out_dir = env::var_os("OUT_DIR").unwrap();
+    let ast_rs = Path::new(&out_dir).join("ast.rs");
     let gen_ast_result = Command::new("python3")
         .args(["gen_ast.py"])
         .output()
         .unwrap();
 
-    fs::write(Path::new("src").join("ast.rs"), gen_ast_result.stdout).unwrap();
+    fs::write(Path::new(&out_dir).join("ast.rs"), gen_ast_result.stdout).unwrap();
     if !gen_ast_result.status.success() {
         fs::write(Path::new("gen_ast.py.stderr"), gen_ast_result.stderr).unwrap();
     }
@@ -17,11 +19,8 @@ fn main() {
         .output()
         .unwrap();
 
-    fs::write(
-        Path::new("src").join("visitor.rs"),
-        gen_visitor_result.stdout,
-    )
-    .unwrap();
+    let visitor_rs = Path::new(&out_dir).join("visitor.rs");
+    fs::write(&visitor_rs, gen_visitor_result.stdout).unwrap();
     if !gen_visitor_result.status.success() {
         fs::write(
             Path::new("gen_visitor.py.stderr"),
@@ -35,12 +34,12 @@ fn main() {
     }
 
     assert!(Command::new("cargo")
-        .args(["fmt", "--", "src/visitor.rs"])
+        .args(["fmt", "--", visitor_rs.to_str().unwrap()])
         .status()
         .unwrap()
         .success());
     assert!(Command::new("cargo")
-        .args(["fmt", "--", "src/ast.rs"])
+        .args(["fmt", "--", ast_rs.to_str().unwrap()])
         .status()
         .unwrap()
         .success());
