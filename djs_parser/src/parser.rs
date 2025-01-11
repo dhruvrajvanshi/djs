@@ -1,6 +1,6 @@
 use std::mem;
 
-use djs_ast::{ArrowFnBody, Expr, Param, ParamList, SourceFile, Stmt};
+use djs_ast::{ArrowFnBody, Block, Expr, Param, ParamList, SourceFile, Stmt};
 use djs_syntax::Span;
 
 use crate::{
@@ -186,7 +186,17 @@ impl<'src> Parser<'src> {
     fn parse_expr_or_block(&mut self) -> Result<ArrowFnBody<'src>> {
         match self.current()?.kind {
             T::LBrace => {
-                todo!()
+                let start = self.advance()?;
+                let mut stmts = vec![];
+                while !matches!(self.current()?.kind, T::RBrace | T::EndOfFile) {
+                    let stmt = self.parse_stmt()?;
+                    stmts.push(stmt);
+                }
+                let stop = self.expect(T::RBrace)?;
+                Ok(ArrowFnBody::Block(Block {
+                    span: Span::between(start.span, stop.span),
+                    stmts,
+                }))
             }
             _ => Ok(ArrowFnBody::Expr(Box::new(self.parse_expr()?))),
         }
@@ -337,5 +347,20 @@ mod tests {
         };
         assert!(matches!(*b, Var(_, "b")));
         assert!(matches!(*obj, Var(_, "a")));
+    }
+
+    #[test]
+    fn parses_arrow_fn_with_block_body() {
+        let source = "() => { x; y }";
+        let mut parser = Parser::new(source);
+        let expr = parser.parse_expr().unwrap();
+        let Expr::ArrowFn(_, _, ArrowFnBody::Block(block)) = expr else {
+            panic!("Expected an arrow fn expression")
+        };
+        let [Stmt::Expr(_, first_stmt), Stmt::Expr(_, second_stmt)] = block.stmts.as_slice() else {
+            panic!("Expected 2 statements in the block")
+        };
+        assert!(matches!(**first_stmt, Expr::Var(_, "x")));
+        assert!(matches!(**second_stmt, Expr::Var(_, "y")));
     }
 }
