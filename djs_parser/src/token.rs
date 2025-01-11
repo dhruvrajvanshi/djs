@@ -14,6 +14,8 @@ pub enum TokenKind {
     Let,
     Var,
     Const,
+    If,
+    Else,
 
     LBrace,
     RBrace,

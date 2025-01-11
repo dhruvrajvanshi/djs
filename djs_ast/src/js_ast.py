@@ -8,6 +8,7 @@ ast_items = [
         ["Block", "Block"],
         ["Return", ["Option", "Expr"]],
         ["VarDecl", "DeclType", "Pattern", ["Option", "Expr"]],
+        ["If", ["Box", "Expr"], ["Box", "Stmt"], ["Option", ["Box", "Stmt"]]],
     ],
     [
         "ast",
