@@ -51,7 +51,7 @@ impl<'src> Lexer<'src> {
             }
             c => {
                 if is_identifier_start(self.current_char()) {
-                    Ok(self.lex_identifier())
+                    Ok(self.lex_ident_or_keyword())
                 } else {
                     Err(Error::UnexpectedCharacter(c))
                 }
@@ -60,8 +60,6 @@ impl<'src> Lexer<'src> {
     }
 
     fn make_token(&self, kind: TokenKind) -> Token<'src> {
-        let start_index = self.start_offset as usize;
-        let end_index = self.current_offset() as usize;
         Token {
             kind,
             span: Span {
@@ -69,8 +67,14 @@ impl<'src> Lexer<'src> {
                 end: self.current_offset(),
             },
             line: self.line,
-            text: &self.source[start_index..end_index],
+            text: self.current_text(),
         }
+    }
+
+    fn current_text(&self) -> &'src str {
+        let start_index = self.start_offset as usize;
+        let end_index = self.current_offset() as usize;
+        &self.source[start_index..end_index]
     }
 
     fn lex_single_char_token(&mut self, kind: TokenKind) -> Result<Token<'src>> {
@@ -84,11 +88,17 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    fn lex_identifier(&mut self) -> Token<'src> {
+    fn lex_ident_or_keyword(&mut self) -> Token<'src> {
         while is_identifier_char(self.current_char()) {
             self.advance();
         }
-        self.make_token(TokenKind::Ident)
+        let token_kind = match self.current_text() {
+            "let" => TokenKind::Let,
+            "var" => TokenKind::Var,
+            "const" => TokenKind::Const,
+            _ => TokenKind::Ident,
+        };
+        self.make_token(token_kind)
     }
 
     fn advance(&mut self) -> char {

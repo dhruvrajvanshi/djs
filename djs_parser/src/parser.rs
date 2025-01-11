@@ -1,6 +1,6 @@
 use std::mem;
 
-use djs_ast::{ArrowFnBody, Block, Expr, Param, ParamList, SourceFile, Stmt};
+use djs_ast::{ArrowFnBody, Block, DeclType, Expr, Param, ParamList, SourceFile, Stmt};
 use djs_syntax::Span;
 
 use crate::{
@@ -56,7 +56,42 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt<'src>> {
-        self.parse_expr_stmt()
+        match self.current()?.kind {
+            T::Let | T::Const | T::Var => self.parse_var_decl(),
+            _ => self.parse_expr_stmt(),
+        }
+    }
+
+    fn parse_var_decl(&mut self) -> Result<Stmt<'src>> {
+        let decl_type = match self.current()?.kind {
+            T::Let => {
+                self.advance()?;
+                DeclType::Let
+            }
+            T::Const => {
+                self.advance()?;
+                DeclType::Const
+            }
+            T::Var => {
+                self.advance()?;
+                DeclType::Var
+            }
+            _ => return Err(Error::UnexpectedToken),
+        };
+        let ident = self.expect(T::Ident)?;
+        let init = if self.current()?.kind == T::Eq {
+            self.advance()?;
+            Some(Box::new(self.parse_expr()?))
+        } else {
+            None
+        };
+        self.expect_semi()?;
+        Ok(Stmt::VarDecl(
+            Span::between(ident.span, ident.span),
+            decl_type,
+            ident.text,
+            init,
+        ))
     }
 
     fn parse_expr_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -362,5 +397,38 @@ mod tests {
         };
         assert!(matches!(**first_stmt, Expr::Var(_, "x")));
         assert!(matches!(**second_stmt, Expr::Var(_, "y")));
+    }
+
+    #[test]
+    fn parses_var_decl() {
+        let source = "let x = y;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::VarDecl(_, DeclType::Let, "x", Some(init)) => {
+                assert!(matches!(*init, Expr::Var(.., "y")));
+            }
+            _ => panic!("Expected a variable declaration"),
+        }
+
+        let source = "const x = y;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::VarDecl(_, DeclType::Const, "x", Some(init)) => {
+                assert!(matches!(*init, Expr::Var(.., "y")));
+            }
+            _ => panic!("Expected a variable declaration"),
+        }
+
+        let source = "var x = y;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::VarDecl(_, DeclType::Var, "x", Some(init)) => {
+                assert!(matches!(*init, Expr::Var(.., "y")));
+            }
+            _ => panic!("Expected a variable declaration"),
+        }
     }
 }
