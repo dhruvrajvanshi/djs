@@ -66,6 +66,13 @@ pub fn walk_stmt<'a, V: Visitor<'a>>(visitor: &mut V, node: &Stmt) {
                 visitor.visit_expr(item);
             }
         }
+        Stmt::If(_, f0, f1, f2) => {
+            visitor.visit_expr(f0);
+            visitor.visit_stmt(f1);
+            if let Some(item) = f2 {
+                visitor.visit_stmt(item);
+            }
+        }
     }
 }
 

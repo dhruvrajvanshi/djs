@@ -22,6 +22,12 @@ pub enum Stmt<'src> {
     Block(Span, Block<'src>),
     Return(Span, Option<Expr<'src>>),
     VarDecl(Span, DeclType, Pattern<'src>, Option<Expr<'src>>),
+    If(
+        Span,
+        Box<Expr<'src>>,
+        Box<Stmt<'src>>,
+        Option<Box<Stmt<'src>>>,
+    ),
 }
 impl Stmt<'_> {
     pub fn span(&self) -> Span {
@@ -30,6 +36,7 @@ impl Stmt<'_> {
             Stmt::Block(span, ..) => *span,
             Stmt::Return(span, ..) => *span,
             Stmt::VarDecl(span, ..) => *span,
+            Stmt::If(span, ..) => *span,
         }
     }
 }
