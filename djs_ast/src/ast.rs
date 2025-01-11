@@ -1,5 +1,5 @@
 // This file is generated automatically
-// python3 djs_ast/gen_ast.py > djs_ast/src/ast.rs
+// python3 djs_ast/gen_ast.py > djs_ast/src/ast.rs && cargo fmt -- djs_ast/src/ast.rs
 // DO NOT EDIT
 use djs_syntax::Span;
 
