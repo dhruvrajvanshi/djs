@@ -1,7 +1,6 @@
-from js_ast import ast_items
+from src.js_ast import ast_items
 
 ast_names = set(item[2] for item in ast_items if item[0] == "ast")
-
 
 def gen_type(type):
     match type:

@@ -1,4 +1,4 @@
-from js_ast import ast_items
+from src.js_ast import ast_items
 
 root_items = [item for item in ast_items if item[0] == "ast"]
 ast_item_names = set(item[2] for item in ast_items if item[0] == "ast")
