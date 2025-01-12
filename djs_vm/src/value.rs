@@ -9,14 +9,16 @@ pub enum Value {
     Object(*mut Object),
 }
 
-pub enum Object {
-    Instance(ObjectInstance),
-    String(String),
-}
-pub struct ObjectInstance {
+pub struct Object {
     pub prototype: *mut Object,
     pub properties: HashMap<String, PropertyDescriptor>,
+    pub kind: ObjectKind,
 }
+pub enum ObjectKind {
+    Ordinary,
+    String(String),
+}
+
 pub enum PropertyDescriptor {
     Value(Value),
 }
