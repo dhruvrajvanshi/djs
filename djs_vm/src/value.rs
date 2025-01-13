@@ -1,5 +1,7 @@
 use std::{collections::HashMap, ptr::NonNull};
 
+use crate::bytecode::Bytecode;
+
 #[derive(Debug, Clone, Copy)]
 pub enum Value {
     Null,
@@ -20,9 +22,15 @@ pub struct Object {
 pub enum ObjectKind {
     Ordinary,
     String(String),
+    Function(Function),
 }
 
 #[derive(Debug)]
 pub enum PropertyDescriptor {
     Value(Value),
+}
+
+#[derive(Debug)]
+pub struct Function {
+    pub code: Vec<Bytecode>,
 }
