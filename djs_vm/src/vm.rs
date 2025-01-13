@@ -2,7 +2,7 @@ use std::ops::{Index, IndexMut};
 
 use crate::{
     bytecode::{Bytecode, Register, REG_RETURN},
-    value::Value,
+    value::{Function, Value},
 };
 
 pub struct VM {
@@ -52,16 +52,11 @@ impl Default for VM {
     }
 }
 
-#[derive(Debug)]
-pub struct Function {
-    pub code: Vec<Bytecode>,
-}
-
 #[cfg(test)]
 mod test {
     use core::f64;
 
-    use crate::{bytecode::REG_RETURN, value::Value, vm::Function};
+    use crate::{bytecode::REG_RETURN, value::Function, value::Value};
 
     use super::VM;
 
