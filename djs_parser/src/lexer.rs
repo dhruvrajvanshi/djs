@@ -28,7 +28,7 @@ impl<'src> Lexer<'src> {
     }
 
     pub fn next_token(&mut self) -> Result<Token<'src>> {
-        self.skip_whitespace();
+        self.skip_whitespace_and_comments();
         self.start_offset = self.current_offset();
         match self.current_char() {
             EOF_CHAR => Ok(self.make_token(TokenKind::EndOfFile)),
@@ -82,10 +82,43 @@ impl<'src> Lexer<'src> {
         Ok(self.make_token(kind))
     }
 
+    fn skip_whitespace_and_comments(&mut self) {
+        while self.current_char().is_whitespace() || self.at_comment() {
+            if self.current_char().is_whitespace() {
+                self.skip_whitespace();
+            } else {
+                self.skip_comment();
+            }
+        }
+    }
+
+    fn skip_comment(&mut self) {
+        let first = self.advance();
+        assert_eq!(first, '/');
+        let second = self.advance();
+        assert!(second == '/' || second == '*');
+        if second == '/' {
+            while !matches!(self.current_char(), '\n' | EOF_CHAR) {
+                self.advance();
+            }
+        } else {
+            while !(self.current_char() == '*' && self.next_char() == '/')
+                && self.current_char() != EOF_CHAR
+            {
+                self.advance();
+            }
+        }
+    }
+
     fn skip_whitespace(&mut self) {
         while self.current_char().is_whitespace() {
             self.advance();
         }
+    }
+
+    fn at_comment(&self) -> bool {
+        (self.current_char() == '/' && self.next_char() == '/')
+            || (self.current_char() == '/' && self.next_char() == '*')
     }
 
     fn lex_ident_or_keyword(&mut self) -> Token<'src> {
@@ -134,6 +167,12 @@ impl<'src> Lexer<'src> {
             .map(|(_, c)| c)
             .unwrap_or(EOF_CHAR)
     }
+
+    fn next_char(&self) -> char {
+        let mut iter = self.input.clone();
+        iter.next();
+        iter.next().map(|(_, c)| c).unwrap_or(EOF_CHAR)
+    }
 }
 const EOF_CHAR: char = '\0';
 
@@ -147,7 +186,11 @@ fn is_identifier_char(c: char) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::{lexer::Lexer, token::TokenKind};
+
+    use crate::{
+        lexer::Lexer,
+        token::{Token, TokenKind},
+    };
 
     #[test]
     fn test_lexes_empty_file() {
@@ -199,5 +242,31 @@ mod test {
         tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::RParen);
         assert_eq!(tok.text, ")");
+    }
+
+    #[test]
+    fn skips_comments() {
+        let mut lexer = Lexer::new(
+            "
+            // foo
+            x
+            // foo
+            y
+
+            // foo
+
+            /* bar
+            */
+            z
+        ",
+        );
+        assert!(matches!(
+            lexer.next_token().unwrap(),
+            Token {
+                kind: TokenKind::Ident,
+                text: "x",
+                ..
+            }
+        ));
     }
 }
