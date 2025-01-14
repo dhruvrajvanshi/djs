@@ -8,6 +8,8 @@ def gen_type(type):
             return f"{generic_name}<{", ".join([gen_type(arg) for arg in args])}>"
         case "Ident":
             return f"Ident<'src>"
+        case "Text":
+            return f"&'src str"
         case str(type) if type in ast_names:
             return f"{type}<'src>"
         case str(type):
