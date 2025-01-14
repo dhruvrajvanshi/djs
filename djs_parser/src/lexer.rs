@@ -30,7 +30,7 @@ impl<'src> Lexer<'src> {
     }
 
     pub fn next_token(&mut self) -> Result<Token<'src>> {
-        self.skip_whitespace_and_comments();
+        self.skip_whitespace_and_comments()?;
         self.start_offset = self.current_offset();
         match self.current_char() {
             EOF_CHAR => Ok(self.make_token(TokenKind::EndOfFile)),
@@ -42,6 +42,7 @@ impl<'src> Lexer<'src> {
             '[' => self.lex_single_char_token(TokenKind::LSquare),
             ']' => self.lex_single_char_token(TokenKind::RSquare),
             ',' => self.lex_single_char_token(TokenKind::Comma),
+            ':' => self.lex_single_char_token(TokenKind::Colon),
             '"' | '\'' => self.lex_simple_string(),
             '=' => {
                 self.advance();
@@ -115,17 +116,18 @@ impl<'src> Lexer<'src> {
         Ok(self.make_token(kind))
     }
 
-    fn skip_whitespace_and_comments(&mut self) {
+    fn skip_whitespace_and_comments(&mut self) -> Result<()> {
         while self.current_char().is_whitespace() || self.at_comment() {
             if self.current_char().is_whitespace() {
                 self.skip_whitespace();
             } else {
-                self.skip_comment();
+                self.skip_comment()?;
             }
         }
+        Ok(())
     }
 
-    fn skip_comment(&mut self) {
+    fn skip_comment(&mut self) -> Result<()> {
         let first = self.advance();
         assert_eq!(first, '/');
         let second = self.advance();
@@ -135,12 +137,18 @@ impl<'src> Lexer<'src> {
                 self.advance();
             }
         } else {
-            while !(self.current_char() == '*' && self.next_char() == '/')
-                && self.current_char() != EOF_CHAR
-            {
-                self.advance();
+            loop {
+                let first = self.advance();
+                if first == EOF_CHAR {
+                    return Err(Error::UnexpectedEOF('*'));
+                }
+                if first == '*' && self.current_char() == '/' {
+                    self.advance();
+                    break;
+                }
             }
         }
+        Ok(())
     }
 
     fn skip_whitespace(&mut self) {
@@ -219,7 +227,6 @@ fn is_identifier_char(c: char) -> bool {
 
 #[cfg(test)]
 mod test {
-
     use crate::{
         lexer::Lexer,
         token::{Token, TokenKind},
@@ -301,6 +308,20 @@ mod test {
                 ..
             }
         ));
+        let mut token = lexer.next_token().unwrap();
+        assert_eq!(token.kind, TokenKind::Ident);
+        assert_eq!(token.text, "y");
+        token = lexer.next_token().unwrap();
+        assert_eq!(token.kind, TokenKind::Ident);
+        assert_eq!(token.text, "z");
+    }
+
+    #[test]
+    fn skips_block_comments() {
+        let mut lexer = Lexer::new("/* foo */ x");
+        let mut token = lexer.next_token().unwrap();
+        assert_eq!(token.kind, TokenKind::Ident);
+        assert_eq!(token.text, "x");
     }
 
     #[test]
