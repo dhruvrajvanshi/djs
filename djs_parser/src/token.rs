@@ -27,6 +27,8 @@ pub enum TokenKind {
     LSquare,
     RSquare,
     Comma,
+    Colon,
+    Dot,
     Semi,
 
     FatArrow,
