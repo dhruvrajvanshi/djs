@@ -14,6 +14,7 @@ pub struct Lexer<'src> {
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
     UnexpectedCharacter(char),
+    UnexpectedEOF(/* expected? */ char),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -40,6 +41,7 @@ impl<'src> Lexer<'src> {
             '[' => self.lex_single_char_token(TokenKind::LSquare),
             ']' => self.lex_single_char_token(TokenKind::RSquare),
             ',' => self.lex_single_char_token(TokenKind::Comma),
+            '"' | '\'' => self.lex_simple_string(),
             '=' => {
                 self.advance();
                 if self.current_char() == '>' {
@@ -56,6 +58,20 @@ impl<'src> Lexer<'src> {
                     Err(Error::UnexpectedCharacter(c))
                 }
             }
+        }
+    }
+
+    fn lex_simple_string(&mut self) -> Result<Token<'src>> {
+        assert!(matches!(self.current_char(), '"' | '\''));
+        let quote = self.advance();
+        while self.current_char() != EOF_CHAR && self.current_char() != quote {
+            self.advance();
+        }
+        let end_quote = self.advance();
+        if end_quote != quote {
+            Err(Error::UnexpectedEOF(quote))
+        } else {
+            Ok(self.make_token(TokenKind::String))
         }
     }
 
@@ -268,5 +284,24 @@ mod test {
                 ..
             }
         ));
+    }
+
+    #[test]
+    fn parses_unquoted_strings() {
+        let mut lexer = Lexer::new(
+            "
+          'foo bar'
+
+          \"foo bar\"
+        ",
+        );
+        let mut tok = lexer.next_token().unwrap();
+
+        assert_eq!(tok.text, "'foo bar'");
+        assert_eq!(tok.kind, TokenKind::String);
+
+        tok = lexer.next_token().unwrap();
+        assert_eq!(tok.text, "\"foo bar\"");
+        assert_eq!(tok.kind, TokenKind::String);
     }
 }
