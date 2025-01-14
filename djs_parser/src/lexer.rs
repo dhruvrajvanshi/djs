@@ -52,14 +52,23 @@ impl<'src> Lexer<'src> {
                     Ok(self.make_token(TokenKind::Eq))
                 }
             }
-            c => {
-                if is_identifier_start(self.current_char()) {
-                    Ok(self.lex_ident_or_keyword())
-                } else {
-                    Err(Error::UnexpectedCharacter(c))
-                }
-            }
+            c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
+            c if c.is_numeric() => self.lex_number(),
+            c => Err(Error::UnexpectedCharacter(c)),
         }
+    }
+
+    fn lex_number(&mut self) -> Result<Token<'src>> {
+        let start = self.advance();
+        assert!(start.is_numeric());
+        while (self.current_char().is_numeric() || self.current_char() == '.') && !self.eof() {
+            self.advance();
+        }
+        Ok(self.make_token(TokenKind::Number))
+    }
+
+    fn eof(&self) -> bool {
+        self.current_char() == EOF_CHAR
     }
 
     fn lex_simple_string(&mut self) -> Result<Token<'src>> {
