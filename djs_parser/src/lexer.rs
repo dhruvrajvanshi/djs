@@ -43,6 +43,7 @@ impl<'src> Lexer<'src> {
             ']' => self.lex_single_char_token(TokenKind::RSquare),
             ',' => self.lex_single_char_token(TokenKind::Comma),
             ':' => self.lex_single_char_token(TokenKind::Colon),
+            '.' => self.lex_single_char_token(TokenKind::Dot),
             '"' | '\'' => self.lex_simple_string(),
             '=' => {
                 self.advance();
@@ -319,7 +320,7 @@ mod test {
     #[test]
     fn skips_block_comments() {
         let mut lexer = Lexer::new("/* foo */ x");
-        let mut token = lexer.next_token().unwrap();
+        let token = lexer.next_token().unwrap();
         assert_eq!(token.kind, TokenKind::Ident);
         assert_eq!(token.text, "x");
     }

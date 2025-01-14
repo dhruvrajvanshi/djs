@@ -1,6 +1,9 @@
 use std::mem;
 
-use djs_ast::{ArrowFnBody, Block, DeclType, Expr, Param, ParamList, Pattern, SourceFile, Stmt};
+use djs_ast::{
+    ArrowFnBody, Block, DeclType, Expr, Ident, ObjectLiteralEntry, Param, ParamList, Pattern,
+    SourceFile, Stmt,
+};
 use djs_syntax::Span;
 
 use crate::{
@@ -20,7 +23,7 @@ type T = TokenKind;
 
 #[derive(Debug)]
 pub enum Error {
-    UnexpectedToken,
+    UnexpectedToken(u32, Span, TokenKind),
     UnexpectedEOF,
     MissingSemi,
     Lexer(lexer::Error),
@@ -103,7 +106,7 @@ impl<'src> Parser<'src> {
                 self.advance()?;
                 DeclType::Var
             }
-            _ => return Err(Error::UnexpectedToken),
+            _ => return self.unexpected_token(),
         };
         let pattern = self.parse_pattern()?;
         let init = if self.current()?.kind == T::Eq {
@@ -121,6 +124,14 @@ impl<'src> Parser<'src> {
             decl_type,
             pattern,
             init,
+        ))
+    }
+
+    fn unexpected_token<T>(&self) -> Result<T> {
+        Err(Error::UnexpectedToken(
+            self.current()?.line,
+            self.current()?.span,
+            self.current()?.kind,
         ))
     }
 
@@ -170,6 +181,29 @@ impl<'src> Parser<'src> {
                 let tok = self.advance()?;
                 Ok(Expr::Number(tok.span, tok.text))
             }
+            T::LBrace => {
+                let start = self.advance()?;
+                let mut entries = vec![];
+                let mut first = true;
+                while !matches!(self.current()?.kind, T::RBrace | T::EndOfFile) {
+                    if !first {
+                        self.expect(T::Comma)?;
+                    } else {
+                        first = false;
+                    }
+                    let start = self.current()?.span;
+                    let ident = self.parse_ident()?;
+                    self.expect(T::Colon)?;
+                    let expr = self.parse_expr()?;
+                    entries.push(ObjectLiteralEntry {
+                        span: Span::between(start, expr.span()),
+                        key: ident,
+                        value: expr,
+                    });
+                }
+                let end = self.expect(T::RBrace)?;
+                Ok(Expr::Object(Span::between(start.span, end.span), entries))
+            }
             T::LParen => {
                 let mut snapshot1 = self.clone();
                 let mut snapshot2 = self.clone();
@@ -185,11 +219,16 @@ impl<'src> Parser<'src> {
                         Ok(expr)
                     }
 
-                    _ => Err(Error::UnexpectedToken),
+                    _ => self.unexpected_token(),
                 }
             }
-            _ => Err(Error::UnexpectedToken),
+            _ => self.unexpected_token(),
         }
+    }
+
+    fn parse_ident(&mut self) -> Result<Ident<'src>> {
+        let tok = self.expect(T::Ident)?;
+        Ok(tok.text)
     }
 
     fn parse_paren_expr(&mut self) -> Result<Expr<'src>> {
@@ -216,8 +255,15 @@ impl<'src> Parser<'src> {
                 let prop = self.parse_expr()?;
                 self.expect(T::RSquare)?;
                 let span = Span::between(lhs.span(), prop.span());
-                let member_expr = Expr::Member(span, Box::new(lhs), Box::new(prop));
+                let member_expr = Expr::Index(span, Box::new(lhs), Box::new(prop));
                 self.parse_member_expr_tail(member_expr)
+            }
+            T::Dot => {
+                self.advance()?;
+                let prop = self.expect(T::Ident)?;
+                let span = Span::between(lhs.span(), prop.span);
+                let prop_expr = Expr::Prop(span, Box::new(lhs), prop.text);
+                self.parse_member_expr_tail(prop_expr)
             }
             _ => Ok(lhs),
         }
@@ -253,7 +299,7 @@ impl<'src> Parser<'src> {
     fn parse_arrow_fn(&mut self) -> Result<Expr<'src>> {
         let params = self.parse_param_list()?;
         self.expect(T::FatArrow)?;
-        let body = self.parse_expr_or_block()?;
+        let body = self.parse_arrow_fn_body()?;
 
         Ok(Expr::ArrowFn(
             Span::between(params.span, body.span()),
@@ -262,7 +308,7 @@ impl<'src> Parser<'src> {
         ))
     }
 
-    fn parse_expr_or_block(&mut self) -> Result<ArrowFnBody<'src>> {
+    fn parse_arrow_fn_body(&mut self) -> Result<ArrowFnBody<'src>> {
         match self.current()?.kind {
             T::LBrace => {
                 let start = self.advance()?;
@@ -295,7 +341,7 @@ impl<'src> Parser<'src> {
                     });
                 }
                 T::RParen => break,
-                _ => return Err(Error::UnexpectedToken),
+                _ => return self.unexpected_token(),
             }
         }
         let stop = self.expect(T::RParen)?;
@@ -321,7 +367,7 @@ impl<'src> Parser<'src> {
         if self.current()?.kind == kind {
             Ok(self.advance()?)
         } else {
-            Err(Error::UnexpectedToken)
+            self.unexpected_token()
         }
     }
 }
@@ -420,11 +466,11 @@ mod tests {
             panic!("Expected a call expression")
         };
         assert!(matches!(args.as_slice(), []));
-        let Member(_, obj, c) = *inner_callee else {
+        let Index(_, obj, c) = *inner_callee else {
             panic!("Expected a member expression")
         };
         assert!(matches!(*c, Var(_, "c")));
-        let Member(_, obj, b) = *obj else {
+        let Index(_, obj, b) = *obj else {
             panic!("Expected a member expression")
         };
         assert!(matches!(*b, Var(_, "b")));
