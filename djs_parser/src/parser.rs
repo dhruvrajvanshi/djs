@@ -166,6 +166,10 @@ impl<'src> Parser<'src> {
                 let tok = self.advance()?;
                 Ok(Expr::Var(tok.span, tok.text))
             }
+            T::Number => {
+                let tok = self.advance()?;
+                Ok(Expr::Number(tok.span, tok.text))
+            }
             T::LParen => {
                 let mut snapshot1 = self.clone();
                 let mut snapshot2 = self.clone();
