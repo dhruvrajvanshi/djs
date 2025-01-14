@@ -19,7 +19,8 @@ ast_items = [
         ["ArrowFn", "ParamList", "ArrowFnBody"],
         ["Call", ["Box", "Expr"], ["Vec", "Expr"]],
         ["Member", ["Box", "Expr"], ["Box", "Expr"]],
-        ["String", "Text"]
+        ["String", "Text"],
+        ["Number", "Text"],
     ],
     ["ast", "enum", "Pattern", ["Var", "Ident"]],
     [
