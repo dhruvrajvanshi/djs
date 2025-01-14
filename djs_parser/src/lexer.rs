@@ -15,6 +15,7 @@ pub struct Lexer<'src> {
 pub enum Error {
     UnexpectedCharacter(char),
     UnexpectedEOF(/* expected? */ char),
+    InvalidEscape(char),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -65,7 +66,14 @@ impl<'src> Lexer<'src> {
         assert!(matches!(self.current_char(), '"' | '\''));
         let quote = self.advance();
         while self.current_char() != EOF_CHAR && self.current_char() != quote {
-            self.advance();
+            let c = self.advance();
+            if c == '\\' {
+                if !matches!(self.current_char(), '\\' | 'n' | 't' | '\'' | '"') {
+                    return Err(Error::InvalidEscape(self.current_char()));
+                } else {
+                    self.advance();
+                }
+            }
         }
         let end_quote = self.advance();
         if end_quote != quote {
@@ -287,7 +295,7 @@ mod test {
     }
 
     #[test]
-    fn parses_unquoted_strings() {
+    fn parses_strings_without_escapes() {
         let mut lexer = Lexer::new(
             "
           'foo bar'
@@ -303,5 +311,17 @@ mod test {
         tok = lexer.next_token().unwrap();
         assert_eq!(tok.text, "\"foo bar\"");
         assert_eq!(tok.kind, TokenKind::String);
+    }
+
+    #[test]
+    fn parses_strings_with_escape() {
+        let mut lexer = Lexer::new(
+            "
+          'foo \\' \\\\ \\n bar'
+        ",
+        );
+        let tok = lexer.next_token().unwrap();
+        assert_eq!(tok.kind, TokenKind::String);
+        assert_eq!(tok.text, "'foo \\' \\\\ \\n bar'")
     }
 }
