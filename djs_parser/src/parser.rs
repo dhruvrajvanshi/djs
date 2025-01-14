@@ -333,6 +333,8 @@ impl From<lexer::Error> for Error {
 
 #[cfg(test)]
 mod tests {
+    use std::{fs::File, io::Read};
+
     use djs_ast::Expr;
 
     use super::*;
@@ -495,5 +497,32 @@ mod tests {
         } else {
             panic!("Expected an if statement");
         }
+    }
+
+    #[test]
+    #[ignore]
+    fn parses_test262_files() {
+        let files = glob::glob("../test262/test/**/*.js")
+            .expect("Invalid glob pattern")
+            .collect::<Vec<_>>();
+        let total_files = files.len();
+        let mut success_count = 0;
+        let mut failure_count = 0;
+        for entry in files {
+            let entry = entry.unwrap();
+            let mut str = String::new();
+            File::open(&entry)
+                .unwrap()
+                .read_to_string(&mut str)
+                .unwrap();
+            let mut parser = Parser::new(&str);
+            if parser.parse_source_file().is_err() {
+                failure_count += 1;
+            } else {
+                success_count += 1;
+            }
+        }
+
+        assert_eq!(failure_count, 0, "Succeeded: {success_count}/{total_files}");
     }
 }
