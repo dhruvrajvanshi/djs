@@ -17,6 +17,7 @@ ast_items = [
         ["Var", "Ident"],
         ["BinOp", ["Box", "Expr"], "BinOp", ["Box", "Expr"]],
         ["ArrowFn", "ParamList", "ArrowFnBody"],
+        ["Function", ["Option", "Ident"], "ParamList", "Block"],
         ["Call", ["Box", "Expr"], ["Vec", "Expr"]],
         ["Index", ["Box", "Expr"], ["Box", "Expr"]],
         ["Prop", ["Box", "Expr"], "Ident"],
