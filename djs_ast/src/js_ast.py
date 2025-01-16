@@ -9,6 +9,7 @@ ast_items = [
         ["Return", ["Option", "Expr"]],
         ["VarDecl", "DeclType", "Pattern", ["Option", "Expr"]],
         ["If", ["Box", "Expr"], ["Box", "Stmt"], ["Option", ["Box", "Stmt"]]],
+        ["While", ["Box", "Expr"], ["Box", "Stmt"]],
     ],
     [
         "ast",
