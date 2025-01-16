@@ -22,6 +22,7 @@ pub enum TokenKind {
     Catch,
     Finally,
     Throw,
+    Return,
 
     String,
     Number,
