@@ -58,6 +58,20 @@ impl<'src> Parser<'src> {
         })
     }
 
+    fn parse_block(&mut self) -> Result<Block<'src>> {
+        let start = self.expect(T::LBrace)?.span;
+        let mut stmts = Vec::new();
+        while self.current()?.kind != T::RBrace {
+            let stmt = self.parse_stmt()?;
+            stmts.push(stmt);
+        }
+        let stop = self.expect(T::RBrace)?.span;
+        Ok(Block {
+            span: Span::between(start, stop),
+            stmts,
+        })
+    }
+
     fn parse_stmt(&mut self) -> Result<Stmt<'src>> {
         match self.current()?.kind {
             T::Let | T::Const | T::Var => self.parse_var_decl(),
@@ -222,8 +236,28 @@ impl<'src> Parser<'src> {
                     _ => self.unexpected_token(),
                 }
             }
+            T::Function => {
+                let start = self.advance()?;
+                let name = if self.at(T::Ident) {
+                    Some(self.parse_ident()?)
+                } else {
+                    None
+                };
+                let params = self.parse_param_list()?;
+                let body = self.parse_block()?;
+                Ok(Expr::Function(
+                    Span::between(start.span, body.span()),
+                    name,
+                    params,
+                    body,
+                ))
+            }
             _ => self.unexpected_token(),
         }
+    }
+
+    fn at(&self, kind: TokenKind) -> bool {
+        self.current().map(|tok| tok.kind == kind).unwrap_or(false)
     }
 
     fn parse_ident(&mut self) -> Result<Ident<'src>> {
