@@ -16,6 +16,7 @@ pub enum TokenKind {
     Const,
     If,
     Else,
+    Function,
 
     String,
     Number,

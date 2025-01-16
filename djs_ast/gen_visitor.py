@@ -18,16 +18,18 @@ def gen_field_visitor(name: str, field_ty: str):
                 p(f"                visitor.visit_{to_snake_case(field_ty)}(item);")
             p(f"            }}")
         case ["Option", ["Box", field_ty]]:
-            p(f"            if let Some(item) = {name} {{")
-            p(f"                visitor.visit_{to_snake_case(field_ty)}(item);")
-            p(f"            }}")
-        case ["Option", field_ty]:
-            p(f"            if let Some(item) = {name} {{")
             if field_ty in ast_item_names:
+                p(f"            if let Some(item) = {name} {{")
                 p(f"                visitor.visit_{to_snake_case(field_ty)}(item);")
-            else:
-                p(f"                visitor.visit_{to_snake_case(field_ty)}(item);")
-            p(f"            }}")
+                p(f"            }}")
+        case ["Option", field_ty]:
+            if field_ty in ast_item_names:
+                p(f"            if let Some(item) = {name} {{")
+                if field_ty in ast_item_names:
+                    p(f"                visitor.visit_{to_snake_case(field_ty)}(item);")
+                else:
+                    p(f"                visitor.visit_{to_snake_case(field_ty)}(item);")
+                p(f"            }}")
         case ["Box", field_ty]:
             p(f"            visitor.visit_{to_snake_case(field_ty)}({name});")
 
