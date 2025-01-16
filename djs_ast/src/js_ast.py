@@ -36,6 +36,7 @@ ast_items = [
         ["String", "Text"],
         ["Number", "Text"],
         ["Object", ["Vec", "ObjectLiteralEntry"]],
+        ["Throw", ["Box", "Expr"]],
     ],
     ["ast", "struct", "ObjectLiteralEntry", ["key", "Ident"], ["value", "Expr"]],
     ["ast", "enum", "Pattern", ["Var", "Ident"]],
