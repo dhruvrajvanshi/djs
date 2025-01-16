@@ -18,6 +18,9 @@ pub enum TokenKind {
     While,
     Else,
     Function,
+    Try,
+    Catch,
+    Finally,
 
     String,
     Number,

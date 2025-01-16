@@ -10,6 +10,17 @@ ast_items = [
         ["VarDecl", "DeclType", "Pattern", ["Option", "Expr"]],
         ["If", ["Box", "Expr"], ["Box", "Stmt"], ["Option", ["Box", "Stmt"]]],
         ["While", ["Box", "Expr"], ["Box", "Stmt"]],
+        ["Try", ["Box", "TryStmt"]],
+    ],
+    [
+        "ast",
+        "struct",
+        "TryStmt",
+        ["try_block", "Block"],
+        ["catch_name", ["Option", "Ident"]],
+        ["catch_block", ["Option", "Block"]],
+        ["finally_block", ["Option", "Block"]],
+
     ],
     [
         "ast",
