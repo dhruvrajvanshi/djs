@@ -2,7 +2,7 @@ use std::mem;
 
 use djs_ast::{
     ArrowFnBody, Block, DeclType, Expr, Ident, ObjectLiteralEntry, Param, ParamList, Pattern,
-    SourceFile, Stmt,
+    SourceFile, Stmt, TryStmt,
 };
 use djs_syntax::Span;
 
@@ -77,8 +77,51 @@ impl<'src> Parser<'src> {
             T::Let | T::Const | T::Var => self.parse_var_decl(),
             T::If => self.parse_if_stmt(),
             T::While => self.parse_while_stmt(),
+            T::Try => self.parse_try_stmt(),
             _ => self.parse_expr_stmt(),
         }
+    }
+
+    fn parse_try_stmt(&mut self) -> Result<Stmt<'src>> {
+        let start = self.expect(T::Try)?;
+        let try_block = self.parse_block()?;
+        let (catch_name, catch_block) = if self.current()?.kind == T::Catch {
+            self.advance()?;
+            if self.current()?.kind == T::LParen {
+                self.advance()?;
+                let name = self.parse_ident()?;
+                self.expect(T::RParen)?;
+                let block = self.parse_block()?;
+                (Some(name), Some(block))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+        let finally_block = if self.current()?.kind == T::Finally {
+            self.advance()?;
+            let block = self.parse_block()?;
+            Some(block)
+        } else {
+            None
+        };
+        let end_span = match (&catch_block, &finally_block) {
+            (_, Some(finally_block)) => finally_block.span(),
+            (Some(block), None) => block.span(),
+            (None, None) => try_block.span(),
+        };
+        let span = Span::between(start.span, end_span);
+        Ok(Stmt::Try(
+            span,
+            Box::new(TryStmt {
+                span,
+                try_block,
+                catch_name,
+                catch_block,
+                finally_block,
+            }),
+        ))
     }
 
     fn parse_while_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -613,5 +656,27 @@ mod tests {
             }
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files")
+    }
+
+    #[test]
+    fn parses_try_catch() {
+        let source = "try { x; } catch (e) { y; } finally { z; }";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        let Stmt::Try(_, try_stmt) = stmt else {
+            panic!("Expected a try statement");
+        };
+        let TryStmt {
+            try_block,
+            catch_name,
+            catch_block,
+            finally_block,
+            ..
+        } = *try_stmt;
+        assert!(matches!(catch_name, Some(..)));
+        assert!(matches!(catch_block, Some(..)));
+        assert!(matches!(finally_block, Some(..)));
+        let Block { stmts, .. } = try_block;
+        assert!(matches!(stmts.as_slice(), [Stmt::Expr(..)]));
     }
 }
