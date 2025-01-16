@@ -309,6 +309,14 @@ impl<'src> Parser<'src> {
                     body,
                 ))
             }
+            T::Throw => {
+                let start = self.advance()?;
+                let expr = self.parse_expr()?;
+                Ok(Expr::Throw(
+                    Span::between(start.span, expr.span()),
+                    Box::new(expr),
+                ))
+            }
             _ => self.unexpected_token(),
         }
     }
