@@ -178,6 +178,7 @@ impl<'src> Lexer<'src> {
             "try" => TokenKind::Try,
             "catch" => TokenKind::Catch,
             "finally" => TokenKind::Finally,
+            "throw" => TokenKind::Throw,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)
