@@ -174,6 +174,7 @@ impl<'src> Lexer<'src> {
             "if" => TokenKind::If,
             "else" => TokenKind::Else,
             "function" => TokenKind::Function,
+            "while" => TokenKind::While,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)

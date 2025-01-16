@@ -76,8 +76,22 @@ impl<'src> Parser<'src> {
         match self.current()?.kind {
             T::Let | T::Const | T::Var => self.parse_var_decl(),
             T::If => self.parse_if_stmt(),
+            T::While => self.parse_while_stmt(),
             _ => self.parse_expr_stmt(),
         }
+    }
+
+    fn parse_while_stmt(&mut self) -> Result<Stmt<'src>> {
+        let start = self.expect(T::While)?.span;
+        self.expect(T::LParen)?;
+        let cond = self.parse_expr()?;
+        self.expect(T::RParen)?;
+        let body = Box::new(self.parse_stmt()?);
+        Ok(Stmt::While(
+            Span::between(start, body.span()),
+            Box::new(cond),
+            body,
+        ))
     }
 
     fn parse_if_stmt(&mut self) -> Result<Stmt<'src>> {

@@ -15,6 +15,7 @@ pub enum TokenKind {
     Var,
     Const,
     If,
+    While,
     Else,
     Function,
 
