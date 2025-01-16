@@ -78,6 +78,7 @@ impl<'src> Parser<'src> {
             T::If => self.parse_if_stmt(),
             T::While => self.parse_while_stmt(),
             T::Try => self.parse_try_stmt(),
+            T::Return => self.parse_return_stmt(),
             _ => self.parse_expr_stmt(),
         }
     }
@@ -227,15 +228,37 @@ impl<'src> Parser<'src> {
         if matches!(self.current()?.kind, T::RBrace | T::EndOfFile) {
             return Ok(());
         }
-        if self.current()?.line
+        if self.current_is_on_new_line() {
+            return Ok(());
+        }
+        Err(Error::MissingSemi)
+    }
+
+    fn current_is_on_new_line(&self) -> bool {
+        let current = self.current();
+        let Ok(current) = current else {
+            return false;
+        };
+        current.line
             > self
                 .last_token
                 .expect("expect_semi must be called after consuming at least 1 token")
                 .line
+    }
+    fn parse_return_stmt(&mut self) -> Result<Stmt<'src>> {
+        let start = self.expect(T::Return)?.span;
+        let expr = if matches!(self.current()?.kind, T::Semi | T::RBrace | T::EndOfFile)
+            || self.current_is_on_new_line()
         {
-            return Ok(());
-        }
-        Err(Error::MissingSemi)
+            None
+        } else {
+            let expr = self.parse_expr()?;
+            self.expect_semi()?;
+            Some(expr)
+        };
+        let end_span = expr.as_ref().map(|it| it.span()).unwrap_or(start);
+        self.expect_semi()?;
+        Ok(Stmt::Return(Span::between(start, end_span), expr))
     }
 
     pub(super) fn parse_primary_expr(&mut self) -> Result<Expr<'src>> {
@@ -686,5 +709,34 @@ mod tests {
         assert!(matches!(finally_block, Some(..)));
         let Block { stmts, .. } = try_block;
         assert!(matches!(stmts.as_slice(), [Stmt::Expr(..)]));
+    }
+
+    #[test]
+    fn parses_return_stmt() {
+        let source = "return;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        assert!(matches!(stmt, Stmt::Return(_, None)));
+    }
+
+    #[test]
+    fn parses_return_stmt_with_expr_on_next_line() {
+        let source = "return\nx;"; // Since x is on the next line, asi should kick in
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        assert!(matches!(stmt, Stmt::Return(_, None)));
+    }
+
+    #[test]
+    fn parses_return_stmt_with_expr_on_the_same_line() {
+        let source = "return x;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::Return(_, Some(expr)) => {
+                assert!(matches!(expr, Expr::Var(.., "x")));
+            }
+            _ => panic!("Expected a return statement"),
+        }
     }
 }
