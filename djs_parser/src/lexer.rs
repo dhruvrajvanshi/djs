@@ -57,6 +57,9 @@ impl<'src> Lexer<'src> {
             _ if at!(">=") => self.lex_2_char_token(TokenKind::GreaterThanEq),
             '>' => self.lex_single_char_token(TokenKind::GreaterThan),
 
+            _ if at!("!==") => self.lex_3_char_token(TokenKind::BangEqEq),
+            _ if at!("!=") => self.lex_2_char_token(TokenKind::BangEq),
+
             _ if at!("===") => self.lex_3_char_token(TokenKind::EqEqEq),
             _ if at!("==") => self.lex_2_char_token(TokenKind::EqEq),
             _ if at!("=>") => self.lex_2_char_token(TokenKind::FatArrow),
