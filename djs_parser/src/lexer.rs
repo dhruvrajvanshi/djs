@@ -68,6 +68,9 @@ impl<'src> Lexer<'src> {
             _ if at!("++") => self.lex_2_char_token(TokenKind::PlusPlus),
             '+' => self.lex_single_char_token(TokenKind::Plus),
 
+            _ if at!("--") => self.lex_2_char_token(TokenKind::MinusMinus),
+            '-' => self.lex_single_char_token(TokenKind::Minus),
+
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c if c.is_numeric() => self.lex_number(),
             c => Err(Error::UnexpectedCharacter(c)),

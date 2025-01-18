@@ -53,6 +53,8 @@ pub enum TokenKind {
     GreaterThanEq,
 
     Plus,
+    Minus,
+    MinusMinus,
     PlusPlus,
 
     EndOfFile,
