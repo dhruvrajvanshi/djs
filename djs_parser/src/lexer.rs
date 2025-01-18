@@ -32,6 +32,11 @@ impl<'src> Lexer<'src> {
     pub fn next_token(&mut self) -> Result<Token<'src>> {
         self.skip_whitespace_and_comments()?;
         self.start_offset = self.current_offset();
+        macro_rules! at {
+            ($expected:expr) => {
+                self.at($expected)
+            };
+        }
         match self.current_char() {
             EOF_CHAR => Ok(self.make_token(TokenKind::EndOfFile)),
             '{' => self.lex_single_char_token(TokenKind::LBrace),
@@ -45,36 +50,49 @@ impl<'src> Lexer<'src> {
             ':' => self.lex_single_char_token(TokenKind::Colon),
             '.' => self.lex_single_char_token(TokenKind::Dot),
             '"' | '\'' => self.lex_simple_string(),
-            '=' => {
-                self.advance();
-                if self.current_char() == '>' {
-                    self.advance();
-                    Ok(self.make_token(TokenKind::FatArrow))
-                } else if self.current_char() == '=' {
-                    self.advance();
-                    if self.current_char() == '=' {
-                        self.advance();
-                        Ok(self.make_token(TokenKind::EqEqEq))
-                    } else {
-                        Ok(self.make_token(TokenKind::EqEq))
-                    }
-                } else {
-                    Ok(self.make_token(TokenKind::Eq))
-                }
-            }
-            '+' => {
-                self.advance();
-                if self.current_char() == '+' {
-                    self.advance();
-                    Ok(self.make_token(TokenKind::PlusPlus))
-                } else {
-                    Ok(self.make_token(TokenKind::Plus))
-                }
-            }
+
+            _ if at!("<=") => self.lex_2_char_token(TokenKind::LessThanEq),
+            '<' => self.lex_single_char_token(TokenKind::LessThan),
+
+            _ if at!(">=") => self.lex_2_char_token(TokenKind::GreaterThanEq),
+            '>' => self.lex_single_char_token(TokenKind::GreaterThan),
+
+            _ if at!("===") => self.lex_3_char_token(TokenKind::EqEqEq),
+            _ if at!("==") => self.lex_2_char_token(TokenKind::EqEq),
+            _ if at!("=>") => self.lex_2_char_token(TokenKind::FatArrow),
+            '=' => self.lex_single_char_token(TokenKind::Eq),
+
+            _ if at!("++") => self.lex_2_char_token(TokenKind::PlusPlus),
+            '+' => self.lex_single_char_token(TokenKind::Plus),
+
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c if c.is_numeric() => self.lex_number(),
             c => Err(Error::UnexpectedCharacter(c)),
         }
+    }
+
+    fn at(&self, expected: &str) -> bool {
+        let mut clone = self.clone();
+        for expected in expected.chars() {
+            if clone.current_char() != expected {
+                return false;
+            }
+            clone.advance();
+        }
+        true
+    }
+
+    fn lex_2_char_token(&mut self, kind: TokenKind) -> Result<Token<'src>> {
+        self.advance();
+        self.advance();
+        Ok(self.make_token(kind))
+    }
+
+    fn lex_3_char_token(&mut self, kind: TokenKind) -> Result<Token<'src>> {
+        self.advance();
+        self.advance();
+        self.advance();
+        Ok(self.make_token(kind))
     }
 
     fn lex_number(&mut self) -> Result<Token<'src>> {
