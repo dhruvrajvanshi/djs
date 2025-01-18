@@ -47,7 +47,7 @@ const ast_items = [
     ["Var", "Ident"],
     ["BinOp", Box("Expr"), "BinOp", Box("Expr")],
     ["ArrowFn", "ParamList", "ArrowFnBody"],
-    ["Function", Option("Ident"), "ParamList", "Block"],
+    ["Function", "Function"],
     ["Call", Box("Expr"), Vec("Expr")],
     ["Index", Box("Expr"), Box("Expr")],
     ["Prop", Box("Expr"), "Ident"],
@@ -63,6 +63,14 @@ const ast_items = [
   Struct("ObjectLiteralEntry", ["span"], ["key", "Ident"], ["value", "Expr"]),
   Struct("ParamList", ["span"], ["params", Vec("Param")]),
   Struct("Param", ["span"], ["name", "Ident"], ["default", Option("Expr")]),
+  Struct(
+    "Function",
+    ["span"],
+    ["name", Option("Ident")],
+    ["params", "ParamList"],
+    ["body", "Block"],
+    ["is_generator", "bool"]
+  ),
   Enum("ArrowFnBody", ["span"], ["Expr", Box("Expr")], ["Block", "Block"]),
   Enum("Pattern", ["span"], ["Var", "Ident"]),
 

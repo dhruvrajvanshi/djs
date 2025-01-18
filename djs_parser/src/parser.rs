@@ -1,8 +1,8 @@
 use std::mem;
 
 use djs_ast::{
-    ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInit, Ident, ObjectLiteralEntry, Param,
-    ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
+    ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInit, Function, Ident, ObjectLiteralEntry,
+    Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -381,6 +381,12 @@ impl<'src> Parser<'src> {
             }
             T::Function => {
                 let start = self.advance()?;
+                let is_generator = if self.at(T::Star) {
+                    self.advance()?;
+                    true
+                } else {
+                    false
+                };
                 let name = if self.at(T::Ident) {
                     Some(self.parse_ident()?)
                 } else {
@@ -388,12 +394,15 @@ impl<'src> Parser<'src> {
                 };
                 let params = self.parse_param_list()?;
                 let body = self.parse_block()?;
-                Ok(Expr::Function(
-                    Span::between(start.span, body.span()),
+                let span = Span::between(start.span, body.span());
+                let f = Function {
+                    span,
                     name,
                     params,
                     body,
-                ))
+                    is_generator,
+                };
+                Ok(Expr::Function(span, f))
             }
             T::Throw => {
                 let start = self.advance()?;
