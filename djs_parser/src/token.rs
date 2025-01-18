@@ -41,6 +41,11 @@ pub enum TokenKind {
 
     FatArrow,
     Eq,
+    EqEq,
+    EqEqEq,
+
+    Plus,
+    PlusPlus,
 
     EndOfFile,
 }
