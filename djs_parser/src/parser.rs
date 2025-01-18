@@ -1,8 +1,8 @@
 use std::mem;
 
 use djs_ast::{
-    ArrowFnBody, Block, DeclType, Expr, For, ForInit, Ident, ObjectLiteralEntry, Param, ParamList,
-    Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
+    ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInit, Ident, ObjectLiteralEntry, Param,
+    ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -443,7 +443,27 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expr(&mut self) -> Result<Expr<'src>> {
-        self.parse_update_expr_or_higher()
+        self.parse_binop_or_higher()
+    }
+
+    fn parse_binop_or_higher(&mut self) -> Result<Expr<'src>> {
+        let lhs = self.parse_update_expr_or_higher()?;
+        match self.current()?.kind {
+            T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq => {
+                let op = self.advance()?;
+                let op = match op.kind {
+                    T::LessThan => BinOp::Lt,
+                    T::GreaterThan => BinOp::Gt,
+                    T::LessThanEq => BinOp::Lte,
+                    T::GreaterThanEq => BinOp::Gte,
+                    _ => unreachable!(),
+                };
+                let rhs = self.parse_binop_or_higher()?;
+                let span = Span::between(lhs.span(), rhs.span());
+                Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
+            }
+            _ => Ok(lhs),
+        }
     }
 
     fn parse_update_expr_or_higher(&mut self) -> Result<Expr<'src>> {
