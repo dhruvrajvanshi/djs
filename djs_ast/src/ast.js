@@ -57,7 +57,8 @@ const ast_items = [
     ["Throw", Box("Expr")],
     ["PostIncrement", Box("Expr")],
     ["PostDecrement", Box("Expr")],
-    ["Array", Vec("Expr")]
+    ["Array", Vec("Expr")],
+    ["New", Box("Expr"), Vec("Expr")]
   ),
   Struct("ObjectLiteralEntry", ["span"], ["key", "Ident"], ["value", "Expr"]),
   Struct("ParamList", ["span"], ["params", Vec("Param")]),

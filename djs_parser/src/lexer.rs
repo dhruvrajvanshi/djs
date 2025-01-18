@@ -222,6 +222,7 @@ impl<'src> Lexer<'src> {
             "throw" => TokenKind::Throw,
             "return" => TokenKind::Return,
             "for" => TokenKind::For,
+            "new" => TokenKind::New,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)
