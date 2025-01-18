@@ -1,6 +1,8 @@
 
 export const ast_items = [
     Struct("SourceFile", ["span"], ["stmts", Vec("Stmt")]),
+    Struct("Ident", ["span"], ["text", "str"]),
+    Struct("Text", ["span"], ["text", "str"]),
     Enum(
         "Stmt",
         ["span"],

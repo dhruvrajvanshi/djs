@@ -2,7 +2,7 @@ use std::mem;
 
 use djs_ast::{
     ArrowFnBody, Block, DeclType, Expr, Ident, ObjectLiteralEntry, Param, ParamList, Pattern,
-    SourceFile, Stmt, TryStmt,
+    SourceFile, Stmt, Text, TryStmt,
 };
 use djs_syntax::Span;
 
@@ -208,9 +208,9 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern<'src>> {
-        let ident = self.expect(T::Ident)?;
+        let ident = self.parse_ident()?;
 
-        Ok(Pattern::Var(ident.span, ident.text))
+        Ok(Pattern::Var(ident.span, ident))
     }
 
     fn parse_expr_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -264,16 +264,28 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_primary_expr(&mut self) -> Result<Expr<'src>> {
         match self.current()?.kind {
             T::Ident => {
-                let tok = self.advance()?;
-                Ok(Expr::Var(tok.span, tok.text))
+                let ident = self.parse_ident()?;
+                Ok(Expr::Var(ident.span, ident))
             }
             T::String => {
                 let tok = self.advance()?;
-                Ok(Expr::Var(tok.span, tok.text))
+                Ok(Expr::String(
+                    tok.span,
+                    Text {
+                        span: tok.span,
+                        text: tok.text,
+                    },
+                ))
             }
             T::Number => {
                 let tok = self.advance()?;
-                Ok(Expr::Number(tok.span, tok.text))
+                Ok(Expr::Number(
+                    tok.span,
+                    Text {
+                        span: tok.span,
+                        text: tok.text,
+                    },
+                ))
             }
             T::LBrace => {
                 let start = self.advance()?;
@@ -350,7 +362,10 @@ impl<'src> Parser<'src> {
 
     fn parse_ident(&mut self) -> Result<Ident<'src>> {
         let tok = self.expect(T::Ident)?;
-        Ok(tok.text)
+        Ok(Ident {
+            span: tok.span,
+            text: tok.text,
+        })
     }
 
     fn parse_paren_expr(&mut self) -> Result<Expr<'src>> {
@@ -382,9 +397,9 @@ impl<'src> Parser<'src> {
             }
             T::Dot => {
                 self.advance()?;
-                let prop = self.expect(T::Ident)?;
+                let prop = self.parse_ident()?;
                 let span = Span::between(lhs.span(), prop.span);
-                let prop_expr = Expr::Prop(span, Box::new(lhs), prop.text);
+                let prop_expr = Expr::Prop(span, Box::new(lhs), prop);
                 self.parse_member_expr_tail(prop_expr)
             }
             _ => Ok(lhs),
@@ -456,10 +471,10 @@ impl<'src> Parser<'src> {
         loop {
             match self.current()?.kind {
                 T::Ident => {
-                    let tok = self.advance()?;
+                    let name = self.parse_ident()?;
                     params.push(Param {
-                        span: tok.span,
-                        name: tok.text,
+                        span: name.span,
+                        name,
                     });
                 }
                 T::RParen => break,
@@ -506,13 +521,27 @@ mod tests {
     use djs_ast::Expr;
 
     use super::*;
+    macro_rules! ident {
+        ($value: pat) => {
+            Ident {
+                text: $value,
+                span: _,
+            }
+        };
+    }
+
+    macro_rules! exp_var {
+        ($value: pat) => {
+            Expr::Var(_, ident!($value))
+        };
+    }
 
     #[test]
     fn test_parse_var_expr() {
         let source = "x";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        assert!(matches!(expr, Expr::Var(_, "x")));
+        assert!(matches!(expr, Expr::Var(_, Ident { text: "x", .. })));
     }
 
     #[test]
@@ -520,7 +549,7 @@ mod tests {
         let source = "(x)";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        assert!(matches!(expr, Expr::Var(_, "x")));
+        assert!(matches!(expr, Expr::Var(_, ident!("x"))));
     }
 
     #[test]
@@ -545,13 +574,13 @@ mod tests {
         let Stmt::Expr(_, x) = &source_file.stmts[0] else {
             panic!("Expected an expression statement")
         };
-        let Expr::Var(_, "x") = **x else {
+        let exp_var!("x") = **x else {
             panic!("Expected a variable expression")
         };
         let Stmt::Expr(_, y) = &source_file.stmts[1] else {
             panic!("Expected an expression statement")
         };
-        let Expr::Var(_, "y") = **y else {
+        let exp_var!("y") = **y else {
             panic!("Expected a variable expression")
         };
     }
@@ -563,10 +592,10 @@ mod tests {
         let expr = parser.parse_expr().unwrap();
         match &expr {
             Expr::Call(_, f, args) => {
-                assert!(matches!(**f, Expr::Var(_, "f")));
+                assert!(matches!(**f, exp_var!("f")));
                 assert!(matches!(
                     args.as_slice(),
-                    [Expr::Var(_, "x"), Expr::Var(_, "y"), Expr::Var(_, "z")]
+                    [exp_var!("x"), exp_var!("y"), exp_var!("z")]
                 ));
             }
             _ => panic!("Expected a call expression"),
@@ -582,7 +611,7 @@ mod tests {
         let Call(_, outer_callee, args) = expr else {
             panic!("Expected a call expression")
         };
-        assert!(matches!(args.as_slice(), [Var(_, "d"), Var(_, "e")]));
+        assert!(matches!(args.as_slice(), [exp_var!("d"), exp_var!("e")]));
         assert!(matches!(*outer_callee, Call(..)));
         let Call(_, inner_callee, args) = *outer_callee else {
             panic!("Expected a call expression")
@@ -591,12 +620,12 @@ mod tests {
         let Index(_, obj, c) = *inner_callee else {
             panic!("Expected a member expression")
         };
-        assert!(matches!(*c, Var(_, "c")));
+        assert!(matches!(*c, exp_var!("c")));
         let Index(_, obj, b) = *obj else {
             panic!("Expected a member expression")
         };
-        assert!(matches!(*b, Var(_, "b")));
-        assert!(matches!(*obj, Var(_, "a")));
+        assert!(matches!(*b, exp_var!("b")));
+        assert!(matches!(*obj, exp_var!("a")));
     }
 
     #[test]
@@ -610,8 +639,8 @@ mod tests {
         let [Stmt::Expr(_, first_stmt), Stmt::Expr(_, second_stmt)] = block.stmts.as_slice() else {
             panic!("Expected 2 statements in the block")
         };
-        assert!(matches!(**first_stmt, Expr::Var(_, "x")));
-        assert!(matches!(**second_stmt, Expr::Var(_, "y")));
+        assert!(matches!(**first_stmt, exp_var!("x")));
+        assert!(matches!(**second_stmt, exp_var!("y")));
     }
 
     #[test]
@@ -620,8 +649,8 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(_, DeclType::Let, Pattern::Var(_, "x"), Some(init)) => {
-                assert!(matches!(init, Expr::Var(.., "y")));
+            Stmt::VarDecl(_, DeclType::Let, Pattern::Var(_, ident!("x")), Some(init)) => {
+                assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
         }
@@ -630,8 +659,8 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(_, DeclType::Const, Pattern::Var(_, "x"), Some(init)) => {
-                assert!(matches!(init, Expr::Var(.., "y")));
+            Stmt::VarDecl(_, DeclType::Const, Pattern::Var(_, ident!("x")), Some(init)) => {
+                assert!(matches!(init, exp_var!("y")));
             }
             _ => panic!("Expected a variable declaration"),
         }
@@ -640,8 +669,8 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(_, DeclType::Var, Pattern::Var(_, "x"), Some(init)) => {
-                assert!(matches!(init, Expr::Var(.., "y")));
+            Stmt::VarDecl(_, DeclType::Var, Pattern::Var(_, ident!("x")), Some(init)) => {
+                assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
         }
@@ -653,15 +682,15 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         if let Stmt::If(_, cond, then_branch, Some(else_branch)) = stmt {
-            assert!(matches!(*cond, Expr::Var(.., "x")));
+            assert!(matches!(*cond, exp_var!("x")));
             let Stmt::Expr(.., e) = *then_branch else {
                 panic!("Expected an expression statement");
             };
-            assert!(matches!(*e, Expr::Var(.., "y")));
+            assert!(matches!(*e, exp_var!("y")));
             let Stmt::Expr(.., e) = *else_branch else {
                 panic!("Expected an expression statement");
             };
-            assert!(matches!(*e, Expr::Var(.., "z")));
+            assert!(matches!(*e, exp_var!("z")));
         } else {
             panic!("Expected an if statement");
         }
@@ -734,7 +763,7 @@ mod tests {
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
             Stmt::Return(_, Some(expr)) => {
-                assert!(matches!(expr, Expr::Var(.., "x")));
+                assert!(matches!(expr, exp_var!("x")));
             }
             _ => panic!("Expected a return statement"),
         }
