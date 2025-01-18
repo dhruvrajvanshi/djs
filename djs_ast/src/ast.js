@@ -1,5 +1,5 @@
 
-export const ast_items = [
+const ast_items = [
     Struct("SourceFile", ["span"], ["stmts", Vec("Stmt")]),
     Struct("Ident", ["span"], ["text", "str"]),
     Struct("Text", ["span"], ["text", "str"]),
@@ -112,3 +112,4 @@ function Box(type) {
 function Vec(type) {
   return ["Vec", type];
 }
+module.exports = { ast_items };
