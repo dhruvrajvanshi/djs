@@ -180,6 +180,7 @@ impl<'src> Lexer<'src> {
             "finally" => TokenKind::Finally,
             "throw" => TokenKind::Throw,
             "return" => TokenKind::Return,
+            "for" => TokenKind::For,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)
