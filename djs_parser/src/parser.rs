@@ -79,6 +79,10 @@ impl<'src> Parser<'src> {
             T::While => self.parse_while_stmt(),
             T::Try => self.parse_try_stmt(),
             T::Return => self.parse_return_stmt(),
+            T::Semi => {
+                let tok = self.advance()?;
+                Ok(Stmt::Empty(tok.span))
+            }
             _ => self.parse_expr_stmt(),
         }
     }
