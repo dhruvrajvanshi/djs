@@ -1,0 +1,112 @@
+
+export const ast_items = [
+    Struct("SourceFile", ["span"], ["stmts", Vec("Stmt")]),
+    Enum(
+        "Stmt",
+        ["span"],
+        ["Expr", Box("Expr")],
+        ["Block", "Block"],
+        ["Return", Option("Expr")],
+        ["VarDecl", "DeclType", "Pattern", Option("Expr")],
+        ["If", Box("Expr"), Box("Stmt"), Option(Box("Stmt"))],
+        ["While", Box("Expr"), Box("Stmt")],
+        ["Try", Box("TryStmt")]
+    ),
+    Struct("Block", ["span"], ["stmts", Vec("Stmt")]),
+    Struct(
+        "TryStmt",
+        ["span"],
+        ["try_block", "Block"],
+        ["catch_name", Option("Ident")],
+        ["catch_block", Option("Block")],
+        ["finally_block", Option("Block")]
+    ),
+
+    Enum(
+        "Expr",
+        ["span"],
+        ["Var", "Ident"],
+        ["BinOp", Box("Expr"), "BinOp", Box("Expr")],
+        ["ArrowFn", "ParamList", "ArrowFnBody"],
+        ["Function", Option("Ident"), "ParamList", "Block"],
+        ["Call", Box("Expr"), Vec("Expr")],
+        ["Index", Box("Expr"), Box("Expr")],
+        ["Prop", Box("Expr"), "Ident"],
+        ["String", "Text"],
+        ["Number", "Text"],
+        ["Object", Vec("ObjectLiteralEntry")],
+        ["Throw", Box("Expr")]
+    ),
+    Struct("ObjectLiteralEntry", ["span"], ["key", "Ident"], ["value", "Expr"]),
+    Struct("ParamList", ["span"], ["params", Vec("Param")]),
+    Struct("Param", ["span"], ["name", "Ident"]),
+    Enum("ArrowFnBody", ["span"], ["Expr", Box("Expr")], ["Block", "Block"]),
+    Enum("Pattern", ["span"], ["Var", "Ident"]),
+
+    Enum("BinOp", [], "Add", "Sub", "Mul", "Div"),
+    Enum("DeclType", [], "Let", "Const", "Var"),
+];
+
+
+/**
+ * @param {string} name
+ * @param {Tag[]} tags
+ * @param {...([string, ...Type[]] | string)} variants
+ * @returns {EnumItem}
+ */
+function Enum(name, tags, ...variants) {
+  return {
+    kind: "enum",
+    name,
+    tags,
+    variants: variants.map((variant) => {
+      if (typeof variant === "string") {
+        return { name: variant, args: [] };
+      } else {
+        return { name: variant[0], args: variant.slice(1) };
+      }
+    }),
+  };
+}
+
+/**
+ * @param {string} name
+ * @param {Tag[]} tags
+ * @param {...[string, Type]} fields
+ * @returns {StructItem}
+ */
+function Struct(name, tags, ...fields) {
+  return {
+    kind: "struct",
+    name,
+    tags,
+    fields,
+  };
+}
+/**
+ *
+ * @template {Type} T
+ * @param {T} type
+ * @returns {["Option", T]}
+ */
+function Option(type) {
+  return ["Option", type];
+}
+
+/**
+ * @template {Type} T
+ * @param {T} type
+ * @returns {["Box", T]}
+ */
+function Box(type) {
+  return ["Box", type];
+}
+
+/**
+ * @template {Type} T
+ * @param {T} type
+ * @returns {["Vec", T]}
+ */
+function Vec(type) {
+  return ["Vec", type];
+}

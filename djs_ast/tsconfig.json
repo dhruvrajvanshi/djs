@@ -1,0 +1,14 @@
+{
+    "compilerOptions": {
+        "checkJs": true,
+        "outDir": "../target",
+        "strict": true,
+        "lib": ["ES2022", "WebWorker"],
+        "target": "ES2022"
+    },
+    "files": [
+        "index.d.ts",
+        "src/ast.js",
+        "gen_ast.js"
+    ]
+}
