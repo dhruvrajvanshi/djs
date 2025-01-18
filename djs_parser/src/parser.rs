@@ -356,24 +356,8 @@ impl<'src> Parser<'src> {
             }
             T::LBrace => {
                 let start = self.advance()?;
-                let mut entries = vec![];
-                let mut first = true;
-                while !matches!(self.current()?.kind, T::RBrace | T::EndOfFile) {
-                    if !first {
-                        self.expect(T::Comma)?;
-                    } else {
-                        first = false;
-                    }
-                    let start = self.current()?.span;
-                    let ident = self.parse_ident()?;
-                    self.expect(T::Colon)?;
-                    let expr = self.parse_expr()?;
-                    entries.push(ObjectLiteralEntry {
-                        span: Span::between(start, expr.span()),
-                        key: ident,
-                        value: expr,
-                    });
-                }
+                let entries =
+                    self.parse_comma_separated_list(T::RBrace, Self::parse_object_literal_entry)?;
                 let end = self.expect(T::RBrace)?;
                 Ok(Expr::Object(Span::between(start.span, end.span), entries))
             }
@@ -419,6 +403,12 @@ impl<'src> Parser<'src> {
                     Box::new(expr),
                 ))
             }
+            T::LSquare => {
+                let start = self.advance()?;
+                let elements = self.parse_comma_separated_list(T::RSquare, Self::parse_expr)?;
+                let end = self.expect(T::RSquare)?;
+                Ok(Expr::Array(Span::between(start.span, end.span), elements))
+            }
             _ => self.unexpected_token(),
         }
     }
@@ -440,6 +430,37 @@ impl<'src> Parser<'src> {
         let expr = self.parse_expr()?;
         self.expect(T::RParen)?;
         Ok(expr)
+    }
+
+    fn parse_comma_separated_list<Item, F: Fn(&mut Self) -> Result<Item>>(
+        &mut self,
+        end_token: TokenKind,
+        parse_item: F,
+    ) -> Result<Vec<Item>> {
+        let mut items = vec![];
+        let mut first = true;
+        while !self.at(T::EndOfFile) && !self.at(end_token) {
+            if !first {
+                self.expect(T::Comma)?;
+            } else {
+                first = false;
+            }
+            let entry = parse_item(self)?;
+            items.push(entry);
+        }
+        Ok(items)
+    }
+
+    fn parse_object_literal_entry(&mut self) -> Result<ObjectLiteralEntry<'src>> {
+        let start = self.current()?.span;
+        let ident = self.parse_ident()?;
+        self.expect(T::Colon)?;
+        let expr = self.parse_expr()?;
+        Ok(ObjectLiteralEntry {
+            span: Span::between(start, expr.span()),
+            key: ident,
+            value: expr,
+        })
     }
 
     fn parse_expr(&mut self) -> Result<Expr<'src>> {
