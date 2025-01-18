@@ -50,8 +50,25 @@ impl<'src> Lexer<'src> {
                 if self.current_char() == '>' {
                     self.advance();
                     Ok(self.make_token(TokenKind::FatArrow))
+                } else if self.current_char() == '=' {
+                    self.advance();
+                    if self.current_char() == '=' {
+                        self.advance();
+                        Ok(self.make_token(TokenKind::EqEqEq))
+                    } else {
+                        Ok(self.make_token(TokenKind::EqEq))
+                    }
                 } else {
                     Ok(self.make_token(TokenKind::Eq))
+                }
+            }
+            '+' => {
+                self.advance();
+                if self.current_char() == '+' {
+                    self.advance();
+                    Ok(self.make_token(TokenKind::PlusPlus))
+                } else {
+                    Ok(self.make_token(TokenKind::Plus))
                 }
             }
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
@@ -362,5 +379,40 @@ mod test {
         let tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::String);
         assert_eq!(tok.text, "'foo \\' \\\\ \\n bar'")
+    }
+
+    #[test]
+    fn lexes_eq_eq_eq() {
+        let mut lexer = Lexer::new("===");
+        let tok = lexer.next_token().unwrap();
+        assert_eq!(tok.kind, TokenKind::EqEqEq);
+    }
+
+    #[test]
+    fn lexes_eqeq() {
+        let mut lexer = Lexer::new("== ");
+        let tok = lexer.next_token().unwrap();
+        assert_eq!(tok.kind, TokenKind::EqEq);
+    }
+
+    #[test]
+    fn lexes_eq() {
+        let mut lexer = Lexer::new("= ");
+        let tok = lexer.next_token().unwrap();
+        assert_eq!(tok.kind, TokenKind::Eq);
+    }
+
+    #[test]
+    fn lexes_plus() {
+        let mut lexer = Lexer::new("+ ");
+        let tok = lexer.next_token().unwrap();
+        assert_eq!(tok.kind, TokenKind::Plus);
+    }
+
+    #[test]
+    fn lexes_plus_plus() {
+        let mut lexer = Lexer::new("++ ");
+        let tok = lexer.next_token().unwrap();
+        assert_eq!(tok.kind, TokenKind::PlusPlus);
     }
 }
