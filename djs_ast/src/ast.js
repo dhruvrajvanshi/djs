@@ -63,7 +63,7 @@ const ast_items = [
   Enum("ArrowFnBody", ["span"], ["Expr", Box("Expr")], ["Block", "Block"]),
   Enum("Pattern", ["span"], ["Var", "Ident"]),
 
-  Enum("BinOp", [], "Add", "Sub", "Mul", "Div"),
+  Enum("BinOp", [], "Add", "Sub", "Mul", "Div", "Gt", "Lt", "Gte", "Lte"),
   Enum("DeclType", [], "Let", "Const", "Var"),
 ];
 

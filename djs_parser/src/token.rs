@@ -44,6 +44,11 @@ pub enum TokenKind {
     EqEq,
     EqEqEq,
 
+    LessThan,
+    LessThanEq,
+    GreaterThan,
+    GreaterThanEq,
+
     Plus,
     PlusPlus,
 
