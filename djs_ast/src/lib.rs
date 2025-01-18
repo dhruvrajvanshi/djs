@@ -4,9 +4,5 @@
 mod ast {
     include!(concat!(env!("OUT_DIR"), "/ast.rs"));
 }
-pub mod visitor {
-
-    include!(concat!(env!("OUT_DIR"), "/visitor.rs"));
-}
 
 pub use ast::*;
