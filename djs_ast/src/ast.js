@@ -1,56 +1,70 @@
-
 const ast_items = [
-    Struct("SourceFile", ["span"], ["stmts", Vec("Stmt")]),
-    Struct("Ident", ["span"], ["text", "str"]),
-    Struct("Text", ["span"], ["text", "str"]),
-    Enum(
-        "Stmt",
-        ["span"],
-        ["Expr", Box("Expr")],
-        ["Block", "Block"],
-        ["Return", Option("Expr")],
-        ["VarDecl", "VarDecl"],
-        ["If", Box("Expr"), Box("Stmt"), Option(Box("Stmt"))],
-        ["While", Box("Expr"), Box("Stmt")],
-        ["Try", Box("TryStmt")],
-        ["Empty"],
-    ),
-    Struct("VarDecl", ["span"], ["decl_type", "DeclType"], ["pattern", "Pattern"], ["init", Option("Expr")]),
-    Struct("Block", ["span"], ["stmts", Vec("Stmt")]),
-    Struct(
-        "TryStmt",
-        ["span"],
-        ["try_block", "Block"],
-        ["catch_name", Option("Ident")],
-        ["catch_block", Option("Block")],
-        ["finally_block", Option("Block")]
-    ),
+  Struct("SourceFile", ["span"], ["stmts", Vec("Stmt")]),
+  Struct("Ident", ["span"], ["text", "str"]),
+  Struct("Text", ["span"], ["text", "str"]),
+  Enum(
+    "Stmt",
+    ["span"],
+    ["Expr", Box("Expr")],
+    ["Block", "Block"],
+    ["Return", Option("Expr")],
+    ["VarDecl", "VarDecl"],
+    ["If", Box("Expr"), Box("Stmt"), Option(Box("Stmt"))],
+    ["While", Box("Expr"), Box("Stmt")],
+    ["Try", Box("TryStmt")],
+    ["For", "For"],
+    ["Empty"]
+  ),
+  Struct(
+    "VarDecl",
+    ["span"],
+    ["decl_type", "DeclType"],
+    ["pattern", "Pattern"],
+    ["init", Option("Expr")]
+  ),
+  Struct(
+    "For",
+    ["span"],
+    ["init", "ForInit"],
+    ["test", Option("Expr")],
+    ["update", Option("Expr")],
+    ["body", Box("Stmt")]
+  ),
+  Enum("ForInit", [], ["VarDecl", "VarDecl"], ["Expr", "Expr"]),
+  Struct("Block", ["span"], ["stmts", Vec("Stmt")]),
+  Struct(
+    "TryStmt",
+    ["span"],
+    ["try_block", "Block"],
+    ["catch_name", Option("Ident")],
+    ["catch_block", Option("Block")],
+    ["finally_block", Option("Block")]
+  ),
 
-    Enum(
-        "Expr",
-        ["span"],
-        ["Var", "Ident"],
-        ["BinOp", Box("Expr"), "BinOp", Box("Expr")],
-        ["ArrowFn", "ParamList", "ArrowFnBody"],
-        ["Function", Option("Ident"), "ParamList", "Block"],
-        ["Call", Box("Expr"), Vec("Expr")],
-        ["Index", Box("Expr"), Box("Expr")],
-        ["Prop", Box("Expr"), "Ident"],
-        ["String", "Text"],
-        ["Number", "Text"],
-        ["Object", Vec("ObjectLiteralEntry")],
-        ["Throw", Box("Expr")]
-    ),
-    Struct("ObjectLiteralEntry", ["span"], ["key", "Ident"], ["value", "Expr"]),
-    Struct("ParamList", ["span"], ["params", Vec("Param")]),
-    Struct("Param", ["span"], ["name", "Ident"]),
-    Enum("ArrowFnBody", ["span"], ["Expr", Box("Expr")], ["Block", "Block"]),
-    Enum("Pattern", ["span"], ["Var", "Ident"]),
+  Enum(
+    "Expr",
+    ["span"],
+    ["Var", "Ident"],
+    ["BinOp", Box("Expr"), "BinOp", Box("Expr")],
+    ["ArrowFn", "ParamList", "ArrowFnBody"],
+    ["Function", Option("Ident"), "ParamList", "Block"],
+    ["Call", Box("Expr"), Vec("Expr")],
+    ["Index", Box("Expr"), Box("Expr")],
+    ["Prop", Box("Expr"), "Ident"],
+    ["String", "Text"],
+    ["Number", "Text"],
+    ["Object", Vec("ObjectLiteralEntry")],
+    ["Throw", Box("Expr")]
+  ),
+  Struct("ObjectLiteralEntry", ["span"], ["key", "Ident"], ["value", "Expr"]),
+  Struct("ParamList", ["span"], ["params", Vec("Param")]),
+  Struct("Param", ["span"], ["name", "Ident"]),
+  Enum("ArrowFnBody", ["span"], ["Expr", Box("Expr")], ["Block", "Block"]),
+  Enum("Pattern", ["span"], ["Var", "Ident"]),
 
-    Enum("BinOp", [], "Add", "Sub", "Mul", "Div"),
-    Enum("DeclType", [], "Let", "Const", "Var"),
+  Enum("BinOp", [], "Add", "Sub", "Mul", "Div"),
+  Enum("DeclType", [], "Let", "Const", "Var"),
 ];
-
 
 /**
  * @param {string} name
