@@ -443,22 +443,30 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expr(&mut self) -> Result<Expr<'src>> {
-        self.parse_binop_or_higher()
+        self.parse_equality_expr()
     }
 
-    fn parse_binop_or_higher(&mut self) -> Result<Expr<'src>> {
+    fn parse_equality_expr(&mut self) -> Result<Expr<'src>> {
+        let lhs = self.parse_relational_expr()?;
+        match self.current()?.kind {
+            T::EqEq | T::EqEqEq | T::BangEq | T::BangEqEq => {
+                let op = self.advance()?;
+                let op = parse_bin_op(op.kind);
+                let rhs = self.parse_equality_expr()?;
+                let span = Span::between(lhs.span(), rhs.span());
+                Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
+            }
+            _ => Ok(lhs),
+        }
+    }
+
+    fn parse_relational_expr(&mut self) -> Result<Expr<'src>> {
         let lhs = self.parse_update_expr_or_higher()?;
         match self.current()?.kind {
             T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq => {
                 let op = self.advance()?;
-                let op = match op.kind {
-                    T::LessThan => BinOp::Lt,
-                    T::GreaterThan => BinOp::Gt,
-                    T::LessThanEq => BinOp::Lte,
-                    T::GreaterThanEq => BinOp::Gte,
-                    _ => unreachable!(),
-                };
-                let rhs = self.parse_binop_or_higher()?;
+                let op = parse_bin_op(op.kind);
+                let rhs = self.parse_relational_expr()?;
                 let span = Span::between(lhs.span(), rhs.span());
                 Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
             }
@@ -612,6 +620,20 @@ impl<'src> Parser<'src> {
 impl From<lexer::Error> for Error {
     fn from(e: lexer::Error) -> Self {
         Error::Lexer(e)
+    }
+}
+
+fn parse_bin_op(kind: TokenKind) -> BinOp {
+    match kind {
+        T::EqEq => BinOp::EqEq,
+        T::EqEqEq => BinOp::EqEqEq,
+        T::BangEq => BinOp::NotEq,
+        T::BangEqEq => BinOp::NotEqEq,
+        T::LessThan => BinOp::Lt,
+        T::LessThanEq => BinOp::Lte,
+        T::GreaterThan => BinOp::Gt,
+        T::GreaterThanEq => BinOp::Gte,
+        _ => unreachable!(),
     }
 }
 
