@@ -2,7 +2,7 @@ use std::mem;
 
 use djs_ast::{
     ArrowFnBody, Block, DeclType, Expr, Ident, ObjectLiteralEntry, Param, ParamList, Pattern,
-    SourceFile, Stmt, Text, TryStmt,
+    SourceFile, Stmt, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -74,7 +74,10 @@ impl<'src> Parser<'src> {
 
     fn parse_stmt(&mut self) -> Result<Stmt<'src>> {
         match self.current()?.kind {
-            T::Let | T::Const | T::Var => self.parse_var_decl(),
+            T::Let | T::Const | T::Var => {
+                let decl = self.parse_var_decl()?;
+                Ok(Stmt::VarDecl(decl.span, decl))
+            }
             T::If => self.parse_if_stmt(),
             T::While => self.parse_while_stmt(),
             T::Try => self.parse_try_stmt(),
@@ -168,7 +171,7 @@ impl<'src> Parser<'src> {
         ))
     }
 
-    fn parse_var_decl(&mut self) -> Result<Stmt<'src>> {
+    fn parse_var_decl(&mut self) -> Result<VarDecl<'src>> {
         let decl_type = match self.current()?.kind {
             T::Let => {
                 self.advance()?;
@@ -192,15 +195,15 @@ impl<'src> Parser<'src> {
             None
         };
         self.expect_semi()?;
-        Ok(Stmt::VarDecl(
-            Span::between(
+        Ok(VarDecl {
+            span: Span::between(
                 pattern.span(),
                 init.as_ref().map(|it| it.span()).unwrap_or(pattern.span()),
             ),
             decl_type,
             pattern,
             init,
-        ))
+        })
     }
 
     fn unexpected_token<T>(&self) -> Result<T> {
@@ -653,7 +656,15 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(_, DeclType::Let, Pattern::Var(_, ident!("x")), Some(init)) => {
+            Stmt::VarDecl(
+                _,
+                VarDecl {
+                    decl_type: DeclType::Let,
+                    pattern: Pattern::Var(_, ident!("x")),
+                    init: Some(init),
+                    ..
+                },
+            ) => {
                 assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
@@ -663,8 +674,16 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(_, DeclType::Const, Pattern::Var(_, ident!("x")), Some(init)) => {
-                assert!(matches!(init, exp_var!("y")));
+            Stmt::VarDecl(
+                _,
+                VarDecl {
+                    decl_type: DeclType::Const,
+                    pattern: Pattern::Var(_, ident!("x")),
+                    init: Some(init),
+                    ..
+                },
+            ) => {
+                assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
         }
@@ -673,7 +692,15 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(_, DeclType::Var, Pattern::Var(_, ident!("x")), Some(init)) => {
+            Stmt::VarDecl(
+                _,
+                VarDecl {
+                    decl_type: DeclType::Var,
+                    pattern: Pattern::Var(_, ident!("x")),
+                    init: Some(init),
+                    ..
+                },
+            ) => {
                 assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
