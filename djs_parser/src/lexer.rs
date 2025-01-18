@@ -268,11 +268,11 @@ impl<'src> Lexer<'src> {
 const EOF_CHAR: char = '\0';
 
 fn is_identifier_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_'
+    c.is_alphabetic() || c == '_' || c == '$'
 }
 
 fn is_identifier_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '_'
+    is_identifier_start(c) || c.is_numeric()
 }
 
 #[cfg(test)]
