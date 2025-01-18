@@ -632,20 +632,7 @@ impl<'src> Parser<'src> {
 
     fn parse_param_list(&mut self) -> Result<ParamList<'src>> {
         let start = self.expect(T::LParen)?;
-        let mut params = Vec::new();
-        loop {
-            match self.current()?.kind {
-                T::Ident => {
-                    let name = self.parse_ident()?;
-                    params.push(Param {
-                        span: name.span,
-                        name,
-                    });
-                }
-                T::RParen => break,
-                _ => return self.unexpected_token(),
-            }
-        }
+        let params = self.parse_comma_separated_list(T::RParen, Self::parse_param)?;
         let stop = self.expect(T::RParen)?;
         Ok(ParamList {
             span: Span {
@@ -653,6 +640,22 @@ impl<'src> Parser<'src> {
                 end: stop.span.end,
             },
             params,
+        })
+    }
+
+    fn parse_param(&mut self) -> Result<Param<'src>> {
+        let name = self.parse_ident()?;
+        let default = match self.current()?.kind {
+            T::Eq => {
+                self.advance()?;
+                Some(self.parse_expr()?)
+            }
+            _ => None,
+        };
+        Ok(Param {
+            span: name.span(),
+            name,
+            default,
         })
     }
 
