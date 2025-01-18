@@ -24,6 +24,7 @@ pub enum TokenKind {
     Throw,
     Return,
     For,
+    New,
 
     String,
     Number,

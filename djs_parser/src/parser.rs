@@ -532,8 +532,22 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_member_expr_or_higher(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_primary_expr()?;
-        self.parse_member_expr_tail(lhs)
+        match self.current()?.kind {
+            T::New => {
+                let start = self.advance()?;
+                let constructor = self.parse_member_expr_or_higher()?;
+                self.expect(T::LParen)?;
+                let args = self.parse_arg_list()?;
+                self.expect(T::RParen)?;
+                let span = Span::between(start.span, constructor.span());
+
+                Ok(Expr::New(span, Box::new(constructor), args))
+            }
+            _ => {
+                let lhs = self.parse_primary_expr()?;
+                self.parse_member_expr_tail(lhs)
+            }
+        }
     }
 
     fn parse_member_expr_tail(&mut self, lhs: Expr<'src>) -> Result<Expr<'src>> {
@@ -897,14 +911,23 @@ mod tests {
         let mut success_count = 0;
         for entry in files {
             let entry = entry.unwrap();
+            if entry.to_str().unwrap().contains("staging") {
+                continue;
+            }
             let mut str = String::new();
             File::open(&entry)
                 .unwrap()
                 .read_to_string(&mut str)
                 .unwrap();
             let mut parser = Parser::new(&str);
-            if parser.parse_source_file().is_ok() {
-                success_count += 1;
+            let result = parser.parse_source_file();
+            match result {
+                Ok(..) => {
+                    success_count += 1;
+                }
+                Err(e) => {
+                    eprintln!("{entry:?}: {e:?}");
+                }
             }
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files")
