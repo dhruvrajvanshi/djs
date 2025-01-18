@@ -1,8 +1,8 @@
 use std::mem;
 
 use djs_ast::{
-    ArrowFnBody, Block, DeclType, Expr, Ident, ObjectLiteralEntry, Param, ParamList, Pattern,
-    SourceFile, Stmt, Text, TryStmt, VarDecl,
+    ArrowFnBody, Block, DeclType, Expr, For, ForInit, Ident, ObjectLiteralEntry, Param, ParamList,
+    Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -86,8 +86,68 @@ impl<'src> Parser<'src> {
                 let tok = self.advance()?;
                 Ok(Stmt::Empty(tok.span))
             }
+            T::LBrace => self
+                .parse_block()
+                .map(|block| Stmt::Block(block.span, block)),
+            T::For => self.parse_for_stmt(),
             _ => self.parse_expr_stmt(),
         }
+    }
+
+    fn parse_for_stmt(&mut self) -> Result<Stmt<'src>> {
+        let first = self.expect(T::For)?;
+        self.expect(T::LParen)?;
+        let init = match self.current()?.kind {
+            // TODO: Handle the lookahead != let [ rule from
+            //       https://tc39.es/ecma262/#prod-ForStatement
+            T::Let | T::Const | T::Var => {
+                let decl = self.parse_var_decl()?;
+                Some(ForInit::VarDecl(decl))
+            }
+            T::Semi => {
+                self.advance()?;
+                None
+            }
+            _ => {
+                let expr = self.parse_expr()?;
+                // No ASI allowed here
+                self.expect(T::Semi)?;
+                Some(ForInit::Expr(expr))
+            }
+        };
+        let cond = if self.current()?.kind == T::Semi {
+            self.advance()?;
+            None
+        } else {
+            let expr = self.parse_expr()?;
+            // No ASI allowed here
+            self.expect(T::Semi)?;
+            Some(expr)
+        };
+        let update = if self.current()?.kind == T::RParen {
+            None
+        } else {
+            Some(self.parse_expr()?)
+        };
+        self.expect(T::RParen)?;
+        let body = Box::new(self.parse_stmt()?);
+        let span = Span::between(first.span, body.span());
+        Ok(Stmt::For(
+            span,
+            For {
+                span,
+                init: init.unwrap_or(ForInit::Expr(Expr::Number(
+                    first.span,
+                    Text {
+                        span: first.span,
+                        text: "0",
+                    },
+                ))),
+                test: cond,
+                update,
+                body,
+            },
+        ))
     }
 
     fn parse_try_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -797,6 +857,49 @@ mod tests {
                 assert!(matches!(expr, exp_var!("x")));
             }
             _ => panic!("Expected a return statement"),
+        }
+    }
+
+    #[test]
+    fn parses_empty_for_loop() {
+        let source = "for(;;);";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        assert!(matches!(stmt, Stmt::For(..)));
+    }
+
+    macro_rules! assert_matches {
+        ($e: expr, $p: pat) => {
+            match $e {
+                $p => {}
+                e => panic!("Expected match failure; Found {e:?}"),
+            }
+        };
+    }
+
+    #[test]
+    fn parses_for_with_init_and_2_expressions() {
+        let source = "for(let x = 0; y; x) {}";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::For(
+                _,
+                For {
+                    init: ForInit::VarDecl(VarDecl { pattern, init, .. }),
+                    test,
+                    update,
+                    body,
+                    ..
+                },
+            ) => {
+                assert!(matches!(pattern, Pattern::Var(..)));
+                assert!(matches!(init, Some(Expr::Number(..))));
+                assert!(matches!(test, Some(Expr::Var(..))));
+                assert!(matches!(update, Some(Expr::Var(..))));
+                assert_matches!(*body, Stmt::Block(..));
+            }
+            e => panic!("Expected a for statement; Found {e:?}"),
         }
     }
 }
