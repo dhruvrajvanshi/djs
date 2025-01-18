@@ -461,12 +461,26 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_relational_expr(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_update_expr_or_higher()?;
+        let lhs = self.parse_additive_expr()?;
         match self.current()?.kind {
             T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq => {
                 let op = self.advance()?;
                 let op = parse_bin_op(op.kind);
                 let rhs = self.parse_relational_expr()?;
+                let span = Span::between(lhs.span(), rhs.span());
+                Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
+            }
+            _ => Ok(lhs),
+        }
+    }
+
+    fn parse_additive_expr(&mut self) -> Result<Expr<'src>> {
+        let lhs = self.parse_update_expr_or_higher()?;
+        match self.current()?.kind {
+            T::Plus | T::Minus => {
+                let op = self.advance()?;
+                let op = parse_bin_op(op.kind);
+                let rhs = self.parse_additive_expr()?;
                 let span = Span::between(lhs.span(), rhs.span());
                 Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
             }
@@ -481,6 +495,13 @@ impl<'src> Parser<'src> {
             let op = self.advance()?;
 
             Ok(Expr::PostIncrement(
+                Span::between(lhs.span(), op.span),
+                Box::new(lhs),
+            ))
+        } else if self.at(T::MinusMinus) && !self.current_is_on_new_line() {
+            let op = self.advance()?;
+
+            Ok(Expr::PostDecrement(
                 Span::between(lhs.span(), op.span),
                 Box::new(lhs),
             ))
@@ -633,6 +654,9 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
         T::LessThanEq => BinOp::Lte,
         T::GreaterThan => BinOp::Gt,
         T::GreaterThanEq => BinOp::Gte,
+        T::Plus => BinOp::Add,
+        T::Minus => BinOp::Sub,
+
         _ => unreachable!(),
     }
 }
