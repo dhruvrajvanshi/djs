@@ -12,7 +12,8 @@ const ast_items = [
         ["VarDecl", "DeclType", "Pattern", Option("Expr")],
         ["If", Box("Expr"), Box("Stmt"), Option(Box("Stmt"))],
         ["While", Box("Expr"), Box("Stmt")],
-        ["Try", Box("TryStmt")]
+        ["Try", Box("TryStmt")],
+        ["Empty"],
     ),
     Struct("Block", ["span"], ["stmts", Vec("Stmt")]),
     Struct(
