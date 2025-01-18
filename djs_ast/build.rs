@@ -4,8 +4,8 @@ use std::{env, fs, path::Path, process::Command};
 fn main() {
     let out_dir = env::var_os("OUT_DIR").unwrap();
     let ast_rs = Path::new(&out_dir).join("ast.rs");
-    let gen_ast_result = Command::new("python3")
-        .args(["gen_ast.py"])
+    let gen_ast_result = Command::new("node")
+        .args(["./gen_ast.js"])
         .output()
         .unwrap();
 
@@ -48,4 +48,6 @@ fn main() {
     println!("cargo::rerun-if-changed=gen_ast.py");
     println!("cargo::rerun-if-changed=gen_visitor.py");
     println!("cargo::rerun-if-changed=src/js_ast.py");
+    println!("cargo::rerun-if-changed=src/ast.js");
+    println!("cargo::rerun-if-changed=gen_ast.js");
 }
