@@ -57,6 +57,7 @@ pub enum TokenKind {
     Minus,
     MinusMinus,
     PlusPlus,
+    Star,
 
     EndOfFile,
 }
