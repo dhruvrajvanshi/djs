@@ -11,7 +11,6 @@ let result = `
 // node djs_ast/gen_ast.js | rustfmt
 // DO NOT EDIT
 use djs_syntax::Span;
-pub type Ident<'src> = &'src str;
 
 `;
 for (const item of ast_items) {
@@ -150,8 +149,7 @@ function gen_struct(item) {
 function gen_type(type) {
   if (typeof type === "string") {
     switch (type) {
-      case "Ident":
-      case "Text":
+      case "str":
         return "&'a str";
       default:
         if (needs_lifetime_param.has(type)) {
@@ -201,7 +199,7 @@ function needs_lifetime_param_set() {
    */
   function type_contains_ident_or_text(type) {
     if (typeof type === "string") {
-      if (type === "Ident" || type === "Text") {
+      if (type === "str") {
         return true;
       }
       if (items_by_name[type] === undefined) {
