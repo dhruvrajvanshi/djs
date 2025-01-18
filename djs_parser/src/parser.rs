@@ -443,8 +443,22 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expr(&mut self) -> Result<Expr<'src>> {
+        self.parse_update_expr_or_higher()
+    }
+
+    fn parse_update_expr_or_higher(&mut self) -> Result<Expr<'src>> {
         let lhs = self.parse_member_expr_or_higher()?;
-        self.parse_call_expr_tail(lhs)
+        let lhs = self.parse_call_expr_tail(lhs)?;
+        if self.at(T::PlusPlus) && !self.current_is_on_new_line() {
+            let op = self.advance()?;
+
+            Ok(Expr::PostIncrement(
+                Span::between(lhs.span(), op.span),
+                Box::new(lhs),
+            ))
+        } else {
+            Ok(lhs)
+        }
     }
 
     fn parse_member_expr_or_higher(&mut self) -> Result<Expr<'src>> {
@@ -901,5 +915,37 @@ mod tests {
             }
             e => panic!("Expected a for statement; Found {e:?}"),
         }
+    }
+
+    #[test]
+    fn parses_postincrement_expr() {
+        let source = "x++;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::Expr(_, e) => {
+                assert_matches!(*e, Expr::PostIncrement(..))
+            }
+            e => panic!("Expected a post increment expression; Found {e:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_postincrement_property_expr() {
+        let source = "x.y++;";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        let Stmt::Expr(_, e) = stmt else {
+            panic!("Expected an expression statement; Found {stmt:?}");
+        };
+
+        let Expr::PostIncrement(_, e) = *e else {
+            panic!("Expected a post increment expression; Found {e:?}");
+        };
+        let Expr::Prop(_, obj, prop) = *e else {
+            panic!("Expected a property expression; Found {e:?}");
+        };
+        assert_matches!(*obj, Expr::Var(..));
+        assert_matches!(prop, ident!("y"));
     }
 }
