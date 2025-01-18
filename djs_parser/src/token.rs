@@ -41,8 +41,11 @@ pub enum TokenKind {
 
     FatArrow,
     Eq,
+
     EqEq,
     EqEqEq,
+    BangEq,
+    BangEqEq,
 
     LessThan,
     LessThanEq,

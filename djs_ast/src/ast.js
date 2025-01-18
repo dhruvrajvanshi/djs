@@ -63,7 +63,26 @@ const ast_items = [
   Enum("ArrowFnBody", ["span"], ["Expr", Box("Expr")], ["Block", "Block"]),
   Enum("Pattern", ["span"], ["Var", "Ident"]),
 
-  Enum("BinOp", [], "Add", "Sub", "Mul", "Div", "Gt", "Lt", "Gte", "Lte"),
+  Enum(
+    "BinOp",
+    [],
+    "Add",
+    "Sub",
+    "Mul",
+    "Div",
+
+    // Relational
+    "Gt",
+    "Lt",
+    "Gte",
+    "Lte",
+
+    // Equality
+    "EqEq",
+    "EqEqEq",
+    "NotEq",
+    "NotEqEq"
+  ),
   Enum("DeclType", [], "Let", "Const", "Var"),
 ];
 
