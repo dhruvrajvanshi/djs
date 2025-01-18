@@ -15,7 +15,9 @@ fn main() {
         .spawn()
         .unwrap();
 
-    gen_ast_result.wait().unwrap();
+    let status = gen_ast_result.wait().unwrap();
+    assert!(status.success());
+
     assert!(Command::new("rustfmt")
         .stdin(Stdio::from(gen_ast_result.stdout.unwrap()))
         .stdout(File::create(&ast_rs).unwrap())
