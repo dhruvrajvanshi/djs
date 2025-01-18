@@ -23,6 +23,7 @@ pub enum TokenKind {
     Finally,
     Throw,
     Return,
+    For,
 
     String,
     Number,
