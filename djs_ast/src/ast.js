@@ -13,8 +13,19 @@ const ast_items = [
     ["While", Box("Expr"), Box("Stmt")],
     ["Try", Box("TryStmt")],
     ["For", "For"],
+    ["ForInOrOf", "ForInOrOf"],
     ["Empty"]
   ),
+  Struct(
+    "ForInOrOf",
+    ["span"],
+    ["decl_type", Option("DeclType")], // None for `for (x of y) {}`
+    ["lhs", "Pattern"],
+    ["in_or_of", "InOrOf"],
+    ["rhs", "Expr"],
+    ["body", Box("Stmt")]
+  ),
+  Enum("InOrOf", [], "In", "Of"),
   Struct(
     "VarDecl",
     ["span"],
