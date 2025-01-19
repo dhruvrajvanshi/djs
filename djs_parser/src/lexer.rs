@@ -51,6 +51,7 @@ impl<'src> Lexer<'src> {
             '.' => self.lex_single_char_token(TokenKind::Dot),
             '*' => self.lex_single_char_token(TokenKind::Star),
             '/' => self.lex_single_char_token(TokenKind::Slash),
+            '?' => self.lex_single_char_token(TokenKind::Question),
             '"' | '\'' => self.lex_simple_string(),
 
             _ if at!("<=") => self.lex_2_char_token(TokenKind::LessThanEq),
