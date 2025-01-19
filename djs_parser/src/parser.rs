@@ -417,7 +417,25 @@ impl<'src> Parser<'src> {
         match self.current()?.kind {
             T::Ident => {
                 let ident = self.parse_ident()?;
-                Ok(Expr::Var(ident.span, ident))
+                match self.current()?.kind {
+                    T::FatArrow => {
+                        let params = ParamList {
+                            span: ident.span,
+                            params: vec![Param {
+                                span: ident.span,
+                                name: ident,
+                                default: None,
+                            }],
+                        };
+                        let body = self.parse_arrow_fn_body()?;
+                        Ok(Expr::ArrowFn(
+                            Span::between(params.span(), body.span()),
+                            params,
+                            body,
+                        ))
+                    }
+                    _ => Ok(Expr::Var(ident.span, ident)),
+                }
             }
             T::String => {
                 let tok = self.advance()?;
@@ -446,24 +464,21 @@ impl<'src> Parser<'src> {
                 let end = self.expect(T::RBrace)?;
                 Ok(Expr::Object(Span::between(start.span, end.span), entries))
             }
-            T::LParen => {
-                let mut snapshot1 = self.clone();
-                let mut snapshot2 = self.clone();
-                let paren_expr = snapshot1.parse_paren_expr();
-                let arrow_fn = snapshot2.parse_arrow_fn();
-                match (paren_expr, arrow_fn) {
-                    (_, Ok(expr)) => {
-                        self.commit(snapshot2);
-                        Ok(expr)
+            T::LParen => match self.peek().map(|it| it.kind) {
+                Some(T::Function) => self.parse_paren_expr(),
+                Some(T::RParen) => self.parse_arrow_fn(),
+                _ => {
+                    let mut snapshot1 = self.clone();
+                    let arrow_expr = snapshot1.parse_arrow_fn();
+                    match arrow_expr {
+                        Ok(arrow_expr) => {
+                            self.commit(snapshot1);
+                            Ok(arrow_expr)
+                        }
+                        Err(..) => self.parse_paren_expr(),
                     }
-                    (Ok(expr), Err(..)) => {
-                        self.commit(snapshot1);
-                        Ok(expr)
-                    }
-
-                    _ => self.unexpected_token(),
                 }
-            }
+            },
             T::Async => {
                 let start = self.advance()?;
                 if self.at(T::Function) {
@@ -492,6 +507,17 @@ impl<'src> Parser<'src> {
                 Ok(Expr::Array(Span::between(start.span, end.span), elements))
             }
             _ => self.unexpected_token(),
+        }
+    }
+
+    fn peek(&self) -> Option<Token> {
+        let mut clone = self.clone();
+        match clone.advance() {
+            Err(_) => None,
+            Ok(tok) => match clone.current() {
+                Ok(_) => Some(tok),
+                Err(_) => None,
+            },
         }
     }
 
