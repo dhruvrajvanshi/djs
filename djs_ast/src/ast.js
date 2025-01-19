@@ -58,7 +58,8 @@ const ast_items = [
     ["PostIncrement", Box("Expr")],
     ["PostDecrement", Box("Expr")],
     ["Array", Vec("Expr")],
-    ["New", Box("Expr"), Vec("Expr")]
+    ["New", Box("Expr"), Vec("Expr")],
+    ["Yield", Option(Box("Expr"))]
   ),
   Struct("ObjectLiteralEntry", ["span"], ["key", "Ident"], ["value", "Expr"]),
   Struct("ParamList", ["span"], ["params", Vec("Param")]),
