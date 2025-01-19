@@ -77,24 +77,37 @@ const ast_items = [
   Enum(
     "BinOp",
     [],
+
+    // Arithmetic
     "Add",
     "Sub",
+
+    // Multiplicative
     "Mul",
     "Div",
+
+    // Bitwise
+    "BitXor",
+    "BitAnd",
+    "BitOr",
+
+    // Logical
+    "And",
+    "Or",
 
     // Relational
     "Gt",
     "Lt",
     "Gte",
     "Lte",
-    "In",
-    "Instanceof",
 
     // Equality
     "EqEq",
     "EqEqEq",
     "NotEq",
-    "NotEqEq"
+    "NotEqEq",
+    "In",
+    "Instanceof"
   ),
   Enum("DeclType", [], "Let", "Const", "Var"),
 ];

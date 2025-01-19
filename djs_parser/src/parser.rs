@@ -506,30 +506,11 @@ impl<'src> Parser<'src> {
         // TODO: parse_coalesce_expr
     }
 
-    fn parse_logical_or_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
-        self.parse_logical_and_expr()
-    }
-
-    fn parse_logical_and_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO:
-        self.parse_bitwise_or_expr()
-    }
-
-    fn parse_bitwise_or_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
-        self.parse_bitwise_xor_expr()
-    }
-
-    fn parse_bitwise_xor_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
-        self.parse_bitwise_and_expr()
-    }
-
-    fn parse_bitwise_and_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
-        self.parse_equality_expr()
-    }
+    define_binop_parser!(parse_logical_or_expr, parse_logical_and_expr, T::AmpAmp);
+    define_binop_parser!(parse_logical_and_expr, parse_bitwise_or_expr, T::VBarVBar);
+    define_binop_parser!(parse_bitwise_or_expr, parse_bitwise_xor_expr, T::VBar);
+    define_binop_parser!(parse_bitwise_xor_expr, parse_bitwise_and_expr, T::Caret);
+    define_binop_parser!(parse_bitwise_and_expr, parse_equality_expr, T::Amp);
 
     define_binop_parser!(
         parse_equality_expr,
@@ -764,6 +745,11 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
         T::Slash => BinOp::Div,
         T::In => BinOp::In,
         T::Instanceof => BinOp::Instanceof,
+        T::AmpAmp => BinOp::And,
+        T::VBarVBar => BinOp::Or,
+        T::VBar => BinOp::BitOr,
+        T::Caret => BinOp::BitXor,
+        T::Amp => BinOp::BitAnd,
 
         k => panic!("Invalid operator {k:?}"),
     }
