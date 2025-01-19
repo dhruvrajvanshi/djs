@@ -22,6 +22,7 @@ const EnumStmt = Enum(
   ["Break", Option("Label")],
   ["Continue", Option("Label")],
   ["Debugger"],
+  ["With", Box(Expr), Box(Stmt)],
   ["Empty"]
 );
 const EnumExpr = Enum(
