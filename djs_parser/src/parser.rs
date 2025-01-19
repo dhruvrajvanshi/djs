@@ -621,7 +621,23 @@ impl<'src> Parser<'src> {
 
     fn parse_conditional_expr(&mut self) -> Result<Expr<'src>> {
         // TODO
-        self.parse_short_circuit_expr()
+        let lhs = self.parse_short_circuit_expr()?;
+        match self.current()?.kind {
+            T::Question => {
+                self.advance()?;
+                let consequent = self.parse_expr()?;
+                self.expect(T::Colon)?;
+                let alternate = self.parse_assignment_expr()?;
+                let span = Span::between(lhs.span(), alternate.span());
+                Ok(Expr::Ternary(
+                    span,
+                    Box::new(lhs),
+                    Box::new(consequent),
+                    Box::new(alternate),
+                ))
+            }
+            _ => Ok(lhs),
+        }
     }
 
     fn parse_short_circuit_expr(&mut self) -> Result<Expr<'src>> {

@@ -48,6 +48,7 @@ pub enum TokenKind {
     Colon,
     Dot,
     Semi,
+    Question,
 
     FatArrow,
     Eq,
