@@ -73,6 +73,14 @@ impl<'src> Lexer<'src> {
             _ if at!("--") => self.lex_2_char_token(TokenKind::MinusMinus),
             '-' => self.lex_single_char_token(TokenKind::Minus),
 
+            _ if at!("&&") => self.lex_2_char_token(TokenKind::AmpAmp),
+            '&' => self.lex_single_char_token(TokenKind::Amp),
+
+            _ if at!("||") => self.lex_2_char_token(TokenKind::VBarVBar),
+            '|' => self.lex_single_char_token(TokenKind::VBar),
+
+            '^' => self.lex_single_char_token(TokenKind::Caret),
+
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c if c.is_numeric() => self.lex_number(),
             c => Err(Error::UnexpectedCharacter(c)),

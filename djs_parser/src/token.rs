@@ -62,5 +62,11 @@ pub enum TokenKind {
     Star,
     Slash,
 
+    VBar,
+    VBarVBar,
+    Amp,
+    AmpAmp,
+    Caret,
+
     EndOfFile,
 }
