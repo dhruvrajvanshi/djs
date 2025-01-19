@@ -130,6 +130,18 @@ impl<'src> Parser<'src> {
                 self.expect_semi()?;
                 Ok(Stmt::Debugger(span))
             }
+            T::With => {
+                let start = self.advance()?;
+                self.expect(T::LParen)?;
+                let obj = self.parse_expr()?;
+                self.expect(T::RParen)?;
+                let body = self.parse_stmt()?;
+                Ok(Stmt::With(
+                    Span::between(start.span, body.span()),
+                    Box::new(obj),
+                    Box::new(body),
+                ))
+            }
             _ => self.parse_expr_stmt(),
         }
     }

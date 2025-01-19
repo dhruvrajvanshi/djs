@@ -34,6 +34,7 @@ pub enum TokenKind {
     Break,
     Continue,
     Debugger,
+    With,
 
     String,
     Number,
