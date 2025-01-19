@@ -32,17 +32,15 @@ pub enum Error {
 macro_rules! define_binop_parser {
     ($fn_name: ident, $next_fn: ident, $op: pat) => {
         fn $fn_name(&mut self) -> Result<Expr<'src>> {
-            let lhs = self.$next_fn()?;
-            match self.current()?.kind {
-                $op => {
-                    let op = self.advance()?;
-                    let op = parse_bin_op(op.kind);
-                    let rhs = self.$fn_name()?;
-                    let span = Span::between(lhs.span(), rhs.span());
-                    Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
-                }
-                _ => Ok(lhs),
+            let mut lhs = self.$next_fn()?;
+            while matches!(self.current()?.kind, $op) {
+                let op = self.advance()?;
+                let op = parse_bin_op(op.kind);
+                let rhs = self.$next_fn()?;
+                let span = Span::between(lhs.span(), rhs.span());
+                lhs = Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs));
             }
+            Ok(lhs)
         }
     };
 }
