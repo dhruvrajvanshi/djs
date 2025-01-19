@@ -234,6 +234,7 @@ impl<'src> Lexer<'src> {
             "for" => TokenKind::For,
             "new" => TokenKind::New,
             "in" => TokenKind::In,
+            "of" => TokenKind::Of,
             "instanceof" => TokenKind::Instanceof,
             "async" => TokenKind::Async,
             "await" => TokenKind::Await,
