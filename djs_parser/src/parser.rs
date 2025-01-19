@@ -533,33 +533,17 @@ impl<'src> Parser<'src> {
         self.parse_equality_expr()
     }
 
-    fn parse_equality_expr(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_relational_expr()?;
-        match self.current()?.kind {
-            T::EqEq | T::EqEqEq | T::BangEq | T::BangEqEq => {
-                let op = self.advance()?;
-                let op = parse_bin_op(op.kind);
-                let rhs = self.parse_equality_expr()?;
-                let span = Span::between(lhs.span(), rhs.span());
-                Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
-            }
-            _ => Ok(lhs),
-        }
-    }
+    define_binop_parser!(
+        parse_equality_expr,
+        parse_relational_expr,
+        T::EqEq | T::EqEqEq | T::BangEq | T::BangEqEq
+    );
 
-    fn parse_relational_expr(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_shift_expr()?;
-        match self.current()?.kind {
-            T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq => {
-                let op = self.advance()?;
-                let op = parse_bin_op(op.kind);
-                let rhs = self.parse_relational_expr()?;
-                let span = Span::between(lhs.span(), rhs.span());
-                Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
-            }
-            _ => Ok(lhs),
-        }
-    }
+    define_binop_parser!(
+        parse_relational_expr,
+        parse_shift_expr,
+        T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq
+    );
 
     fn parse_shift_expr(&mut self) -> Result<Expr<'src>> {
         // TODO
