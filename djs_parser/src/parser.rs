@@ -1,8 +1,8 @@
 use std::mem;
 
 use djs_ast::{
-    ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInit, Function, Ident, ObjectLiteralEntry,
-    Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
+    ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf,
+    ObjectLiteralEntry, Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -105,9 +105,63 @@ impl<'src> Parser<'src> {
             T::LBrace => self
                 .parse_block()
                 .map(|block| Stmt::Block(block.span, block)),
-            T::For => self.parse_for_stmt(),
+            T::For => {
+                let mut for_stmt_snapshot = self.clone();
+                match for_stmt_snapshot.parse_for_stmt() {
+                    Ok(stmt) => {
+                        self.commit(for_stmt_snapshot);
+                        Ok(stmt)
+                    }
+                    Err(..) => self.parse_for_in_of_stmt(),
+                }
+            }
             _ => self.parse_expr_stmt(),
         }
+    }
+    fn parse_for_in_of_stmt(&mut self) -> Result<Stmt<'src>> {
+        let start = self.expect(T::For)?.span;
+        self.expect(T::LParen)?;
+        let decl_type = match self.current()?.kind {
+            T::Let => {
+                self.advance()?;
+                Some(DeclType::Let)
+            }
+            T::Const => {
+                self.advance()?;
+                Some(DeclType::Const)
+            }
+            T::Var => {
+                self.advance()?;
+                Some(DeclType::Var)
+            }
+            _ => None,
+        };
+        let lhs = self.parse_pattern()?;
+        let in_or_of = match self.current()?.kind {
+            T::In => {
+                self.advance()?;
+                InOrOf::In
+            }
+            T::Of => {
+                self.advance()?;
+                InOrOf::Of
+            }
+            _ => return self.unexpected_token(),
+        };
+        let rhs = self.parse_assignment_expr()?;
+        self.expect(T::RParen)?;
+        let body = Box::new(self.parse_stmt()?);
+        Ok(Stmt::ForInOrOf(
+            Span::between(start, body.span()),
+            ForInOrOf {
+                span: Span::between(start, body.span()),
+                in_or_of,
+                decl_type,
+                lhs,
+                rhs,
+                body,
+            },
+        ))
     }
 
     fn parse_for_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -1144,5 +1198,27 @@ mod tests {
         };
         assert_matches!(*obj, Expr::Var(..));
         assert_matches!(prop, ident!("y"));
+    }
+
+    #[test]
+    fn parses_simple_for_of_stmt() {
+        let src = "for(let x of y) z;";
+        let mut parser = Parser::new(src);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::ForInOrOf(
+                _,
+                ForInOrOf {
+                    decl_type: Some(DeclType::Let),
+                    lhs: Pattern::Var(_, ident!("x")),
+                    rhs: Expr::Var(_, ident!("y")),
+                    body,
+                    ..
+                },
+            ) => {
+                assert_matches!(*body, Stmt::Expr(..));
+            }
+            e => panic!("Expected a for of statement; Found {e:?}"),
+        }
     }
 }
