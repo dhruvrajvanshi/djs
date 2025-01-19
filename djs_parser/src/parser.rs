@@ -25,7 +25,7 @@ type T = TokenKind;
 pub enum Error {
     UnexpectedToken(u32, Span, TokenKind),
     UnexpectedEOF,
-    MissingSemi,
+    MissingSemi { line: u32, found: TokenKind },
     Lexer(lexer::Error),
 }
 
@@ -395,7 +395,14 @@ impl<'src> Parser<'src> {
         if self.current_is_on_new_line() {
             return Ok(());
         }
-        Err(Error::MissingSemi)
+        Err(Error::MissingSemi {
+            line: self.current_line(),
+            found: self.current()?.kind,
+        })
+    }
+
+    fn current_line(&self) -> u32 {
+        self.current().map(|it| it.line).unwrap_or(1)
     }
 
     fn current_is_on_new_line(&self) -> bool {
