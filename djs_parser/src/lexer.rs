@@ -238,6 +238,9 @@ impl<'src> Lexer<'src> {
             "instanceof" => TokenKind::Instanceof,
             "async" => TokenKind::Async,
             "await" => TokenKind::Await,
+            "break" => TokenKind::Break,
+            "continue" => TokenKind::Continue,
+            "debugger" => TokenKind::Debugger,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)
