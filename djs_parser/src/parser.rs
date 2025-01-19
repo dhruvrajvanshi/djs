@@ -536,13 +536,14 @@ impl<'src> Parser<'src> {
     define_binop_parser!(
         parse_equality_expr,
         parse_relational_expr,
-        T::EqEq | T::EqEqEq | T::BangEq | T::BangEqEq
+        T::EqEq | T::EqEqEq | T::BangEq | T::BangEqEq | T::In | T::Instanceof
     );
 
+    // https://tc39.es/ecma262/#prod-AdditiveExpression
     define_binop_parser!(
         parse_relational_expr,
         parse_shift_expr,
-        T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq
+        T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq | T::In | T::Instanceof
     );
 
     fn parse_shift_expr(&mut self) -> Result<Expr<'src>> {
@@ -763,8 +764,10 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
         T::Minus => BinOp::Sub,
         T::Star => BinOp::Mul,
         T::Slash => BinOp::Div,
+        T::In => BinOp::In,
+        T::Instanceof => BinOp::Instanceof,
 
-        _ => unreachable!(),
+        k => panic!("Invalid operator {k:?}"),
     }
 }
 
