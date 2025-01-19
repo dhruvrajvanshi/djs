@@ -25,6 +25,8 @@ pub enum TokenKind {
     Return,
     For,
     New,
+    In,
+    Instanceof,
 
     String,
     Number,

@@ -87,6 +87,8 @@ const ast_items = [
     "Lt",
     "Gte",
     "Lte",
+    "In",
+    "Instanceof",
 
     // Equality
     "EqEq",
