@@ -31,6 +31,9 @@ pub enum TokenKind {
     Yield,
     Async,
     Await,
+    Break,
+    Continue,
+    Debugger,
 
     String,
     Number,
