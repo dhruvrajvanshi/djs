@@ -19,6 +19,9 @@ const EnumStmt = Enum(
   ["Try", Box("TryStmt")],
   ["For", "For"],
   ["ForInOrOf", "ForInOrOf"],
+  ["Break", Option("Label")],
+  ["Continue", Option("Label")],
+  ["Debugger"],
   ["Empty"]
 );
 const EnumExpr = Enum(
@@ -45,6 +48,7 @@ const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
   Struct("Ident", ["span"], ["text", "str"]),
   Struct("Text", ["span"], ["text", "str"]),
+  Struct("Label", ["span"], ["name", "str"]),
   EnumStmt,
   Struct(
     "ForInOrOf",
