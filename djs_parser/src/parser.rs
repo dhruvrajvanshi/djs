@@ -395,30 +395,18 @@ impl<'src> Parser<'src> {
                     _ => self.unexpected_token(),
                 }
             }
-            T::Function => {
+            T::Async => {
                 let start = self.advance()?;
-                let is_generator = if self.at(T::Star) {
-                    self.advance()?;
-                    true
+                if self.at(T::Function) {
+                    let f = self.parse_function()?;
+                    Ok(Expr::Function(Span::between(start.span, f.span), f))
                 } else {
-                    false
-                };
-                let name = if self.at(T::Ident) {
-                    Some(self.parse_ident()?)
-                } else {
-                    None
-                };
-                let params = self.parse_param_list()?;
-                let body = self.parse_block()?;
-                let span = Span::between(start.span, body.span());
-                let f = Function {
-                    span,
-                    name,
-                    params,
-                    body,
-                    is_generator,
-                };
-                Ok(Expr::Function(span, f))
+                    self.parse_arrow_fn()
+                }
+            }
+            T::Function => {
+                let f = self.parse_function()?;
+                Ok(Expr::Function(f.span, f))
             }
             T::Throw => {
                 let start = self.advance()?;
@@ -436,6 +424,32 @@ impl<'src> Parser<'src> {
             }
             _ => self.unexpected_token(),
         }
+    }
+
+    fn parse_function(&mut self) -> Result<Function<'src>> {
+        let start = self.advance()?;
+        let is_generator = if self.at(T::Star) {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
+        let name = if self.at(T::Ident) {
+            Some(self.parse_ident()?)
+        } else {
+            None
+        };
+        let params = self.parse_param_list()?;
+        let body = self.parse_block()?;
+        let span = Span::between(start.span, body.span());
+        let f = Function {
+            span,
+            name,
+            params,
+            body,
+            is_generator,
+        };
+        Ok(f)
     }
 
     fn at(&self, kind: TokenKind) -> bool {
@@ -493,7 +507,21 @@ impl<'src> Parser<'src> {
     }
     fn parse_assignment_expr(&mut self) -> Result<Expr<'src>> {
         // TODO
-        self.parse_conditional_expr()
+        match self.current()?.kind {
+            T::Yield => {
+                let start = self.advance()?;
+                if self.current_is_on_new_line() {
+                    Ok(Expr::Yield(start.span, None))
+                } else {
+                    let expr = self.parse_assignment_expr()?;
+                    Ok(Expr::Yield(
+                        Span::between(start.span, expr.span()),
+                        Some(Box::new(expr)),
+                    ))
+                }
+            }
+            _ => self.parse_conditional_expr(),
+        }
     }
 
     fn parse_conditional_expr(&mut self) -> Result<Expr<'src>> {

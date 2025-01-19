@@ -27,6 +27,9 @@ pub enum TokenKind {
     New,
     In,
     Instanceof,
+    Yield,
+    Async,
+    Await,
 
     String,
     Number,
