@@ -473,6 +473,45 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expr(&mut self) -> Result<Expr<'src>> {
+        self.parse_assignment_expr()
+    }
+    fn parse_assignment_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_conditional_expr()
+    }
+
+    fn parse_conditional_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_short_circuit_expr()
+    }
+
+    fn parse_short_circuit_expr(&mut self) -> Result<Expr<'src>> {
+        self.parse_logical_or_expr()
+        // TODO: parse_coalesce_expr
+    }
+
+    fn parse_logical_or_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_logical_and_expr()
+    }
+
+    fn parse_logical_and_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO:
+        self.parse_bitwise_or_expr()
+    }
+
+    fn parse_bitwise_or_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_bitwise_xor_expr()
+    }
+
+    fn parse_bitwise_xor_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_bitwise_and_expr()
+    }
+
+    fn parse_bitwise_and_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
         self.parse_equality_expr()
     }
 
@@ -491,7 +530,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_relational_expr(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_additive_expr()?;
+        let lhs = self.parse_shift_expr()?;
         match self.current()?.kind {
             T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq => {
                 let op = self.advance()?;
@@ -504,8 +543,13 @@ impl<'src> Parser<'src> {
         }
     }
 
+    fn parse_shift_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_additive_expr()
+    }
+
     fn parse_additive_expr(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_update_expr_or_higher()?;
+        let lhs = self.parse_multiplicative_expr()?;
         match self.current()?.kind {
             T::Plus | T::Minus => {
                 let op = self.advance()?;
@@ -518,9 +562,22 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_update_expr_or_higher(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_member_expr_or_higher()?;
-        let lhs = self.parse_call_expr_tail(lhs)?;
+    fn parse_multiplicative_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_exponentiation_expr()
+    }
+    fn parse_exponentiation_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_unary_expr()
+    }
+
+    fn parse_unary_expr(&mut self) -> Result<Expr<'src>> {
+        // TODO
+        self.parse_update_expr()
+    }
+
+    fn parse_update_expr(&mut self) -> Result<Expr<'src>> {
+        let lhs = self.parse_left_hand_side_expr()?;
         if self.at(T::PlusPlus) && !self.current_is_on_new_line() {
             let op = self.advance()?;
 
@@ -538,6 +595,11 @@ impl<'src> Parser<'src> {
         } else {
             Ok(lhs)
         }
+    }
+
+    fn parse_left_hand_side_expr(&mut self) -> Result<Expr<'src>> {
+        let lhs = self.parse_member_expr_or_higher()?;
+        self.parse_call_expr_tail(lhs)
     }
 
     fn parse_member_expr_or_higher(&mut self) -> Result<Expr<'src>> {
