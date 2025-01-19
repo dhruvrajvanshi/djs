@@ -44,7 +44,8 @@ const EnumExpr = Enum(
   ["Array", Vec(Expr)],
   ["New", Box(Expr), Vec(Expr)],
   ["Yield", Option(Box(Expr))],
-  ["Ternary", Box(Expr), Box(Expr), Box(Expr)]
+  ["Ternary", Box(Expr), Box(Expr), Box(Expr)],
+  ["Assign", Box(Expr), Box(Expr)]
 );
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
