@@ -634,7 +634,24 @@ impl<'src> Parser<'src> {
                     ))
                 }
             }
-            _ => self.parse_conditional_expr(),
+            _ => {
+                let mut snapshot = self.clone();
+                let assignment = snapshot.parse_left_hand_side_expr();
+                // conditional_expr is a superset of left_hand_side_expr,
+                // therefore, we must try and parse the sequence "left_hand_side_expr = rhs" first
+                // then fallback to conditional_expr
+                // TODO: Avoid doing a snapshot and lookahead in common cases
+                match (snapshot.current()?.kind, assignment) {
+                    (T::Eq, Ok(lhs)) => {
+                        self.commit(snapshot);
+                        self.advance()?;
+                        let rhs = self.parse_assignment_expr()?;
+                        let span = Span::between(lhs.span(), rhs.span());
+                        Ok(Expr::Assign(span, Box::new(lhs), Box::new(rhs)))
+                    }
+                    _ => self.parse_conditional_expr(),
+                }
+            }
         }
     }
 
