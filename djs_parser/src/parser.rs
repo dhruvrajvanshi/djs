@@ -29,6 +29,24 @@ pub enum Error {
     Lexer(lexer::Error),
 }
 
+macro_rules! define_binop_parser {
+    ($fn_name: ident, $next_fn: ident, $op: pat) => {
+        fn $fn_name(&mut self) -> Result<Expr<'src>> {
+            let lhs = self.$next_fn()?;
+            match self.current()?.kind {
+                $op => {
+                    let op = self.advance()?;
+                    let op = parse_bin_op(op.kind);
+                    let rhs = self.$fn_name()?;
+                    let span = Span::between(lhs.span(), rhs.span());
+                    Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
+                }
+                _ => Ok(lhs),
+            }
+        }
+    };
+}
+
 impl<'src> Parser<'src> {
     pub fn new(source: &'src str) -> Self {
         let mut lexer = Lexer::new(source);
@@ -548,24 +566,18 @@ impl<'src> Parser<'src> {
         self.parse_additive_expr()
     }
 
-    fn parse_additive_expr(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_multiplicative_expr()?;
-        match self.current()?.kind {
-            T::Plus | T::Minus => {
-                let op = self.advance()?;
-                let op = parse_bin_op(op.kind);
-                let rhs = self.parse_additive_expr()?;
-                let span = Span::between(lhs.span(), rhs.span());
-                Ok(Expr::BinOp(span, Box::new(lhs), op, Box::new(rhs)))
-            }
-            _ => Ok(lhs),
-        }
-    }
+    define_binop_parser!(
+        parse_additive_expr,
+        parse_multiplicative_expr,
+        T::Plus | T::Minus
+    );
 
-    fn parse_multiplicative_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
-        self.parse_exponentiation_expr()
-    }
+    define_binop_parser!(
+        parse_multiplicative_expr,
+        parse_exponentiation_expr,
+        T::Star | T::Slash
+    );
+
     fn parse_exponentiation_expr(&mut self) -> Result<Expr<'src>> {
         // TODO
         self.parse_unary_expr()
@@ -765,6 +777,8 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
         T::GreaterThanEq => BinOp::Gte,
         T::Plus => BinOp::Add,
         T::Minus => BinOp::Sub,
+        T::Star => BinOp::Mul,
+        T::Slash => BinOp::Div,
 
         _ => unreachable!(),
     }
