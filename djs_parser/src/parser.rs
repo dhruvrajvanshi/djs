@@ -1224,7 +1224,8 @@ mod tests {
                     if expected_parse_error {
                         success_count += 1;
                     } else {
-                        eprintln!("{entry:?}:{line}: {e:?}");
+                        let path = entry.to_str().unwrap();
+                        eprintln!("{path}:{line}: {e:?}");
                     }
                 }
             }
