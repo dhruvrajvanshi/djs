@@ -37,6 +37,7 @@ const EnumExpr = Enum(
   ["Prop", Box(Expr), "Ident"],
   ["String", "Text"],
   ["Number", "Text"],
+  ["Boolean", "bool"],
   ["Object", Vec("ObjectLiteralEntry")],
   ["Throw", Box(Expr)],
   ["PostIncrement", Box(Expr)],
