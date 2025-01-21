@@ -1174,18 +1174,44 @@ mod tests {
                 // TODO: Avoid creating separate functions for binops
                 continue;
             }
+
+            let expected_parse_error = syntax_error_expected(&str);
             let mut parser = Parser::new(&str);
             let result = parser.parse_source_file();
             match result {
                 Ok(..) => {
-                    success_count += 1;
+                    if !expected_parse_error {
+                        success_count += 1;
+                    } else {
+                        eprintln!("{entry:?}: Expected a parse error but the file was parsed successfully");
+                    }
                 }
                 Err(e) => {
-                    eprintln!("{entry:?}: {e:?}");
+                    if expected_parse_error {
+                        success_count += 1;
+                    } else {
+                        eprintln!("{entry:?}: {e:?}");
+                    }
                 }
             }
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files")
+    }
+
+    fn syntax_error_expected(s: &str) -> bool {
+        let Some(frontmatter_start) = s.find("/*---") else {
+            return false;
+        };
+        let Some(frontmatter_end) = s.find("---*/") else {
+            return false;
+        };
+        let substr = &s[frontmatter_start..frontmatter_end];
+        let is_negative = substr.contains("negative:");
+        //  phase: parse
+        //  type: SyntaxError
+        let syntax_error_expected =
+            substr.contains("phase: parse") && substr.contains("type: SyntaxError");
+        is_negative && syntax_error_expected
     }
 
     #[test]
