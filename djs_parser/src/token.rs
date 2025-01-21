@@ -38,6 +38,7 @@ pub enum TokenKind {
 
     String,
     Number,
+    Regex,
 
     LBrace,
     RBrace,

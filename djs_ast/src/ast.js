@@ -45,7 +45,8 @@ const EnumExpr = Enum(
   ["New", Box(Expr), Vec(Expr)],
   ["Yield", Option(Box(Expr))],
   ["Ternary", Box(Expr), Box(Expr), Box(Expr)],
-  ["Assign", Box(Expr), Box(Expr)]
+  ["Assign", Box(Expr), Box(Expr)],
+  ["Regex", "Text"]
 );
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
