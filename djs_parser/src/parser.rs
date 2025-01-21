@@ -733,8 +733,25 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_unary_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
-        self.parse_update_expr()
+        macro_rules! make_unary {
+            ($case: ident) => {{
+                let start = self.advance()?;
+                let expr = self.parse_unary_expr()?;
+                Ok(Expr::$case(
+                    Span::between(start.span, expr.span()),
+                    Box::new(expr),
+                ))
+            }};
+        }
+        match self.current()?.kind {
+            T::Delete => make_unary!(Delete),
+            T::Bang => make_unary!(Not),
+            T::Plus => make_unary!(UnaryPlus),
+            T::Minus => make_unary!(UnaryMinus),
+            T::Typeof => make_unary!(TypeOf),
+            T::Void => make_unary!(Void),
+            _ => self.parse_update_expr(),
+        }
     }
 
     fn parse_update_expr(&mut self) -> Result<Expr<'src>> {
