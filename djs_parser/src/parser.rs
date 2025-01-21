@@ -24,9 +24,19 @@ type T = TokenKind;
 #[derive(Debug)]
 pub enum Error {
     UnexpectedToken(u32, Span, TokenKind),
-    UnexpectedEOF,
+    UnexpectedEOF(u32),
     MissingSemi { line: u32, found: TokenKind },
     Lexer(lexer::Error),
+}
+impl Error {
+    pub fn line(&self) -> u32 {
+        match self {
+            Error::UnexpectedToken(line, ..) => *line,
+            Error::UnexpectedEOF(line) => *line,
+            Error::MissingSemi { line, .. } => *line,
+            Error::Lexer(e) => e.line(),
+        }
+    }
 }
 
 macro_rules! define_binop_parser {
@@ -1200,14 +1210,15 @@ mod tests {
                     if !expected_parse_error {
                         success_count += 1;
                     } else {
-                        eprintln!("{entry:?}: Expected a parse error but the file was parsed successfully");
+                        eprintln!("{entry:?}:) Expected a parse error but the file was parsed successfully");
                     }
                 }
                 Err(e) => {
+                    let line = e.line();
                     if expected_parse_error {
                         success_count += 1;
                     } else {
-                        eprintln!("{entry:?}: {e:?}");
+                        eprintln!("{entry:?}:{line}: {e:?}");
                     }
                 }
             }
