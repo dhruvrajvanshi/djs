@@ -16,6 +16,7 @@ pub enum Error {
     UnexpectedCharacter(char),
     UnexpectedEOF(/* expected? */ char),
     InvalidEscape(char),
+    ExpectedAHexChar(char),
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -172,7 +173,29 @@ impl<'src> Lexer<'src> {
         while self.current_char() != EOF_CHAR && self.current_char() != quote {
             let c = self.advance();
             if c == '\\' {
-                if !matches!(self.current_char(), '\\' | 'n' | 't' | '\'' | '"') {
+                if self.current_char() == 'u' {
+                    // https://tc39.es/ecma262/#prod-UnicodeEscapeSequence
+                    self.advance();
+                    if self.current_char() == '{' {
+                        while !matches!(self.current_char(), '}' | EOF_CHAR) {
+                            let c = self.advance();
+                            if !c.is_ascii_hexdigit() {
+                                return Err(Error::ExpectedAHexChar(c));
+                            }
+                        }
+                    } else {
+                        for _ in 0..4 {
+                            let c = self.advance();
+                            if !c.is_ascii_hexdigit() {
+                                return Err(Error::ExpectedAHexChar(c));
+                            }
+                        }
+                    }
+                } else if !matches!(
+                    self.current_char(),
+                    // https://tc39.es/ecma262/#prod-SingleEscapeCharacter
+                    '\\' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\'' | '"'
+                ) {
                     return Err(Error::InvalidEscape(self.current_char()));
                 } else {
                     self.advance();
@@ -507,5 +530,11 @@ mod test {
         let mut lexer = Lexer::new("++ ");
         let tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::PlusPlus);
+    }
+    #[test]
+    fn lexes_unicode_escape() {
+        let mut lexer = Lexer::new("'\\u0041'");
+        let tok = lexer.next_token().unwrap();
+        assert_eq!(tok.kind, TokenKind::String);
     }
 }
