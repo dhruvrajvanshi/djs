@@ -322,6 +322,8 @@ impl<'src> Lexer<'src> {
             "delete" => TokenKind::Delete,
             "typeof" => TokenKind::Typeof,
             "void" => TokenKind::Void,
+            "true" => TokenKind::True,
+            "false" => TokenKind::False,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)

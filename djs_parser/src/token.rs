@@ -38,6 +38,8 @@ pub enum TokenKind {
     Delete,
     Typeof,
     Void,
+    True,
+    False,
 
     String,
     Number,
