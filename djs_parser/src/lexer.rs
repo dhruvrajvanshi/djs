@@ -50,7 +50,16 @@ impl<'src> Lexer<'src> {
             ':' => self.lex_single_char_token(TokenKind::Colon),
             '.' => self.lex_single_char_token(TokenKind::Dot),
             '*' => self.lex_single_char_token(TokenKind::Star),
-            '/' => self.lex_single_char_token(TokenKind::Slash),
+            '/' => {
+                let mut snapshot = self.clone();
+                match snapshot.try_lex_regex() {
+                    Some(token) => {
+                        *self = snapshot;
+                        Ok(token)
+                    }
+                    None => self.lex_single_char_token(TokenKind::Slash),
+                }
+            }
             '?' => self.lex_single_char_token(TokenKind::Question),
             '"' | '\'' => self.lex_simple_string(),
 
@@ -85,6 +94,38 @@ impl<'src> Lexer<'src> {
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c if c.is_numeric() => self.lex_number(),
             c => Err(Error::UnexpectedCharacter(c)),
+        }
+    }
+
+    fn try_lex_regex(&mut self) -> Option<Token<'src>> {
+        assert!(self.current_char() == '/');
+        self.advance();
+
+        while self.current_char() != '/' && self.current_char() != EOF_CHAR {
+            if is_line_terminator(self.current_char()) {
+                return None;
+            }
+            let c = self.advance();
+            if c == '\\' {
+                self.advance();
+                // Any character except for a linebreak is a valid escape character
+                // in a regex literal
+                // https://tc39.es/ecma262/#prod-RegularExpressionBackslashSequence
+                if is_line_terminator(self.current_char()) || self.current_char() == EOF_CHAR {
+                    return None;
+                } else {
+                    self.advance();
+                }
+            }
+        }
+        if self.current_char() == '/' {
+            self.advance();
+            while is_valid_regex_flag(self.current_char()) {
+                self.advance();
+            }
+            Some(self.make_token(TokenKind::Regex))
+        } else {
+            None
         }
     }
 
@@ -293,6 +334,14 @@ fn is_identifier_start(c: char) -> bool {
 
 fn is_identifier_char(c: char) -> bool {
     is_identifier_start(c) || c.is_numeric()
+}
+
+fn is_line_terminator(c: char) -> bool {
+    c == '\n' || c == '\r'
+}
+fn is_valid_regex_flag(c: char) -> bool {
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags
+    matches!(c, 'd' | 'g' | 'i' | 'm' | 's' | 'u' | 'v' | 'y')
 }
 
 #[cfg(test)]
