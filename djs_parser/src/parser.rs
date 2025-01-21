@@ -152,6 +152,10 @@ impl<'src> Parser<'src> {
                     Box::new(body),
                 ))
             }
+            T::Function => {
+                let f = self.parse_function()?;
+                Ok(Stmt::FunctionDecl(f.span, f))
+            }
             _ => self.parse_expr_stmt(),
         }
     }
@@ -1253,7 +1257,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 20078);
+        assert_eq!(success_count, 20155);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
