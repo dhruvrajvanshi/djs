@@ -51,6 +51,8 @@ impl<'src> Lexer<'src> {
             ':' => self.lex_single_char_token(TokenKind::Colon),
             '.' => self.lex_single_char_token(TokenKind::Dot),
             '*' => self.lex_single_char_token(TokenKind::Star),
+            '!' => self.lex_single_char_token(TokenKind::Bang),
+            '~' => self.lex_single_char_token(TokenKind::Tilde),
             '/' => {
                 let mut snapshot = self.clone();
                 match snapshot.try_lex_regex() {
@@ -306,6 +308,10 @@ impl<'src> Lexer<'src> {
             "break" => TokenKind::Break,
             "continue" => TokenKind::Continue,
             "debugger" => TokenKind::Debugger,
+            "with" => TokenKind::With,
+            "delete" => TokenKind::Delete,
+            "typeof" => TokenKind::Typeof,
+            "void" => TokenKind::Void,
             _ => TokenKind::Ident,
         };
         self.make_token(token_kind)
