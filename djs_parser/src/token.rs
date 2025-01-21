@@ -35,6 +35,9 @@ pub enum TokenKind {
     Continue,
     Debugger,
     With,
+    Delete,
+    Typeof,
+    Void,
 
     String,
     Number,
@@ -51,6 +54,8 @@ pub enum TokenKind {
     Dot,
     Semi,
     Question,
+    Bang,
+    Tilde,
 
     FatArrow,
     Eq,
