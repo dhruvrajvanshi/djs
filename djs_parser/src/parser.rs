@@ -795,10 +795,16 @@ impl<'src> Parser<'src> {
             T::New => {
                 let start = self.advance()?;
                 let constructor = self.parse_member_expr_or_higher()?;
-                self.expect(T::LParen)?;
-                let args = self.parse_arg_list()?;
-                self.expect(T::RParen)?;
-                let span = Span::between(start.span, constructor.span());
+                let (args, end) = if self.at(T::LParen) {
+                    self.expect(T::LParen)?;
+                    let args = self.parse_arg_list()?;
+                    let end = self.expect(T::RParen)?;
+                    (args, end.span)
+                } else {
+                    (vec![], constructor.span())
+                };
+
+                let span = Span::between(start.span, end);
 
                 Ok(Expr::New(span, Box::new(constructor), args))
             }
@@ -1225,7 +1231,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 19827);
+        assert_eq!(success_count, 19971);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
