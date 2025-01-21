@@ -765,6 +765,25 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_update_expr(&mut self) -> Result<Expr<'src>> {
+        match self.current()?.kind {
+            T::PlusPlus => {
+                let start = self.advance()?;
+                let expr = self.parse_unary_expr()?;
+                return Ok(Expr::PreIncrement(
+                    Span::between(start.span, expr.span()),
+                    Box::new(expr),
+                ));
+            }
+            T::MinusMinus => {
+                let start = self.advance()?;
+                let expr = self.parse_unary_expr()?;
+                return Ok(Expr::PreDecrement(
+                    Span::between(start.span, expr.span()),
+                    Box::new(expr),
+                ));
+            }
+            _ => {}
+        }
         let lhs = self.parse_left_hand_side_expr()?;
         if self.at(T::PlusPlus) && !self.current_is_on_new_line() {
             let op = self.advance()?;
@@ -1232,7 +1251,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 19971);
+        assert_eq!(success_count, 20077);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
