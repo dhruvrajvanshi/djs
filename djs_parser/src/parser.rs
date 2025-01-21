@@ -802,6 +802,7 @@ impl<'src> Parser<'src> {
             T::Minus => make_unary!(UnaryMinus),
             T::Typeof => make_unary!(TypeOf),
             T::Void => make_unary!(Void),
+            T::Await => make_unary!(Await),
             _ => self.parse_update_expr(),
         }
     }

@@ -58,7 +58,8 @@ const EnumExpr = Enum(
   ["UnaryPlus", Box(Expr)],
   ["UnaryMinus", Box(Expr)],
   ["BitNot", Box(Expr)],
-  ["Not", Box(Expr)]
+  ["Not", Box(Expr)],
+  ["Await", Box(Expr)]
 );
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
