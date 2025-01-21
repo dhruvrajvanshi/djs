@@ -497,21 +497,7 @@ impl<'src> Parser<'src> {
                 let end = self.expect(T::RBrace)?;
                 Ok(Expr::Object(Span::between(start.span, end.span), entries))
             }
-            T::LParen => match self.peek().map(|it| it.kind) {
-                Some(T::Function) => self.parse_paren_expr(),
-                Some(T::RParen) => self.parse_arrow_fn(),
-                _ => {
-                    let mut snapshot1 = self.clone();
-                    let arrow_expr = snapshot1.parse_arrow_fn();
-                    match arrow_expr {
-                        Ok(arrow_expr) => {
-                            self.commit(snapshot1);
-                            Ok(arrow_expr)
-                        }
-                        Err(..) => self.parse_paren_expr(),
-                    }
-                }
-            },
+            T::LParen => self.parse_paren_expr(),
             T::Async => {
                 let start = self.advance()?;
                 if self.at(T::Function) {
@@ -660,6 +646,25 @@ impl<'src> Parser<'src> {
                     ))
                 }
             }
+            T::Ident if self.next_is(T::FatArrow) && self.next_is_on_the_same_line() => {
+                let ident = self.parse_ident()?;
+                let params = ParamList {
+                    span: ident.span,
+                    params: vec![Param {
+                        span: ident.span,
+                        name: ident,
+                        default: None,
+                    }],
+                };
+                self.expect(T::FatArrow)?;
+                let body = self.parse_arrow_fn_body()?;
+                Ok(Expr::ArrowFn(
+                    Span::between(params.span(), body.span()),
+                    params,
+                    body,
+                ))
+            }
+            T::LParen if self.can_start_arrow_fn() => self.parse_arrow_fn(),
             _ => {
                 let mut snapshot = self.clone();
                 let assignment = snapshot.parse_left_hand_side_expr();
@@ -679,6 +684,37 @@ impl<'src> Parser<'src> {
                 }
             }
         }
+    }
+
+    fn can_start_arrow_fn(&self) -> bool {
+        let mut clone = self.clone();
+        let Ok(_) = clone.expect(T::LParen) else {
+            return false;
+        };
+        let Ok(_) = clone.parse_comma_separated_list(T::RParen, Self::parse_param) else {
+            return false;
+        };
+        let Ok(rparen) = clone.expect(T::RParen) else {
+            return false;
+        };
+        let Ok(fatarrow) = clone.expect(T::FatArrow) else {
+            return false;
+        };
+        rparen.line == fatarrow.line
+    }
+
+    fn next_is(&self, t: TokenKind) -> bool {
+        self.peek().map(|tok| tok.kind == t).unwrap_or(false)
+    }
+
+    fn next_is_on_the_same_line(&self) -> bool {
+        let Ok(current_line) = self.current().map(|tok| tok.line) else {
+            return false;
+        };
+        let Some(next_line) = self.peek().map(|tok| tok.line) else {
+            return false;
+        };
+        current_line == next_line
     }
 
     fn parse_conditional_expr(&mut self) -> Result<Expr<'src>> {
