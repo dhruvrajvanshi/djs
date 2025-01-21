@@ -525,6 +525,16 @@ impl<'src> Parser<'src> {
                 let end = self.expect(T::RSquare)?;
                 Ok(Expr::Array(Span::between(start.span, end.span), elements))
             }
+            T::Regex => {
+                let tok = self.advance()?;
+                Ok(Expr::Regex(
+                    tok.span,
+                    Text {
+                        span: tok.span,
+                        text: tok.text,
+                    },
+                ))
+            }
             _ => self.unexpected_token(),
         }
     }
