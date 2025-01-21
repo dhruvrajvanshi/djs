@@ -156,6 +156,14 @@ impl<'src> Parser<'src> {
                 let f = self.parse_function()?;
                 Ok(Stmt::FunctionDecl(f.span, f))
             }
+            T::Async => {
+                if self.at(T::Function) {
+                    let f = self.parse_function()?;
+                    Ok(Stmt::FunctionDecl(f.span, f))
+                } else {
+                    self.unexpected_token()
+                }
+            }
             _ => self.parse_expr_stmt(),
         }
     }
@@ -1294,7 +1302,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 20155);
+        assert_eq!(success_count, 20365);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
