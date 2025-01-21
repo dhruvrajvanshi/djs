@@ -13,10 +13,20 @@ pub struct Lexer<'src> {
 }
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
-    UnexpectedCharacter(char),
-    UnexpectedEOF(/* expected? */ char),
-    InvalidEscape(char),
-    ExpectedAHexChar(char),
+    UnexpectedCharacter(u32, char),
+    UnexpectedEOF(u32, /* expected? */ char),
+    InvalidEscape(u32, char),
+    ExpectedAHexChar(u32, char),
+}
+impl Error {
+    pub fn line(&self) -> u32 {
+        match self {
+            Error::UnexpectedCharacter(line, _) => *line,
+            Error::UnexpectedEOF(line, _) => *line,
+            Error::InvalidEscape(line, _) => *line,
+            Error::ExpectedAHexChar(line, _) => *line,
+        }
+    }
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -96,7 +106,7 @@ impl<'src> Lexer<'src> {
 
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c if c.is_numeric() => self.lex_number(),
-            c => Err(Error::UnexpectedCharacter(c)),
+            c => Err(Error::UnexpectedCharacter(self.line, c)),
         }
     }
 
@@ -182,14 +192,14 @@ impl<'src> Lexer<'src> {
                         while !matches!(self.current_char(), '}' | EOF_CHAR) {
                             let c = self.advance();
                             if !c.is_ascii_hexdigit() {
-                                return Err(Error::ExpectedAHexChar(c));
+                                return Err(Error::ExpectedAHexChar(self.line, c));
                             }
                         }
                     } else {
                         for _ in 0..4 {
                             let c = self.advance();
                             if !c.is_ascii_hexdigit() {
-                                return Err(Error::ExpectedAHexChar(c));
+                                return Err(Error::ExpectedAHexChar(self.line, c));
                             }
                         }
                     }
@@ -198,7 +208,7 @@ impl<'src> Lexer<'src> {
                     // https://tc39.es/ecma262/#prod-SingleEscapeCharacter
                     '\\' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\'' | '"'
                 ) {
-                    return Err(Error::InvalidEscape(self.current_char()));
+                    return Err(Error::InvalidEscape(self.line, self.current_char()));
                 } else {
                     self.advance();
                 }
@@ -206,7 +216,7 @@ impl<'src> Lexer<'src> {
         }
         let end_quote = self.advance();
         if end_quote != quote {
-            Err(Error::UnexpectedEOF(quote))
+            Err(Error::UnexpectedEOF(self.line, quote))
         } else {
             Ok(self.make_token(TokenKind::String))
         }
@@ -259,7 +269,7 @@ impl<'src> Lexer<'src> {
             loop {
                 let first = self.advance();
                 if first == EOF_CHAR {
-                    return Err(Error::UnexpectedEOF('*'));
+                    return Err(Error::UnexpectedEOF(self.line, '*'));
                 }
                 if first == '*' && self.current_char() == '/' {
                     self.advance();
