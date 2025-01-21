@@ -46,7 +46,15 @@ const EnumExpr = Enum(
   ["Yield", Option(Box(Expr))],
   ["Ternary", Box(Expr), Box(Expr), Box(Expr)],
   ["Assign", Box(Expr), Box(Expr)],
-  ["Regex", "Text"]
+  ["Regex", "Text"],
+  // Unary operators
+  ["Delete", Box(Expr)],
+  ["Void", Box(Expr)],
+  ["TypeOf", Box(Expr)],
+  ["UnaryPlus", Box(Expr)],
+  ["UnaryMinus", Box(Expr)],
+  ["BitNot", Box(Expr)],
+  ["Not", Box(Expr)]
 );
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
