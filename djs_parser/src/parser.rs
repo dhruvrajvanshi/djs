@@ -530,7 +530,8 @@ impl<'src> Parser<'src> {
             }
             T::LSquare => {
                 let start = self.advance()?;
-                let elements = self.parse_comma_separated_list(T::RSquare, Self::parse_expr)?;
+                let elements =
+                    self.parse_comma_separated_list(T::RSquare, Self::parse_assignment_expr)?;
                 let end = self.expect(T::RSquare)?;
                 Ok(Expr::Array(Span::between(start.span, end.span), elements))
             }
@@ -629,7 +630,7 @@ impl<'src> Parser<'src> {
         let start = self.current()?.span;
         let ident = self.parse_ident()?;
         self.expect(T::Colon)?;
-        let expr = self.parse_expr()?;
+        let expr = self.parse_assignment_expr()?;
         Ok(ObjectLiteralEntry {
             span: Span::between(start, expr.span()),
             key: ident,
@@ -638,7 +639,18 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_expr(&mut self) -> Result<Expr<'src>> {
-        self.parse_assignment_expr()
+        let mut comma_exprs = vec![self.parse_assignment_expr()?];
+        while self.current()?.kind == T::Comma {
+            self.advance()?;
+            comma_exprs.push(self.parse_assignment_expr()?);
+        }
+        if comma_exprs.len() == 1 {
+            Ok(comma_exprs.pop().unwrap())
+        } else {
+            let start = comma_exprs.first().unwrap().span();
+            let end = comma_exprs.last().unwrap().span();
+            Ok(Expr::Comma(Span::between(start, end), comma_exprs))
+        }
     }
     fn parse_assignment_expr(&mut self) -> Result<Expr<'src>> {
         // TODO
@@ -932,7 +944,11 @@ impl<'src> Parser<'src> {
             if matches!(self.current()?.kind, T::RParen | T::EndOfFile) {
                 break;
             }
-            args.push(self.parse_expr()?);
+            args.push(
+                // We want one level below parse_expr here because
+                // we don't want each argument to be parsed as a comma expression
+                self.parse_assignment_expr()?,
+            );
             if self.current()?.kind == T::Comma {
                 self.advance()?;
             }
@@ -1309,7 +1325,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 21609);
+        assert_eq!(success_count, 21716);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
@@ -1502,4 +1518,7 @@ mod tests {
         assert_matches!(&two_args[0], Expr::Number(..));
         assert_matches!(&two_args[1], Expr::Number(..));
     }
+
+    #[test]
+    fn parses_comma_operator() {}
 }
