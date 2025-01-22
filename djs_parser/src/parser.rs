@@ -23,7 +23,7 @@ type T = TokenKind;
 
 #[derive(Debug)]
 pub enum Error {
-    UnexpectedToken(u32, Span, TokenKind),
+    UnexpectedToken(u32, Span, TokenKind, Option<TokenKind>),
     UnexpectedEOF(u32),
     MissingSemi { line: u32, found: TokenKind },
     Lexer(lexer::Error),
@@ -390,6 +390,7 @@ impl<'src> Parser<'src> {
             self.current()?.line,
             self.current()?.span,
             self.current()?.kind,
+            self.last_token.map(|it| it.kind),
         ))
     }
 
@@ -855,70 +856,76 @@ impl<'src> Parser<'src> {
         }
     }
 
+    ///
+    ///
+    /// MemberExpression :
+    ///   (PrimaryExpression | new MemberExpression) ((. IdentifierName) | [ Expression ] )*
+    ///
+    ///
+    /// CallExpression :
+    ///    MemberExpression (Arguments | [Expression] | . IdentifierName)*
+    ///
+    /// LeftHandSideExpression :
+    ///   MemberExpression
+    ///   CallExpression
+    ///   OptionalExpression
+    ///
+    ///
+    ///
     fn parse_left_hand_side_expr(&mut self) -> Result<Expr<'src>> {
-        let lhs = self.parse_member_expr_or_higher()?;
-        self.parse_call_expr_tail(lhs)
+        self.parse_member_or_call_expr(/* allow_calls */ true)
     }
 
-    fn parse_member_expr_or_higher(&mut self) -> Result<Expr<'src>> {
-        match self.current()?.kind {
+    fn parse_member_or_call_expr(&mut self, allow_calls: bool) -> Result<Expr<'src>> {
+        let mut lhs = match self.current()?.kind {
             T::New => {
                 let start = self.advance()?;
-                let constructor = self.parse_member_expr_or_higher()?;
-                let (args, end) = if self.at(T::LParen) {
-                    self.expect(T::LParen)?;
-                    let args = self.parse_arg_list()?;
-                    let end = self.expect(T::RParen)?;
-                    (args, end.span)
-                } else {
-                    (vec![], constructor.span())
-                };
-
-                let span = Span::between(start.span, end);
-
-                Ok(Expr::New(span, Box::new(constructor), args))
+                let expr = self.parse_member_or_call_expr(
+                    // Since new Foo() means `new (Foo)()` and not (new (Foo())), we don't allow calls here
+                    /* allow_calls */
+                    false,
+                )?;
+                let span = Span::between(start.span, expr.span());
+                Expr::New(span, Box::new(expr))
             }
-            _ => {
-                let lhs = self.parse_primary_expr()?;
-                self.parse_member_expr_tail(lhs)
+            _ => self.parse_primary_expr()?,
+        };
+        loop {
+            match self.current()?.kind {
+                T::Dot => {
+                    self.advance()?;
+                    let prop = self.parse_ident()?;
+                    let span = Span::between(lhs.span(), prop.span());
+                    lhs = Expr::Prop(span, Box::new(lhs), prop);
+                }
+                T::LSquare => {
+                    let start = self.advance()?;
+                    let prop = self.parse_expr()?;
+                    let end = self.expect(T::RSquare)?;
+                    let span = Span::between(start.span, end.span);
+                    lhs = Expr::Index(span, Box::new(lhs), Box::new(prop));
+                }
+                T::LParen if allow_calls => {
+                    let (args, args_span) = self.parse_arguments()?;
+                    let span = Span::between(lhs.span(), args_span);
+                    lhs = Expr::Call(span, Box::new(lhs), args);
+                }
+                _ => {
+                    break;
+                }
             }
         }
+        Ok(lhs)
     }
 
-    fn parse_member_expr_tail(&mut self, lhs: Expr<'src>) -> Result<Expr<'src>> {
-        match self.current()?.kind {
-            T::LSquare => {
-                self.advance()?;
-                let prop = self.parse_expr()?;
-                self.expect(T::RSquare)?;
-                let span = Span::between(lhs.span(), prop.span());
-                let member_expr = Expr::Index(span, Box::new(lhs), Box::new(prop));
-                self.parse_member_expr_tail(member_expr)
-            }
-            T::Dot => {
-                self.advance()?;
-                let prop = self.parse_ident()?;
-                let span = Span::between(lhs.span(), prop.span);
-                let prop_expr = Expr::Prop(span, Box::new(lhs), prop);
-                self.parse_member_expr_tail(prop_expr)
-            }
-            _ => Ok(lhs),
-        }
+    fn parse_arguments(&mut self) -> Result<(Vec<Expr<'src>>, Span)> {
+        let first = self.expect(T::LParen)?;
+        let args = self.parse_arg_list()?;
+        let last = self.expect(T::RParen)?;
+        let span = Span::between(first.span, last.span);
+        Ok((args, span))
     }
 
-    fn parse_call_expr_tail(&mut self, lhs: Expr<'src>) -> Result<Expr<'src>> {
-        match self.current()?.kind {
-            T::LParen => {
-                self.advance()?;
-                let args = self.parse_arg_list()?;
-                let end_tok = self.expect(T::RParen)?;
-                let span = Span::between(lhs.span(), end_tok.span);
-                let call_expr = Expr::Call(span, Box::new(lhs), args);
-                self.parse_call_expr_tail(call_expr)
-            }
-            _ => Ok(lhs),
-        }
-    }
     fn parse_arg_list(&mut self) -> Result<Vec<Expr<'src>>> {
         let mut args = Vec::new();
         loop {
@@ -1286,7 +1293,7 @@ mod tests {
                     if !expected_parse_error {
                         success_count += 1;
                     } else {
-                        eprintln!("{entry:?}:) Expected a parse error but the file was parsed successfully");
+                        println!("{entry:?}:) Expected a parse error but the file was parsed successfully");
                     }
                 }
                 Err(e) => {
@@ -1295,14 +1302,14 @@ mod tests {
                         success_count += 1;
                     } else {
                         let path = entry.to_str().unwrap();
-                        eprintln!("{path}:{line}: {e:?}");
+                        println!("{path}:{line}: {e:?}");
                     }
                 }
             }
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 20365);
+        assert_eq!(success_count, 21609);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
@@ -1467,5 +1474,32 @@ mod tests {
             }
             e => panic!("Expected a for of statement; Found {e:?}"),
         }
+    }
+
+    #[test]
+    fn parses_chained_constructor_property() {
+        let src = "new Date(1899, 0).getYear()";
+        let mut parser = Parser::new(src);
+        let expr = parser.parse_expr().unwrap();
+        let Expr::Call(_, outer_callee, outer_args) = expr else {
+            panic!("Expected a call expression; Found {expr:?}");
+        };
+        assert!(outer_args.is_empty());
+        let Expr::Prop(_, new_date_call, prop) = *outer_callee else {
+            panic!("Expected a property expression; Found {outer_callee:?}");
+        };
+        assert!(prop.text == "getYear");
+        let Expr::Call(_, new_date, two_args) = *new_date_call else {
+            panic!("Expected a call expression; Found {new_date_call:?}");
+        };
+        let Expr::New(_, date) = *new_date else {
+            panic!("Expected a new expression; Found {new_date:?}");
+        };
+        let Expr::Var(_, ident!("Date")) = *date else {
+            panic!("Expected the expression 'Date'; Found {date:?}");
+        };
+        assert!(two_args.len() == 2);
+        assert_matches!(&two_args[0], Expr::Number(..));
+        assert_matches!(&two_args[1], Expr::Number(..));
     }
 }
