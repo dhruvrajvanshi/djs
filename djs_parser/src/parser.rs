@@ -556,8 +556,8 @@ impl<'src> Parser<'src> {
         let mut clone = self.clone();
         match clone.advance() {
             Err(_) => None,
-            Ok(tok) => match clone.current() {
-                Ok(_) => Some(tok),
+            Ok(_) => match clone.current() {
+                Ok(tok) => Some(*tok),
                 Err(_) => None,
             },
         }
@@ -1355,7 +1355,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 22370;
+        let expected_successes = 22713;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
@@ -1555,5 +1555,16 @@ mod tests {
     }
 
     #[test]
-    fn parses_comma_operator() {}
+    fn parses_arrow_function_expr_without_param_parens() {
+        let source = "x => x";
+        let mut parser = Parser::new(source);
+        let expr = parser.parse_expr().unwrap();
+        match expr {
+            Expr::ArrowFn(_, params, _body) => {
+                assert!(params.params.len() == 1);
+                assert!(matches!(params.params[0].name, Ident { text: "x", .. }));
+            }
+            e => panic!("Expected an arrow function expression; Found {e:?}"),
+        }
+    }
 }
