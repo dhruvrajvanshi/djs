@@ -206,7 +206,7 @@ impl<'src> Lexer<'src> {
                 } else if !matches!(
                     self.current_char(),
                     // https://tc39.es/ecma262/#prod-SingleEscapeCharacter
-                    '\\' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\'' | '"'
+                    '\\' | 'b' | 'f' | 'n' | 'r' | 't' | 'v' | '\'' | '"' | '\n'
                 ) {
                     return Err(Error::InvalidEscape(self.line, self.current_char()));
                 } else {
