@@ -6,3 +6,5 @@ mod ast {
 }
 
 pub use ast::*;
+
+include!(concat!(env!("OUT_DIR"), "/tokens.rs"));

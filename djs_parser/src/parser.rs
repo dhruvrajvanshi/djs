@@ -1325,7 +1325,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 21716);
+        assert_eq!(success_count, 21782);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
