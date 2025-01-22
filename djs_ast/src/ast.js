@@ -63,7 +63,8 @@ const EnumExpr = Enum(
   ["Await", Box(Expr)],
   ["Comma", Vec(Expr)],
 
-  ["Super"]
+  ["Super"],
+  ["Class", Box("Class")]
 );
 const StructClass = Struct(
   "Class",
