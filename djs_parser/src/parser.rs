@@ -2,7 +2,8 @@ use std::mem;
 
 use djs_ast::{
     ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf,
-    ObjectLiteralEntry, Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
+    ObjectLiteralEntry, ObjectLiteralKey, Param, ParamList, Pattern, SourceFile, Stmt, Text,
+    TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -628,7 +629,22 @@ impl<'src> Parser<'src> {
 
     fn parse_object_literal_entry(&mut self) -> Result<ObjectLiteralEntry<'src>> {
         let start = self.current()?.span;
-        let ident = self.parse_ident()?;
+        let ident = match self.current()?.kind {
+            T::String => {
+                let tok = self.advance()?;
+                ObjectLiteralKey::String(Text {
+                    span: tok.span,
+                    text: tok.text,
+                })
+            }
+            T::LSquare => {
+                self.advance()?;
+                let expr = self.parse_expr()?;
+                self.expect(T::RSquare)?;
+                ObjectLiteralKey::Computed(expr)
+            }
+            _ => ObjectLiteralKey::Ident(self.parse_member_ident_name()?),
+        };
         self.expect(T::Colon)?;
         let expr = self.parse_assignment_expr()?;
         Ok(ObjectLiteralEntry {
@@ -1339,7 +1355,11 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 22122;
+        let expected_successes = 22370;
+        if success_count > expected_successes {
+            let improvement = success_count - expected_successes;
+            panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
+        }
         assert_eq!(success_count, expected_successes);
     }
 
