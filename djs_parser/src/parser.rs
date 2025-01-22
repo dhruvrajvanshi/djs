@@ -906,7 +906,7 @@ impl<'src> Parser<'src> {
             match self.current()?.kind {
                 T::Dot => {
                     self.advance()?;
-                    let prop = self.parse_ident()?;
+                    let prop = self.parse_member_ident_name()?;
                     let span = Span::between(lhs.span(), prop.span());
                     lhs = Expr::Prop(span, Box::new(lhs), prop);
                 }
@@ -928,6 +928,20 @@ impl<'src> Parser<'src> {
             }
         }
         Ok(lhs)
+    }
+
+    /// property names are allowed to contain keywords
+    fn parse_member_ident_name(&mut self) -> Result<Ident<'src>> {
+        let tok = self.current()?.kind;
+        if tok.is_keyword() {
+            let tok = self.advance()?;
+            Ok(Ident {
+                span: tok.span,
+                text: tok.text,
+            })
+        } else {
+            self.parse_ident()
+        }
     }
 
     fn parse_arguments(&mut self) -> Result<(Vec<Expr<'src>>, Span)> {
@@ -1325,7 +1339,8 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        assert_eq!(success_count, 21782);
+        let expected_successes = 22122;
+        assert_eq!(success_count, expected_successes);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
