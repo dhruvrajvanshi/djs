@@ -7,6 +7,7 @@ const tokens = [
   ["Const", "const"],
   ["If", "if"],
   ["While", "while"],
+  ["Do", "do"],
   ["Else", "else"],
   ["Function", "function"],
   ["Try", "try"],
