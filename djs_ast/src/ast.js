@@ -16,6 +16,7 @@ const EnumStmt = Enum(
   ["VarDecl", "VarDecl"],
   ["If", Box(Expr), Box(Stmt), Option(Box(Stmt))],
   ["While", Box(Expr), Box(Stmt)],
+  ["DoWhile", Box(Stmt), Box(Expr)],
   ["Try", Box("TryStmt")],
   ["For", "For"],
   ["ForInOrOf", "ForInOrOf"],
