@@ -295,37 +295,7 @@ impl<'src> Lexer<'src> {
         while is_identifier_char(self.current_char()) {
             self.advance();
         }
-        let token_kind = match self.current_text() {
-            "let" => TokenKind::Let,
-            "var" => TokenKind::Var,
-            "const" => TokenKind::Const,
-            "if" => TokenKind::If,
-            "else" => TokenKind::Else,
-            "function" => TokenKind::Function,
-            "while" => TokenKind::While,
-            "try" => TokenKind::Try,
-            "catch" => TokenKind::Catch,
-            "finally" => TokenKind::Finally,
-            "throw" => TokenKind::Throw,
-            "return" => TokenKind::Return,
-            "for" => TokenKind::For,
-            "new" => TokenKind::New,
-            "in" => TokenKind::In,
-            "of" => TokenKind::Of,
-            "instanceof" => TokenKind::Instanceof,
-            "async" => TokenKind::Async,
-            "await" => TokenKind::Await,
-            "break" => TokenKind::Break,
-            "continue" => TokenKind::Continue,
-            "debugger" => TokenKind::Debugger,
-            "with" => TokenKind::With,
-            "delete" => TokenKind::Delete,
-            "typeof" => TokenKind::Typeof,
-            "void" => TokenKind::Void,
-            "true" => TokenKind::True,
-            "false" => TokenKind::False,
-            _ => TokenKind::Ident,
-        };
+        let token_kind = TokenKind::from_str(self.current_text()).unwrap_or(TokenKind::Ident);
         self.make_token(token_kind)
     }
 
