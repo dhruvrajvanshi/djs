@@ -24,6 +24,7 @@ const EnumStmt = Enum(
   ["Debugger"],
   ["With", Box(Expr), Box(Stmt)],
   ["FunctionDecl", "Function"],
+  ["ClassDecl", "Class"],
   ["Empty"]
 );
 const EnumExpr = Enum(
@@ -60,16 +61,34 @@ const EnumExpr = Enum(
   ["BitNot", Box(Expr)],
   ["Not", Box(Expr)],
   ["Await", Box(Expr)],
-  ["Comma", Vec(Expr)]
+  ["Comma", Vec(Expr)],
+
+  ["Super"]
 );
 const StructClass = Struct(
   "Class",
   ["span"],
   ["name", Option("Ident")],
-  ["superclass", Option("Ident")],
+  ["superclass", Option(Expr)],
   ["body", "ClassBody"]
 );
-const StructBody = Struct("ClassBody", ["span"], ["methods", Vec("MethodDef")]);
+const StructBody = Struct(
+  "ClassBody",
+  ["span"],
+  ["members", Vec("ClassMember")]
+);
+const EnumClassMember = Enum(
+  "ClassMember",
+  [],
+  ["MethodDef", "MethodDef"],
+  ["FieldDef", "FieldDef"]
+);
+const StructFieldDef = Struct(
+  "FieldDef",
+  ["span"],
+  ["name", "Ident"],
+  ["initializer", Option(Expr)]
+);
 const StructMethodDef = Struct(
   "MethodDef",
   ["span"],
@@ -85,6 +104,8 @@ const ast_items = [
   StructClass,
   StructBody,
   StructMethodDef,
+  EnumClassMember,
+  StructFieldDef,
   Struct(
     "ForInOrOf",
     ["span"],
@@ -125,7 +146,7 @@ const ast_items = [
   Struct("ObjectLiteralEntry", ["span"], ["key", "ObjectKey"], ["value", Expr]),
   Enum(
     "ObjectKey",
-    [],
+    ["span"],
     ["Ident", "Ident"],
     ["String", "Text"],
     ["Computed", Expr]

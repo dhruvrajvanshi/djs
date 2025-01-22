@@ -31,6 +31,10 @@ const tokens = [
   ["Void", "void"],
   ["True", "true"],
   ["False", "false"],
+  ["Class", "class"],
+  ["Extends", "extends"],
+  ["Static", "static"],
+  ["Super", "super"],
 
   "String",
   "Number",
