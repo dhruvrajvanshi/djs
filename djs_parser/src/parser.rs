@@ -1451,7 +1451,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 23288;
+        let expected_successes = 23658;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
@@ -1676,5 +1676,18 @@ mod tests {
             }
             e => panic!("Expected a function statement; Found {e:?}"),
         }
+    }
+
+    #[test]
+    fn test() {
+        let source = r#"""
+verifyProperty(Date.prototype, "toGMTString", {
+  enumerable: false,
+  writable: true,
+  configurable: true,
+});
+        """#;
+        let mut parser = Parser::new(source);
+        parser.parse_stmt().unwrap();
     }
 }
