@@ -630,6 +630,10 @@ impl<'src> Parser<'src> {
             T::True => Ok(Expr::Boolean(self.advance()?.span, true)),
             T::False => Ok(Expr::Boolean(self.advance()?.span, false)),
             T::Super => Ok(Expr::Super(self.advance()?.span)),
+            T::Class => {
+                let cls = self.parse_class()?;
+                Ok(Expr::Class(cls.span, Box::new(cls)))
+            }
             _ => self.unexpected_token(),
         }
     }
@@ -1447,7 +1451,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 23165;
+        let expected_successes = 23288;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
