@@ -115,6 +115,7 @@ impl<'src> Parser<'src> {
             }
             T::If => self.parse_if_stmt(),
             T::While => self.parse_while_stmt(),
+            T::Do => self.parse_do_while_stmt(),
             T::Try => self.parse_try_stmt(),
             T::Return => self.parse_return_stmt(),
             T::Semi => {
@@ -181,6 +182,20 @@ impl<'src> Parser<'src> {
             _ => self.parse_expr_stmt(),
         }
     }
+    fn parse_do_while_stmt(&mut self) -> Result<Stmt<'src>> {
+        let start = self.expect(T::Do)?;
+        let body = Box::new(self.parse_stmt()?);
+        self.expect(T::While)?;
+        self.expect(T::LParen)?;
+        let cond = self.parse_expr()?;
+        self.expect(T::RParen)?;
+        Ok(Stmt::DoWhile(
+            Span::between(start.span, cond.span()),
+            body,
+            Box::new(cond),
+        ))
+    }
+
     fn parse_class(&mut self) -> Result<Class<'src>> {
         let first = self.expect(T::Class)?;
         let name = self.parse_optional_binding_ident()?;
@@ -1455,7 +1470,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 26376;
+        let expected_successes = 26416;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
