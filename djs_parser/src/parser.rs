@@ -24,15 +24,23 @@ type T = TokenKind;
 
 #[derive(Debug)]
 pub enum Error {
-    UnexpectedToken(u32, Span, TokenKind, Option<TokenKind>),
+    UnexpectedToken {
+        line: u32,
+        span: Span,
+        found: TokenKind,
+        last_token: Option<TokenKind>,
+    },
     UnexpectedEOF(u32),
-    MissingSemi { line: u32, found: TokenKind },
+    MissingSemi {
+        line: u32,
+        found: TokenKind,
+    },
     Lexer(lexer::Error),
 }
 impl Error {
     pub fn line(&self) -> u32 {
         match self {
-            Error::UnexpectedToken(line, ..) => *line,
+            Error::UnexpectedToken { line, .. } => *line,
             Error::UnexpectedEOF(line) => *line,
             Error::MissingSemi { line, .. } => *line,
             Error::Lexer(e) => e.line(),
@@ -158,7 +166,8 @@ impl<'src> Parser<'src> {
                 Ok(Stmt::FunctionDecl(f.span, f))
             }
             T::Async => {
-                if self.at(T::Function) {
+                if self.next_is(T::Function) {
+                    self.advance()?;
                     let f = self.parse_function()?;
                     Ok(Stmt::FunctionDecl(f.span, f))
                 } else {
@@ -387,12 +396,12 @@ impl<'src> Parser<'src> {
     }
 
     fn unexpected_token<T>(&self) -> Result<T> {
-        Err(Error::UnexpectedToken(
-            self.current()?.line,
-            self.current()?.span,
-            self.current()?.kind,
-            self.last_token.map(|it| it.kind),
-        ))
+        Err(Error::UnexpectedToken {
+            line: self.current()?.line,
+            span: self.current()?.span,
+            found: self.current()?.kind,
+            last_token: self.last_token.map(|it| it.kind),
+        })
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern<'src>> {
@@ -1355,7 +1364,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 22713;
+        let expected_successes = 22860;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
@@ -1565,6 +1574,20 @@ mod tests {
                 assert!(matches!(params.params[0].name, Ident { text: "x", .. }));
             }
             e => panic!("Expected an arrow function expression; Found {e:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_async_function_stmt() {
+        let source = "async function foo() {}";
+        let mut parser = Parser::new(source);
+        let stmt = parser.parse_stmt().unwrap();
+        match stmt {
+            Stmt::FunctionDecl(_, f) => {
+                assert!(f.name.map(|it| it.text) == Some("foo"));
+                assert!(f.params.params.is_empty());
+            }
+            e => panic!("Expected a function statement; Found {e:?}"),
         }
     }
 }
