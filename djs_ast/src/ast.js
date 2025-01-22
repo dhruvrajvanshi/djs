@@ -46,7 +46,7 @@ const EnumExpr = Enum(
   ["PreIncrement", Box(Expr)],
   ["PreDecrement", Box(Expr)],
   ["Array", Vec(Expr)],
-  ["New", Box(Expr), Vec(Expr)],
+  ["New", Box(Expr)],
   ["Yield", Option(Box(Expr))],
   ["Ternary", Box(Expr), Box(Expr), Box(Expr)],
   ["Assign", Box(Expr), Box(Expr)],
