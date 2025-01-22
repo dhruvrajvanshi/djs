@@ -1,5 +1,5 @@
 /** @type {string | [string, string][]} */
-export const tokens = [
+const tokens = [
   "Ident",
 
   ["Let", "let"],
@@ -78,3 +78,4 @@ export const tokens = [
 
   "EndOfFile",
 ];
+module.exports = { tokens };
