@@ -105,7 +105,19 @@ const ast_items = [
   ),
 
   EnumExpr,
-  Struct("ObjectLiteralEntry", ["span"], ["key", "Ident"], ["value", Expr]),
+  Struct(
+    "ObjectLiteralEntry",
+    ["span"],
+    ["key", "ObjectLiteralKey"],
+    ["value", Expr]
+  ),
+  Enum(
+    "ObjectLiteralKey",
+    [],
+    ["Ident", "Ident"],
+    ["String", "Text"],
+    ["Computed", Expr]
+  ),
   Struct("ParamList", ["span"], ["params", Vec("Param")]),
   Struct("Param", ["span"], ["name", "Ident"], ["default", Option(Expr)]),
   Struct(
