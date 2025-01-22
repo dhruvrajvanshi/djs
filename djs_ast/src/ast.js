@@ -62,12 +62,29 @@ const EnumExpr = Enum(
   ["Await", Box(Expr)],
   ["Comma", Vec(Expr)]
 );
+const StructClass = Struct(
+  "Class",
+  ["span"],
+  ["name", Option("Ident")],
+  ["superclass", Option("Ident")],
+  ["body", "ClassBody"]
+);
+const StructBody = Struct("ClassBody", ["span"], ["methods", Vec("MethodDef")]);
+const StructMethodDef = Struct(
+  "MethodDef",
+  ["span"],
+  ["name", "ObjectKey"],
+  ["body", "Function"]
+);
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
   Struct("Ident", ["span"], ["text", "str"]),
   Struct("Text", ["span"], ["text", "str"]),
   Struct("Label", ["span"], ["name", "str"]),
   EnumStmt,
+  StructClass,
+  StructBody,
+  StructMethodDef,
   Struct(
     "ForInOrOf",
     ["span"],
@@ -105,14 +122,9 @@ const ast_items = [
   ),
 
   EnumExpr,
-  Struct(
-    "ObjectLiteralEntry",
-    ["span"],
-    ["key", "ObjectLiteralKey"],
-    ["value", Expr]
-  ),
+  Struct("ObjectLiteralEntry", ["span"], ["key", "ObjectKey"], ["value", Expr]),
   Enum(
-    "ObjectLiteralKey",
+    "ObjectKey",
     [],
     ["Ident", "Ident"],
     ["String", "Text"],

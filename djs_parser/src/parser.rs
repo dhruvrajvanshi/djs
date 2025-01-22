@@ -2,8 +2,8 @@ use std::mem;
 
 use djs_ast::{
     ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf,
-    ObjectLiteralEntry, ObjectLiteralKey, Param, ParamList, Pattern, SourceFile, Stmt, Text,
-    TryStmt, VarDecl,
+    ObjectKey, ObjectLiteralEntry, Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt,
+    VarDecl,
 };
 use djs_syntax::Span;
 
@@ -641,7 +641,7 @@ impl<'src> Parser<'src> {
         let ident = match self.current()?.kind {
             T::String => {
                 let tok = self.advance()?;
-                ObjectLiteralKey::String(Text {
+                ObjectKey::String(Text {
                     span: tok.span,
                     text: tok.text,
                 })
@@ -650,9 +650,9 @@ impl<'src> Parser<'src> {
                 self.advance()?;
                 let expr = self.parse_expr()?;
                 self.expect(T::RSquare)?;
-                ObjectLiteralKey::Computed(expr)
+                ObjectKey::Computed(expr)
             }
-            _ => ObjectLiteralKey::Ident(self.parse_member_ident_name()?),
+            _ => ObjectKey::Ident(self.parse_member_ident_name()?),
         };
         self.expect(T::Colon)?;
         let expr = self.parse_assignment_expr()?;
