@@ -709,6 +709,10 @@ impl<'src> Parser<'src> {
             }
             let entry = parse_item(self)?;
             items.push(entry);
+            if self.at(T::Comma) && self.next_is(end_token) {
+                self.advance()?;
+                break;
+            }
         }
         Ok(items)
     }
@@ -1451,7 +1455,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 23658;
+        let expected_successes = 26376;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
