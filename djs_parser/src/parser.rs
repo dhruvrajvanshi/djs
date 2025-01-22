@@ -1,9 +1,9 @@
 use std::mem;
 
 use djs_ast::{
-    ArrowFnBody, BinOp, Block, DeclType, Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf,
-    ObjectKey, ObjectLiteralEntry, Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt,
-    VarDecl,
+    ArrowFnBody, BinOp, Block, Class, ClassBody, ClassMember, DeclType, Expr, For, ForInOrOf,
+    ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey, ObjectLiteralEntry, Param, ParamList,
+    Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -165,6 +165,10 @@ impl<'src> Parser<'src> {
                 let f = self.parse_function()?;
                 Ok(Stmt::FunctionDecl(f.span, f))
             }
+            T::Class => {
+                let c = self.parse_class()?;
+                Ok(Stmt::ClassDecl(c.span, c))
+            }
             T::Async => {
                 if self.next_is(T::Function) {
                     self.advance()?;
@@ -177,6 +181,74 @@ impl<'src> Parser<'src> {
             _ => self.parse_expr_stmt(),
         }
     }
+    fn parse_class(&mut self) -> Result<Class<'src>> {
+        let first = self.expect(T::Class)?;
+        let name = self.parse_optional_binding_ident()?;
+        let superclass = if self.current()?.kind == T::Extends {
+            self.advance()?;
+            Some(self.parse_left_hand_side_expr()?)
+        } else {
+            None
+        };
+        let body_start = self.expect(T::LBrace)?;
+        let mut members = vec![];
+        while !matches!(self.current()?.kind, T::RBrace | T::EndOfFile) {
+            members.push(self.parse_class_member()?);
+        }
+        let body_end = self.expect(T::RBrace)?;
+        let span = Span::between(first.span, body_end.span);
+        Ok(Class {
+            span,
+            name,
+            superclass,
+            body: ClassBody {
+                span: Span::between(body_start.span, body_end.span),
+                members,
+            },
+        })
+    }
+
+    fn parse_class_member(&mut self) -> Result<ClassMember<'src>> {
+        Ok(ClassMember::MethodDef(self.parse_method_def()?))
+    }
+
+    fn parse_method_def(&mut self) -> Result<MethodDef<'src>> {
+        let static_token = if self.current()?.kind == T::Static {
+            Some(self.advance()?)
+        } else {
+            None
+        };
+        let name = self.parse_object_key()?;
+        let start = static_token.map(|it| it.span).unwrap_or(name.span());
+        let params = self.parse_param_list()?;
+        let body = self.parse_block()?;
+        let span = Span::between(start, body.span);
+        Ok(MethodDef {
+            span,
+            name,
+            body: Function {
+                span,
+                name: None,
+                params,
+                body,
+                is_generator: false,
+            },
+        })
+    }
+
+    fn parse_binding_ident(&mut self) -> Result<Ident<'src>> {
+        // TODO: Handle [Yield, Await] as identifier names
+        self.parse_ident()
+    }
+
+    fn parse_optional_binding_ident(&mut self) -> Result<Option<Ident<'src>>> {
+        if self.current()?.kind == T::Ident {
+            Ok(Some(self.parse_binding_ident()?))
+        } else {
+            Ok(None)
+        }
+    }
+
     fn parse_for_in_of_stmt(&mut self) -> Result<Stmt<'src>> {
         let start = self.expect(T::For)?.span;
         self.expect(T::LParen)?;
@@ -557,6 +629,7 @@ impl<'src> Parser<'src> {
             }
             T::True => Ok(Expr::Boolean(self.advance()?.span, true)),
             T::False => Ok(Expr::Boolean(self.advance()?.span, false)),
+            T::Super => Ok(Expr::Super(self.advance()?.span)),
             _ => self.unexpected_token(),
         }
     }
@@ -638,28 +711,38 @@ impl<'src> Parser<'src> {
 
     fn parse_object_literal_entry(&mut self) -> Result<ObjectLiteralEntry<'src>> {
         let start = self.current()?.span;
-        let ident = match self.current()?.kind {
-            T::String => {
-                let tok = self.advance()?;
-                ObjectKey::String(Text {
-                    span: tok.span,
-                    text: tok.text,
-                })
-            }
-            T::LSquare => {
-                self.advance()?;
-                let expr = self.parse_expr()?;
-                self.expect(T::RSquare)?;
-                ObjectKey::Computed(expr)
-            }
-            _ => ObjectKey::Ident(self.parse_member_ident_name()?),
-        };
+        let ident = self.parse_object_key()?;
         self.expect(T::Colon)?;
         let expr = self.parse_assignment_expr()?;
         Ok(ObjectLiteralEntry {
             span: Span::between(start, expr.span()),
             key: ident,
             value: expr,
+        })
+    }
+
+    fn parse_object_key(&mut self) -> Result<ObjectKey<'src>> {
+        Ok(match self.current()?.kind {
+            T::String => {
+                let tok = self.advance()?;
+                ObjectKey::String(
+                    tok.span,
+                    Text {
+                        span: tok.span,
+                        text: tok.text,
+                    },
+                )
+            }
+            T::LSquare => {
+                let start = self.advance()?.span;
+                let expr = self.parse_expr()?;
+                let stop = self.expect(T::RSquare)?.span;
+                ObjectKey::Computed(Span::between(start, stop), expr)
+            }
+            _ => {
+                let ident = self.parse_member_ident_name()?;
+                ObjectKey::Ident(ident.span, ident)
+            }
         })
     }
 
@@ -1364,7 +1447,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 22860;
+        let expected_successes = 23165;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
