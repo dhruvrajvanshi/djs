@@ -170,8 +170,15 @@ const ast_items = [
     ["Var", "Ident"],
     ["Assignment", Box("Pattern"), Box(Expr)],
     ["Array", Vec(Option("Pattern"))],
-    ["Object", Vec("ObjectPatternProperty")],
+    ["Object", "ObjectPattern"],
     ["Rest", Box("Pattern")]
+  ),
+
+  Struct(
+    "ObjectPattern",
+    ["span"],
+    ["properties", Vec("ObjectPatternProperty")],
+    ["rest", Option(Box("Pattern"))]
   ),
 
   Struct(

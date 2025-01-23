@@ -2,8 +2,8 @@ use std::mem;
 
 use djs_ast::{
     ArrowFnBody, BinOp, Block, Class, ClassBody, ClassMember, DeclType, Expr, For, ForInOrOf,
-    ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey, ObjectLiteralEntry, Param, ParamList,
-    Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
+    ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey, ObjectLiteralEntry, ObjectPattern,
+    ObjectPatternProperty, Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -527,7 +527,7 @@ impl<'src> Parser<'src> {
                 let mut elements = vec![];
                 loop {
                     match self.current()?.kind {
-                        T::Comma if self.next_is(T::RParen) => {
+                        T::Comma if self.next_is(T::RSquare) => {
                             self.advance()?;
                             break;
                         }
@@ -550,6 +550,51 @@ impl<'src> Parser<'src> {
                 let end = self.expect(T::RSquare)?;
                 Pattern::Array(Span::between(start.span, end.span), elements)
             }
+            T::LBrace => {
+                let start = self.advance()?;
+                let mut entries = vec![];
+                let mut rest = None;
+                loop {
+                    match self.current()?.kind {
+                        T::Comma if self.next_is(T::RBrace) => {
+                            self.advance()?;
+                            break;
+                        }
+                        T::RBrace | T::EndOfFile => {
+                            break;
+                        }
+                        T::DotDotDot => {
+                            self.advance()?;
+                            let rest_pattern = self.parse_pattern()?;
+                            rest = Some(Box::new(rest_pattern));
+                            if self.at(T::Comma) {
+                                self.advance()?;
+                                break;
+                            } else {
+                                break;
+                            }
+                        }
+                        _ => {
+                            let entry = self.parse_object_pattern_property()?;
+                            entries.push(entry);
+                            if self.at(T::RBrace) {
+                                break;
+                            }
+                            self.expect(T::Comma)?;
+                        }
+                    }
+                }
+                let stop = self.expect(T::RBrace)?;
+                let span = Span::between(start.span, stop.span);
+                Pattern::Object(
+                    span,
+                    ObjectPattern {
+                        span,
+                        properties: entries,
+                        rest,
+                    },
+                )
+            }
             _ => self.unexpected_token()?,
         };
         match self.current()?.kind {
@@ -564,6 +609,32 @@ impl<'src> Parser<'src> {
             }
             _ => Ok(head),
         }
+    }
+
+    fn parse_object_pattern_property(&mut self) -> Result<ObjectPatternProperty<'src>> {
+        let key = self.parse_object_key()?;
+        let value = match (&key, self.current()?.kind) {
+            (_, T::Colon) => {
+                self.advance()?;
+                self.parse_pattern()?
+            }
+            (ObjectKey::Ident(span, ident), _) => Pattern::Var(
+                *span,
+                Ident {
+                    span: *span,
+                    text: ident.text,
+                },
+            ),
+            (ObjectKey::Computed(..) | ObjectKey::String(..), _) => {
+                self.expect(T::Colon)?;
+                self.parse_pattern()?
+            }
+        };
+        Ok(ObjectPatternProperty {
+            span: Span::between(key.span(), value.span()),
+            key,
+            value,
+        })
     }
 
     fn parse_expr_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -1276,7 +1347,7 @@ mod tests {
     use core::panic;
     use std::{fs::File, io::Read};
 
-    use djs_ast::Expr;
+    use djs_ast::{Expr, ObjectPattern};
 
     use super::*;
     macro_rules! ident {
@@ -1531,7 +1602,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 27102;
+        let expected_successes = 28016;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
@@ -1809,5 +1880,91 @@ verifyProperty(Date.prototype, "toGMTString", {
         } else {
             panic!("Expected [,x] to be parsed as None, Some(x); Found {items:?}");
         }
+    }
+
+    #[test]
+    fn parses_empty_object_pattern() {
+        let pattern = Parser::new("{}").parse_pattern().unwrap();
+        let Pattern::Object(
+            _,
+            ObjectPattern {
+                properties,
+                rest: None,
+                ..
+            },
+        ) = pattern
+        else {
+            panic!("Expected an object pattern; Found {pattern:?}");
+        };
+        assert!(properties.is_empty());
+    }
+
+    #[test]
+    fn parses_object_pattern_with_one_property() {
+        let pattern = Parser::new("{ x }").parse_pattern().unwrap();
+        let Pattern::Object(
+            _,
+            ObjectPattern {
+                properties,
+                rest: None,
+                ..
+            },
+        ) = pattern
+        else {
+            panic!("Expected an object pattern; Found {pattern:?}");
+        };
+        let [ObjectPatternProperty { key, value, .. }] = properties.as_slice() else {
+            panic!("Expected {{ x }} to be parsed correctly; Found {properties:?}");
+        };
+        assert_matches!(key, ObjectKey::Ident(.., ident!("x")));
+        assert_matches!(value, Pattern::Var(.., ident!("x")));
+    }
+
+    #[test]
+    fn parses_object_pattern_nested() {
+        let pattern = Parser::new("{ x: { y } }").parse_pattern().unwrap();
+        let Pattern::Object(_, pattern) = pattern else {
+            panic!("Expected an object pattern; Found {pattern:?}");
+        };
+        let [ObjectPatternProperty { key, value, .. }] = pattern.properties.as_slice() else {
+            panic!("Expected {{ x: {{ y }} }} to be parsed correctly; Found {pattern:?}");
+        };
+        assert_matches!(key, ObjectKey::Ident(.., ident!("x")));
+        let Pattern::Object(
+            _,
+            ObjectPattern {
+                properties: inner_props,
+                ..
+            },
+        ) = value
+        else {
+            panic!("Expected {{ y }} to be parsed correctly; Found {value:?}");
+        };
+        let [ObjectPatternProperty { key, .. }] = inner_props.as_slice() else {
+            panic!("Expected {{ y }} to be parsed correctly; Found {inner_props:?}");
+        };
+        assert_matches!(key, ObjectKey::Ident(.., ident!("y")));
+    }
+
+    #[test]
+    fn parses_rest_pattern_in_object() {
+        let pattern = Parser::new("{ x, ...y }").parse_pattern().unwrap();
+        let Pattern::Object(
+            _,
+            ObjectPattern {
+                properties,
+                rest: Some(rest),
+                ..
+            },
+        ) = pattern
+        else {
+            panic!("Expected an object pattern; Found {pattern:?}");
+        };
+        let [ObjectPatternProperty { key, .. }] = properties.as_slice() else {
+            panic!("Expected {{ x, ...y }} to be parsed correctly; Found {properties:?}");
+        };
+        let rest = *rest;
+        assert_matches!(key, ObjectKey::Ident(.., ident!("x")));
+        assert_matches!(rest, Pattern::Var(_, ident!("y")));
     }
 }
