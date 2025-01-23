@@ -463,7 +463,7 @@ impl<'src> Parser<'src> {
             }
             _ => return self.unexpected_token(),
         };
-        let pattern = self.parse_pattern()?;
+        let pattern = self.parse_pattern_with_precedence(/* allow_assignment */ false)?;
         let init = if self.current()?.kind == T::Eq {
             self.advance()?;
             Some(self.parse_expr()?)
@@ -492,9 +492,23 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_pattern(&mut self) -> Result<Pattern<'src>> {
-        let ident = self.parse_ident()?;
+        self.parse_pattern_with_precedence(/* allow_assignment */ true)
+    }
 
-        Ok(Pattern::Var(ident.span, ident))
+    fn parse_pattern_with_precedence(&mut self, allow_assignment: bool) -> Result<Pattern<'src>> {
+        let ident = self.parse_binding_ident()?;
+        let head = Pattern::Var(ident.span, ident);
+        if allow_assignment && self.at(T::Eq) {
+            self.advance()?;
+            let init = self.parse_assignment_expr()?;
+            Ok(Pattern::Assignment(
+                Span::between(head.span(), init.span()),
+                Box::new(head),
+                Box::new(init),
+            ))
+        } else {
+            Ok(head)
+        }
     }
 
     fn parse_expr_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -562,8 +576,7 @@ impl<'src> Parser<'src> {
                             span: ident.span,
                             params: vec![Param {
                                 span: ident.span,
-                                name: ident,
-                                default: None,
+                                pattern: Pattern::Var(ident.span, ident),
                             }],
                         };
                         let body = self.parse_arrow_fn_body()?;
@@ -799,13 +812,12 @@ impl<'src> Parser<'src> {
                 }
             }
             T::Ident if self.next_is(T::FatArrow) && self.next_is_on_the_same_line() => {
-                let ident = self.parse_ident()?;
+                let pattern = self.parse_pattern()?;
                 let params = ParamList {
-                    span: ident.span,
+                    span: pattern.span(),
                     params: vec![Param {
-                        span: ident.span,
-                        name: ident,
-                        default: None,
+                        span: pattern.span(),
+                        pattern,
                     }],
                 };
                 self.expect(T::FatArrow)?;
@@ -1147,18 +1159,10 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_param(&mut self) -> Result<Param<'src>> {
-        let name = self.parse_ident()?;
-        let default = match self.current()?.kind {
-            T::Eq => {
-                self.advance()?;
-                Some(self.parse_expr()?)
-            }
-            _ => None,
-        };
+        let pattern = self.parse_pattern()?;
         Ok(Param {
-            span: name.span(),
-            name,
-            default,
+            span: pattern.span(),
+            pattern,
         })
     }
 
@@ -1470,7 +1474,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 26416;
+        let expected_successes = 26429;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
@@ -1677,7 +1681,10 @@ mod tests {
         match expr {
             Expr::ArrowFn(_, params, _body) => {
                 assert!(params.params.len() == 1);
-                assert!(matches!(params.params[0].name, Ident { text: "x", .. }));
+                assert!(matches!(
+                    params.params[0].pattern,
+                    Pattern::Var(_, Ident { text: "x", .. })
+                ));
             }
             e => panic!("Expected an arrow function expression; Found {e:?}"),
         }

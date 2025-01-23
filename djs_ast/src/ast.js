@@ -154,7 +154,7 @@ const ast_items = [
     ["Computed", Expr]
   ),
   Struct("ParamList", ["span"], ["params", Vec("Param")]),
-  Struct("Param", ["span"], ["name", "Ident"], ["default", Option(Expr)]),
+  Struct("Param", ["span"], ["pattern", "Pattern"]),
   Struct(
     "Function",
     ["span"],
@@ -164,7 +164,22 @@ const ast_items = [
     ["is_generator", "bool"]
   ),
   Enum("ArrowFnBody", ["span"], [Expr, Box(Expr)], ["Block", "Block"]),
-  Enum("Pattern", ["span"], ["Var", "Ident"]),
+  Enum(
+    "Pattern",
+    ["span"],
+    ["Var", "Ident"],
+    ["Assignment", Box("Pattern"), Box(Expr)],
+    ["Array", Vec(Option("Pattern"))],
+    ["Object", Vec("ObjectPatternProperty")],
+    ["Rest", Box("Pattern")]
+  ),
+
+  Struct(
+    "ObjectPatternProperty",
+    ["span"],
+    ["key", "ObjectKey"],
+    ["value", "Pattern"]
+  ),
 
   Enum(
     "BinOp",
