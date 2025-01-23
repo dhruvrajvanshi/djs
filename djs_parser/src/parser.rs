@@ -17,6 +17,7 @@ pub struct Parser<'src> {
     lexer: Lexer<'src>,
     last_token: Option<Token<'src>>,
     current_token: lexer::Result<Token<'src>>,
+    expected: TokenKind,
 }
 pub type Result<T> = std::result::Result<T, Error>;
 
@@ -27,6 +28,7 @@ pub enum Error {
     UnexpectedToken {
         line: u32,
         span: Span,
+        expected: TokenKind,
         found: TokenKind,
         last_token: Option<TokenKind>,
     },
@@ -72,6 +74,7 @@ impl<'src> Parser<'src> {
             last_token: None,
             lexer,
             current_token,
+            expected: T::EndOfFile,
         }
     }
 
@@ -488,16 +491,50 @@ impl<'src> Parser<'src> {
             span: self.current()?.span,
             found: self.current()?.kind,
             last_token: self.last_token.map(|it| it.kind),
+            expected: self.expected,
         })
     }
 
-    fn parse_pattern(&mut self) -> Result<Pattern<'src>> {
+    pub(super) fn parse_pattern(&mut self) -> Result<Pattern<'src>> {
         self.parse_pattern_with_precedence(/* allow_assignment */ true)
     }
 
     fn parse_pattern_with_precedence(&mut self, allow_assignment: bool) -> Result<Pattern<'src>> {
-        let ident = self.parse_binding_ident()?;
-        let head = Pattern::Var(ident.span, ident);
+        let head = match self.current()?.kind {
+            T::Ident => {
+                let ident = self.parse_binding_ident()?;
+                Pattern::Var(ident.span, ident)
+            }
+            T::LSquare => {
+                let start = self.advance()?;
+                let mut elements = vec![];
+                loop {
+                    match self.current()?.kind {
+                        T::Comma if self.next_is(T::RParen) => {
+                            self.advance()?;
+                            break;
+                        }
+                        T::RSquare | T::EndOfFile => {
+                            break;
+                        }
+                        T::Comma => {
+                            self.advance()?;
+                            elements.push(None);
+                        }
+                        _ => {
+                            elements.push(Some(self.parse_pattern()?));
+                            if self.at(T::RSquare) {
+                                break;
+                            }
+                            self.expect(T::Comma)?;
+                        }
+                    }
+                }
+                let end = self.expect(T::RSquare)?;
+                Pattern::Array(Span::between(start.span, end.span), elements)
+            }
+            _ => self.unexpected_token()?,
+        };
         if allow_assignment && self.at(T::Eq) {
             self.advance()?;
             let init = self.parse_assignment_expr()?;
@@ -1179,6 +1216,7 @@ impl<'src> Parser<'src> {
         if self.current()?.kind == kind {
             Ok(self.advance()?)
         } else {
+            self.expected = kind;
             self.unexpected_token()
         }
     }
@@ -1217,6 +1255,7 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
 
 #[cfg(test)]
 mod tests {
+    use core::panic;
     use std::{fs::File, io::Read};
 
     use djs_ast::Expr;
@@ -1474,7 +1513,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 26429;
+        let expected_successes = 27102;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
@@ -1715,5 +1754,42 @@ verifyProperty(Date.prototype, "toGMTString", {
         """#;
         let mut parser = Parser::new(source);
         parser.parse_stmt().unwrap();
+    }
+
+    #[test]
+    fn parses_array_patterns() {
+        let pattern = Parser::new("[x, y,]").parse_pattern().unwrap();
+        let Pattern::Array(_, items) = pattern else {
+            panic!("Expected an array pattern; Found {pattern:?}");
+        };
+        let [Some(Pattern::Var(_, ident!("x"))), Some(Pattern::Var(_, ident!("y")))] =
+            items.as_slice()
+        else {
+            panic!("Expected [x, y,] to be parsed as [x, y]; Found {items:?}");
+        };
+    }
+
+    #[test]
+    fn parses_array_pattern_with_elision() {
+        let pattern = Parser::new("[,]").parse_pattern().unwrap();
+        let Pattern::Array(_, items) = pattern else {
+            panic!("Expected an array pattern; Found {pattern:?}");
+        };
+        let [None] = items.as_slice() else {
+            panic!("Expected [,] to be parsed as [None]; Found {items:?}");
+        };
+    }
+
+    #[test]
+    fn parses_array_pattern_with_elision_2() {
+        let pattern = Parser::new("[,x]").parse_pattern().unwrap();
+        let Pattern::Array(_, items) = pattern else {
+            panic!("Expected an array pattern; Found {pattern:?}");
+        };
+
+        if let [None, Some(Pattern::Var(_, ident!("x")))] = items.as_slice() {
+        } else {
+            panic!("Expected [,x] to be parsed as None, Some(x); Found {items:?}");
+        }
     }
 }
