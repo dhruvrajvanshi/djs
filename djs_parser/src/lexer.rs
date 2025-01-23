@@ -59,6 +59,7 @@ impl<'src> Lexer<'src> {
             ']' => self.lex_single_char_token(TokenKind::RSquare),
             ',' => self.lex_single_char_token(TokenKind::Comma),
             ':' => self.lex_single_char_token(TokenKind::Colon),
+            _ if at!("...") => self.lex_3_char_token(TokenKind::DotDotDot),
             '.' => self.lex_single_char_token(TokenKind::Dot),
             '*' => self.lex_single_char_token(TokenKind::Star),
             '~' => self.lex_single_char_token(TokenKind::Tilde),
