@@ -23,6 +23,14 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 type T = TokenKind;
 
+bitflags::bitflags! {
+    struct PatternFlags: u8 {
+        const NONE = 0;
+        const ALLOW_ASSIGNMENT = 1 << 0;
+        const ALLOW_SPREAD = 1 << 1;
+    }
+}
+
 #[derive(Debug)]
 pub enum Error {
     UnexpectedToken {
@@ -466,7 +474,9 @@ impl<'src> Parser<'src> {
             }
             _ => return self.unexpected_token(),
         };
-        let pattern = self.parse_pattern_with_precedence(/* allow_assignment */ false)?;
+        let pattern = self.parse_pattern_with_precedence(
+            !(PatternFlags::ALLOW_ASSIGNMENT | PatternFlags::ALLOW_SPREAD),
+        )?;
         let init = if self.current()?.kind == T::Eq {
             self.advance()?;
             Some(self.parse_expr()?)
@@ -496,14 +506,21 @@ impl<'src> Parser<'src> {
     }
 
     pub(super) fn parse_pattern(&mut self) -> Result<Pattern<'src>> {
-        self.parse_pattern_with_precedence(/* allow_assignment */ true)
+        self.parse_pattern_with_precedence(PatternFlags::all())
     }
 
-    fn parse_pattern_with_precedence(&mut self, allow_assignment: bool) -> Result<Pattern<'src>> {
+    fn parse_pattern_with_precedence(&mut self, flags: PatternFlags) -> Result<Pattern<'src>> {
         let head = match self.current()?.kind {
             T::Ident => {
                 let ident = self.parse_binding_ident()?;
                 Pattern::Var(ident.span, ident)
+            }
+            T::DotDotDot if flags.contains(PatternFlags::ALLOW_SPREAD) => {
+                let start = self.advance()?;
+                let pattern = self.parse_pattern_with_precedence(
+                    !(PatternFlags::ALLOW_ASSIGNMENT | PatternFlags::ALLOW_SPREAD),
+                )?;
+                Pattern::Rest(Span::between(start.span, pattern.span()), Box::new(pattern))
             }
             T::LSquare => {
                 let start = self.advance()?;
@@ -535,16 +552,17 @@ impl<'src> Parser<'src> {
             }
             _ => self.unexpected_token()?,
         };
-        if allow_assignment && self.at(T::Eq) {
-            self.advance()?;
-            let init = self.parse_assignment_expr()?;
-            Ok(Pattern::Assignment(
-                Span::between(head.span(), init.span()),
-                Box::new(head),
-                Box::new(init),
-            ))
-        } else {
-            Ok(head)
+        match self.current()?.kind {
+            T::Eq if flags.contains(PatternFlags::ALLOW_ASSIGNMENT) => {
+                self.advance()?;
+                let init = self.parse_assignment_expr()?;
+                Ok(Pattern::Assignment(
+                    Span::between(head.span(), init.span()),
+                    Box::new(head),
+                    Box::new(init),
+                ))
+            }
+            _ => Ok(head),
         }
     }
 

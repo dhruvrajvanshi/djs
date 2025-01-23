@@ -50,6 +50,7 @@ const tokens = [
   "Comma",
   "Colon",
   "Dot",
+  "DotDotDot",
   "Semi",
   "Question",
   "Bang",
