@@ -15,6 +15,7 @@ const EnumStmt = Enum(
   ["Return", Option(Expr)],
   ["VarDecl", "VarDecl"],
   ["If", Box(Expr), Box(Stmt), Option(Box(Stmt))],
+  ["Switch", Box(Expr), Vec("SwitchCase")],
   ["While", Box(Expr), Box(Stmt)],
   ["DoWhile", Box(Stmt), Box(Expr)],
   ["Try", Box("TryStmt")],
@@ -28,6 +29,7 @@ const EnumStmt = Enum(
   ["ClassDecl", "Class"],
   ["Empty"]
 );
+
 const EnumExpr = Enum(
   Expr,
   ["span"],
@@ -108,6 +110,7 @@ const ast_items = [
   StructMethodDef,
   EnumClassMember,
   StructFieldDef,
+  Struct("SwitchCase", ["span"], ["test", Option(Expr)], ["body", Vec(Stmt)]),
   Struct(
     "ForInOrOf",
     ["span"],
