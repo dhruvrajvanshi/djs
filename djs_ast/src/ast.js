@@ -51,7 +51,7 @@ const EnumExpr = Enum(
   ["New", Box(Expr)],
   ["Yield", Option(Box(Expr))],
   ["Ternary", Box(Expr), Box(Expr), Box(Expr)],
-  ["Assign", Box(Expr), Box(Expr)],
+  ["Assign", Box(Expr), "AssignOp", Box(Expr)],
   ["Regex", "Text"],
   // Unary operators
   ["Delete", Box(Expr)],
@@ -222,6 +222,23 @@ const ast_items = [
     "NotEqEq",
     "In",
     "Instanceof"
+  ),
+  Enum(
+    "AssignOp",
+    [],
+    "Eq",
+    "MulEq",
+    "DivEq",
+    "ModEq",
+    "AddEq",
+    "SubEq",
+    "LeftShiftEq",
+    "RightShiftEq",
+    "UnsignedRightShiftEq",
+    "BitAndEq",
+    "BitXorEq",
+    "BitOrEq",
+    "ExponentEq"
   ),
   Enum("DeclType", [], "Let", "Const", "Var"),
 ];
