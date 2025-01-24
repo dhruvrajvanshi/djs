@@ -528,7 +528,7 @@ impl<'src> Parser<'src> {
                 let mut elements = vec![];
                 loop {
                     match self.current()?.kind {
-                        T::Comma if self.next_is(T::RSquare) => {
+                        T::Comma if self.next_is(T::RSquare) && !elements.is_empty() => {
                             self.advance()?;
                             break;
                         }
@@ -794,14 +794,8 @@ impl<'src> Parser<'src> {
     }
 
     fn peek(&self) -> Option<Token> {
-        let mut clone = self.clone();
-        match clone.advance() {
-            Err(_) => None,
-            Ok(_) => match clone.current() {
-                Ok(tok) => Some(*tok),
-                Err(_) => None,
-            },
-        }
+        let mut clone = self.lexer.clone();
+        clone.next_token().map(Some).unwrap_or(None)
     }
 
     fn parse_function(&mut self) -> Result<Function<'src>> {
