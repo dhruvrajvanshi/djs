@@ -871,11 +871,11 @@ impl<'src> Parser<'src> {
         let ident = self.parse_object_key()?;
         self.expect(T::Colon)?;
         let expr = self.parse_assignment_expr()?;
-        Ok(ObjectLiteralEntry {
-            span: Span::between(start, expr.span()),
-            key: ident,
-            value: expr,
-        })
+        Ok(ObjectLiteralEntry::Prop(
+            Span::between(start, expr.span()),
+            ident,
+            expr,
+        ))
     }
 
     fn parse_object_key(&mut self) -> Result<ObjectKey<'src>> {
@@ -1343,14 +1343,11 @@ fn is_lhs_expr(expr: &Expr<'_>) -> bool {
 fn expr_is_pattern(expr: &Expr) -> bool {
     match expr {
         Expr::Var(_, _) => true,
-        Expr::Object(_, obj) => {
-            for entry in obj {
-                if !expr_is_pattern(&entry.value) {
-                    return false;
-                }
-            }
-            true
-        }
+        Expr::Object(_, obj) => obj.iter().all(|entry| match entry {
+            ObjectLiteralEntry::Prop(_, _, value) => expr_is_pattern(value),
+            ObjectLiteralEntry::Method(..) => false,
+            ObjectLiteralEntry::Spread(_, e) => expr_is_pattern(e),
+        }),
         Expr::Array(_, items) => items.iter().all(expr_is_pattern),
         _ => false,
     }
@@ -1635,7 +1632,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 28016;
+        let expected_successes = 29519;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
