@@ -145,7 +145,13 @@ const ast_items = [
   ),
 
   EnumExpr,
-  Struct("ObjectLiteralEntry", ["span"], ["key", "ObjectKey"], ["value", Expr]),
+  Enum(
+    "ObjectLiteralEntry",
+    ["span"],
+    ["Prop", "ObjectKey", Expr],
+    ["Method", "MethodDef"],
+    ["Spread", Expr]
+  ),
   Enum(
     "ObjectKey",
     ["span"],
