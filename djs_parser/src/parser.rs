@@ -3,8 +3,8 @@ use std::mem;
 use djs_ast::{
     ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody, ClassMember, DeclType, Expr, For,
     ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey, ObjectLiteralEntry,
-    ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern, SourceFile, Stmt, Text,
-    TryStmt, VarDecl,
+    ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern, SourceFile, Stmt, SwitchCase,
+    Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -107,16 +107,23 @@ impl<'src> Parser<'src> {
 
     fn parse_block(&mut self) -> Result<Block<'src>> {
         let start = self.expect(T::LBrace)?.span;
-        let mut stmts = Vec::new();
-        while self.current()?.kind != T::RBrace {
-            let stmt = self.parse_stmt()?;
-            stmts.push(stmt);
-        }
+        let stmts = self.parse_stmt_list(|t| matches!(t, T::RBrace))?;
         let stop = self.expect(T::RBrace)?.span;
         Ok(Block {
             span: Span::between(start, stop),
             stmts,
         })
+    }
+    fn parse_stmt_list(
+        &mut self,
+        end_token: impl Fn(TokenKind) -> bool,
+    ) -> Result<Vec<Stmt<'src>>> {
+        let mut stmts = vec![];
+        while !end_token(self.current()?.kind) && self.current()?.kind != T::EndOfFile {
+            let stmt = self.parse_stmt()?;
+            stmts.push(stmt);
+        }
+        Ok(stmts)
     }
 
     fn parse_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -126,6 +133,7 @@ impl<'src> Parser<'src> {
                 Ok(Stmt::VarDecl(decl.span, decl))
             }
             T::If => self.parse_if_stmt(),
+            T::Switch => self.parse_switch_stmt(),
             T::While => self.parse_while_stmt(),
             T::Do => self.parse_do_while_stmt(),
             T::Try => self.parse_try_stmt(),
@@ -457,6 +465,54 @@ impl<'src> Parser<'src> {
             then_branch,
             else_branch,
         ))
+    }
+
+    fn parse_switch_stmt(&mut self) -> Result<Stmt<'src>> {
+        let start = self.expect(T::Switch)?.span;
+        self.expect(T::LParen)?;
+        let expr = self.parse_expr()?;
+        self.expect(T::RParen)?;
+        self.expect(T::LBrace)?;
+        let mut cases = vec![];
+        while !matches!(self.current()?.kind, T::RBrace | T::EndOfFile) {
+            cases.push(self.parse_switch_case()?);
+        }
+        self.expect(T::RBrace)?;
+        let end = self.current()?.span;
+        Ok(Stmt::Switch(
+            Span::between(start, end),
+            Box::new(expr),
+            cases,
+        ))
+    }
+    fn parse_switch_case(&mut self) -> Result<SwitchCase<'src>> {
+        match self.current()?.kind {
+            T::Case => {
+                let start = self.expect(T::Case)?;
+                let expr = self.parse_expr()?;
+                let colon = self.expect(T::Colon)?;
+                let stmts =
+                    self.parse_stmt_list(|t| matches!(t, T::Case | T::Default | T::RBrace))?;
+                let end = stmts.last().map(Stmt::span).unwrap_or(colon.span);
+                Ok(SwitchCase {
+                    span: Span::between(start.span, end),
+                    test: Some(expr),
+                    body: stmts,
+                })
+            }
+            _ => {
+                let start = self.expect(T::Default)?.span;
+                let colon = self.expect(T::Colon)?;
+                let stmts =
+                    self.parse_stmt_list(|t| matches!(t, T::Case | T::Default | T::RBrace))?;
+                let end = stmts.last().map(Stmt::span).unwrap_or(colon.span);
+                Ok(SwitchCase {
+                    span: Span::between(start, end),
+                    test: None,
+                    body: stmts,
+                })
+            }
+        }
     }
 
     fn parse_var_decl(&mut self) -> Result<VarDecl<'src>> {
@@ -1661,7 +1717,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 30422;
+        let expected_successes = 30472;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
@@ -2038,5 +2094,19 @@ verifyProperty(Date.prototype, "toGMTString", {
         };
         assert_matches!(*z, Expr::Var(.., ident!("z")));
         assert_matches!(*a, Expr::Var(.., ident!("a")));
+    }
+
+    #[test]
+    fn switch_case_smoke_test() {
+        Parser::new("switch(foo) {}").parse_stmt().unwrap();
+        Parser::new(
+            "
+            switch(foo) {
+                case 1: bar;
+            }
+        ",
+        )
+        .parse_stmt()
+        .unwrap();
     }
 }
