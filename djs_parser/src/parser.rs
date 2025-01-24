@@ -557,10 +557,6 @@ impl<'src> Parser<'src> {
                 let mut rest = None;
                 loop {
                     match self.current()?.kind {
-                        T::Comma if self.next_is(T::RBrace) => {
-                            self.advance()?;
-                            break;
-                        }
                         T::RBrace | T::EndOfFile => {
                             break;
                         }
