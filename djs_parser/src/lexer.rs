@@ -61,6 +61,24 @@ impl<'src> Lexer<'src> {
             ':' => self.lex_single_char_token(TokenKind::Colon),
             _ if at!("...") => self.lex_3_char_token(TokenKind::DotDotDot),
             '.' => self.lex_single_char_token(TokenKind::Dot),
+
+            _ if at!("&&=") => self.lex_3_char_token(TokenKind::AmpAmpEq),
+            _ if at!("||=") => self.lex_3_char_token(TokenKind::BarBarEq),
+            _ if at!("??=") => self.lex_3_char_token(TokenKind::QuestionQuestionEq),
+            _ if at!("*=") => self.lex_2_char_token(TokenKind::StarEq),
+            _ if at!("/=") => self.lex_2_char_token(TokenKind::SlashEq),
+            _ if at!("%=") => self.lex_2_char_token(TokenKind::PercentEq),
+            _ if at!("+=") => self.lex_2_char_token(TokenKind::PlusEq),
+            _ if at!("-=") => self.lex_2_char_token(TokenKind::MinusEq),
+            _ if at!("<<=") => self.lex_3_char_token(TokenKind::LessThanLessThanEq),
+            _ if at!(">>=") => self.lex_3_char_token(TokenKind::GreaterThanGreaterThanEq),
+            _ if at!(">>>=") => {
+                self.lex_3_char_token(TokenKind::GreaterThanGreaterThanGreaterThanEq)
+            }
+            _ if at!("&=") => self.lex_2_char_token(TokenKind::AmpEq),
+            _ if at!("^=") => self.lex_2_char_token(TokenKind::CaretEq),
+            _ if at!("|=") => self.lex_2_char_token(TokenKind::BarEq),
+            _ if at!("**=") => self.lex_3_char_token(TokenKind::StarStarEq),
             '*' => self.lex_single_char_token(TokenKind::Star),
             '~' => self.lex_single_char_token(TokenKind::Tilde),
             '/' => {

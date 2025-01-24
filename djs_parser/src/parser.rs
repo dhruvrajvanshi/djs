@@ -1,9 +1,10 @@
 use std::mem;
 
 use djs_ast::{
-    ArrowFnBody, BinOp, Block, Class, ClassBody, ClassMember, DeclType, Expr, For, ForInOrOf,
-    ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey, ObjectLiteralEntry, ObjectPattern,
-    ObjectPatternProperty, Param, ParamList, Pattern, SourceFile, Stmt, Text, TryStmt, VarDecl,
+    ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody, ClassMember, DeclType, Expr, For,
+    ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey, ObjectLiteralEntry,
+    ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern, SourceFile, Stmt, Text,
+    TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -957,7 +958,7 @@ impl<'src> Parser<'src> {
             T::LParen if self.can_start_arrow_fn() => self.parse_arrow_fn(),
             _ => {
                 let lhs = self.parse_conditional_expr()?;
-                if self.current()?.kind == T::Eq {
+                if let Some(assign_op) = assign_op(self.current()?.kind) {
                     if !is_lhs_expr(&lhs) {
                         return self.unexpected_token();
                     }
@@ -967,7 +968,7 @@ impl<'src> Parser<'src> {
                     self.advance()?;
                     let rhs = self.parse_assignment_expr()?;
                     let span = Span::between(lhs.span(), rhs.span());
-                    Ok(Expr::Assign(span, Box::new(lhs), Box::new(rhs)))
+                    Ok(Expr::Assign(span, Box::new(lhs), assign_op, Box::new(rhs)))
                 } else {
                     Ok(lhs)
                 }
@@ -1358,6 +1359,25 @@ fn expr_is_pattern(expr: &Expr) -> bool {
         }
         Expr::Array(_, items) => items.iter().all(expr_is_pattern),
         _ => false,
+    }
+}
+
+fn assign_op(kind: TokenKind) -> Option<AssignOp> {
+    match kind {
+        T::Eq => Some(AssignOp::Eq),
+        T::PlusEq => Some(AssignOp::AddEq),
+        T::MinusEq => Some(AssignOp::SubEq),
+        T::StarEq => Some(AssignOp::MulEq),
+        T::PercentEq => Some(AssignOp::DivEq),
+        T::SlashEq => Some(AssignOp::DivEq),
+        T::AmpEq => Some(AssignOp::BitAndEq),
+        T::BarEq => Some(AssignOp::BitOrEq),
+        T::CaretEq => Some(AssignOp::BitXorEq),
+        T::LessThanEq => Some(AssignOp::LeftShiftEq),
+        T::GreaterThanGreaterThanEq => Some(AssignOp::RightShiftEq),
+        T::GreaterThanGreaterThanGreaterThanEq => Some(AssignOp::UnsignedRightShiftEq),
+        T::StarStarEq => Some(AssignOp::ExponentEq),
+        _ => None,
     }
 }
 
@@ -1993,7 +2013,7 @@ verifyProperty(Date.prototype, "toGMTString", {
         let Expr::Ternary(_, _, _, alt) = expr else {
             panic!("Expected a ternary expression; Found {expr:?}");
         };
-        let Expr::Assign(_, z, a) = *alt else {
+        let Expr::Assign(_, z, AssignOp::Eq, a) = *alt else {
             panic!("Expected z = a to be parsed as an assignment; Found {alt:?}");
         };
         assert_matches!(*z, Expr::Var(.., ident!("z")));
