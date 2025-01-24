@@ -36,6 +36,9 @@ const tokens = [
   ["Extends", "extends"],
   ["Static", "static"],
   ["Super", "super"],
+  ["Switch", "switch"],
+  ["Case", "case"],
+  ["Default", "default"],
 
   "String",
   "Number",
