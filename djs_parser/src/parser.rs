@@ -956,21 +956,20 @@ impl<'src> Parser<'src> {
             }
             T::LParen if self.can_start_arrow_fn() => self.parse_arrow_fn(),
             _ => {
-                let mut snapshot = self.clone();
-                let assignment = snapshot.parse_left_hand_side_expr();
-                // conditional_expr is a superset of left_hand_side_expr,
-                // therefore, we must try and parse the sequence "left_hand_side_expr = rhs" first
-                // then fallback to conditional_expr
-                // TODO: Avoid doing a snapshot and lookahead in common cases
-                match (snapshot.current()?.kind, assignment) {
-                    (T::Eq, Ok(lhs)) => {
-                        self.commit(snapshot);
-                        self.advance()?;
-                        let rhs = self.parse_assignment_expr()?;
-                        let span = Span::between(lhs.span(), rhs.span());
-                        Ok(Expr::Assign(span, Box::new(lhs), Box::new(rhs)))
+                let lhs = self.parse_conditional_expr()?;
+                if self.current()?.kind == T::Eq {
+                    if !is_lhs_expr(&lhs) {
+                        return self.unexpected_token();
                     }
-                    _ => self.parse_conditional_expr(),
+                    if matches!(lhs, Expr::Object(..) | Expr::Array(..)) && !expr_is_pattern(&lhs) {
+                        return self.unexpected_token();
+                    }
+                    self.advance()?;
+                    let rhs = self.parse_assignment_expr()?;
+                    let span = Span::between(lhs.span(), rhs.span());
+                    Ok(Expr::Assign(span, Box::new(lhs), Box::new(rhs)))
+                } else {
+                    Ok(lhs)
                 }
             }
         }
@@ -1339,6 +1338,26 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
         T::Amp => BinOp::BitAnd,
 
         k => panic!("Invalid operator {k:?}"),
+    }
+}
+
+fn is_lhs_expr(expr: &Expr<'_>) -> bool {
+    matches!(expr, Expr::Var(..) | Expr::Index(..) | Expr::Prop(..))
+}
+
+fn expr_is_pattern(expr: &Expr) -> bool {
+    match expr {
+        Expr::Var(_, _) => true,
+        Expr::Object(_, obj) => {
+            for entry in obj {
+                if !expr_is_pattern(&entry.value) {
+                    return false;
+                }
+            }
+            true
+        }
+        Expr::Array(_, items) => items.iter().all(expr_is_pattern),
+        _ => false,
     }
 }
 
@@ -1966,5 +1985,18 @@ verifyProperty(Date.prototype, "toGMTString", {
         let rest = *rest;
         assert_matches!(key, ObjectKey::Ident(.., ident!("x")));
         assert_matches!(rest, Pattern::Var(_, ident!("y")));
+    }
+
+    #[test]
+    fn parses_conditional_with_assignment_on_rhs() {
+        let expr = Parser::new("x ? y : z = a").parse_expr().unwrap();
+        let Expr::Ternary(_, _, _, alt) = expr else {
+            panic!("Expected a ternary expression; Found {expr:?}");
+        };
+        let Expr::Assign(_, z, a) = *alt else {
+            panic!("Expected z = a to be parsed as an assignment; Found {alt:?}");
+        };
+        assert_matches!(*z, Expr::Var(.., ident!("z")));
+        assert_matches!(*a, Expr::Var(.., ident!("a")));
     }
 }
