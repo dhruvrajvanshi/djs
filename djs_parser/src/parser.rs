@@ -247,7 +247,7 @@ impl<'src> Parser<'src> {
         };
         let name = self.parse_object_key()?;
         let start = static_token.map(|it| it.span).unwrap_or(name.span());
-        let params = self.parse_param_list()?;
+        let params = self.parse_params_with_parens()?;
         let body = self.parse_block()?;
         let span = Span::between(start, body.span);
         Ok(MethodDef {
@@ -811,7 +811,7 @@ impl<'src> Parser<'src> {
         } else {
             None
         };
-        let params = self.parse_param_list()?;
+        let params = self.parse_params_with_parens()?;
         let body = self.parse_block()?;
         let span = Span::between(start.span, body.span());
         let f = Function {
@@ -867,15 +867,48 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_object_literal_entry(&mut self) -> Result<ObjectLiteralEntry<'src>> {
-        let start = self.current()?.span;
-        let ident = self.parse_object_key()?;
-        self.expect(T::Colon)?;
-        let expr = self.parse_assignment_expr()?;
-        Ok(ObjectLiteralEntry::Prop(
-            Span::between(start, expr.span()),
-            ident,
-            expr,
-        ))
+        match self.current()?.kind {
+            T::DotDotDot => {
+                let start = self.advance()?;
+                let expr = self.parse_assignment_expr()?;
+                Ok(ObjectLiteralEntry::Spread(
+                    Span::between(start.span, expr.span()),
+                    expr,
+                ))
+            }
+            _ => {
+                let start = self.current()?.span;
+                let name = self.parse_object_key()?;
+                match self.current()?.kind {
+                    T::LParen => {
+                        let params = self.parse_params_with_parens()?;
+                        let body = self.parse_block()?;
+                        let span = Span::between(start, body.span);
+                        let method = MethodDef {
+                            span,
+                            name,
+                            body: Function {
+                                span,
+                                name: None,
+                                params,
+                                body,
+                                is_generator: false,
+                            },
+                        };
+                        Ok(ObjectLiteralEntry::Method(start, method))
+                    }
+                    _ => {
+                        self.expect(T::Colon)?;
+                        let expr = self.parse_assignment_expr()?;
+                        Ok(ObjectLiteralEntry::Prop(
+                            Span::between(start, expr.span()),
+                            name,
+                            expr,
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     fn parse_object_key(&mut self) -> Result<ObjectKey<'src>> {
@@ -1234,7 +1267,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_arrow_fn(&mut self) -> Result<Expr<'src>> {
-        let params = self.parse_param_list()?;
+        let params = self.parse_params_with_parens()?;
         self.expect(T::FatArrow)?;
         let body = self.parse_arrow_fn_body()?;
 
@@ -1265,7 +1298,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn parse_param_list(&mut self) -> Result<ParamList<'src>> {
+    fn parse_params_with_parens(&mut self) -> Result<ParamList<'src>> {
         let start = self.expect(T::LParen)?;
         let params = self.parse_comma_separated_list(T::RParen, Self::parse_param)?;
         let stop = self.expect(T::RParen)?;
@@ -1632,7 +1665,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 29519;
+        let expected_successes = 30422;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
