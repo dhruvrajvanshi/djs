@@ -68,7 +68,6 @@
 ../test262/test/annexB/language/statements/for-await-of/iterator-close-return-emulates-undefined-throws-when-called.js
 ../test262/test/annexB/language/statements/for-in/nonstrict-initializer.js
 ../test262/test/annexB/language/statements/labeled/function-declaration.js
-../test262/test/built-ins/Array/from/elements-deleted-after.js
 ../test262/test/built-ins/Array/from/source-object-iterator-1.js
 ../test262/test/built-ins/Array/from/source-object-iterator-2.js
 ../test262/test/built-ins/Array/fromAsync/asyncitems-arraylike-length-accessor-throws.js
@@ -90,10 +89,8 @@
 ../test262/test/built-ins/Array/prototype/flatMap/this-value-ctor-object-species-custom-ctor.js
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-10-1.js
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-4-10.js
-../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-2.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-3-15.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-4-10.js
-../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-2.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-9-1.js
 ../test262/test/built-ins/Array/prototype/map/resizable-buffer-shrink-mid-iteration.js
 ../test262/test/built-ins/Array/prototype/map/resizable-buffer.js
@@ -2753,7 +2750,6 @@
 ../test262/test/built-ins/TypedArray/prototype/sort/BigInt/return-same-instance.js
 ../test262/test/built-ins/TypedArray/prototype/sort/BigInt/sortcompare-with-no-tostring.js
 ../test262/test/built-ins/TypedArray/prototype/sort/BigInt/sorted-values.js
-../test262/test/built-ins/TypedArray/prototype/sort/stability.js
 ../test262/test/built-ins/TypedArray/prototype/subarray/BigInt/infinity.js
 ../test262/test/built-ins/TypedArray/prototype/subarray/BigInt/minus-zero.js
 ../test262/test/built-ins/TypedArray/prototype/subarray/BigInt/result-does-not-copy-ordinary-properties.js
@@ -3218,7 +3214,6 @@
 ../test262/test/intl402/Segmenter/prototype/segment/segment-tostring.js
 ../test262/test/intl402/String/prototype/toLocaleUpperCase/special_casing_Lithuanian.js
 ../test262/test/intl402/Temporal/Duration/prototype/round/relativeto-infinity-throws-rangeerror.js
-../test262/test/intl402/Temporal/Duration/prototype/total/dst-day-length.js
 ../test262/test/intl402/Temporal/Duration/prototype/total/relativeto-infinity-throws-rangeerror.js
 ../test262/test/intl402/Temporal/Instant/prototype/toLocaleString/default-includes-time-not-time-zone-name.js
 ../test262/test/intl402/Temporal/Instant/prototype/toLocaleString/lone-options-accepted.js
@@ -3530,7 +3525,6 @@
 ../test262/test/language/directive-prologue/10.1.1-8gs.js
 ../test262/test/language/directive-prologue/14.1-4gs.js
 ../test262/test/language/directive-prologue/14.1-5gs.js
-../test262/test/language/expressions/addition/S11.6.1_A4_T7.js
 ../test262/test/language/expressions/addition/S11.6.1_A4_T8.js
 ../test262/test/language/expressions/addition/bigint-and-number.js
 ../test262/test/language/expressions/addition/bigint-errors.js
@@ -6629,12 +6623,7 @@
 ../test262/test/language/expressions/delete/identifier-strict-recursive.js
 ../test262/test/language/expressions/delete/identifier-strict.js
 ../test262/test/language/expressions/delete/non-reference-return-true.js
-../test262/test/language/expressions/division/S11.5.2_A4_T10.js
-../test262/test/language/expressions/division/S11.5.2_A4_T6.js
-../test262/test/language/expressions/division/S11.5.2_A4_T8.js
-../test262/test/language/expressions/division/S11.5.2_A4_T9.js
 ../test262/test/language/expressions/division/bigint-and-number.js
-../test262/test/language/expressions/division/bigint-arithmetic.js
 ../test262/test/language/expressions/division/bigint-complex-infinity.js
 ../test262/test/language/expressions/division/bigint-errors.js
 ../test262/test/language/expressions/division/bigint-toprimitive.js
@@ -7685,7 +7674,6 @@
 ../test262/test/language/expressions/right-shift/order-of-evaluation.js
 ../test262/test/language/expressions/strict-does-not-equals/bigint-and-object.js
 ../test262/test/language/expressions/strict-equals/bigint-and-object.js
-../test262/test/language/expressions/subtraction/S11.6.2_A4_T7.js
 ../test262/test/language/expressions/subtraction/S11.6.2_A4_T8.js
 ../test262/test/language/expressions/subtraction/bigint-and-number.js
 ../test262/test/language/expressions/subtraction/bigint-errors.js
@@ -13136,7 +13124,6 @@
 ../test262/test/language/statements/with/strict-script.js
 ../test262/test/language/types/null/S8.2_A2.js
 ../test262/test/language/types/number/8.5.1.js
-../test262/test/language/types/number/S8.5_A11_T1.js
 ../test262/test/language/types/number/S8.5_A13_T2.js
 ../test262/test/language/types/number/S8.5_A14_T1.js
 ../test262/test/language/types/number/S8.5_A14_T2.js

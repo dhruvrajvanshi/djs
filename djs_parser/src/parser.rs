@@ -16,6 +16,7 @@ use crate::{
 #[derive(Clone)]
 pub struct Parser<'src> {
     lexer: Lexer<'src>,
+    last_lexer: Lexer<'src>,
     last_token: Option<Token<'src>>,
     current_token: lexer::Result<Token<'src>>,
     expected: TokenKind,
@@ -83,9 +84,11 @@ macro_rules! define_binop_parser {
 impl<'src> Parser<'src> {
     pub fn new(source: &'src str) -> Self {
         let mut lexer = Lexer::new(source);
+        let last_lexer = lexer.clone();
         let current_token = lexer.next_token();
         Parser {
             last_token: None,
+            last_lexer,
             lexer,
             current_token,
             expected: T::EndOfFile,
@@ -849,8 +852,9 @@ impl<'src> Parser<'src> {
                 let end = self.expect(T::RSquare)?;
                 Ok(Expr::Array(Span::between(start.span, end.span), elements))
             }
-            T::Regex => {
-                let tok = self.advance()?;
+            T::Slash => {
+                self.re_lex_regex()?;
+                let tok = self.expect(T::Regex)?;
                 Ok(Expr::Regex(Text {
                     span: tok.span,
                     text: tok.text,
@@ -865,6 +869,16 @@ impl<'src> Parser<'src> {
             }
             _ => self.unexpected_token(),
         }
+    }
+
+    fn re_lex_regex(&mut self) -> Result<()> {
+        let mut last_lexer = self.last_lexer.clone();
+        last_lexer.enable_regex();
+        self.current_token = last_lexer.next_token();
+        last_lexer.disable_regex();
+        assert!(self.current()?.kind == T::Regex);
+        self.lexer = last_lexer;
+        Ok(())
     }
 
     fn peek(&self) -> Option<Token<'src>> {
@@ -1490,6 +1504,7 @@ impl<'src> Parser<'src> {
     }
 
     fn advance(&mut self) -> Result<Token<'src>> {
+        self.last_lexer = self.lexer.clone();
         let last_token = mem::replace(&mut self.current_token, self.lexer.next_token())?;
         self.last_token = Some(last_token);
         Ok(last_token)
@@ -1764,8 +1779,9 @@ mod tests {
 
             let expected_parse_error = syntax_error_expected(&str);
             let mut parser = Parser::new(&str);
-            let result = parser.parse_source_file();
             let path = entry.to_str().unwrap();
+            eprintln!("Parsing {path}...");
+            let result = parser.parse_source_file();
             match result {
                 Ok(..) => {
                     if expected_parse_error {
@@ -2216,5 +2232,10 @@ verifyProperty(Date.prototype, "toGMTString", {
     #[test]
     fn should_allow_a_method_named_get_in_object_literals() {
         Parser::new("({ get() {} })").parse_expr().unwrap();
+    }
+
+    #[test]
+    fn regex() {
+        Parser::new("f(1 / 2, ' / ')").parse_expr().unwrap();
     }
 }
