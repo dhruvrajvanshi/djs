@@ -1067,6 +1067,7 @@
 ../test262/test/built-ins/Array/from/calling-from-valid-1-onlyStrict.js
 ../test262/test/built-ins/Array/from/calling-from-valid-2.js
 ../test262/test/built-ins/Array/from/elements-added-after.js
+../test262/test/built-ins/Array/from/elements-deleted-after.js
 ../test262/test/built-ins/Array/from/elements-updated-after.js
 ../test262/test/built-ins/Array/from/from-array.js
 ../test262/test/built-ins/Array/from/from-string.js
@@ -2360,6 +2361,7 @@
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-1.js
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-10.js
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-11.js
+../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-2.js
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-3.js
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-4.js
 ../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-9-5.js
@@ -2589,6 +2591,7 @@
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-1.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-10.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-11.js
+../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-2.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-3.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-4.js
 ../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-8-5.js
@@ -19420,6 +19423,7 @@
 ../test262/test/built-ins/TypedArray/prototype/sort/sortcompare-with-no-tostring.js
 ../test262/test/built-ins/TypedArray/prototype/sort/sorted-values-nan.js
 ../test262/test/built-ins/TypedArray/prototype/sort/sorted-values.js
+../test262/test/built-ins/TypedArray/prototype/sort/stability.js
 ../test262/test/built-ins/TypedArray/prototype/sort/this-is-not-object.js
 ../test262/test/built-ins/TypedArray/prototype/sort/this-is-not-typedarray-instance.js
 ../test262/test/built-ins/TypedArray/prototype/subarray/BigInt/detached-buffer.js
@@ -21849,6 +21853,7 @@
 ../test262/test/intl402/Temporal/Duration/prototype/round/relativeto-sub-minute-offset.js
 ../test262/test/intl402/Temporal/Duration/prototype/round/rounding-with-largestunit.js
 ../test262/test/intl402/Temporal/Duration/prototype/total/dst-balancing-result.js
+../test262/test/intl402/Temporal/Duration/prototype/total/dst-day-length.js
 ../test262/test/intl402/Temporal/Duration/prototype/total/dst-rounding-result.js
 ../test262/test/intl402/Temporal/Duration/prototype/total/relativeto-string-datetime.js
 ../test262/test/intl402/Temporal/Duration/prototype/total/relativeto-sub-minute-offset.js
@@ -22945,6 +22950,7 @@
 ../test262/test/language/expressions/addition/S11.6.1_A4_T4.js
 ../test262/test/language/expressions/addition/S11.6.1_A4_T5.js
 ../test262/test/language/expressions/addition/S11.6.1_A4_T6.js
+../test262/test/language/expressions/addition/S11.6.1_A4_T7.js
 ../test262/test/language/expressions/addition/S11.6.1_A4_T9.js
 ../test262/test/language/expressions/addition/bigint-arithmetic.js
 ../test262/test/language/expressions/addition/coerce-bigint-to-string.js
@@ -26713,11 +26719,16 @@
 ../test262/test/language/expressions/division/S11.5.2_A3_T2.9.js
 ../test262/test/language/expressions/division/S11.5.2_A4_T1.1.js
 ../test262/test/language/expressions/division/S11.5.2_A4_T1.2.js
+../test262/test/language/expressions/division/S11.5.2_A4_T10.js
 ../test262/test/language/expressions/division/S11.5.2_A4_T2.js
 ../test262/test/language/expressions/division/S11.5.2_A4_T3.js
 ../test262/test/language/expressions/division/S11.5.2_A4_T4.js
 ../test262/test/language/expressions/division/S11.5.2_A4_T5.js
+../test262/test/language/expressions/division/S11.5.2_A4_T6.js
 ../test262/test/language/expressions/division/S11.5.2_A4_T7.js
+../test262/test/language/expressions/division/S11.5.2_A4_T8.js
+../test262/test/language/expressions/division/S11.5.2_A4_T9.js
+../test262/test/language/expressions/division/bigint-arithmetic.js
 ../test262/test/language/expressions/division/line-terminator.js
 ../test262/test/language/expressions/division/order-of-evaluation.js
 ../test262/test/language/expressions/does-not-equals/S11.9.2_A1.js
@@ -29341,6 +29352,7 @@
 ../test262/test/language/expressions/subtraction/S11.6.2_A4_T4.js
 ../test262/test/language/expressions/subtraction/S11.6.2_A4_T5.js
 ../test262/test/language/expressions/subtraction/S11.6.2_A4_T6.js
+../test262/test/language/expressions/subtraction/S11.6.2_A4_T7.js
 ../test262/test/language/expressions/subtraction/bigint-arithmetic.js
 ../test262/test/language/expressions/subtraction/order-of-evaluation.js
 ../test262/test/language/expressions/super/call-arg-evaluation-err.js
@@ -35529,6 +35541,7 @@
 ../test262/test/language/types/number/S8.5_A1.js
 ../test262/test/language/types/number/S8.5_A10_T1.js
 ../test262/test/language/types/number/S8.5_A10_T2.js
+../test262/test/language/types/number/S8.5_A11_T1.js
 ../test262/test/language/types/number/S8.5_A11_T2.js
 ../test262/test/language/types/number/S8.5_A12.1.js
 ../test262/test/language/types/number/S8.5_A12.2.js
