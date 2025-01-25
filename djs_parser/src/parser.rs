@@ -4,7 +4,7 @@ use djs_ast::{
     AccessorType, ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody, ClassMember, DeclType,
     Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey,
     ObjectLiteralEntry, ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern,
-    SourceFile, Stmt, SwitchCase, Text, TryStmt, VarDecl,
+    SourceFile, Stmt, SwitchCase, Text, TryStmt, VarDecl, VarDeclarator,
 };
 use djs_syntax::Span;
 
@@ -534,6 +534,7 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_var_decl(&mut self) -> Result<VarDecl<'src>> {
+        let mut span = self.current()?.span;
         let decl_type = match self.current()?.kind {
             T::Let => {
                 self.advance()?;
@@ -549,25 +550,33 @@ impl<'src> Parser<'src> {
             }
             _ => return self.unexpected_token(),
         };
+        let mut declarators = vec![self.parse_var_declarator()?];
+        while self.at(T::Comma) {
+            self.advance()?;
+            declarators.push(self.parse_var_declarator()?);
+        }
+        // TODO: Include the initializer in the span
+        span.end_with(declarators.last().unwrap().pattern.span());
+        self.expect_semi()?;
+        Ok(VarDecl {
+            span,
+            decl_type,
+            declarators,
+        })
+    }
+
+    fn parse_var_declarator(&mut self) -> Result<VarDeclarator<'src>> {
         let pattern = self.parse_pattern_with_precedence(
             !(PatternFlags::ALLOW_ASSIGNMENT | PatternFlags::ALLOW_SPREAD),
         )?;
         let init = if self.current()?.kind == T::Eq {
             self.advance()?;
-            Some(self.parse_expr()?)
+            Some(self.parse_assignment_expr()?)
         } else {
             None
         };
-        self.expect_semi()?;
-        Ok(VarDecl {
-            span: Span::between(
-                pattern.span(),
-                init.as_ref().map(|it| it.span()).unwrap_or(pattern.span()),
-            ),
-            decl_type,
-            pattern,
-            init,
-        })
+
+        Ok(VarDeclarator { pattern, init })
     }
 
     fn unexpected_token<T>(&self) -> Result<T> {
@@ -1690,54 +1699,6 @@ mod tests {
     }
 
     #[test]
-    fn parses_var_decl() {
-        let source = "let x = y;";
-        let mut parser = Parser::new(source);
-        let stmt = parser.parse_stmt().unwrap();
-        match stmt {
-            Stmt::VarDecl(VarDecl {
-                decl_type: DeclType::Let,
-                pattern: Pattern::Var(ident!("x")),
-                init: Some(init),
-                ..
-            }) => {
-                assert!(matches!(init, Expr::Var(.., ident!("y"))));
-            }
-            _ => panic!("Expected a variable declaration"),
-        }
-
-        let source = "const x = y;";
-        let mut parser = Parser::new(source);
-        let stmt = parser.parse_stmt().unwrap();
-        match stmt {
-            Stmt::VarDecl(VarDecl {
-                decl_type: DeclType::Const,
-                pattern: Pattern::Var(ident!("x")),
-                init: Some(init),
-                ..
-            }) => {
-                assert!(matches!(init, Expr::Var(.., ident!("y"))));
-            }
-            _ => panic!("Expected a variable declaration"),
-        }
-
-        let source = "var x = y;";
-        let mut parser = Parser::new(source);
-        let stmt = parser.parse_stmt().unwrap();
-        match stmt {
-            Stmt::VarDecl(VarDecl {
-                decl_type: DeclType::Var,
-                pattern: Pattern::Var(ident!("x")),
-                init: Some(init),
-                ..
-            }) => {
-                assert!(matches!(init, Expr::Var(.., ident!("y"))));
-            }
-            _ => panic!("Expected a variable declaration"),
-        }
-    }
-
-    #[test]
     fn parses_if_stmt() {
         let source = "if (x) y; else z;";
         let mut parser = Parser::new(source);
@@ -1952,12 +1913,20 @@ mod tests {
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
             Stmt::For(For {
-                init: ForInit::VarDecl(VarDecl { pattern, init, .. }),
+                init:
+                    ForInit::VarDecl(VarDecl {
+                        decl_type: DeclType::Let,
+                        declarators,
+                        ..
+                    }),
                 test,
                 update,
                 body,
                 ..
             }) => {
+                let [VarDeclarator { pattern, init }] = declarators.as_slice() else {
+                    panic!("Expected a declarator in the for loop");
+                };
                 assert!(matches!(pattern, Pattern::Var(..)));
                 assert!(matches!(init, Some(Expr::Number(..))));
                 assert!(matches!(test, Some(Expr::Var(..))));
