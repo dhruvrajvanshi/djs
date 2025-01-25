@@ -135,7 +135,7 @@ impl<'src> Parser<'src> {
         match self.current()?.kind {
             T::Let | T::Const | T::Var => {
                 let decl = self.parse_var_decl()?;
-                Ok(Stmt::VarDecl(decl.span, decl))
+                Ok(Stmt::VarDecl(decl))
             }
             T::If => self.parse_if_stmt(),
             T::Switch => self.parse_switch_stmt(),
@@ -147,9 +147,7 @@ impl<'src> Parser<'src> {
                 let tok = self.advance()?;
                 Ok(Stmt::Empty(tok.span))
             }
-            T::LBrace => self
-                .parse_block()
-                .map(|block| Stmt::Block(block.span, block)),
+            T::LBrace => self.parse_block().map(Stmt::Block),
             T::For => {
                 let mut for_stmt_snapshot = self.clone();
                 match for_stmt_snapshot.parse_for_stmt() {
@@ -189,17 +187,17 @@ impl<'src> Parser<'src> {
             }
             T::Function => {
                 let f = self.parse_function()?;
-                Ok(Stmt::FunctionDecl(f.span, f))
+                Ok(Stmt::FunctionDecl(f))
             }
             T::Class => {
                 let c = self.parse_class()?;
-                Ok(Stmt::ClassDecl(c.span, c))
+                Ok(Stmt::ClassDecl(c))
             }
             T::Async => {
                 if self.next_is(T::Function) {
                     self.advance()?;
                     let f = self.parse_function()?;
-                    Ok(Stmt::FunctionDecl(f.span, f))
+                    Ok(Stmt::FunctionDecl(f))
                 } else {
                     self.unexpected_token()
                 }
@@ -349,17 +347,14 @@ impl<'src> Parser<'src> {
         let rhs = self.parse_assignment_expr()?;
         self.expect(T::RParen)?;
         let body = Box::new(self.parse_stmt()?);
-        Ok(Stmt::ForInOrOf(
-            Span::between(start, body.span()),
-            ForInOrOf {
-                span: Span::between(start, body.span()),
-                in_or_of,
-                decl_type,
-                lhs,
-                rhs,
-                body,
-            },
-        ))
+        Ok(Stmt::ForInOrOf(ForInOrOf {
+            span: Span::between(start, body.span()),
+            in_or_of,
+            decl_type,
+            lhs,
+            rhs,
+            body,
+        }))
     }
 
     fn parse_for_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -400,22 +395,16 @@ impl<'src> Parser<'src> {
         self.expect(T::RParen)?;
         let body = Box::new(self.parse_stmt()?);
         let span = Span::between(first.span, body.span());
-        Ok(Stmt::For(
+        Ok(Stmt::For(For {
             span,
-            For {
-                span,
-                init: init.unwrap_or(ForInit::Expr(Expr::Number(
-                    first.span,
-                    Text {
-                        span: first.span,
-                        text: "0",
-                    },
-                ))),
-                test: cond,
-                update,
-                body,
-            },
-        ))
+            init: init.unwrap_or(ForInit::Expr(Expr::Number(Text {
+                span: first.span,
+                text: "0",
+            }))),
+            test: cond,
+            update,
+            body,
+        }))
     }
 
     fn parse_try_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -448,16 +437,13 @@ impl<'src> Parser<'src> {
             (None, None) => try_block.span(),
         };
         let span = Span::between(start.span, end_span);
-        Ok(Stmt::Try(
+        Ok(Stmt::Try(Box::new(TryStmt {
             span,
-            Box::new(TryStmt {
-                span,
-                try_block,
-                catch_name,
-                catch_block,
-                finally_block,
-            }),
-        ))
+            try_block,
+            catch_name,
+            catch_block,
+            finally_block,
+        })))
     }
 
     fn parse_while_stmt(&mut self) -> Result<Stmt<'src>> {
@@ -602,14 +588,14 @@ impl<'src> Parser<'src> {
         let head = match self.current()?.kind {
             T::Ident => {
                 let ident = self.parse_binding_ident()?;
-                Pattern::Var(ident.span, ident)
+                Pattern::Var(ident)
             }
             T::DotDotDot if flags.contains(PatternFlags::ALLOW_SPREAD) => {
-                let start = self.advance()?;
+                self.advance()?;
                 let pattern = self.parse_pattern_with_precedence(
                     !(PatternFlags::ALLOW_ASSIGNMENT | PatternFlags::ALLOW_SPREAD),
                 )?;
-                Pattern::Rest(Span::between(start.span, pattern.span()), Box::new(pattern))
+                Pattern::Rest(Box::new(pattern))
             }
             T::LSquare => {
                 let start = self.advance()?;
@@ -671,14 +657,11 @@ impl<'src> Parser<'src> {
                 }
                 let stop = self.expect(T::RBrace)?;
                 let span = Span::between(start.span, stop.span);
-                Pattern::Object(
+                Pattern::Object(ObjectPattern {
                     span,
-                    ObjectPattern {
-                        span,
-                        properties: entries,
-                        rest,
-                    },
-                )
+                    properties: entries,
+                    rest,
+                })
             }
             _ => self.unexpected_token()?,
         };
@@ -703,13 +686,10 @@ impl<'src> Parser<'src> {
                 self.advance()?;
                 self.parse_pattern()?
             }
-            (ObjectKey::Ident(span, ident), _) => Pattern::Var(
-                *span,
-                Ident {
-                    span: *span,
-                    text: ident.text,
-                },
-            ),
+            (ObjectKey::Ident(ident), _) => Pattern::Var(Ident {
+                span: ident.span,
+                text: ident.text,
+            }),
             (ObjectKey::Computed(..) | ObjectKey::String(..), _) => {
                 self.expect(T::Colon)?;
                 self.parse_pattern()?
@@ -725,7 +705,7 @@ impl<'src> Parser<'src> {
     fn parse_expr_stmt(&mut self) -> Result<Stmt<'src>> {
         let expr = self.parse_expr()?;
         self.expect_semi()?;
-        Ok(Stmt::Expr(expr.span(), Box::new(expr)))
+        Ok(Stmt::Expr(Box::new(expr)))
     }
 
     fn expect_semi(&mut self) -> Result<()> {
@@ -787,7 +767,7 @@ impl<'src> Parser<'src> {
                             span: ident.span,
                             params: vec![Param {
                                 span: ident.span,
-                                pattern: Pattern::Var(ident.span, ident),
+                                pattern: Pattern::Var(ident),
                             }],
                         };
                         let body = self.parse_arrow_fn_body()?;
@@ -797,28 +777,22 @@ impl<'src> Parser<'src> {
                             body,
                         ))
                     }
-                    _ => Ok(Expr::Var(ident.span, ident)),
+                    _ => Ok(Expr::Var(ident)),
                 }
             }
             T::String => {
                 let tok = self.advance()?;
-                Ok(Expr::String(
-                    tok.span,
-                    Text {
-                        span: tok.span,
-                        text: tok.text,
-                    },
-                ))
+                Ok(Expr::String(Text {
+                    span: tok.span,
+                    text: tok.text,
+                }))
             }
             T::Number => {
                 let tok = self.advance()?;
-                Ok(Expr::Number(
-                    tok.span,
-                    Text {
-                        span: tok.span,
-                        text: tok.text,
-                    },
-                ))
+                Ok(Expr::Number(Text {
+                    span: tok.span,
+                    text: tok.text,
+                }))
             }
             T::LBrace => {
                 let start = self.advance()?;
@@ -829,25 +803,22 @@ impl<'src> Parser<'src> {
             }
             T::LParen => self.parse_paren_expr(),
             T::Async => {
-                let start = self.advance()?;
+                self.advance()?;
                 if self.at(T::Function) {
                     let f = self.parse_function()?;
-                    Ok(Expr::Function(Span::between(start.span, f.span), f))
+                    Ok(Expr::Function(f))
                 } else {
                     self.parse_arrow_fn()
                 }
             }
             T::Function => {
                 let f = self.parse_function()?;
-                Ok(Expr::Function(f.span, f))
+                Ok(Expr::Function(f))
             }
             T::Throw => {
-                let start = self.advance()?;
+                self.advance()?;
                 let expr = self.parse_expr()?;
-                Ok(Expr::Throw(
-                    Span::between(start.span, expr.span()),
-                    Box::new(expr),
-                ))
+                Ok(Expr::Throw(Box::new(expr)))
             }
             T::LSquare => {
                 let start = self.advance()?;
@@ -858,20 +829,17 @@ impl<'src> Parser<'src> {
             }
             T::Regex => {
                 let tok = self.advance()?;
-                Ok(Expr::Regex(
-                    tok.span,
-                    Text {
-                        span: tok.span,
-                        text: tok.text,
-                    },
-                ))
+                Ok(Expr::Regex(Text {
+                    span: tok.span,
+                    text: tok.text,
+                }))
             }
             T::True => Ok(Expr::Boolean(self.advance()?.span, true)),
             T::False => Ok(Expr::Boolean(self.advance()?.span, false)),
             T::Super => Ok(Expr::Super(self.advance()?.span)),
             T::Class => {
                 let cls = self.parse_class()?;
-                Ok(Expr::Class(cls.span, Box::new(cls)))
+                Ok(Expr::Class(Box::new(cls)))
             }
             _ => self.unexpected_token(),
         }
@@ -954,16 +922,13 @@ impl<'src> Parser<'src> {
     fn parse_object_literal_entry(&mut self) -> Result<ObjectLiteralEntry<'src>> {
         match self.current()?.kind {
             T::DotDotDot => {
-                let start = self.advance()?;
+                self.advance()?;
                 let expr = self.parse_assignment_expr()?;
-                Ok(ObjectLiteralEntry::Spread(
-                    Span::between(start.span, expr.span()),
-                    expr,
-                ))
+                Ok(ObjectLiteralEntry::Spread(expr))
             }
             T::Ident if self.next_is(T::Comma) || self.next_is(T::RBrace) => {
                 let ident = self.parse_ident()?;
-                Ok(ObjectLiteralEntry::Ident(ident.span, ident))
+                Ok(ObjectLiteralEntry::Ident(ident))
             }
             T::Ident
                 if self.current_matches(Token::is_accessor_type)
@@ -1003,7 +968,7 @@ impl<'src> Parser<'src> {
                                 is_async: false,
                             },
                         };
-                        Ok(ObjectLiteralEntry::Method(start, method))
+                        Ok(ObjectLiteralEntry::Method(method))
                     }
                     _ => {
                         self.expect(T::Colon)?;
@@ -1084,41 +1049,32 @@ impl<'src> Parser<'src> {
                 is_async,
             },
         };
-        Ok(ObjectLiteralEntry::Method(span, method))
+        Ok(ObjectLiteralEntry::Method(method))
     }
 
     fn parse_object_key(&mut self) -> Result<ObjectKey<'src>> {
         Ok(match self.current()?.kind {
             T::String => {
                 let tok = self.advance()?;
-                ObjectKey::String(
-                    tok.span,
-                    Text {
-                        span: tok.span,
-                        text: tok.text,
-                    },
-                )
+                ObjectKey::String(Text {
+                    span: tok.span,
+                    text: tok.text,
+                })
             }
             T::Number => {
                 let tok = self.advance()?;
-                ObjectKey::String(
-                    tok.span,
-                    Text {
-                        span: tok.span,
-                        text: tok.text,
-                    },
-                )
+                ObjectKey::String(Text {
+                    span: tok.span,
+                    text: tok.text,
+                })
             }
             T::LSquare => {
-                let start = self.advance()?.span;
+                self.advance()?;
                 let expr = self.parse_expr()?;
-                let stop = self.expect(T::RSquare)?.span;
-                ObjectKey::Computed(Span::between(start, stop), expr)
+                self.expect(T::RSquare)?;
+                ObjectKey::Computed(expr)
             }
-            _ => {
-                let ident = self.parse_member_ident_name()?;
-                ObjectKey::Ident(ident.span, ident)
-            }
+            _ => ObjectKey::Ident(self.parse_member_ident_name()?),
         })
     }
 
@@ -1151,10 +1107,7 @@ impl<'src> Parser<'src> {
                     }
                     let expr = self.parse_assignment_expr()?;
                     if is_yield_from {
-                        Ok(Expr::YieldFrom(
-                            Span::between(start.span, expr.span()),
-                            Box::new(expr),
-                        ))
+                        Ok(Expr::YieldFrom(Box::new(expr)))
                     } else {
                         Ok(Expr::Yield(
                             Span::between(start.span, expr.span()),
@@ -1302,12 +1255,9 @@ impl<'src> Parser<'src> {
     fn parse_unary_expr(&mut self) -> Result<Expr<'src>> {
         macro_rules! make_unary {
             ($case: ident) => {{
-                let start = self.advance()?;
+                self.advance()?;
                 let expr = self.parse_unary_expr()?;
-                Ok(Expr::$case(
-                    Span::between(start.span, expr.span()),
-                    Box::new(expr),
-                ))
+                Ok(Expr::$case(Box::new(expr)))
             }};
         }
         match self.current()?.kind {
@@ -1325,38 +1275,25 @@ impl<'src> Parser<'src> {
     fn parse_update_expr(&mut self) -> Result<Expr<'src>> {
         match self.current()?.kind {
             T::PlusPlus => {
-                let start = self.advance()?;
+                self.advance()?;
                 let expr = self.parse_unary_expr()?;
-                return Ok(Expr::PreIncrement(
-                    Span::between(start.span, expr.span()),
-                    Box::new(expr),
-                ));
+                return Ok(Expr::PreIncrement(Box::new(expr)));
             }
             T::MinusMinus => {
-                let start = self.advance()?;
+                self.advance()?;
                 let expr = self.parse_unary_expr()?;
-                return Ok(Expr::PreDecrement(
-                    Span::between(start.span, expr.span()),
-                    Box::new(expr),
-                ));
+                return Ok(Expr::PreDecrement(Box::new(expr)));
             }
             _ => {}
         }
         let lhs = self.parse_left_hand_side_expr()?;
         if self.at(T::PlusPlus) && !self.current_is_on_new_line() {
-            let op = self.advance()?;
-
-            Ok(Expr::PostIncrement(
-                Span::between(lhs.span(), op.span),
-                Box::new(lhs),
-            ))
+            self.advance()?;
+            Ok(Expr::PostIncrement(Box::new(lhs)))
         } else if self.at(T::MinusMinus) && !self.current_is_on_new_line() {
-            let op = self.advance()?;
+            self.advance()?;
 
-            Ok(Expr::PostDecrement(
-                Span::between(lhs.span(), op.span),
-                Box::new(lhs),
-            ))
+            Ok(Expr::PostDecrement(Box::new(lhs)))
         } else {
             Ok(lhs)
         }
@@ -1385,14 +1322,13 @@ impl<'src> Parser<'src> {
     fn parse_member_or_call_expr(&mut self, allow_calls: bool) -> Result<Expr<'src>> {
         let mut lhs = match self.current()?.kind {
             T::New => {
-                let start = self.advance()?;
+                self.advance()?;
                 let expr = self.parse_member_or_call_expr(
                     // Since new Foo() means `new (Foo)()` and not (new (Foo())), we don't allow calls here
                     /* allow_calls */
                     false,
                 )?;
-                let span = Span::between(start.span, expr.span());
-                Expr::New(span, Box::new(expr))
+                Expr::New(Box::new(expr))
             }
             _ => self.parse_primary_expr()?,
         };
@@ -1487,12 +1423,9 @@ impl<'src> Parser<'src> {
                 }
                 let stop = self.expect(T::RBrace)?;
                 let span = Span::between(start.span, stop.span);
-                Ok(ArrowFnBody::Block(span, Block { span, stmts }))
+                Ok(ArrowFnBody::Block(Block { span, stmts }))
             }
-            _ => {
-                let expr = self.parse_expr()?;
-                Ok(ArrowFnBody::Expr(expr.span(), Box::new(expr)))
-            }
+            _ => Ok(ArrowFnBody::Expr(Box::new(self.parse_expr()?))),
         }
     }
 
@@ -1574,12 +1507,12 @@ fn is_lhs_expr(expr: &Expr<'_>) -> bool {
 
 fn expr_is_pattern(expr: &Expr) -> bool {
     match expr {
-        Expr::Var(_, _) => true,
+        Expr::Var(_) => true,
         Expr::Object(_, obj) => obj.iter().all(|entry| match entry {
             ObjectLiteralEntry::Ident(..) => true,
             ObjectLiteralEntry::Prop(_, _, value) => expr_is_pattern(value),
             ObjectLiteralEntry::Method(..) => false,
-            ObjectLiteralEntry::Spread(_, e) => expr_is_pattern(e),
+            ObjectLiteralEntry::Spread(e) => expr_is_pattern(e),
         }),
         Expr::Array(_, items) => items.iter().all(expr_is_pattern),
         _ => false,
@@ -1629,7 +1562,7 @@ mod tests {
 
     macro_rules! exp_var {
         ($value: pat) => {
-            Expr::Var(_, ident!($value))
+            Expr::Var(ident!($value))
         };
     }
 
@@ -1638,7 +1571,7 @@ mod tests {
         let source = "x";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        assert!(matches!(expr, Expr::Var(_, Ident { text: "x", .. })));
+        assert!(matches!(expr, Expr::Var(Ident { text: "x", .. })));
     }
 
     #[test]
@@ -1646,7 +1579,7 @@ mod tests {
         let source = "(x)";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        assert!(matches!(expr, Expr::Var(_, ident!("x"))));
+        assert!(matches!(expr, Expr::Var(ident!("x"))));
     }
 
     #[test]
@@ -1668,13 +1601,13 @@ mod tests {
 
         assert!(source_file.stmts.len() == 2);
 
-        let Stmt::Expr(_, x) = &source_file.stmts[0] else {
+        let Stmt::Expr(x) = &source_file.stmts[0] else {
             panic!("Expected an expression statement")
         };
         let exp_var!("x") = **x else {
             panic!("Expected a variable expression")
         };
-        let Stmt::Expr(_, y) = &source_file.stmts[1] else {
+        let Stmt::Expr(y) = &source_file.stmts[1] else {
             panic!("Expected an expression statement")
         };
         let exp_var!("y") = **y else {
@@ -1730,10 +1663,10 @@ mod tests {
         let source = "() => { x; y }";
         let mut parser = Parser::new(source);
         let expr = parser.parse_expr().unwrap();
-        let Expr::ArrowFn(_, _, ArrowFnBody::Block(_, block)) = expr else {
+        let Expr::ArrowFn(_, _, ArrowFnBody::Block(block)) = expr else {
             panic!("Expected an arrow fn expression")
         };
-        let [Stmt::Expr(_, first_stmt), Stmt::Expr(_, second_stmt)] = block.stmts.as_slice() else {
+        let [Stmt::Expr(first_stmt), Stmt::Expr(second_stmt)] = block.stmts.as_slice() else {
             panic!("Expected 2 statements in the block")
         };
         assert!(matches!(**first_stmt, exp_var!("x")));
@@ -1746,15 +1679,12 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(
-                _,
-                VarDecl {
-                    decl_type: DeclType::Let,
-                    pattern: Pattern::Var(_, ident!("x")),
-                    init: Some(init),
-                    ..
-                },
-            ) => {
+            Stmt::VarDecl(VarDecl {
+                decl_type: DeclType::Let,
+                pattern: Pattern::Var(ident!("x")),
+                init: Some(init),
+                ..
+            }) => {
                 assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
@@ -1764,15 +1694,12 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(
-                _,
-                VarDecl {
-                    decl_type: DeclType::Const,
-                    pattern: Pattern::Var(_, ident!("x")),
-                    init: Some(init),
-                    ..
-                },
-            ) => {
+            Stmt::VarDecl(VarDecl {
+                decl_type: DeclType::Const,
+                pattern: Pattern::Var(ident!("x")),
+                init: Some(init),
+                ..
+            }) => {
                 assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
@@ -1782,15 +1709,12 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::VarDecl(
-                _,
-                VarDecl {
-                    decl_type: DeclType::Var,
-                    pattern: Pattern::Var(_, ident!("x")),
-                    init: Some(init),
-                    ..
-                },
-            ) => {
+            Stmt::VarDecl(VarDecl {
+                decl_type: DeclType::Var,
+                pattern: Pattern::Var(ident!("x")),
+                init: Some(init),
+                ..
+            }) => {
                 assert!(matches!(init, Expr::Var(.., ident!("y"))));
             }
             _ => panic!("Expected a variable declaration"),
@@ -1942,7 +1866,7 @@ mod tests {
         let source = "try { x; } catch (e) { y; } finally { z; }";
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
-        let Stmt::Try(_, try_stmt) = stmt else {
+        let Stmt::Try(try_stmt) = stmt else {
             panic!("Expected a try statement");
         };
         let TryStmt {
@@ -2011,16 +1935,13 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::For(
-                _,
-                For {
-                    init: ForInit::VarDecl(VarDecl { pattern, init, .. }),
-                    test,
-                    update,
-                    body,
-                    ..
-                },
-            ) => {
+            Stmt::For(For {
+                init: ForInit::VarDecl(VarDecl { pattern, init, .. }),
+                test,
+                update,
+                body,
+                ..
+            }) => {
                 assert!(matches!(pattern, Pattern::Var(..)));
                 assert!(matches!(init, Some(Expr::Number(..))));
                 assert!(matches!(test, Some(Expr::Var(..))));
@@ -2037,7 +1958,7 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::Expr(_, e) => {
+            Stmt::Expr(e) => {
                 assert_matches!(*e, Expr::PostIncrement(..))
             }
             e => panic!("Expected a post increment expression; Found {e:?}"),
@@ -2049,11 +1970,11 @@ mod tests {
         let source = "x.y++;";
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
-        let Stmt::Expr(_, e) = stmt else {
+        let Stmt::Expr(e) = stmt else {
             panic!("Expected an expression statement; Found {stmt:?}");
         };
 
-        let Expr::PostIncrement(_, e) = *e else {
+        let Expr::PostIncrement(e) = *e else {
             panic!("Expected a post increment expression; Found {e:?}");
         };
         let Expr::Prop(_, obj, prop) = *e else {
@@ -2069,16 +1990,13 @@ mod tests {
         let mut parser = Parser::new(src);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::ForInOrOf(
-                _,
-                ForInOrOf {
-                    decl_type: Some(DeclType::Let),
-                    lhs: Pattern::Var(_, ident!("x")),
-                    rhs: Expr::Var(_, ident!("y")),
-                    body,
-                    ..
-                },
-            ) => {
+            Stmt::ForInOrOf(ForInOrOf {
+                decl_type: Some(DeclType::Let),
+                lhs: Pattern::Var(ident!("x")),
+                rhs: Expr::Var(ident!("y")),
+                body,
+                ..
+            }) => {
                 assert_matches!(*body, Stmt::Expr(..));
             }
             e => panic!("Expected a for of statement; Found {e:?}"),
@@ -2101,10 +2019,10 @@ mod tests {
         let Expr::Call(_, new_date, two_args) = *new_date_call else {
             panic!("Expected a call expression; Found {new_date_call:?}");
         };
-        let Expr::New(_, date) = *new_date else {
+        let Expr::New(date) = *new_date else {
             panic!("Expected a new expression; Found {new_date:?}");
         };
-        let Expr::Var(_, ident!("Date")) = *date else {
+        let Expr::Var(ident!("Date")) = *date else {
             panic!("Expected the expression 'Date'; Found {date:?}");
         };
         assert!(two_args.len() == 2);
@@ -2122,7 +2040,7 @@ mod tests {
                 assert!(params.params.len() == 1);
                 assert!(matches!(
                     params.params[0].pattern,
-                    Pattern::Var(_, Ident { text: "x", .. })
+                    Pattern::Var(Ident { text: "x", .. })
                 ));
             }
             e => panic!("Expected an arrow function expression; Found {e:?}"),
@@ -2135,7 +2053,7 @@ mod tests {
         let mut parser = Parser::new(source);
         let stmt = parser.parse_stmt().unwrap();
         match stmt {
-            Stmt::FunctionDecl(_, f) => {
+            Stmt::FunctionDecl(f) => {
                 assert!(f.name.map(|it| it.text) == Some("foo"));
                 assert!(f.params.params.is_empty());
             }
@@ -2162,8 +2080,7 @@ verifyProperty(Date.prototype, "toGMTString", {
         let Pattern::Array(_, items) = pattern else {
             panic!("Expected an array pattern; Found {pattern:?}");
         };
-        let [Some(Pattern::Var(_, ident!("x"))), Some(Pattern::Var(_, ident!("y")))] =
-            items.as_slice()
+        let [Some(Pattern::Var(ident!("x"))), Some(Pattern::Var(ident!("y")))] = items.as_slice()
         else {
             panic!("Expected [x, y,] to be parsed as [x, y]; Found {items:?}");
         };
@@ -2187,7 +2104,7 @@ verifyProperty(Date.prototype, "toGMTString", {
             panic!("Expected an array pattern; Found {pattern:?}");
         };
 
-        if let [None, Some(Pattern::Var(_, ident!("x")))] = items.as_slice() {
+        if let [None, Some(Pattern::Var(ident!("x")))] = items.as_slice() {
         } else {
             panic!("Expected [,x] to be parsed as None, Some(x); Found {items:?}");
         }
@@ -2196,14 +2113,11 @@ verifyProperty(Date.prototype, "toGMTString", {
     #[test]
     fn parses_empty_object_pattern() {
         let pattern = Parser::new("{}").parse_pattern().unwrap();
-        let Pattern::Object(
-            _,
-            ObjectPattern {
-                properties,
-                rest: None,
-                ..
-            },
-        ) = pattern
+        let Pattern::Object(ObjectPattern {
+            properties,
+            rest: None,
+            ..
+        }) = pattern
         else {
             panic!("Expected an object pattern; Found {pattern:?}");
         };
@@ -2213,14 +2127,11 @@ verifyProperty(Date.prototype, "toGMTString", {
     #[test]
     fn parses_object_pattern_with_one_property() {
         let pattern = Parser::new("{ x }").parse_pattern().unwrap();
-        let Pattern::Object(
-            _,
-            ObjectPattern {
-                properties,
-                rest: None,
-                ..
-            },
-        ) = pattern
+        let Pattern::Object(ObjectPattern {
+            properties,
+            rest: None,
+            ..
+        }) = pattern
         else {
             panic!("Expected an object pattern; Found {pattern:?}");
         };
@@ -2234,20 +2145,17 @@ verifyProperty(Date.prototype, "toGMTString", {
     #[test]
     fn parses_object_pattern_nested() {
         let pattern = Parser::new("{ x: { y } }").parse_pattern().unwrap();
-        let Pattern::Object(_, pattern) = pattern else {
+        let Pattern::Object(pattern) = pattern else {
             panic!("Expected an object pattern; Found {pattern:?}");
         };
         let [ObjectPatternProperty { key, value, .. }] = pattern.properties.as_slice() else {
             panic!("Expected {{ x: {{ y }} }} to be parsed correctly; Found {pattern:?}");
         };
         assert_matches!(key, ObjectKey::Ident(.., ident!("x")));
-        let Pattern::Object(
-            _,
-            ObjectPattern {
-                properties: inner_props,
-                ..
-            },
-        ) = value
+        let Pattern::Object(ObjectPattern {
+            properties: inner_props,
+            ..
+        }) = value
         else {
             panic!("Expected {{ y }} to be parsed correctly; Found {value:?}");
         };
@@ -2260,14 +2168,11 @@ verifyProperty(Date.prototype, "toGMTString", {
     #[test]
     fn parses_rest_pattern_in_object() {
         let pattern = Parser::new("{ x, ...y }").parse_pattern().unwrap();
-        let Pattern::Object(
-            _,
-            ObjectPattern {
-                properties,
-                rest: Some(rest),
-                ..
-            },
-        ) = pattern
+        let Pattern::Object(ObjectPattern {
+            properties,
+            rest: Some(rest),
+            ..
+        }) = pattern
         else {
             panic!("Expected an object pattern; Found {pattern:?}");
         };
@@ -2276,7 +2181,7 @@ verifyProperty(Date.prototype, "toGMTString", {
         };
         let rest = *rest;
         assert_matches!(key, ObjectKey::Ident(.., ident!("x")));
-        assert_matches!(rest, Pattern::Var(_, ident!("y")));
+        assert_matches!(rest, Pattern::Var(ident!("y")));
     }
 
     #[test]

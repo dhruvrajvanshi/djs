@@ -1,7 +1,7 @@
 const { ast_items } = require("./src/ast.js");
 
 const items_by_name = Object.fromEntries(
-  ast_items.map((item) => [item.name, item])
+  ast_items.map((item) => [item.name, item]),
 );
 
 const needs_lifetime_param = needs_lifetime_param_set();
@@ -57,7 +57,11 @@ function gen_enum(item) {
      * @returns {string}
      */
     function gen_case(variant) {
-      return `Self::${variant.name}(span, ..) => *span`
+      if (variant.args.length === 1 && type_is_spanned(variant.args[0])) {
+        return `Self::${variant.name}(inner) => inner.span()`;
+      } else {
+        return `Self::${variant.name}(span, ..) => *span`;
+      }
     }
   }
   if (methods.length > 0) {
@@ -82,13 +86,13 @@ function gen_enum(item) {
   function gen_variant(variant) {
     /** @type {string[]} */
     const args = [];
-
-    if (item.tags.includes("span")) {
+    let inherits_span = false;
+    if (variant.args.length === 1 && type_is_spanned(variant.args[0])) {
+      inherits_span = true;
+    } else if (item.tags.includes("span")) {
       args.push("Span");
     }
-    if (typeof variant !== "string") {
-      args.push(...variant.args.map(gen_type));
-    }
+    args.push(...variant.args.map(gen_type));
     if (args.length > 0) {
       return `  ${variant.name}(${args.join(", ")})`;
     } else {
@@ -184,11 +188,13 @@ function needs_lifetime_param_set() {
     switch (item.kind) {
       case "struct":
         return item.fields.some(([_, type]) =>
-          type_contains_ident_or_text(type)
+          type_contains_ident_or_text(type),
         );
       case "enum":
-        return item.variants.some((variant) =>
-          variant.args.length > 0 && variant.args.some(type_contains_ident_or_text)
+        return item.variants.some(
+          (variant) =>
+            variant.args.length > 0 &&
+            variant.args.some(type_contains_ident_or_text),
         );
     }
   }
@@ -209,5 +215,22 @@ function needs_lifetime_param_set() {
     } else {
       return type.slice(1).some(type_contains_ident_or_text);
     }
+  }
+}
+
+/**
+ *
+ * @param {Type} type
+ * @returns {boolean}
+ */
+function type_is_spanned(type) {
+  if (typeof type === "string") {
+    return items_by_name[type]?.tags.includes("span") ?? false;
+  } else {
+    if (type.length > 2) {
+      throw new Error("Unexpected type: " + JSON.stringify(type));
+    }
+    const [container, arg] = type;
+    return container === "Box" && type_is_spanned(arg);
   }
 }
