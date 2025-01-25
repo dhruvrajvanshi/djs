@@ -1137,11 +1137,23 @@ impl<'src> Parser<'src> {
                 if self.current_is_on_new_line() {
                     Ok(Expr::Yield(start.span, None))
                 } else {
+                    let mut is_yield_from = false;
+                    if self.at(T::Star) {
+                        self.advance()?;
+                        is_yield_from = true;
+                    }
                     let expr = self.parse_assignment_expr()?;
-                    Ok(Expr::Yield(
-                        Span::between(start.span, expr.span()),
-                        Some(Box::new(expr)),
-                    ))
+                    if is_yield_from {
+                        Ok(Expr::YieldFrom(
+                            Span::between(start.span, expr.span()),
+                            Box::new(expr),
+                        ))
+                    } else {
+                        Ok(Expr::Yield(
+                            Span::between(start.span, expr.span()),
+                            Some(Box::new(expr)),
+                        ))
+                    }
                 }
             }
             T::Ident if self.next_is(T::FatArrow) && self.next_is_on_the_same_line() => {
