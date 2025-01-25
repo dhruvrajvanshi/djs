@@ -16,4 +16,8 @@ impl Span {
     pub fn end(&self) -> usize {
         self.end as usize
     }
+
+    pub fn end_with(&mut self, span: Span) {
+        self.end = span.end;
+    }
 }

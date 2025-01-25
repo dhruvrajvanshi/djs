@@ -126,10 +126,11 @@ const ast_items = [
   Struct(
     "VarDecl",
     ["span"],
+
     ["decl_type", "DeclType"],
-    ["pattern", "Pattern"],
-    ["init", Option(Expr)],
+    ["declarators", Vec("VarDeclarator")],
   ),
+  Struct("VarDeclarator", [], ["pattern", "Pattern"], ["init", Option(Expr)]),
   Struct(
     "For",
     ["span"],
