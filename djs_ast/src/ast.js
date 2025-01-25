@@ -98,6 +98,7 @@ const StructMethodDef = Struct(
   ["span"],
   ["name", "ObjectKey"],
   ["body", "Function"],
+  ["accessor_type", Option("AccessorType")],
 );
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
@@ -252,6 +253,7 @@ const ast_items = [
     "ExponentEq",
   ),
   Enum("DeclType", [], "Let", "Const", "Var"),
+  Enum("AccessorType", [], "Get", "Set"),
 ];
 
 /**
