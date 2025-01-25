@@ -27,7 +27,7 @@ const EnumStmt = Enum(
   ["With", Box(Expr), Box(Stmt)],
   ["FunctionDecl", "Function"],
   ["ClassDecl", "Class"],
-  ["Empty"]
+  ["Empty"],
 );
 
 const EnumExpr = Enum(
@@ -67,37 +67,37 @@ const EnumExpr = Enum(
   ["Comma", Vec(Expr)],
 
   ["Super"],
-  ["Class", Box("Class")]
+  ["Class", Box("Class")],
 );
 const StructClass = Struct(
   "Class",
   ["span"],
   ["name", Option("Ident")],
   ["superclass", Option(Expr)],
-  ["body", "ClassBody"]
+  ["body", "ClassBody"],
 );
 const StructBody = Struct(
   "ClassBody",
   ["span"],
-  ["members", Vec("ClassMember")]
+  ["members", Vec("ClassMember")],
 );
 const EnumClassMember = Enum(
   "ClassMember",
   [],
   ["MethodDef", "MethodDef"],
-  ["FieldDef", "FieldDef"]
+  ["FieldDef", "FieldDef"],
 );
 const StructFieldDef = Struct(
   "FieldDef",
   ["span"],
   ["name", "Ident"],
-  ["initializer", Option(Expr)]
+  ["initializer", Option(Expr)],
 );
 const StructMethodDef = Struct(
   "MethodDef",
   ["span"],
   ["name", "ObjectKey"],
-  ["body", "Function"]
+  ["body", "Function"],
 );
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
@@ -118,7 +118,7 @@ const ast_items = [
     ["lhs", "Pattern"],
     ["in_or_of", "InOrOf"],
     ["rhs", Expr],
-    ["body", Box(Stmt)]
+    ["body", Box(Stmt)],
   ),
   Enum("InOrOf", [], "In", "Of"),
   Struct(
@@ -126,7 +126,7 @@ const ast_items = [
     ["span"],
     ["decl_type", "DeclType"],
     ["pattern", "Pattern"],
-    ["init", Option(Expr)]
+    ["init", Option(Expr)],
   ),
   Struct(
     "For",
@@ -134,7 +134,7 @@ const ast_items = [
     ["init", "ForInit"],
     ["test", Option(Expr)],
     ["update", Option(Expr)],
-    ["body", Box(Stmt)]
+    ["body", Box(Stmt)],
   ),
   Enum("ForInit", [], ["VarDecl", "VarDecl"], [Expr, Expr]),
   Struct("Block", ["span"], ["stmts", Vec(Stmt)]),
@@ -144,7 +144,7 @@ const ast_items = [
     ["try_block", "Block"],
     ["catch_name", Option("Ident")],
     ["catch_block", Option("Block")],
-    ["finally_block", Option("Block")]
+    ["finally_block", Option("Block")],
   ),
 
   EnumExpr,
@@ -153,14 +153,14 @@ const ast_items = [
     ["span"],
     ["Prop", "ObjectKey", Expr],
     ["Method", "MethodDef"],
-    ["Spread", Expr]
+    ["Spread", Expr],
   ),
   Enum(
     "ObjectKey",
     ["span"],
     ["Ident", "Ident"],
     ["String", "Text"],
-    ["Computed", Expr]
+    ["Computed", Expr],
   ),
   Struct("ParamList", ["span"], ["params", Vec("Param")]),
   Struct("Param", ["span"], ["pattern", "Pattern"]),
@@ -170,7 +170,7 @@ const ast_items = [
     ["name", Option("Ident")],
     ["params", "ParamList"],
     ["body", "Block"],
-    ["is_generator", "bool"]
+    ["is_generator", "bool"],
   ),
   Enum("ArrowFnBody", ["span"], [Expr, Box(Expr)], ["Block", "Block"]),
   Enum(
@@ -180,21 +180,21 @@ const ast_items = [
     ["Assignment", Box("Pattern"), Box(Expr)],
     ["Array", Vec(Option("Pattern"))],
     ["Object", "ObjectPattern"],
-    ["Rest", Box("Pattern")]
+    ["Rest", Box("Pattern")],
   ),
 
   Struct(
     "ObjectPattern",
     ["span"],
     ["properties", Vec("ObjectPatternProperty")],
-    ["rest", Option(Box("Pattern"))]
+    ["rest", Option(Box("Pattern"))],
   ),
 
   Struct(
     "ObjectPatternProperty",
     ["span"],
     ["key", "ObjectKey"],
-    ["value", "Pattern"]
+    ["value", "Pattern"],
   ),
 
   Enum(
@@ -230,7 +230,7 @@ const ast_items = [
     "NotEq",
     "NotEqEq",
     "In",
-    "Instanceof"
+    "Instanceof",
   ),
   Enum(
     "AssignOp",
@@ -247,7 +247,7 @@ const ast_items = [
     "BitAndEq",
     "BitXorEq",
     "BitOrEq",
-    "ExponentEq"
+    "ExponentEq",
   ),
   Enum("DeclType", [], "Let", "Const", "Var"),
 ];
