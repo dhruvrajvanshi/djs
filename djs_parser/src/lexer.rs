@@ -158,11 +158,11 @@ impl<'src> Lexer<'src> {
             }
             let c = self.advance();
             if c == '\\' {
-                self.advance();
+                let c = self.current_char();
                 // Any character except for a linebreak is a valid escape character
                 // in a regex literal
                 // https://tc39.es/ecma262/#prod-RegularExpressionBackslashSequence
-                if is_line_terminator(self.current_char()) || self.current_char() == EOF_CHAR {
+                if is_line_terminator(c) || c == EOF_CHAR {
                     return Err(Error::Message(self.line, "Unexpected newline in regex"));
                 } else {
                     self.advance();
@@ -562,5 +562,12 @@ mod test {
         let mut lexer = Lexer::new("'\\u0041'");
         let tok = lexer.next_token().unwrap();
         assert_eq!(tok.kind, TokenKind::String);
+    }
+
+    #[test]
+    fn lexes_regex() {
+        let mut lexer = Lexer::new("/a\\1/");
+        lexer.enable_regex();
+        assert_eq!(lexer.next_token().unwrap().kind, TokenKind::Regex);
     }
 }
