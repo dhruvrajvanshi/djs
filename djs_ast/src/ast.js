@@ -44,27 +44,27 @@ const EnumExpr = Enum(
   ["Number", "Text"],
   ["Boolean", "bool"],
   ["Object", Vec("ObjectLiteralEntry")],
-  ["Throw", Box(Expr)],
-  ["PostIncrement", Box(Expr)],
-  ["PostDecrement", Box(Expr)],
-  ["PreIncrement", Box(Expr)],
-  ["PreDecrement", Box(Expr)],
+  ["Throw", { tags: ["span"] }, Box(Expr)],
+  ["PostIncrement", { tags: ["span"] }, Box(Expr)],
+  ["PostDecrement", { tags: ["span"] }, Box(Expr)],
+  ["PreIncrement", { tags: ["span"] }, Box(Expr)],
+  ["PreDecrement", { tags: ["span"] }, Box(Expr)],
   ["Array", Vec(Expr)],
-  ["New", Box(Expr)],
+  ["New", { tags: ["span"] }, Box(Expr)],
   ["Yield", Option(Box(Expr))],
-  ["YieldFrom", Box(Expr)],
+  ["YieldFrom", { tags: ["span"] }, Box(Expr)],
   ["Ternary", Box(Expr), Box(Expr), Box(Expr)],
   ["Assign", Box(Expr), "AssignOp", Box(Expr)],
   ["Regex", "Text"],
   // Unary operators
-  ["Delete", Box(Expr)],
-  ["Void", Box(Expr)],
-  ["TypeOf", Box(Expr)],
-  ["UnaryPlus", Box(Expr)],
-  ["UnaryMinus", Box(Expr)],
-  ["BitNot", Box(Expr)],
-  ["Not", Box(Expr)],
-  ["Await", Box(Expr)],
+  ["Delete", { tags: ["span"] }, Box(Expr)],
+  ["Void", { tags: ["span"] }, Box(Expr)],
+  ["TypeOf", { tags: ["span"] }, Box(Expr)],
+  ["UnaryPlus", { tags: ["span"] }, Box(Expr)],
+  ["UnaryMinus", { tags: ["span"] }, Box(Expr)],
+  ["BitNot", { tags: ["span"] }, Box(Expr)],
+  ["Not", { tags: ["span"] }, Box(Expr)],
+  ["Await", { tags: ["span"] }, Box(Expr)],
   ["Comma", Vec(Expr)],
 
   ["Super"],
@@ -261,7 +261,7 @@ const ast_items = [
 /**
  * @param {string} name
  * @param {Tag[]} tags
- * @param {...([string, ...Type[]] | string)} variants
+ * @param {...([string, ...Type[]] | ([string, { tags: Tag[] }, ...Type[]]) | string)} variants
  * @returns {EnumItem}
  */
 function Enum(name, tags, ...variants) {
@@ -269,13 +269,26 @@ function Enum(name, tags, ...variants) {
     kind: "enum",
     name,
     tags,
-    variants: variants.map((variant) => {
-      if (typeof variant === "string") {
-        return { name: variant, args: [] };
-      } else {
-        return { name: variant[0], args: variant.slice(1) };
-      }
-    }),
+    variants: variants.map(
+      /**
+       * @returns {EnumVariant}
+       */
+      (variant) => {
+        if (typeof variant === "string") {
+          return { name: variant, args: [], tags: [] };
+        } else if (typeof variant[1] === "object" && "tags" in variant[1]) {
+          return {
+            name: variant[0],
+            tags: variant[1].tags,
+            // @ts-ignore - TS doesn't understand that the previous check guarantees this
+            args: variant.slice(2),
+          };
+        } else {
+          // @ts-ignore - TS doesn't understand that the previous check guarantees this
+          return { name: variant[0], args: variant.slice(1), tags: [] };
+        }
+      },
+    ),
   };
 }
 
