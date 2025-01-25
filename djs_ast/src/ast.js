@@ -212,6 +212,7 @@ const ast_items = [
     // Multiplicative
     "Mul",
     "Div",
+    "Mod",
 
     // Bitwise
     "BitXor",

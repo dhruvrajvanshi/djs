@@ -79,6 +79,7 @@ impl<'src> Lexer<'src> {
             _ if at!("^=") => self.lex_2_char_token(TokenKind::CaretEq),
             _ if at!("|=") => self.lex_2_char_token(TokenKind::BarEq),
             _ if at!("**=") => self.lex_3_char_token(TokenKind::StarStarEq),
+            '%' => self.lex_single_char_token(TokenKind::Percent),
             '*' => self.lex_single_char_token(TokenKind::Star),
             '~' => self.lex_single_char_token(TokenKind::Tilde),
             '/' => {

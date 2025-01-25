@@ -58,6 +58,7 @@ const tokens = [
   "Question",
   "Bang",
   "Tilde",
+  "Percent",
 
   "FatArrow",
   "Eq",
