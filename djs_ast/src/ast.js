@@ -151,6 +151,7 @@ const ast_items = [
   Enum(
     "ObjectLiteralEntry",
     ["span"],
+    ["Ident", "Ident"],
     ["Prop", "ObjectKey", Expr],
     ["Method", "MethodDef"],
     ["Spread", Expr],
