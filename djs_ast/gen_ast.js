@@ -57,7 +57,7 @@ function gen_enum(item) {
      * @returns {string}
      */
     function gen_case(variant) {
-      if (variant.args.length === 1 && type_is_spanned(variant.args[0])) {
+      if (inherits_span(variant)) {
         return `Self::${variant.name}(inner) => inner.span()`;
       } else {
         return `Self::${variant.name}(span, ..) => *span`;
@@ -80,16 +80,25 @@ function gen_enum(item) {
   `;
 
   /**
+   *
+   * @param {EnumVariant} variant
+   */
+  function inherits_span(variant) {
+    return (
+      variant.args.length === 1 &&
+      !variant.tags.includes("span") &&
+      type_is_spanned(variant.args[0])
+    );
+  }
+
+  /**
    * @param {EnumVariant} variant
    * @returns
    */
   function gen_variant(variant) {
     /** @type {string[]} */
     const args = [];
-    let inherits_span = false;
-    if (variant.args.length === 1 && type_is_spanned(variant.args[0])) {
-      inherits_span = true;
-    } else if (item.tags.includes("span")) {
+    if (item.tags.includes("span") && !inherits_span(variant)) {
       args.push("Span");
     }
     args.push(...variant.args.map(gen_type));

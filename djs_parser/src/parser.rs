@@ -816,9 +816,12 @@ impl<'src> Parser<'src> {
                 Ok(Expr::Function(f))
             }
             T::Throw => {
-                self.advance()?;
+                let start = self.advance()?.span;
                 let expr = self.parse_expr()?;
-                Ok(Expr::Throw(Box::new(expr)))
+                Ok(Expr::Throw(
+                    Span::between(start, expr.span()),
+                    Box::new(expr),
+                ))
             }
             T::LSquare => {
                 let start = self.advance()?;
@@ -1106,13 +1109,11 @@ impl<'src> Parser<'src> {
                         is_yield_from = true;
                     }
                     let expr = self.parse_assignment_expr()?;
+                    let span = Span::between(start.span, expr.span());
                     if is_yield_from {
-                        Ok(Expr::YieldFrom(Box::new(expr)))
+                        Ok(Expr::YieldFrom(span, Box::new(expr)))
                     } else {
-                        Ok(Expr::Yield(
-                            Span::between(start.span, expr.span()),
-                            Some(Box::new(expr)),
-                        ))
+                        Ok(Expr::Yield(span, Some(Box::new(expr))))
                     }
                 }
             }
@@ -1255,9 +1256,12 @@ impl<'src> Parser<'src> {
     fn parse_unary_expr(&mut self) -> Result<Expr<'src>> {
         macro_rules! make_unary {
             ($case: ident) => {{
-                self.advance()?;
+                let start = self.advance()?.span;
                 let expr = self.parse_unary_expr()?;
-                Ok(Expr::$case(Box::new(expr)))
+                Ok(Expr::$case(
+                    Span::between(start, expr.span()),
+                    Box::new(expr),
+                ))
             }};
         }
         match self.current()?.kind {
@@ -1275,25 +1279,37 @@ impl<'src> Parser<'src> {
     fn parse_update_expr(&mut self) -> Result<Expr<'src>> {
         match self.current()?.kind {
             T::PlusPlus => {
-                self.advance()?;
+                let start = self.advance()?;
                 let expr = self.parse_unary_expr()?;
-                return Ok(Expr::PreIncrement(Box::new(expr)));
+                return Ok(Expr::PreIncrement(
+                    Span::between(start.span, expr.span()),
+                    Box::new(expr),
+                ));
             }
             T::MinusMinus => {
-                self.advance()?;
+                let start = self.advance()?.span;
                 let expr = self.parse_unary_expr()?;
-                return Ok(Expr::PreDecrement(Box::new(expr)));
+                return Ok(Expr::PreDecrement(
+                    Span::between(start, expr.span()),
+                    Box::new(expr),
+                ));
             }
             _ => {}
         }
         let lhs = self.parse_left_hand_side_expr()?;
         if self.at(T::PlusPlus) && !self.current_is_on_new_line() {
-            self.advance()?;
-            Ok(Expr::PostIncrement(Box::new(lhs)))
+            let end = self.advance()?;
+            Ok(Expr::PostIncrement(
+                Span::between(lhs.span(), end.span),
+                Box::new(lhs),
+            ))
         } else if self.at(T::MinusMinus) && !self.current_is_on_new_line() {
-            self.advance()?;
+            let end = self.advance()?;
 
-            Ok(Expr::PostDecrement(Box::new(lhs)))
+            Ok(Expr::PostDecrement(
+                Span::between(lhs.span(), end.span),
+                Box::new(lhs),
+            ))
         } else {
             Ok(lhs)
         }
@@ -1322,13 +1338,13 @@ impl<'src> Parser<'src> {
     fn parse_member_or_call_expr(&mut self, allow_calls: bool) -> Result<Expr<'src>> {
         let mut lhs = match self.current()?.kind {
             T::New => {
-                self.advance()?;
+                let start = self.advance()?;
                 let expr = self.parse_member_or_call_expr(
                     // Since new Foo() means `new (Foo)()` and not (new (Foo())), we don't allow calls here
                     /* allow_calls */
                     false,
                 )?;
-                Expr::New(Box::new(expr))
+                Expr::New(Span::between(start.span, expr.span()), Box::new(expr))
             }
             _ => self.parse_primary_expr()?,
         };
@@ -1974,7 +1990,7 @@ mod tests {
             panic!("Expected an expression statement; Found {stmt:?}");
         };
 
-        let Expr::PostIncrement(e) = *e else {
+        let Expr::PostIncrement(_, e) = *e else {
             panic!("Expected a post increment expression; Found {e:?}");
         };
         let Expr::Prop(_, obj, prop) = *e else {
@@ -2019,7 +2035,7 @@ mod tests {
         let Expr::Call(_, new_date, two_args) = *new_date_call else {
             panic!("Expected a call expression; Found {new_date_call:?}");
         };
-        let Expr::New(date) = *new_date else {
+        let Expr::New(_, date) = *new_date else {
             panic!("Expected a new expression; Found {new_date:?}");
         };
         let Expr::Var(ident!("Date")) = *date else {
