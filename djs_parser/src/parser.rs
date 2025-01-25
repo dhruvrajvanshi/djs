@@ -768,27 +768,7 @@ impl<'src> Parser<'src> {
 
     pub(super) fn parse_primary_expr(&mut self) -> Result<Expr<'src>> {
         match self.current()?.kind {
-            T::Ident => {
-                let ident = self.parse_ident()?;
-                match self.current()?.kind {
-                    T::FatArrow => {
-                        let params = ParamList {
-                            span: ident.span,
-                            params: vec![Param {
-                                span: ident.span,
-                                pattern: Pattern::Var(ident),
-                            }],
-                        };
-                        let body = self.parse_arrow_fn_body()?;
-                        Ok(Expr::ArrowFn(
-                            Span::between(params.span(), body.span()),
-                            params,
-                            body,
-                        ))
-                    }
-                    _ => Ok(Expr::Var(ident)),
-                }
-            }
+            T::Ident => Ok(Expr::Var(self.parse_ident()?)),
             T::String => {
                 let tok = self.advance()?;
                 Ok(Expr::String(Text {
@@ -1801,7 +1781,10 @@ mod tests {
                     if expected_parse_error {
                         successful_results.push(entry);
                     } else {
-                        eprintln!("{path}: Expected a successful parse but failed with {e:?}");
+                        let line = e.line();
+                        eprintln!(
+                            "{path}:{line}: Expected a successful parse but failed with {e:?}"
+                        );
                         unsuccessful_results.push(entry);
                     }
                 }
