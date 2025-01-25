@@ -834,8 +834,29 @@ impl<'src> Parser<'src> {
             }
             T::LSquare => {
                 let start = self.advance()?;
-                let elements =
-                    self.parse_comma_separated_list(T::RSquare, Self::parse_assignment_expr)?;
+                let mut elements = vec![];
+                loop {
+                    match self.current()?.kind {
+                        T::Comma if self.next_is(T::RSquare) && !elements.is_empty() => {
+                            self.advance()?;
+                            break;
+                        }
+                        T::RSquare | T::EndOfFile => {
+                            break;
+                        }
+                        T::Comma => {
+                            self.advance()?;
+                            elements.push(None);
+                        }
+                        _ => {
+                            elements.push(Some(self.parse_assignment_expr()?));
+                            if self.at(T::RSquare) {
+                                break;
+                            }
+                            self.expect(T::Comma)?;
+                        }
+                    }
+                }
                 let end = self.expect(T::RSquare)?;
                 Ok(Expr::Array(Span::between(start.span, end.span), elements))
             }
@@ -1539,7 +1560,10 @@ fn expr_is_pattern(expr: &Expr) -> bool {
             ObjectLiteralEntry::Method(..) => false,
             ObjectLiteralEntry::Spread(e) => expr_is_pattern(e),
         }),
-        Expr::Array(_, items) => items.iter().all(expr_is_pattern),
+        Expr::Array(_, items) => items.iter().all(|e| match e {
+            Some(e) => expr_is_pattern(e),
+            None => true,
+        }),
         _ => false,
     }
 }
