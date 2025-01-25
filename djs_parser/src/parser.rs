@@ -1294,7 +1294,7 @@ impl<'src> Parser<'src> {
     define_binop_parser!(
         parse_multiplicative_expr,
         parse_exponentiation_expr,
-        T::Star | T::Slash
+        T::Star | T::Slash | T::Percent
     );
 
     fn parse_exponentiation_expr(&mut self) -> Result<Expr<'src>> {
@@ -1558,6 +1558,7 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
         T::Minus => BinOp::Sub,
         T::Star => BinOp::Mul,
         T::Slash => BinOp::Div,
+        T::Percent => BinOp::Mod,
         T::In => BinOp::In,
         T::Instanceof => BinOp::Instanceof,
         T::AmpAmp => BinOp::And,
@@ -1884,7 +1885,6 @@ mod tests {
             for entry in unsuccessful_results {
                 writeln!(file, "{}", entry.to_str().unwrap()).unwrap();
             }
-            return;
         } else {
             let mut baseline_success = String::new();
             let mut baseline_failures = String::new();
