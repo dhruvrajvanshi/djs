@@ -123,14 +123,29 @@ impl<'src> Lexer<'src> {
 
             '^' => self.lex_single_char_token(TokenKind::Caret),
 
+            _ if at!("0x") => self.lex_hex_number(),
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c if c.is_numeric() => self.lex_number(),
             c => Err(Error::UnexpectedCharacter(self.line, c)),
         }
     }
 
+    fn lex_hex_number(&mut self) -> Result<Token<'src>> {
+        assert_eq!(self.current_char(), '0');
+        assert_eq!(self.next_char(), 'x');
+        self.advance();
+        self.advance();
+        if !self.current_char().is_ascii_hexdigit() {
+            return Err(Error::ExpectedAHexChar(self.line, self.current_char()));
+        }
+        while self.current_char().is_ascii_hexdigit() && self.current_char() != EOF_CHAR {
+            self.advance();
+        }
+        Ok(self.make_token(TokenKind::Number))
+    }
+
     fn try_lex_regex(&mut self) -> Option<Token<'src>> {
-        assert!(self.current_char() == '/');
+        assert_eq!(self.current_char(), '/');
         self.advance();
 
         while self.current_char() != '/' && self.current_char() != EOF_CHAR {
