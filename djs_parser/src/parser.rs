@@ -1,10 +1,10 @@
 use std::mem;
 
 use djs_ast::{
-    ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody, ClassMember, DeclType, Expr, For,
-    ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey, ObjectLiteralEntry,
-    ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern, SourceFile, Stmt, SwitchCase,
-    Text, TryStmt, VarDecl,
+    AccessorType, ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody, ClassMember, DeclType,
+    Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey,
+    ObjectLiteralEntry, ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern,
+    SourceFile, Stmt, SwitchCase, Text, TryStmt, VarDecl,
 };
 use djs_syntax::Span;
 
@@ -46,6 +46,10 @@ pub enum Error {
         line: u32,
         found: TokenKind,
     },
+    GetterWithParams {
+        line: u32,
+        accessor_type: Option<AccessorType>,
+    },
     Lexer(lexer::Error),
 }
 impl Error {
@@ -54,6 +58,7 @@ impl Error {
             Error::UnexpectedToken { line, .. } => *line,
             Error::UnexpectedEOF(line) => *line,
             Error::MissingSemi { line, .. } => *line,
+            Error::GetterWithParams { line, .. } => *line,
             Error::Lexer(e) => e.line(),
         }
     }
@@ -253,6 +258,19 @@ impl<'src> Parser<'src> {
         } else {
             None
         };
+        let accessor_type = if self.current_matches(Token::is_get)
+            && self.next_matches(Token::can_start_object_property_name)
+        {
+            self.advance()?;
+            Some(AccessorType::Get)
+        } else if self.current_matches(Token::is_set)
+            && self.next_matches(Token::can_start_object_property_name)
+        {
+            self.advance()?;
+            Some(AccessorType::Set)
+        } else {
+            None
+        };
         let is_async = if self.current()?.kind == T::Async {
             self.advance()?;
             true
@@ -273,6 +291,7 @@ impl<'src> Parser<'src> {
         Ok(MethodDef {
             span,
             name,
+            accessor_type,
             body: Function {
                 span,
                 name: None,
@@ -858,7 +877,7 @@ impl<'src> Parser<'src> {
         }
     }
 
-    fn peek(&self) -> Option<Token> {
+    fn peek(&self) -> Option<Token<'src>> {
         let mut clone = self.lexer.clone();
         clone.next_token().map(Some).unwrap_or(None)
     }
@@ -946,6 +965,12 @@ impl<'src> Parser<'src> {
                 let ident = self.parse_ident()?;
                 Ok(ObjectLiteralEntry::Ident(ident.span, ident))
             }
+            T::Ident
+                if self.current_matches(Token::is_accessor_type)
+                    && self.next_matches(Token::can_start_object_property_name) =>
+            {
+                self.parse_object_literal_entry_method()
+            }
             T::Async if self.next_is(T::Star) => self.parse_object_literal_entry_method(),
             T::Ident if self.next_is(T::LParen) => self.parse_object_literal_entry_method(),
             T::Star => self.parse_object_literal_entry_method(),
@@ -968,6 +993,7 @@ impl<'src> Parser<'src> {
                         let method = MethodDef {
                             span,
                             name,
+                            accessor_type: None,
                             body: Function {
                                 span,
                                 name: None,
@@ -992,9 +1018,36 @@ impl<'src> Parser<'src> {
             }
         }
     }
+    fn next_matches(&self, predicate: impl Fn(&Token<'src>) -> bool) -> bool {
+        let Some(next) = self.peek() else {
+            return false;
+        };
+        predicate(&next)
+    }
+
+    fn current_matches(&self, predicate: impl Fn(&Token<'src>) -> bool) -> bool {
+        let Ok(current) = self.current() else {
+            return false;
+        };
+        predicate(current)
+    }
 
     fn parse_object_literal_entry_method(&mut self) -> Result<ObjectLiteralEntry<'src>> {
         let start = self.current()?.span;
+        let line = self.current_line();
+        let accessor_type = if self.current_matches(Token::is_get)
+            && self.next_matches(Token::can_start_object_property_name)
+        {
+            self.advance()?;
+            Some(AccessorType::Get)
+        } else if self.current_matches(Token::is_set)
+            && self.next_matches(Token::can_start_object_property_name)
+        {
+            self.advance()?;
+            Some(AccessorType::Set)
+        } else {
+            None
+        };
         let is_async = if self.at(T::Async) {
             self.advance()?;
             true
@@ -1009,9 +1062,22 @@ impl<'src> Parser<'src> {
         let params = self.parse_params_with_parens()?;
         let body = self.parse_block()?;
         let span = Span::between(start, body.span);
+
+        match accessor_type {
+            Some(AccessorType::Get) => {
+                if !params.params.is_empty() {
+                    return Err(Error::GetterWithParams {
+                        line,
+                        accessor_type,
+                    });
+                }
+            }
+            _ => {}
+        }
         let method = MethodDef {
             span,
             name,
+            accessor_type,
             body: Function {
                 span,
                 name: None,
@@ -1820,15 +1886,16 @@ mod tests {
             let baseline_success = baseline_success.lines().collect::<HashSet<&str>>();
             let baseline_failures = baseline_failures.lines().collect::<HashSet<&str>>();
 
-            if successful_results.len() > baseline_success.len() {
-                let new_successes = successful_results.len() - baseline_success.len();
-                eprintln!("🎉 {new_successes} case(s) now pass; You can update the baseline by running UPDATE_BASELINE=true cargo test");
-            }
             for entry in successful_results.difference(&baseline_success) {
                 eprintln!("✅ {}", entry);
             }
             for entry in unsuccessful_results.difference(&baseline_failures) {
                 eprintln!("🛑 {}", entry);
+            }
+
+            if successful_results.len() > baseline_success.len() {
+                let new_successes = successful_results.len() - baseline_success.len();
+                eprintln!("🎉 {new_successes} case(s) now pass; You can update the baseline by running UPDATE_BASELINE=true cargo test");
             }
 
             assert_eq!(successful_results.len(), baseline_success.len());
@@ -2218,5 +2285,10 @@ verifyProperty(Date.prototype, "toGMTString", {
         )
         .parse_stmt()
         .unwrap();
+    }
+
+    #[test]
+    fn should_allow_a_method_named_get_in_object_literals() {
+        Parser::new("({ get() {} })").parse_expr().unwrap();
     }
 }
