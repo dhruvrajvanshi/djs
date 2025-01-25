@@ -172,6 +172,7 @@ const ast_items = [
     ["params", "ParamList"],
     ["body", "Block"],
     ["is_generator", "bool"],
+    ["is_async", "bool"],
   ),
   Enum("ArrowFnBody", ["span"], [Expr, Box(Expr)], ["Block", "Block"]),
   Enum(
