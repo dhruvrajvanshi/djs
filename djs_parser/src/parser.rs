@@ -1522,7 +1522,12 @@ fn assign_op(kind: TokenKind) -> Option<AssignOp> {
 #[cfg(test)]
 mod tests {
     use core::panic;
-    use std::{fs::File, io::Read};
+    use std::{
+        collections::HashSet,
+        env,
+        fs::File,
+        io::{Read, Write},
+    };
 
     use djs_ast::{Expr, ObjectPattern};
 
@@ -1731,8 +1736,9 @@ mod tests {
         let files = glob::glob("../test262/test/**/*.js")
             .expect("Invalid glob pattern")
             .collect::<Vec<_>>();
-        let total_files = files.len();
-        let mut success_count = 0;
+        let mut successful_results = vec![];
+        let mut unsuccessful_results = vec![];
+
         for entry in files {
             let entry = entry.unwrap();
             if entry.to_str().unwrap().contains("staging") {
@@ -1758,33 +1764,75 @@ mod tests {
             let expected_parse_error = syntax_error_expected(&str);
             let mut parser = Parser::new(&str);
             let result = parser.parse_source_file();
+            let path = entry.to_str().unwrap();
             match result {
                 Ok(..) => {
-                    if !expected_parse_error {
-                        success_count += 1;
+                    if expected_parse_error {
+                        eprintln!(
+                            "{path}: Expected a parse error but the file was parsed successfully"
+                        );
+                        unsuccessful_results.push(entry);
                     } else {
-                        println!("{entry:?}:) Expected a parse error but the file was parsed successfully");
+                        successful_results.push(entry);
                     }
                 }
                 Err(e) => {
-                    let line = e.line();
                     if expected_parse_error {
-                        success_count += 1;
+                        successful_results.push(entry);
                     } else {
-                        let path = entry.to_str().unwrap();
-                        println!("{path}:{line}: {e:?}");
+                        eprintln!("{path}: Expected a successful parse but failed with {e:?}");
+                        unsuccessful_results.push(entry);
                     }
                 }
             }
         }
-        eprintln!("Successfully parsed: {success_count}/{total_files} files");
-        // Update this when the parser is more complete
-        let expected_successes = 32362;
-        if success_count > expected_successes {
-            let improvement = success_count - expected_successes;
-            panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
+        if env::var("UPDATE_BASELINE").is_ok() {
+            println!("Updating baseline...");
+            let mut file = File::create("test_262_baseline.success.txt").unwrap();
+            for entry in successful_results {
+                writeln!(file, "{}", entry.to_str().unwrap()).unwrap();
+            }
+            let mut file = File::create("test_262_baseline.failed.txt").unwrap();
+            for entry in unsuccessful_results {
+                writeln!(file, "{}", entry.to_str().unwrap()).unwrap();
+            }
+            return;
+        } else {
+            let mut baseline_success = String::new();
+            let mut baseline_failures = String::new();
+            File::open("test_262_baseline.success.txt")
+                .unwrap()
+                .read_to_string(&mut baseline_success)
+                .unwrap();
+            File::open("test_262_baseline.failed.txt")
+                .unwrap()
+                .read_to_string(&mut baseline_failures)
+                .unwrap();
+
+            let successful_results = successful_results
+                .iter()
+                .map(|entry| entry.to_str().unwrap())
+                .collect::<HashSet<&str>>();
+            let unsuccessful_results = unsuccessful_results
+                .iter()
+                .map(|entry| entry.to_str().unwrap())
+                .collect::<HashSet<&str>>();
+            let baseline_success = baseline_success.lines().collect::<HashSet<&str>>();
+            let baseline_failures = baseline_failures.lines().collect::<HashSet<&str>>();
+
+            if successful_results.len() > baseline_success.len() {
+                let new_successes = successful_results.len() - baseline_success.len();
+                eprintln!("🎉 {new_successes} case(s) now pass; You can update the baseline by running UPDATE_BASELINE=true cargo test");
+            }
+            for entry in successful_results.difference(&baseline_success) {
+                eprintln!("✅ {}", entry);
+            }
+            for entry in unsuccessful_results.difference(&baseline_failures) {
+                eprintln!("🛑 {}", entry);
+            }
+
+            assert_eq!(successful_results.len(), baseline_success.len());
         }
-        assert_eq!(success_count, expected_successes);
     }
 
     fn syntax_error_expected(s: &str) -> bool {
