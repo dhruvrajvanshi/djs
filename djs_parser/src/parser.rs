@@ -253,6 +253,18 @@ impl<'src> Parser<'src> {
         } else {
             None
         };
+        let is_async = if self.current()?.kind == T::Async {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
+        let is_generator = if self.current()?.kind == T::Star {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
         let name = self.parse_object_key()?;
         let start = static_token.map(|it| it.span).unwrap_or(name.span());
         let params = self.parse_params_with_parens()?;
@@ -266,7 +278,8 @@ impl<'src> Parser<'src> {
                 name: None,
                 params,
                 body,
-                is_generator: false,
+                is_generator,
+                is_async,
             },
         })
     }
@@ -872,6 +885,7 @@ impl<'src> Parser<'src> {
             params,
             body,
             is_generator,
+            is_async: false,
         };
         Ok(f)
     }
@@ -932,6 +946,17 @@ impl<'src> Parser<'src> {
                 let ident = self.parse_ident()?;
                 Ok(ObjectLiteralEntry::Ident(ident.span, ident))
             }
+            T::Async if self.next_is(T::Star) => self.parse_object_literal_entry_method(),
+            T::Ident if self.next_is(T::LParen) => self.parse_object_literal_entry_method(),
+            T::Star => self.parse_object_literal_entry_method(),
+            T::Async
+                if self.next_is(T::Ident)
+                    || self.next_is(T::LSquare)
+                    || self.peek().map(|it| it.kind.is_keyword()).unwrap_or(false) =>
+            {
+                self.parse_object_literal_entry_method()
+            }
+
             _ => {
                 let start = self.current()?.span;
                 let name = self.parse_object_key()?;
@@ -949,6 +974,7 @@ impl<'src> Parser<'src> {
                                 params,
                                 body,
                                 is_generator: false,
+                                is_async: false,
                             },
                         };
                         Ok(ObjectLiteralEntry::Method(start, method))
@@ -965,6 +991,37 @@ impl<'src> Parser<'src> {
                 }
             }
         }
+    }
+
+    fn parse_object_literal_entry_method(&mut self) -> Result<ObjectLiteralEntry<'src>> {
+        let start = self.current()?.span;
+        let is_async = if self.at(T::Async) {
+            self.advance()?;
+            true
+        } else {
+            false
+        };
+        let is_generator = self.at(T::Star);
+        if is_generator {
+            self.advance()?;
+        }
+        let name = self.parse_object_key()?;
+        let params = self.parse_params_with_parens()?;
+        let body = self.parse_block()?;
+        let span = Span::between(start, body.span);
+        let method = MethodDef {
+            span,
+            name,
+            body: Function {
+                span,
+                name: None,
+                params,
+                body,
+                is_generator,
+                is_async,
+            },
+        };
+        Ok(ObjectLiteralEntry::Method(span, method))
     }
 
     fn parse_object_key(&mut self) -> Result<ObjectKey<'src>> {
@@ -1722,7 +1779,7 @@ mod tests {
         }
         eprintln!("Successfully parsed: {success_count}/{total_files} files");
         // Update this when the parser is more complete
-        let expected_successes = 30472;
+        let expected_successes = 32362;
         if success_count > expected_successes {
             let improvement = success_count - expected_successes;
             panic!("🎉 Good job! After this change, the parser handles {improvement} more case(s). Please Update the baseline in parser.rs::test::parses_test262_files::expected_successes to {success_count}");
