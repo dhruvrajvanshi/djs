@@ -1,9 +1,9 @@
 use std::mem;
 
 use djs_ast::{
-    AccessorType, ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody, ClassMember, DeclType,
-    Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef, ObjectKey,
-    ObjectLiteralEntry, ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern,
+    AccessorType, ArrayLiteralMember, ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody,
+    ClassMember, DeclType, Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef,
+    ObjectKey, ObjectLiteralEntry, ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern,
     SourceFile, Stmt, SwitchCase, Text, TryStmt, VarDecl, VarDeclarator,
 };
 use djs_syntax::Span;
@@ -844,12 +844,21 @@ impl<'src> Parser<'src> {
                         T::RSquare | T::EndOfFile => {
                             break;
                         }
-                        T::Comma => {
+                        T::DotDotDot => {
                             self.advance()?;
-                            elements.push(None);
+                            elements
+                                .push(ArrayLiteralMember::Spread(self.parse_assignment_expr()?));
+                            if self.at(T::RSquare) {
+                                break;
+                            }
+                            self.expect(T::Comma)?;
+                        }
+                        T::Comma => {
+                            let span = self.advance()?.span;
+                            elements.push(ArrayLiteralMember::Elision(span));
                         }
                         _ => {
-                            elements.push(Some(self.parse_assignment_expr()?));
+                            elements.push(ArrayLiteralMember::Expr(self.parse_assignment_expr()?));
                             if self.at(T::RSquare) {
                                 break;
                             }
@@ -1561,8 +1570,9 @@ fn expr_is_pattern(expr: &Expr) -> bool {
             ObjectLiteralEntry::Spread(e) => expr_is_pattern(e),
         }),
         Expr::Array(_, items) => items.iter().all(|e| match e {
-            Some(e) => expr_is_pattern(e),
-            None => true,
+            ArrayLiteralMember::Expr(e) => expr_is_pattern(e),
+            ArrayLiteralMember::Elision(_) => true,
+            ArrayLiteralMember::Spread(e) => expr_is_pattern(e),
         }),
         _ => false,
     }

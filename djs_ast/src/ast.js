@@ -49,7 +49,7 @@ const EnumExpr = Enum(
   ["PostDecrement", { tags: ["span"] }, Box(Expr)],
   ["PreIncrement", { tags: ["span"] }, Box(Expr)],
   ["PreDecrement", { tags: ["span"] }, Box(Expr)],
-  ["Array", Vec(Option(Expr))],
+  ["Array", Vec("ArrayLiteralMember")],
   ["New", { tags: ["span"] }, Box(Expr)],
   ["Yield", Option(Box(Expr))],
   ["YieldFrom", { tags: ["span"] }, Box(Expr)],
@@ -177,6 +177,10 @@ const ast_items = [
     ["is_generator", "bool"],
     ["is_async", "bool"],
   ),
+  Enum("ArrayLiteralMember", ["span"], ["Expr", Expr], "Elision", [
+    "Spread",
+    Expr,
+  ]),
   Enum("ArrowFnBody", ["span"], [Expr, Box(Expr)], ["Block", "Block"]),
   Enum(
     "Pattern",
