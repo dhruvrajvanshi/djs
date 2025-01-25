@@ -1102,6 +1102,16 @@ impl<'src> Parser<'src> {
                     },
                 )
             }
+            T::Number => {
+                let tok = self.advance()?;
+                ObjectKey::String(
+                    tok.span,
+                    Text {
+                        span: tok.span,
+                        text: tok.text,
+                    },
+                )
+            }
             T::LSquare => {
                 let start = self.advance()?.span;
                 let expr = self.parse_expr()?;
