@@ -49,7 +49,7 @@ const EnumExpr = Enum(
   ["PostDecrement", { tags: ["span"] }, Box(Expr)],
   ["PreIncrement", { tags: ["span"] }, Box(Expr)],
   ["PreDecrement", { tags: ["span"] }, Box(Expr)],
-  ["Array", Vec(Expr)],
+  ["Array", Vec(Option(Expr))],
   ["New", { tags: ["span"] }, Box(Expr)],
   ["Yield", Option(Box(Expr))],
   ["YieldFrom", { tags: ["span"] }, Box(Expr)],
