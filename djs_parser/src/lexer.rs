@@ -10,6 +10,7 @@ pub struct Lexer<'src> {
     source: &'src str,
     start_offset: u32,
     input: CharIndices<'src>,
+    regex_enabled: bool,
 }
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
@@ -17,6 +18,7 @@ pub enum Error {
     UnexpectedEOF(u32, /* expected? */ char),
     InvalidEscape(u32, char),
     ExpectedAHexChar(u32, char),
+    Message(u32, &'static str),
 }
 impl Error {
     pub fn line(&self) -> u32 {
@@ -25,6 +27,7 @@ impl Error {
             Error::UnexpectedEOF(line, _) => *line,
             Error::InvalidEscape(line, _) => *line,
             Error::ExpectedAHexChar(line, _) => *line,
+            Error::Message(line, _) => *line,
         }
     }
 }
@@ -37,7 +40,15 @@ impl<'src> Lexer<'src> {
             start_offset: 0,
             source: input,
             input: input.char_indices(),
+            regex_enabled: false,
         }
+    }
+
+    pub fn enable_regex(&mut self) {
+        self.regex_enabled = true;
+    }
+    pub fn disable_regex(&mut self) {
+        self.regex_enabled = false;
     }
 
     pub fn next_token(&mut self) -> Result<Token<'src>> {
@@ -82,16 +93,8 @@ impl<'src> Lexer<'src> {
             '%' => self.lex_single_char_token(TokenKind::Percent),
             '*' => self.lex_single_char_token(TokenKind::Star),
             '~' => self.lex_single_char_token(TokenKind::Tilde),
-            '/' => {
-                let mut snapshot = self.clone();
-                match snapshot.try_lex_regex() {
-                    Some(token) => {
-                        *self = snapshot;
-                        Ok(token)
-                    }
-                    None => self.lex_single_char_token(TokenKind::Slash),
-                }
-            }
+            '/' if self.regex_enabled => self.lex_regex(),
+            '/' => self.lex_single_char_token(TokenKind::Slash),
             '?' => self.lex_single_char_token(TokenKind::Question),
             '"' | '\'' => self.lex_simple_string(),
 
@@ -145,13 +148,13 @@ impl<'src> Lexer<'src> {
         Ok(self.make_token(TokenKind::Number))
     }
 
-    fn try_lex_regex(&mut self) -> Option<Token<'src>> {
+    fn lex_regex(&mut self) -> Result<Token<'src>> {
         assert_eq!(self.current_char(), '/');
         self.advance();
 
         while self.current_char() != '/' && self.current_char() != EOF_CHAR {
             if is_line_terminator(self.current_char()) {
-                return None;
+                return Err(Error::Message(self.line, "Unexpected newline in regex"));
             }
             let c = self.advance();
             if c == '\\' {
@@ -160,7 +163,7 @@ impl<'src> Lexer<'src> {
                 // in a regex literal
                 // https://tc39.es/ecma262/#prod-RegularExpressionBackslashSequence
                 if is_line_terminator(self.current_char()) || self.current_char() == EOF_CHAR {
-                    return None;
+                    return Err(Error::Message(self.line, "Unexpected newline in regex"));
                 } else {
                     self.advance();
                 }
@@ -171,9 +174,9 @@ impl<'src> Lexer<'src> {
             while is_valid_regex_flag(self.current_char()) {
                 self.advance();
             }
-            Some(self.make_token(TokenKind::Regex))
+            Ok(self.make_token(TokenKind::Regex))
         } else {
-            None
+            Err(Error::UnexpectedEOF(self.line, '/'))
         }
     }
 
