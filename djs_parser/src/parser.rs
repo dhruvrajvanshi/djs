@@ -1063,16 +1063,13 @@ impl<'src> Parser<'src> {
         let body = self.parse_block()?;
         let span = Span::between(start, body.span);
 
-        match accessor_type {
-            Some(AccessorType::Get) => {
-                if !params.params.is_empty() {
-                    return Err(Error::GetterWithParams {
-                        line,
-                        accessor_type,
-                    });
-                }
+        if let Some(AccessorType::Get) = accessor_type {
+            if !params.params.is_empty() {
+                return Err(Error::GetterWithParams {
+                    line,
+                    accessor_type,
+                });
             }
-            _ => {}
         }
         let method = MethodDef {
             span,
