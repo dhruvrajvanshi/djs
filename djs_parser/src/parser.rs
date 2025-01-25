@@ -928,6 +928,10 @@ impl<'src> Parser<'src> {
                     expr,
                 ))
             }
+            T::Ident if self.next_is(T::Comma) || self.next_is(T::RBrace) => {
+                let ident = self.parse_ident()?;
+                Ok(ObjectLiteralEntry::Ident(ident.span, ident))
+            }
             _ => {
                 let start = self.current()?.span;
                 let name = self.parse_object_key()?;
@@ -1429,6 +1433,7 @@ fn expr_is_pattern(expr: &Expr) -> bool {
     match expr {
         Expr::Var(_, _) => true,
         Expr::Object(_, obj) => obj.iter().all(|entry| match entry {
+            ObjectLiteralEntry::Ident(..) => true,
             ObjectLiteralEntry::Prop(_, _, value) => expr_is_pattern(value),
             ObjectLiteralEntry::Method(..) => false,
             ObjectLiteralEntry::Spread(_, e) => expr_is_pattern(e),
