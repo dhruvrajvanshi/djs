@@ -4,7 +4,7 @@ use djs_ast::{
     AccessorType, ArrayLiteralMember, ArrowFnBody, AssignOp, BinOp, Block, Class, ClassBody,
     ClassMember, DeclType, Expr, For, ForInOrOf, ForInit, Function, Ident, InOrOf, MethodDef,
     ObjectKey, ObjectLiteralEntry, ObjectPattern, ObjectPatternProperty, Param, ParamList, Pattern,
-    SourceFile, Stmt, SwitchCase, Text, TryStmt, VarDecl, VarDeclarator,
+    SourceFile, Stmt, SwitchCase, TemplateLiteralFragment, Text, TryStmt, VarDecl, VarDeclarator,
 };
 use djs_syntax::Span;
 
@@ -52,6 +52,7 @@ pub enum Error {
         accessor_type: Option<AccessorType>,
     },
     Lexer(lexer::Error),
+    Message(u32, &'static str),
 }
 impl Error {
     pub fn line(&self) -> u32 {
@@ -61,6 +62,7 @@ impl Error {
             Error::MissingSemi { line, .. } => *line,
             Error::GetterWithParams { line, .. } => *line,
             Error::Lexer(e) => e.line(),
+            Error::Message(line, _) => *line,
         }
     }
 }
@@ -867,8 +869,38 @@ impl<'src> Parser<'src> {
                 let cls = self.parse_class()?;
                 Ok(Expr::Class(Box::new(cls)))
             }
+            T::TemplateLiteralFragment => self.parse_template_literal(),
             _ => self.unexpected_token(),
         }
+    }
+
+    fn parse_template_literal(&mut self) -> Result<Expr<'src>> {
+        let mut span = self.current()?.span;
+        let mut fragments = vec![];
+        loop {
+            match self.current()?.kind {
+                T::TemplateLiteralFragment => {
+                    let tok = self.advance()?;
+                    fragments.push(TemplateLiteralFragment::Text(Text {
+                        text: tok.text,
+                        span: tok.span,
+                    }));
+                    if tok.text.ends_with("${") {
+                        self.lexer.start_template_literal_interpolation();
+                        let expr = self.parse_expr()?;
+                        fragments.push(TemplateLiteralFragment::Expr(expr));
+                        self.lexer.end_template_literal_interpolation();
+                    } else if tok.text.ends_with("`") {
+                        span.end_with(tok.span);
+                        break;
+                    }
+                }
+                _ => {
+                    return Err(Error::UnexpectedEOF(self.current_line()));
+                }
+            }
+        }
+        Ok(Expr::TemplateLiteral(span, fragments))
     }
 
     fn re_lex_regex(&mut self) -> Result<()> {
