@@ -43,6 +43,7 @@ const tokens = [
   "String",
   "Number",
   "Regex",
+  "TemplateLiteralFragment",
 
   "LBrace",
   "RBrace",

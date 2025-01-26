@@ -11,6 +11,7 @@ pub struct Lexer<'src> {
     start_offset: u32,
     input: CharIndices<'src>,
     regex_enabled: bool,
+    template_literal_interpolation: bool,
 }
 #[derive(Debug, Clone, Copy)]
 pub enum Error {
@@ -41,6 +42,7 @@ impl<'src> Lexer<'src> {
             source: input,
             input: input.char_indices(),
             regex_enabled: false,
+            template_literal_interpolation: false,
         }
     }
 
@@ -49,6 +51,14 @@ impl<'src> Lexer<'src> {
     }
     pub fn disable_regex(&mut self) {
         self.regex_enabled = false;
+    }
+
+    pub fn start_template_literal_interpolation(&mut self) {
+        self.template_literal_interpolation = true;
+    }
+
+    pub fn end_template_literal_interpolation(&mut self) {
+        self.template_literal_interpolation = false;
     }
 
     pub fn next_token(&mut self) -> Result<Token<'src>> {
@@ -62,6 +72,10 @@ impl<'src> Lexer<'src> {
         match self.current_char() {
             EOF_CHAR => Ok(self.make_token(TokenKind::EndOfFile)),
             '{' => self.lex_single_char_token(TokenKind::LBrace),
+            '}' if self.template_literal_interpolation => {
+                self.end_template_literal_interpolation();
+                self.lex_template_literal_post_interpolation()
+            }
             '}' => self.lex_single_char_token(TokenKind::RBrace),
             '(' => self.lex_single_char_token(TokenKind::LParen),
             ')' => self.lex_single_char_token(TokenKind::RParen),
@@ -97,6 +111,7 @@ impl<'src> Lexer<'src> {
             '/' => self.lex_single_char_token(TokenKind::Slash),
             '?' => self.lex_single_char_token(TokenKind::Question),
             '"' | '\'' => self.lex_simple_string(),
+            '`' => self.lex_template_literal_start(),
 
             _ if at!("<=") => self.lex_2_char_token(TokenKind::LessThanEq),
             '<' => self.lex_single_char_token(TokenKind::LessThan),
@@ -132,6 +147,112 @@ impl<'src> Lexer<'src> {
             c if c.is_numeric() => self.lex_number(),
             c => Err(Error::UnexpectedCharacter(self.line, c)),
         }
+    }
+
+    fn lex_template_literal_start(&mut self) -> Result<Token<'src>> {
+        assert_eq!(self.current_char(), '`');
+        self.advance();
+        loop {
+            match self.current_char() {
+                '\\' => {
+                    self.advance();
+                    if self.current_char() == 'u' {
+                        self.consume_unicode_escape()?;
+                    } else {
+                        self.advance();
+                    }
+                }
+
+                '`' => {
+                    self.advance();
+                    return Ok(self.make_token(TokenKind::TemplateLiteralFragment));
+                }
+                '$' if self.next_char() == '{' => {
+                    self.advance();
+                    self.advance();
+                    return Ok(self.make_token(TokenKind::TemplateLiteralFragment));
+                }
+                EOF_CHAR => {
+                    return Err(Error::UnexpectedEOF(self.line, '`'));
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+    }
+
+    fn lex_template_literal_post_interpolation(&mut self) -> Result<Token<'src>> {
+        assert_eq!(self.current_char(), '}');
+        self.advance();
+        loop {
+            match self.current_char() {
+                '\\' => {
+                    self.advance();
+                    if self.current_char() == 'u' {
+                        self.consume_unicode_escape()?;
+                    } else {
+                        self.advance();
+                    }
+                }
+                '`' => {
+                    self.advance();
+                    return Ok(self.make_token(TokenKind::TemplateLiteralFragment));
+                }
+                '$' if self.next_char() == '{' => {
+                    self.advance();
+                    self.advance();
+                    return Ok(self.make_token(TokenKind::TemplateLiteralFragment));
+                }
+                EOF_CHAR => {
+                    return Err(Error::UnexpectedEOF(self.line, '`'));
+                }
+                _ => {
+                    self.advance();
+                }
+            }
+        }
+    }
+
+    fn consume_unicode_escape(&mut self) -> Result<()> {
+        assert_eq!(self.current_char(), 'u');
+        self.advance();
+        if self.current_char() == '{' {
+            self.advance();
+            let start_offset = self.current_offset() as usize;
+            let mut end_offset = start_offset;
+            while self.current_char() != '}' && self.current_char() != EOF_CHAR {
+                let c = self.advance();
+                if !c.is_ascii_hexdigit() {
+                    return Err(Error::ExpectedAHexChar(self.line, c));
+                } else {
+                    end_offset = self.current_offset() as usize;
+                }
+            }
+            let hex_string = &self.source[start_offset..end_offset];
+            // between 0x0 and 0x10FFFF inclusive
+            match u64::from_str_radix(hex_string, 16) {
+                Ok(code_point) if code_point <= 0x10FFFF => {}
+                _ => {
+                    return Err(Error::Message(
+                        self.line,
+                        "Code point must be between 0x0 and 0x10FFFF inclusive",
+                    ));
+                }
+            }
+            let last = self.advance();
+            if last != '}' {
+                return Err(Error::UnexpectedEOF(self.line, '}'));
+            }
+        } else {
+            for _ in 0..4 {
+                let c = self.advance();
+                if !c.is_ascii_hexdigit() {
+                    return Err(Error::ExpectedAHexChar(self.line, c));
+                }
+            }
+        }
+        Ok(())
     }
 
     fn lex_hex_number(&mut self) -> Result<Token<'src>> {
