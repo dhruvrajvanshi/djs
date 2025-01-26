@@ -69,6 +69,7 @@ const EnumExpr = Enum(
 
   ["Super"],
   ["Class", Box("Class")],
+  ["TemplateLiteral", Vec("TemplateLiteralFragment")],
 );
 const StructClass = Struct(
   "Class",
@@ -182,6 +183,7 @@ const ast_items = [
     Expr,
   ]),
   Enum("ArrowFnBody", ["span"], [Expr, Box(Expr)], ["Block", "Block"]),
+  Enum("TemplateLiteralFragment", ["span"], ["Text", "Text"], ["Expr", Expr]),
   Enum(
     "Pattern",
     ["span"],
