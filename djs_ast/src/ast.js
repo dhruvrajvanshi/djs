@@ -243,6 +243,11 @@ const ast_items = [
     "NotEqEq",
     "In",
     "Instanceof",
+
+    // Shift
+    "LeftShift",
+    "RightShift",
+    "UnsignedRightShift",
   ),
   Enum(
     "AssignOp",

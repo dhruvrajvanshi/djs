@@ -1296,10 +1296,11 @@ impl<'src> Parser<'src> {
         T::LessThan | T::GreaterThan | T::LessThanEq | T::GreaterThanEq | T::In | T::Instanceof
     );
 
-    fn parse_shift_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
-        self.parse_additive_expr()
-    }
+    define_binop_parser!(
+        parse_shift_expr,
+        parse_additive_expr,
+        T::LessThanLessThan | T::GreaterThanGreaterThan | T::GreaterThanGreaterThanGreaterThan
+    );
 
     define_binop_parser!(
         parse_additive_expr,
@@ -1578,6 +1579,9 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
         T::VBar => BinOp::BitOr,
         T::Caret => BinOp::BitXor,
         T::Amp => BinOp::BitAnd,
+        T::LessThanLessThan => BinOp::LeftShift,
+        T::GreaterThanGreaterThan => BinOp::RightShift,
+        T::GreaterThanGreaterThanGreaterThan => BinOp::UnsignedRightShift,
 
         k => panic!("Invalid operator {k:?}"),
     }
