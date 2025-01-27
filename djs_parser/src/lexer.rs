@@ -365,6 +365,23 @@ impl<'src> Lexer<'src> {
         while (self.current_char().is_ascii_digit() || self.current_char() == '.') && !self.eof() {
             self.advance();
         }
+        let mut has_exponent_part = false;
+        if self.at("e") || self.at("E") {
+            has_exponent_part = true;
+            self.advance();
+            if self.at("+") || self.at("-") {
+                self.advance();
+            }
+            if !self.current_char().is_ascii_digit() {
+                return Err(Error::Message(
+                    self.line,
+                    "Expected a digit after the exponent",
+                ));
+            }
+            while self.current_char().is_ascii_digit() && !self.eof() {
+                self.advance();
+            }
+        }
         self.consume_optional('n');
         let text = self.current_text();
 
@@ -384,6 +401,12 @@ impl<'src> Lexer<'src> {
             return Err(Error::Message(
                 self.line,
                 "Invalid number literal: decimal points are not allowed in BigInt literals",
+            ));
+        }
+        if text.ends_with("n") && has_exponent_part {
+            return Err(Error::Message(
+                self.line,
+                "Invalid number literal: BigInt literals cannot have an exponent part",
             ));
         }
 
