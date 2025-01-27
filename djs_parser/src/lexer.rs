@@ -96,10 +96,12 @@ impl<'src> Lexer<'src> {
             _ if at!("+=") => self.lex_2_char_token(TokenKind::PlusEq),
             _ if at!("-=") => self.lex_2_char_token(TokenKind::MinusEq),
             _ if at!("<<=") => self.lex_3_char_token(TokenKind::LessThanLessThanEq),
+            _ if at!("<<") => self.lex_3_char_token(TokenKind::LessThanLessThan),
             _ if at!(">>=") => self.lex_3_char_token(TokenKind::GreaterThanGreaterThanEq),
             _ if at!(">>>=") => {
-                self.lex_3_char_token(TokenKind::GreaterThanGreaterThanGreaterThanEq)
+                self.lex_4_char_token(TokenKind::GreaterThanGreaterThanGreaterThanEq)
             }
+            _ if at!(">>>") => self.lex_3_char_token(TokenKind::GreaterThanGreaterThanGreaterThan),
             _ if at!("&=") => self.lex_2_char_token(TokenKind::AmpEq),
             _ if at!("^=") => self.lex_2_char_token(TokenKind::CaretEq),
             _ if at!("|=") => self.lex_2_char_token(TokenKind::BarEq),
@@ -343,6 +345,14 @@ impl<'src> Lexer<'src> {
     }
 
     fn lex_3_char_token(&mut self, kind: TokenKind) -> Result<Token<'src>> {
+        self.advance();
+        self.advance();
+        self.advance();
+        Ok(self.make_token(kind))
+    }
+
+    fn lex_4_char_token(&mut self, kind: TokenKind) -> Result<Token<'src>> {
+        self.advance();
         self.advance();
         self.advance();
         self.advance();
