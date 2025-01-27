@@ -29,11 +29,6 @@
 ../test262/test/built-ins/Array/prototype/flatMap/array-like-objects.js
 ../test262/test/built-ins/Array/prototype/flatMap/this-value-ctor-object-species-custom-ctor-poisoned-throws.js
 ../test262/test/built-ins/Array/prototype/flatMap/this-value-ctor-object-species-custom-ctor.js
-../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-10-1.js
-../test262/test/built-ins/Array/prototype/indexOf/15.4.4.14-4-10.js
-../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-3-15.js
-../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-4-10.js
-../test262/test/built-ins/Array/prototype/lastIndexOf/15.4.4.15-9-1.js
 ../test262/test/built-ins/Array/prototype/pop/clamps-to-integer-limit.js
 ../test262/test/built-ins/Array/prototype/pop/length-near-integer-limit.js
 ../test262/test/built-ins/Array/prototype/push/clamps-to-integer-limit.js
@@ -105,12 +100,6 @@
 ../test262/test/built-ins/Atomics/waitAsync/returns-result-object-value-is-string-timed-out.js
 ../test262/test/built-ins/Atomics/xor/expected-return-value.js
 ../test262/test/built-ins/BigInt/non-integer-rangeerror.js
-../test262/test/built-ins/Date/prototype/setFullYear/new-value-time-clip.js
-../test262/test/built-ins/Date/prototype/setHours/new-value-time-clip.js
-../test262/test/built-ins/Date/prototype/setMinutes/new-value-time-clip.js
-../test262/test/built-ins/Date/prototype/setMonth/new-value-time-clip.js
-../test262/test/built-ins/Date/prototype/setSeconds/new-value-time-clip.js
-../test262/test/built-ins/Date/prototype/setTime/new-value-time-clip.js
 ../test262/test/built-ins/Function/prototype/apply/get-index-abrupt.js
 ../test262/test/built-ins/Function/prototype/bind/instance-construct-newtarget-boundtarget-bound.js
 ../test262/test/built-ins/Function/prototype/bind/instance-construct-newtarget-boundtarget.js
@@ -156,31 +145,9 @@
 ../test262/test/built-ins/Iterator/prototype/take/underlying-iterator-advanced-in-parallel.js
 ../test262/test/built-ins/JSON/parse/reviver-forward-modifies-object.js
 ../test262/test/built-ins/Map/valid-keys.js
-../test262/test/built-ins/Math/atan2/S15.8.2.5_A14.js
-../test262/test/built-ins/Math/atan2/S15.8.2.5_A16.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A1.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A11.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A12.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A14.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A16.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A17.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A18.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A2.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A20.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A22.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A23.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A3.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A4.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A5.js
-../test262/test/built-ins/Math/pow/applying-the-exp-operator_A6.js
-../test262/test/built-ins/Math/sqrt/results.js
-../test262/test/built-ins/Math/sumPrecise/sum.js
 ../test262/test/built-ins/Math/trunc/Math.trunc_NegDecimal.js
 ../test262/test/built-ins/Math/trunc/Math.trunc_PosDecimal.js
-../test262/test/built-ins/Number/S9.3.1_A9.js
 ../test262/test/built-ins/Number/bigint-conversion.js
-../test262/test/built-ins/Number/prototype/toExponential/undefined-fractiondigits.js
-../test262/test/built-ins/Number/prototype/toPrecision/exponential.js
 ../test262/test/built-ins/Number/prototype/toString/numeric-literal-tostring-radix-1.js
 ../test262/test/built-ins/Number/prototype/toString/numeric-literal-tostring-radix-37.js
 ../test262/test/built-ins/Number/prototype/toString/numeric-literal-tostring-radix-poisoned.js
@@ -576,8 +543,6 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/round/precision-exact-in-balance-time-duration.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/precision-exact-in-round-duration.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/result-out-of-range.js
-../test262/test/built-ins/Temporal/Duration/prototype/round/roundingincrement-non-integer.js
-../test262/test/built-ins/Temporal/Duration/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-wrong-type.js
@@ -616,7 +581,6 @@
 ../test262/test/built-ins/Temporal/Instant/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Instant/large-bigint.js
 ../test262/test/built-ins/Temporal/Instant/prototype/add/minimum-maximum-instant.js
-../test262/test/built-ins/Temporal/Instant/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-expand.js
@@ -634,7 +598,6 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/round/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/largestunit-wrong-type.js
-../test262/test/built-ins/Temporal/Instant/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-wrong-type.js
@@ -650,7 +613,6 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/year-format.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/largestunit-wrong-type.js
-../test262/test/built-ins/Temporal/Instant/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-wrong-type.js
@@ -674,8 +636,6 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/order-of-operations.js
-../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement-non-integer.js
-../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-wrong-type.js
@@ -692,8 +652,6 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/order-of-operations.js
-../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement-non-integer.js
-../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-wrong-type.js
@@ -722,7 +680,6 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/throws-if-duration-days-too-large.js
-../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-halfexpand-is-default.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-invalid-string.js
@@ -734,8 +691,6 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/order-of-operations.js
-../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingincrement-non-integer.js
-../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-wrong-type.js
@@ -759,8 +714,6 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/order-of-operations.js
-../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingincrement-non-integer.js
-../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-wrong-type.js
@@ -800,7 +753,6 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/add/argument-duration-precision-exact-numerical-values.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/add/precision-exact-mathematical-values-2.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/add/subclassing-ignored.js
-../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-wrong-type.js
@@ -810,7 +762,6 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/largestunit-wrong-type.js
-../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-wrong-type.js
@@ -826,7 +777,6 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/largestunit-wrong-type.js
-../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-wrong-type.js
@@ -852,7 +802,6 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/order-of-operations.js
-../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-wrong-type.js
@@ -868,7 +817,6 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/order-of-operations.js
-../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-wrong-type.js
@@ -893,7 +841,6 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/hoursInDay/get-start-of-day-throws.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/get-start-of-day-throws.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/rounded-date-time-outside-valid-limits.js
-../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-expand.js
@@ -912,8 +859,6 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/order-of-operations.js
-../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingincrement-addition-out-of-range.js
-../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-wrong-type.js
@@ -939,8 +884,6 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-invalid-string.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/order-of-operations.js
-../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingincrement-addition-out-of-range.js
-../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-invalid-string.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-wrong-type.js
@@ -1037,7 +980,6 @@
 ../test262/test/intl402/Segmenter/constructor/constructor/options-localeMatcher-invalid.js
 ../test262/test/intl402/Segmenter/constructor/constructor/options-undefined.js
 ../test262/test/intl402/Segmenter/constructor/supportedLocalesOf/options-localeMatcher-invalid.js
-../test262/test/intl402/Segmenter/prototype/segment/containing/one-index.js
 ../test262/test/intl402/Segmenter/prototype/segment/segment-tostring.js
 ../test262/test/intl402/Temporal/Instant/prototype/toLocaleString/lone-options-accepted.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/toLocaleString/lone-options-accepted.js
@@ -1290,7 +1232,6 @@
 ../test262/test/language/comments/multi-line-asi-carriage-return.js
 ../test262/test/language/comments/multi-line-asi-line-separator.js
 ../test262/test/language/comments/multi-line-asi-paragraph-separator.js
-../test262/test/language/computed-property-names/object/property/number-duplicates.js
 ../test262/test/language/destructuring/binding/syntax/property-list-single-name-bindings.js
 ../test262/test/language/destructuring/binding/syntax/property-list-with-property-list.js
 ../test262/test/language/directive-prologue/10.1.1-2gs.js
@@ -1298,7 +1239,6 @@
 ../test262/test/language/directive-prologue/10.1.1-8gs.js
 ../test262/test/language/directive-prologue/14.1-4gs.js
 ../test262/test/language/directive-prologue/14.1-5gs.js
-../test262/test/language/expressions/addition/S11.6.1_A4_T8.js
 ../test262/test/language/expressions/arrow-function/array-destructuring-param-strict-body.js
 ../test262/test/language/expressions/arrow-function/dflt-params-duplicates.js
 ../test262/test/language/expressions/arrow-function/dflt-params-rest.js
@@ -1977,7 +1917,6 @@
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-coalesce.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-logical-and.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-logical-or.js
-../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-exponetiation-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-integer-separators.js
@@ -1985,7 +1924,6 @@
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-coalesce.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-logical-and.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-logical-or.js
-../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-exponetiation-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-integer-separators.js
@@ -4314,7 +4252,6 @@
 ../test262/test/language/expressions/delete/non-reference-return-true.js
 ../test262/test/language/expressions/division/no-magic-asi-from-block-eval.js
 ../test262/test/language/expressions/division/no-magic-asi.js
-../test262/test/language/expressions/does-not-equals/S11.9.2_A5.3.js
 ../test262/test/language/expressions/dynamic-import/assignment-expression/await-identifier.js
 ../test262/test/language/expressions/dynamic-import/assignment-expression/logical-and-expr.js
 ../test262/test/language/expressions/dynamic-import/assignment-expression/module-code-other_FIXTURE.js
@@ -4585,7 +4522,6 @@
 ../test262/test/language/expressions/dynamic-import/usage/syntax-nested-block-labeled-is-call-expression-square-brackets.js
 ../test262/test/language/expressions/dynamic-import/usage/syntax-nested-block-labeled-returns-thenable.js
 ../test262/test/language/expressions/dynamic-import/usage/syntax-nested-block-labeled-specifier-tostring.js
-../test262/test/language/expressions/equals/S11.9.1_A5.3.js
 ../test262/test/language/expressions/exponentiation/applying-the-exp-operator_A1.js
 ../test262/test/language/expressions/exponentiation/applying-the-exp-operator_A11.js
 ../test262/test/language/expressions/exponentiation/applying-the-exp-operator_A12.js
@@ -4864,7 +4800,6 @@
 ../test262/test/language/expressions/object/accessor-name-computed-yield-expr.js
 ../test262/test/language/expressions/object/accessor-name-computed-yield-id.js
 ../test262/test/language/expressions/object/accessor-name-literal-numeric-binary.js
-../test262/test/language/expressions/object/accessor-name-literal-numeric-exponent.js
 ../test262/test/language/expressions/object/accessor-name-literal-numeric-leading-decimal.js
 ../test262/test/language/expressions/object/covered-ident-name-prop-name-literal-break-escaped.js
 ../test262/test/language/expressions/object/covered-ident-name-prop-name-literal-case-escaped.js
@@ -4912,7 +4847,6 @@
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-coalesce.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-logical-and.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-logical-or.js
-../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-exponetiation-expression.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-integer-separators.js
@@ -5285,7 +5219,6 @@
 ../test262/test/language/expressions/right-shift/bigint-wrapped-values.js
 ../test262/test/language/expressions/right-shift/bigint.js
 ../test262/test/language/expressions/right-shift/order-of-evaluation.js
-../test262/test/language/expressions/subtraction/S11.6.2_A4_T8.js
 ../test262/test/language/expressions/super/call-construct-invocation.js
 ../test262/test/language/expressions/super/call-spread-err-mult-err-expr-throws.js
 ../test262/test/language/expressions/super/call-spread-err-mult-err-iter-get-value.js
@@ -5595,14 +5528,6 @@
 ../test262/test/language/line-terminators/invalid-regexp-ps.js
 ../test262/test/language/line-terminators/invalid-string-cr.js
 ../test262/test/language/line-terminators/invalid-string-lf.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T1.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T2.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T3.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T4.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T5.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T6.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T7.js
-../test262/test/language/literals/numeric/S7.8.3_A1.2_T8.js
 ../test262/test/language/literals/numeric/S7.8.3_A2.1_T1.js
 ../test262/test/language/literals/numeric/S7.8.3_A2.1_T2.js
 ../test262/test/language/literals/numeric/S7.8.3_A2.1_T3.js
@@ -5614,30 +5539,6 @@
 ../test262/test/language/literals/numeric/S7.8.3_A2.2_T6.js
 ../test262/test/language/literals/numeric/S7.8.3_A2.2_T7.js
 ../test262/test/language/literals/numeric/S7.8.3_A2.2_T8.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T1.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T2.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T3.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T4.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T5.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T6.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T7.js
-../test262/test/language/literals/numeric/S7.8.3_A3.3_T8.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T1.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T2.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T3.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T4.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T5.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T6.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T7.js
-../test262/test/language/literals/numeric/S7.8.3_A3.4_T8.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T1.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T2.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T3.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T4.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T5.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T6.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T7.js
-../test262/test/language/literals/numeric/S7.8.3_A4.2_T8.js
 ../test262/test/language/literals/numeric/S7.8.3_A5.1_T2.js
 ../test262/test/language/literals/numeric/S7.8.3_A5.1_T4.js
 ../test262/test/language/literals/numeric/S7.8.3_A5.1_T6.js
@@ -6346,7 +6247,6 @@
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-coalesce.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-logical-and.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-logical-or.js
-../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-exponetiation-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-integer-separators.js
@@ -6354,7 +6254,6 @@
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-coalesce.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-logical-and.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-logical-or.js
-../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-exponetiation-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-integer-separators.js
@@ -10136,8 +10035,6 @@
 ../test262/test/language/statements/for-of/dstr/obj-prop-put-prop-ref-no-get.js
 ../test262/test/language/statements/for-of/dstr/obj-prop-put-prop-ref-user-err.js
 ../test262/test/language/statements/for-of/dstr/obj-prop-put-prop-ref.js
-../test262/test/language/statements/for-of/dstr/obj-rest-non-string-computed-property-1e0.js
-../test262/test/language/statements/for-of/dstr/obj-rest-non-string-computed-property-array-1e0.js
 ../test262/test/language/statements/for-of/dstr/obj-rest-to-property-with-setter.js
 ../test262/test/language/statements/for-of/dstr/obj-rest-to-property.js
 ../test262/test/language/statements/for-of/dstr/var-ary-ptrn-elem-ary-elision-init.js
@@ -10569,10 +10466,6 @@
 ../test262/test/language/statements/with/strict-fn-method.js
 ../test262/test/language/statements/with/strict-script.js
 ../test262/test/language/types/null/S8.2_A2.js
-../test262/test/language/types/number/8.5.1.js
-../test262/test/language/types/number/S8.5_A13_T2.js
-../test262/test/language/types/number/S8.5_A14_T1.js
-../test262/test/language/types/number/S8.5_A14_T2.js
 ../test262/test/language/types/reference/put-value-prop-base-primitive.js
 ../test262/test/language/types/string/S8.4_A5.js
 ../test262/test/language/white-space/after-regular-expression-literal-zwnbsp.js
