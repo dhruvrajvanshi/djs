@@ -144,8 +144,8 @@ impl<'src> Lexer<'src> {
 
             '^' => self.lex_single_char_token(TokenKind::Caret),
 
-            _ if at!("0x") => self.lex_hex_number(),
-            _ if at!("0o") => self.lex_octal_number(),
+            _ if at!("0x") || at!("0X") => self.lex_hex_number(),
+            _ if at!("0o") || at!("0O") => self.lex_octal_number(),
             c if c.is_ascii_digit() => self.lex_number(),
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c => Err(Error::UnexpectedCharacter(self.line, c)),
@@ -267,7 +267,7 @@ impl<'src> Lexer<'src> {
 
     fn lex_hex_number(&mut self) -> Result<Token<'src>> {
         assert_eq!(self.current_char(), '0');
-        assert_eq!(self.next_char(), 'x');
+        assert!(matches!(self.next_char(), 'x' | 'X'));
         self.advance();
         self.advance();
         if !self.current_char().is_ascii_hexdigit() {
@@ -282,7 +282,7 @@ impl<'src> Lexer<'src> {
 
     fn lex_octal_number(&mut self) -> Result<Token<'src>> {
         assert_eq!(self.current_char(), '0');
-        assert_eq!(self.next_char(), 'o');
+        assert!(matches!(self.next_char(), 'o' | 'O'));
         self.advance();
         self.advance();
         if !is_octal_digit(self.current_char()) {
