@@ -32725,9 +32725,13 @@
 ../test262/test/language/literals/numeric/S7.8.3_A4.2_T7.js
 ../test262/test/language/literals/numeric/S7.8.3_A4.2_T8.js
 ../test262/test/language/literals/numeric/S7.8.3_A5.1_T1.js
+../test262/test/language/literals/numeric/S7.8.3_A5.1_T2.js
 ../test262/test/language/literals/numeric/S7.8.3_A5.1_T3.js
+../test262/test/language/literals/numeric/S7.8.3_A5.1_T4.js
 ../test262/test/language/literals/numeric/S7.8.3_A5.1_T5.js
+../test262/test/language/literals/numeric/S7.8.3_A5.1_T6.js
 ../test262/test/language/literals/numeric/S7.8.3_A5.1_T7.js
+../test262/test/language/literals/numeric/S7.8.3_A5.1_T8.js
 ../test262/test/language/literals/numeric/S7.8.3_A6.1_T1.js
 ../test262/test/language/literals/numeric/S7.8.3_A6.1_T2.js
 ../test262/test/language/literals/numeric/S7.8.3_A6.2_T1.js
