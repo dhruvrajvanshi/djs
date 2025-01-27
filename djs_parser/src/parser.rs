@@ -1888,19 +1888,22 @@ mod tests {
     }
 
     fn syntax_error_expected(s: &str) -> bool {
-        let Some(frontmatter_start) = s.find("/*---") else {
-            return false;
-        };
-        let Some(frontmatter_end) = s.find("---*/") else {
-            return false;
-        };
-        let substr = &s[frontmatter_start..frontmatter_end];
-        let is_negative = substr.contains("negative:");
+        let frontmatter = frontmatter(s);
+        let is_negative = frontmatter.contains("negative:");
         //  phase: parse
         //  type: SyntaxError
         let syntax_error_expected =
-            substr.contains("phase: parse") && substr.contains("type: SyntaxError");
+            frontmatter.contains("phase: parse") && frontmatter.contains("type: SyntaxError");
         is_negative && syntax_error_expected
+    }
+    fn frontmatter(s: &str) -> &str {
+        let Some(frontmatter_start) = s.find("/*---") else {
+            return "";
+        };
+        let Some(frontmatter_end) = s.find("---*/") else {
+            return "";
+        };
+        &s[frontmatter_start..frontmatter_end]
     }
 
     #[test]
