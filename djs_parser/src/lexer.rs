@@ -157,8 +157,8 @@ impl<'src> Lexer<'src> {
             match self.current_char() {
                 '\\' => {
                     self.advance();
-                    if self.current_char() == 'u' {
-                        self.consume_unicode_escape()?;
+                    if self.current_char() == 'u' || self.current_char() == 'x' {
+                        self.consume_unicode_or_hex_escape()?;
                     } else {
                         self.advance();
                     }
@@ -190,8 +190,8 @@ impl<'src> Lexer<'src> {
             match self.current_char() {
                 '\\' => {
                     self.advance();
-                    if self.current_char() == 'u' {
-                        self.consume_unicode_escape()?;
+                    if matches!(self.current_char(), 'u' | 'x') {
+                        self.consume_unicode_or_hex_escape()?;
                     } else {
                         self.advance();
                     }
@@ -215,10 +215,10 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    fn consume_unicode_escape(&mut self) -> Result<()> {
-        assert_eq!(self.current_char(), 'u');
-        self.advance();
-        if self.current_char() == '{' {
+    fn consume_unicode_or_hex_escape(&mut self) -> Result<()> {
+        assert!(matches!(self.current_char(), 'u' | 'x'));
+        let first = self.advance();
+        if first == 'u' && self.current_char() == '{' {
             self.advance();
             let start_offset = self.current_offset() as usize;
             let mut end_offset = start_offset;
@@ -245,8 +245,15 @@ impl<'src> Lexer<'src> {
             if last != '}' {
                 return Err(Error::UnexpectedEOF(self.line, '}'));
             }
-        } else {
+        } else if first == 'u' {
             for _ in 0..4 {
+                let c = self.advance();
+                if !c.is_ascii_hexdigit() {
+                    return Err(Error::ExpectedAHexChar(self.line, c));
+                }
+            }
+        } else if first == 'x' {
+            for _ in 0..2 {
                 let c = self.advance();
                 if !c.is_ascii_hexdigit() {
                     return Err(Error::ExpectedAHexChar(self.line, c));
@@ -389,24 +396,8 @@ impl<'src> Lexer<'src> {
         while self.current_char() != EOF_CHAR && self.current_char() != quote {
             let c = self.advance();
             if c == '\\' {
-                if self.current_char() == 'u' {
-                    // https://tc39.es/ecma262/#prod-UnicodeEscapeSequence
-                    self.advance();
-                    if self.current_char() == '{' {
-                        while !matches!(self.current_char(), '}' | EOF_CHAR) {
-                            let c = self.advance();
-                            if !c.is_ascii_hexdigit() {
-                                return Err(Error::ExpectedAHexChar(self.line, c));
-                            }
-                        }
-                    } else {
-                        for _ in 0..4 {
-                            let c = self.advance();
-                            if !c.is_ascii_hexdigit() {
-                                return Err(Error::ExpectedAHexChar(self.line, c));
-                            }
-                        }
-                    }
+                if self.current_char() == 'u' || self.current_char() == 'x' {
+                    self.consume_unicode_or_hex_escape()?;
                 } else if !matches!(
                     self.current_char(),
                     // https://tc39.es/ecma262/#prod-SingleEscapeCharacter
