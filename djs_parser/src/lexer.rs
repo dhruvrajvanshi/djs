@@ -146,6 +146,7 @@ impl<'src> Lexer<'src> {
 
             _ if at!("0x") || at!("0X") => self.lex_hex_number(),
             _ if at!("0o") || at!("0O") => self.lex_octal_number(),
+            _ if at!("0b") || at!("0b") => self.lex_binary_number(),
             c if c.is_ascii_digit() => self.lex_number(),
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
             c => Err(Error::UnexpectedCharacter(self.line, c)),
@@ -289,6 +290,21 @@ impl<'src> Lexer<'src> {
             return Err(Error::ExpectedAHexChar(self.line, self.current_char()));
         }
         while is_octal_digit(self.current_char()) && self.current_char() != EOF_CHAR {
+            self.advance();
+        }
+        self.consume_optional('n');
+        Ok(self.make_token(TokenKind::Number))
+    }
+
+    fn lex_binary_number(&mut self) -> Result<Token<'src>> {
+        assert_eq!(self.current_char(), '0');
+        assert!(matches!(self.next_char(), 'b' | 'B'));
+        self.advance();
+        self.advance();
+        if !is_binary_digit(self.current_char()) {
+            return Err(Error::Message(self.line, "Expected 0 or 1"));
+        }
+        while is_binary_digit(self.current_char()) && self.current_char() != EOF_CHAR {
             self.advance();
         }
         self.consume_optional('n');
@@ -585,6 +601,10 @@ fn is_valid_regex_flag(c: char) -> bool {
 
 fn is_octal_digit(c: char) -> bool {
     matches!(c, '0'..='7')
+}
+
+fn is_binary_digit(c: char) -> bool {
+    matches!(c, '0' | '1')
 }
 
 #[cfg(test)]
