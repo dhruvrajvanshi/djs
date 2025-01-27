@@ -146,7 +146,7 @@ const ast_items = [
     "TryStmt",
     ["span"],
     ["try_block", "Block"],
-    ["catch_name", Option("Ident")],
+    ["catch_pattern", Option("Pattern")],
     ["catch_block", Option("Block")],
     ["finally_block", Option("Block")],
   ),
