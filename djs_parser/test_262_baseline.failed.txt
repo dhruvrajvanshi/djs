@@ -66,14 +66,6 @@
 ../test262/test/built-ins/AsyncFromSyncIteratorPrototype/return/absent-value-not-passed.js
 ../test262/test/built-ins/AsyncFromSyncIteratorPrototype/return/return-null.js
 ../test262/test/built-ins/AsyncGeneratorPrototype/return/return-suspendedYield-broken-promise-try-catch.js
-../test262/test/built-ins/Atomics/add/expected-return-value.js
-../test262/test/built-ins/Atomics/and/expected-return-value.js
-../test262/test/built-ins/Atomics/compareExchange/expected-return-value.js
-../test262/test/built-ins/Atomics/exchange/expected-return-value.js
-../test262/test/built-ins/Atomics/load/expected-return-value.js
-../test262/test/built-ins/Atomics/or/expected-return-value.js
-../test262/test/built-ins/Atomics/store/expected-return-value.js
-../test262/test/built-ins/Atomics/sub/expected-return-value.js
 ../test262/test/built-ins/Atomics/waitAsync/bigint/false-for-timeout-agent.js
 ../test262/test/built-ins/Atomics/waitAsync/bigint/nan-for-timeout-agent.js
 ../test262/test/built-ins/Atomics/waitAsync/bigint/negative-timeout-agent.js
@@ -98,7 +90,6 @@
 ../test262/test/built-ins/Atomics/waitAsync/returns-result-object-value-is-promise-resolves-to-ok.js
 ../test262/test/built-ins/Atomics/waitAsync/returns-result-object-value-is-string-not-equal.js
 ../test262/test/built-ins/Atomics/waitAsync/returns-result-object-value-is-string-timed-out.js
-../test262/test/built-ins/Atomics/xor/expected-return-value.js
 ../test262/test/built-ins/BigInt/non-integer-rangeerror.js
 ../test262/test/built-ins/Function/prototype/apply/get-index-abrupt.js
 ../test262/test/built-ins/Function/prototype/bind/instance-construct-newtarget-boundtarget-bound.js
@@ -1812,7 +1803,6 @@
 ../test262/test/language/expressions/await/await-in-nested-function.js
 ../test262/test/language/expressions/await/await-in-nested-generator.js
 ../test262/test/language/expressions/await/for-await-of-interleaved.js
-../test262/test/language/expressions/bitwise-and/bigint-non-primitive.js
 ../test262/test/language/expressions/bitwise-not/S11.4.8_A2.1_T1.js
 ../test262/test/language/expressions/bitwise-not/S11.4.8_A2.1_T2.js
 ../test262/test/language/expressions/bitwise-not/S11.4.8_A2.2_T1.js
@@ -1828,8 +1818,6 @@
 ../test262/test/language/expressions/bitwise-not/S9.5_A3.2_T2.js
 ../test262/test/language/expressions/bitwise-not/bigint-non-primitive.js
 ../test262/test/language/expressions/bitwise-not/bigint.js
-../test262/test/language/expressions/bitwise-or/bigint-non-primitive.js
-../test262/test/language/expressions/bitwise-xor/bigint-non-primitive.js
 ../test262/test/language/expressions/call/eval-spread-empty-leading.js
 ../test262/test/language/expressions/call/eval-spread-empty-trailing.js
 ../test262/test/language/expressions/call/eval-spread-empty.js
@@ -4694,7 +4682,6 @@
 ../test262/test/language/expressions/in/private-field-rhs-yield-present.js
 ../test262/test/language/expressions/in/rhs-yield-absent-non-strict.js
 ../test262/test/language/expressions/in/rhs-yield-present.js
-../test262/test/language/expressions/left-shift/bigint-non-primitive.js
 ../test262/test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-and.js
 ../test262/test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-nullish.js
 ../test262/test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-or.js
@@ -4799,7 +4786,6 @@
 ../test262/test/language/expressions/object/__proto__-duplicate.js
 ../test262/test/language/expressions/object/accessor-name-computed-yield-expr.js
 ../test262/test/language/expressions/object/accessor-name-computed-yield-id.js
-../test262/test/language/expressions/object/accessor-name-literal-numeric-binary.js
 ../test262/test/language/expressions/object/accessor-name-literal-numeric-leading-decimal.js
 ../test262/test/language/expressions/object/covered-ident-name-prop-name-literal-break-escaped.js
 ../test262/test/language/expressions/object/covered-ident-name-prop-name-literal-case-escaped.js
@@ -5292,7 +5278,6 @@
 ../test262/test/language/expressions/template-literal/tv-utf16-escape-sequence.js
 ../test262/test/language/expressions/template-literal/tv-zwnbsp.js
 ../test262/test/language/expressions/this/S11.1.1_A1.js
-../test262/test/language/expressions/unsigned-right-shift/bigint-non-primitive.js
 ../test262/test/language/expressions/yield/in-iteration-stmt.js
 ../test262/test/language/expressions/yield/iter-value-specified.js
 ../test262/test/language/expressions/yield/iter-value-unspecified.js
