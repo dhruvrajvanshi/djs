@@ -81,6 +81,10 @@ const tokens = [
   "Star",
   "Slash",
 
+  "LessThanLessThan",
+  "GreaterThanGreaterThan",
+  "GreaterThanGreaterThanGreaterThan",
+
   "AmpAmpEq",
   "BarBarEq",
   "QuestionQuestionEq",
