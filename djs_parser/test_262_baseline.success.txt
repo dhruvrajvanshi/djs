@@ -4498,6 +4498,7 @@
 ../test262/test/built-ins/Atomics/add/bigint/good-views.js
 ../test262/test/built-ins/Atomics/add/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/add/descriptor.js
+../test262/test/built-ins/Atomics/add/expected-return-value.js
 ../test262/test/built-ins/Atomics/add/good-views.js
 ../test262/test/built-ins/Atomics/add/length.js
 ../test262/test/built-ins/Atomics/add/name.js
@@ -4512,6 +4513,7 @@
 ../test262/test/built-ins/Atomics/and/bigint/good-views.js
 ../test262/test/built-ins/Atomics/and/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/and/descriptor.js
+../test262/test/built-ins/Atomics/and/expected-return-value.js
 ../test262/test/built-ins/Atomics/and/good-views.js
 ../test262/test/built-ins/Atomics/and/length.js
 ../test262/test/built-ins/Atomics/and/name.js
@@ -4526,6 +4528,7 @@
 ../test262/test/built-ins/Atomics/compareExchange/bigint/good-views.js
 ../test262/test/built-ins/Atomics/compareExchange/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/compareExchange/descriptor.js
+../test262/test/built-ins/Atomics/compareExchange/expected-return-value.js
 ../test262/test/built-ins/Atomics/compareExchange/good-views.js
 ../test262/test/built-ins/Atomics/compareExchange/length.js
 ../test262/test/built-ins/Atomics/compareExchange/name.js
@@ -4541,6 +4544,7 @@
 ../test262/test/built-ins/Atomics/exchange/bigint/good-views.js
 ../test262/test/built-ins/Atomics/exchange/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/exchange/descriptor.js
+../test262/test/built-ins/Atomics/exchange/expected-return-value.js
 ../test262/test/built-ins/Atomics/exchange/good-views.js
 ../test262/test/built-ins/Atomics/exchange/length.js
 ../test262/test/built-ins/Atomics/exchange/name.js
@@ -4563,6 +4567,7 @@
 ../test262/test/built-ins/Atomics/load/bigint/good-views.js
 ../test262/test/built-ins/Atomics/load/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/load/descriptor.js
+../test262/test/built-ins/Atomics/load/expected-return-value.js
 ../test262/test/built-ins/Atomics/load/good-views.js
 ../test262/test/built-ins/Atomics/load/length.js
 ../test262/test/built-ins/Atomics/load/name.js
@@ -4623,6 +4628,7 @@
 ../test262/test/built-ins/Atomics/or/bigint/good-views.js
 ../test262/test/built-ins/Atomics/or/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/or/descriptor.js
+../test262/test/built-ins/Atomics/or/expected-return-value.js
 ../test262/test/built-ins/Atomics/or/good-views.js
 ../test262/test/built-ins/Atomics/or/length.js
 ../test262/test/built-ins/Atomics/or/name.js
@@ -4646,6 +4652,7 @@
 ../test262/test/built-ins/Atomics/store/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/store/descriptor.js
 ../test262/test/built-ins/Atomics/store/expected-return-value-negative-zero.js
+../test262/test/built-ins/Atomics/store/expected-return-value.js
 ../test262/test/built-ins/Atomics/store/good-views.js
 ../test262/test/built-ins/Atomics/store/length.js
 ../test262/test/built-ins/Atomics/store/name.js
@@ -4660,6 +4667,7 @@
 ../test262/test/built-ins/Atomics/sub/bigint/good-views.js
 ../test262/test/built-ins/Atomics/sub/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/sub/descriptor.js
+../test262/test/built-ins/Atomics/sub/expected-return-value.js
 ../test262/test/built-ins/Atomics/sub/good-views.js
 ../test262/test/built-ins/Atomics/sub/length.js
 ../test262/test/built-ins/Atomics/sub/name.js
@@ -4826,6 +4834,7 @@
 ../test262/test/built-ins/Atomics/xor/bigint/good-views.js
 ../test262/test/built-ins/Atomics/xor/bigint/non-shared-bufferdata.js
 ../test262/test/built-ins/Atomics/xor/descriptor.js
+../test262/test/built-ins/Atomics/xor/expected-return-value.js
 ../test262/test/built-ins/Atomics/xor/good-views.js
 ../test262/test/built-ins/Atomics/xor/length.js
 ../test262/test/built-ins/Atomics/xor/name.js
@@ -26692,6 +26701,7 @@
 ../test262/test/language/expressions/bitwise-and/S11.10.1_A3_T2.9.js
 ../test262/test/language/expressions/bitwise-and/bigint-and-number.js
 ../test262/test/language/expressions/bitwise-and/bigint-errors.js
+../test262/test/language/expressions/bitwise-and/bigint-non-primitive.js
 ../test262/test/language/expressions/bitwise-and/bigint-toprimitive.js
 ../test262/test/language/expressions/bitwise-and/bigint-wrapped-values.js
 ../test262/test/language/expressions/bitwise-and/bigint.js
@@ -26722,6 +26732,7 @@
 ../test262/test/language/expressions/bitwise-or/S11.10.3_A3_T2.9.js
 ../test262/test/language/expressions/bitwise-or/bigint-and-number.js
 ../test262/test/language/expressions/bitwise-or/bigint-errors.js
+../test262/test/language/expressions/bitwise-or/bigint-non-primitive.js
 ../test262/test/language/expressions/bitwise-or/bigint-toprimitive.js
 ../test262/test/language/expressions/bitwise-or/bigint-wrapped-values.js
 ../test262/test/language/expressions/bitwise-or/bigint.js
@@ -26751,6 +26762,7 @@
 ../test262/test/language/expressions/bitwise-xor/S11.10.2_A3_T2.9.js
 ../test262/test/language/expressions/bitwise-xor/bigint-and-number.js
 ../test262/test/language/expressions/bitwise-xor/bigint-errors.js
+../test262/test/language/expressions/bitwise-xor/bigint-non-primitive.js
 ../test262/test/language/expressions/bitwise-xor/bigint-toprimitive.js
 ../test262/test/language/expressions/bitwise-xor/bigint-wrapped-values.js
 ../test262/test/language/expressions/bitwise-xor/bigint.js
@@ -30449,6 +30461,7 @@
 ../test262/test/language/expressions/left-shift/S9.5_A3.2_T1.js
 ../test262/test/language/expressions/left-shift/bigint-and-number.js
 ../test262/test/language/expressions/left-shift/bigint-errors.js
+../test262/test/language/expressions/left-shift/bigint-non-primitive.js
 ../test262/test/language/expressions/left-shift/bigint-toprimitive.js
 ../test262/test/language/expressions/left-shift/bigint-wrapped-values.js
 ../test262/test/language/expressions/left-shift/bigint.js
@@ -30766,6 +30779,7 @@
 ../test262/test/language/expressions/object/accessor-name-computed-err-unresolvable.js
 ../test262/test/language/expressions/object/accessor-name-computed-in.js
 ../test262/test/language/expressions/object/accessor-name-computed.js
+../test262/test/language/expressions/object/accessor-name-literal-numeric-binary.js
 ../test262/test/language/expressions/object/accessor-name-literal-numeric-exponent.js
 ../test262/test/language/expressions/object/accessor-name-literal-numeric-hex.js
 ../test262/test/language/expressions/object/accessor-name-literal-numeric-non-canonical.js
@@ -32014,6 +32028,7 @@
 ../test262/test/language/expressions/unsigned-right-shift/S9.6_A3.2_T1.js
 ../test262/test/language/expressions/unsigned-right-shift/bigint-and-number.js
 ../test262/test/language/expressions/unsigned-right-shift/bigint-errors.js
+../test262/test/language/expressions/unsigned-right-shift/bigint-non-primitive.js
 ../test262/test/language/expressions/unsigned-right-shift/bigint-toprimitive.js
 ../test262/test/language/expressions/unsigned-right-shift/bigint-wrapped-values.js
 ../test262/test/language/expressions/unsigned-right-shift/bigint.js
