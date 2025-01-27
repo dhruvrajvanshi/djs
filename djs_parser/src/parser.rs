@@ -415,11 +415,11 @@ impl<'src> Parser<'src> {
     fn parse_try_stmt(&mut self) -> Result<Stmt<'src>> {
         let start = self.expect(T::Try)?;
         let try_block = self.parse_block()?;
-        let (catch_name, catch_block) = if self.current()?.kind == T::Catch {
+        let (catch_pattern, catch_block) = if self.current()?.kind == T::Catch {
             self.advance()?;
             if self.current()?.kind == T::LParen {
                 self.advance()?;
-                let name = self.parse_ident()?;
+                let name = self.parse_pattern()?;
                 self.expect(T::RParen)?;
                 let block = self.parse_block()?;
                 (Some(name), Some(block))
@@ -445,7 +445,7 @@ impl<'src> Parser<'src> {
         Ok(Stmt::Try(Box::new(TryStmt {
             span,
             try_block,
-            catch_name,
+            catch_pattern,
             catch_block,
             finally_block,
         })))
@@ -1916,12 +1916,12 @@ mod tests {
         };
         let TryStmt {
             try_block,
-            catch_name,
+            catch_pattern,
             catch_block,
             finally_block,
             ..
         } = *try_stmt;
-        assert!(matches!(catch_name, Some(..)));
+        assert!(matches!(catch_pattern, Some(..)));
         assert!(matches!(catch_block, Some(..)));
         assert!(matches!(finally_block, Some(..)));
         let Block { stmts, .. } = try_block;
