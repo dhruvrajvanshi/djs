@@ -143,8 +143,9 @@ impl<'src> Lexer<'src> {
             '^' => self.lex_single_char_token(TokenKind::Caret),
 
             _ if at!("0x") => self.lex_hex_number(),
+            _ if at!("0o") => self.lex_octal_number(),
+            c if c.is_ascii_digit() => self.lex_number(),
             c if is_identifier_start(c) => Ok(self.lex_ident_or_keyword()),
-            c if c.is_numeric() => self.lex_number(),
             c => Err(Error::UnexpectedCharacter(self.line, c)),
         }
     }
@@ -266,6 +267,22 @@ impl<'src> Lexer<'src> {
         while self.current_char().is_ascii_hexdigit() && self.current_char() != EOF_CHAR {
             self.advance();
         }
+        self.consume_optional('n');
+        Ok(self.make_token(TokenKind::Number))
+    }
+
+    fn lex_octal_number(&mut self) -> Result<Token<'src>> {
+        assert_eq!(self.current_char(), '0');
+        assert_eq!(self.next_char(), 'o');
+        self.advance();
+        self.advance();
+        if !is_octal_digit(self.current_char()) {
+            return Err(Error::ExpectedAHexChar(self.line, self.current_char()));
+        }
+        while is_octal_digit(self.current_char()) && self.current_char() != EOF_CHAR {
+            self.advance();
+        }
+        self.consume_optional('n');
         Ok(self.make_token(TokenKind::Number))
     }
 
@@ -327,11 +344,39 @@ impl<'src> Lexer<'src> {
 
     fn lex_number(&mut self) -> Result<Token<'src>> {
         let start = self.advance();
-        assert!(start.is_numeric());
-        while (self.current_char().is_numeric() || self.current_char() == '.') && !self.eof() {
+        assert!(start.is_ascii_digit());
+        while (self.current_char().is_ascii_digit() || self.current_char() == '.') && !self.eof() {
             self.advance();
         }
+        self.consume_optional('n');
+        let text = self.current_text();
+
+        let mut chars = text.chars();
+        let first = chars.next();
+        let second = chars.next();
+        match (first, second) {
+            (Some('0'), Some(c)) if c.is_numeric() => {
+                return Err(Error::Message(
+                    self.line,
+                    "Invalid number literal: leading 0s are not allowed; If you want to use an octal literal, use a 0o prefix.",
+                ));
+            }
+            _ => {}
+        }
+        if text.ends_with("n") && text.contains(".") {
+            return Err(Error::Message(
+                self.line,
+                "Invalid number literal: decimal points are not allowed in BigInt literals",
+            ));
+        }
+
         Ok(self.make_token(TokenKind::Number))
+    }
+
+    fn consume_optional(&mut self, expected: char) {
+        if self.current_char() == expected {
+            self.advance();
+        }
     }
 
     fn eof(&self) -> bool {
@@ -512,6 +557,10 @@ fn is_line_terminator(c: char) -> bool {
 fn is_valid_regex_flag(c: char) -> bool {
     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags
     matches!(c, 'd' | 'g' | 'i' | 'm' | 's' | 'u' | 'v' | 'y')
+}
+
+fn is_octal_digit(c: char) -> bool {
+    matches!(c, '0'..='7')
 }
 
 #[cfg(test)]
