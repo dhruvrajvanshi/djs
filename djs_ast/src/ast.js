@@ -1,13 +1,32 @@
 /**
- * {@link EnumStmt}
+ * {@link DStmt}
  */
 const Stmt = "Stmt";
 /**
- * {@link EnumExpr}
+ * {@link DExpr}
  */
 const Expr = "Expr";
 
-const EnumStmt = Enum(
+/**
+ * {@link DIdent}
+ */
+const Ident = "Ident";
+const DIdent = Struct(Ident, ["span"], ["text", "str"]);
+
+/**
+ * {@link DPattern}
+ */
+const Pattern = "Pattern";
+const DPattern = Enum(
+  Pattern,
+  ["span"],
+  ["Var", Ident],
+  ["Assignment", Box(Pattern), Box(Expr)],
+  ["Array", Vec(Option(Pattern))],
+  ["Object", "ObjectPattern"],
+  ["Rest", Box(Pattern)],
+);
+const DStmt = Enum(
   Stmt,
   ["span"],
   [Expr, Box(Expr)],
@@ -30,16 +49,16 @@ const EnumStmt = Enum(
   ["Empty"],
 );
 
-const EnumExpr = Enum(
+const DExpr = Enum(
   Expr,
   ["span"],
-  ["Var", "Ident"],
+  ["Var", Ident],
   ["BinOp", Box(Expr), "BinOp", Box(Expr)],
   ["ArrowFn", "ParamList", "ArrowFnBody"],
   ["Function", "Function"],
   ["Call", Box(Expr), Vec(Expr)],
   ["Index", Box(Expr), Box(Expr)],
-  ["Prop", Box(Expr), "Ident"],
+  ["Prop", Box(Expr), Ident],
   ["String", "Text"],
   ["Number", "Text"],
   ["Boolean", "bool"],
@@ -74,7 +93,7 @@ const EnumExpr = Enum(
 const StructClass = Struct(
   "Class",
   ["span"],
-  ["name", Option("Ident")],
+  ["name", Option(Ident)],
   ["superclass", Option(Expr)],
   ["body", "ClassBody"],
 );
@@ -92,7 +111,7 @@ const EnumClassMember = Enum(
 const StructFieldDef = Struct(
   "FieldDef",
   ["span"],
-  ["name", "Ident"],
+  ["name", Ident],
   ["initializer", Option(Expr)],
 );
 const StructMethodDef = Struct(
@@ -104,21 +123,22 @@ const StructMethodDef = Struct(
 );
 const ast_items = [
   Struct("SourceFile", ["span"], ["stmts", Vec(Stmt)]),
-  Struct("Ident", ["span"], ["text", "str"]),
   Struct("Text", ["span"], ["text", "str"]),
   Struct("Label", ["span"], ["name", "str"]),
-  EnumStmt,
+  DStmt,
   StructClass,
   StructBody,
   StructMethodDef,
   EnumClassMember,
   StructFieldDef,
+  DIdent,
+  DPattern,
   Struct("SwitchCase", ["span"], ["test", Option(Expr)], ["body", Vec(Stmt)]),
   Struct(
     "ForInOrOf",
     ["span"],
     ["decl_type", Option("DeclType")], // None for `for (x of y) {}`
-    ["lhs", "Pattern"],
+    ["lhs", Pattern],
     ["in_or_of", "InOrOf"],
     ["rhs", Expr],
     ["body", Box(Stmt)],
@@ -131,7 +151,7 @@ const ast_items = [
     ["decl_type", "DeclType"],
     ["declarators", Vec("VarDeclarator")],
   ),
-  Struct("VarDeclarator", [], ["pattern", "Pattern"], ["init", Option(Expr)]),
+  Struct("VarDeclarator", [], ["pattern", Pattern], ["init", Option(Expr)]),
   Struct(
     "For",
     ["span"],
@@ -146,16 +166,16 @@ const ast_items = [
     "TryStmt",
     ["span"],
     ["try_block", "Block"],
-    ["catch_pattern", Option("Pattern")],
+    ["catch_pattern", Option(Pattern)],
     ["catch_block", Option("Block")],
     ["finally_block", Option("Block")],
   ),
 
-  EnumExpr,
+  DExpr,
   Enum(
     "ObjectLiteralEntry",
     ["span"],
-    ["Ident", "Ident"],
+    [Ident, Ident],
     ["Prop", "ObjectKey", Expr],
     ["Method", "MethodDef"],
     ["Spread", Expr],
@@ -163,16 +183,16 @@ const ast_items = [
   Enum(
     "ObjectKey",
     ["span"],
-    ["Ident", "Ident"],
+    [Ident, Ident],
     ["String", "Text"],
     ["Computed", Expr],
   ),
   Struct("ParamList", ["span"], ["params", Vec("Param")]),
-  Struct("Param", ["span"], ["pattern", "Pattern"]),
+  Struct("Param", ["span"], ["pattern", Pattern]),
   Struct(
     "Function",
     ["span"],
-    ["name", Option("Ident")],
+    ["name", Option(Ident)],
     ["params", "ParamList"],
     ["body", "Block"],
     ["is_generator", "bool"],
@@ -184,28 +204,19 @@ const ast_items = [
   ]),
   Enum("ArrowFnBody", ["span"], [Expr, Box(Expr)], ["Block", "Block"]),
   Enum("TemplateLiteralFragment", ["span"], ["Text", "Text"], ["Expr", Expr]),
-  Enum(
-    "Pattern",
-    ["span"],
-    ["Var", "Ident"],
-    ["Assignment", Box("Pattern"), Box(Expr)],
-    ["Array", Vec(Option("Pattern"))],
-    ["Object", "ObjectPattern"],
-    ["Rest", Box("Pattern")],
-  ),
 
   Struct(
     "ObjectPattern",
     ["span"],
     ["properties", Vec("ObjectPatternProperty")],
-    ["rest", Option(Box("Pattern"))],
+    ["rest", Option(Box(Pattern))],
   ),
 
   Struct(
     "ObjectPatternProperty",
     ["span"],
     ["key", "ObjectKey"],
-    ["value", "Pattern"],
+    ["value", Pattern],
   ),
 
   Enum(
@@ -318,6 +329,7 @@ function Struct(name, tags, ...fields) {
     fields,
   };
 }
+
 /**
  *
  * @template {Type} T
@@ -345,4 +357,5 @@ function Box(type) {
 function Vec(type) {
   return ["Vec", type];
 }
+
 module.exports = { ast_items };
