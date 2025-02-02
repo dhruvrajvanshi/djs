@@ -22,8 +22,9 @@ const DPattern = Enum(
   ["span"],
   ["Var", Ident],
   ["Assignment", Box(Pattern), Box(Expr)],
-  ["Array", Vec(Option(Pattern))],
+  ["Array", Vec(Pattern)],
   ["Object", "ObjectPattern"],
+  "Elision",
   ["Rest", Box(Pattern)],
 );
 const DStmt = Enum(

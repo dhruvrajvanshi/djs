@@ -624,11 +624,11 @@ impl<'src> Parser<'src> {
                             break;
                         }
                         T::Comma => {
-                            self.advance()?;
-                            elements.push(None);
+                            let span = self.advance()?.span;
+                            elements.push(Pattern::Elision(span));
                         }
                         _ => {
-                            elements.push(Some(self.parse_pattern()?));
+                            elements.push(self.parse_pattern()?);
                             if self.at(T::RSquare) {
                                 break;
                             }
@@ -2137,8 +2137,7 @@ verifyProperty(Date.prototype, "toGMTString", {
         let Pattern::Array(_, items) = pattern else {
             panic!("Expected an array pattern; Found {pattern:?}");
         };
-        let [Some(Pattern::Var(ident!("x"))), Some(Pattern::Var(ident!("y")))] = items.as_slice()
-        else {
+        let [Pattern::Var(ident!("x")), Pattern::Var(ident!("y"))] = items.as_slice() else {
             panic!("Expected [x, y,] to be parsed as [x, y]; Found {items:?}");
         };
     }
@@ -2149,7 +2148,7 @@ verifyProperty(Date.prototype, "toGMTString", {
         let Pattern::Array(_, items) = pattern else {
             panic!("Expected an array pattern; Found {pattern:?}");
         };
-        let [None] = items.as_slice() else {
+        let [Pattern::Elision(_)] = items.as_slice() else {
             panic!("Expected [,] to be parsed as [None]; Found {items:?}");
         };
     }
@@ -2161,7 +2160,7 @@ verifyProperty(Date.prototype, "toGMTString", {
             panic!("Expected an array pattern; Found {pattern:?}");
         };
 
-        if let [None, Some(Pattern::Var(ident!("x")))] = items.as_slice() {
+        if let [Pattern::Elision(_), Pattern::Var(ident!("x"))] = items.as_slice() {
         } else {
             panic!("Expected [,x] to be parsed as None, Some(x); Found {items:?}");
         }
