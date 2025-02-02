@@ -71,8 +71,12 @@ function gen_enum(item) {
       }
     `;
   }
+  const derives = ["Debug"];
+  if (item.tags.includes("clone")) {
+    derives.push("Clone");
+  }
   return `
-    #[derive(Debug)]
+    #[derive(${derives.join(", ")})]
     pub enum ${item.name}${lifetime_param} {
         ${variants}
     }
@@ -144,9 +148,13 @@ function gen_struct(item) {
       }
     `;
   }
+  const derives = ["Debug"];
+  if (item.tags.includes("clone")) {
+    derives.push("Clone");
+  }
 
   return `
-    #[derive(Debug)]
+    #[derive(${derives.join(", ")})]
     pub struct ${item.name}${lifetime_param} {
       ${span}
       ${fields}
