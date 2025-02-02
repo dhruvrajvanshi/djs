@@ -11,7 +11,7 @@ const Expr = "Expr";
  * {@link DIdent}
  */
 const Ident = "Ident";
-const DIdent = Struct(Ident, ["span"], ["text", "str"]);
+const DIdent = Struct(Ident, ["span", "clone"], ["text", "str"]);
 
 /**
  * {@link DPattern}
