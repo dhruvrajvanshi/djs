@@ -1203,12 +1203,12 @@ impl<'src> Parser<'src> {
             _ => {
                 let lhs = self.parse_conditional_expr()?;
                 if let Some(assign_op) = assign_op(self.current()?.kind) {
-                    if !is_lhs_expr(&lhs) {
-                        return self.unexpected_token();
-                    }
-                    if matches!(lhs, Expr::Object(..) | Expr::Array(..)) && !expr_is_pattern(&lhs) {
-                        return self.unexpected_token();
-                    }
+                    let Some(lhs) = expr_to_pattern(&lhs) else {
+                        return Err(Error::Message(
+                            self.current_line(),
+                            "Invalid left-hand side in assignment",
+                        ));
+                    };
                     self.advance()?;
                     let rhs = self.parse_assignment_expr()?;
                     let span = Span::between(lhs.span(), rhs.span());
@@ -1587,25 +1587,86 @@ fn parse_bin_op(kind: TokenKind) -> BinOp {
     }
 }
 
-fn is_lhs_expr(expr: &Expr<'_>) -> bool {
-    matches!(expr, Expr::Var(..) | Expr::Index(..) | Expr::Prop(..))
+fn obj_literal_to_pattern<'s>(
+    span: Span,
+    entries: &[ObjectLiteralEntry<'s>],
+) -> Option<Pattern<'s>> {
+    let mut properties = vec![];
+    let mut rest = None;
+    for (index, entry) in entries.iter().enumerate() {
+        match entry {
+            ObjectLiteralEntry::Ident(ident) => {
+                properties.push(ObjectPatternProperty {
+                    span: ident.span,
+                    key: ObjectKey::Ident(ident.clone()),
+                    value: Pattern::Var(ident.clone()),
+                });
+            }
+
+            // { key: value }
+            ObjectLiteralEntry::Prop(span, key, value) => {
+                properties.push(ObjectPatternProperty {
+                    span: *span,
+                    key: key.clone(),
+                    value: expr_to_pattern(value)?,
+                });
+            }
+            ObjectLiteralEntry::Spread(expr) => {
+                if index != entries.len() - 1 {
+                    return None;
+                }
+                rest = Some(Box::new(expr_to_pattern(expr)?));
+            }
+            ObjectLiteralEntry::Method(..) => {
+                return None;
+            }
+        }
+    }
+    Some(Pattern::Object(ObjectPattern {
+        span,
+        properties,
+        rest,
+    }))
+}
+fn array_literal_to_pattern<'s>(
+    span: Span,
+    items: &[ArrayLiteralMember<'s>],
+) -> Option<Pattern<'s>> {
+    let mut members = vec![];
+    for items in items {
+        match items {
+            ArrayLiteralMember::Elision(span) => {
+                members.push(Pattern::Elision(*span));
+            }
+            ArrayLiteralMember::Expr(expr) => {
+                let expr = expr_to_pattern(expr)?;
+                members.push(expr);
+            }
+            ArrayLiteralMember::Spread(expr) => {
+                let expr = expr_to_pattern(expr)?;
+                members.push(Pattern::Rest(Box::new(expr)));
+            }
+        }
+    }
+    Some(Pattern::Array(span, members))
 }
 
-fn expr_is_pattern(expr: &Expr) -> bool {
+fn expr_to_pattern<'src>(expr: &Expr<'src>) -> Option<Pattern<'src>> {
     match expr {
-        Expr::Var(_) => true,
-        Expr::Object(_, obj) => obj.iter().all(|entry| match entry {
-            ObjectLiteralEntry::Ident(..) => true,
-            ObjectLiteralEntry::Prop(_, _, value) => expr_is_pattern(value),
-            ObjectLiteralEntry::Method(..) => false,
-            ObjectLiteralEntry::Spread(e) => expr_is_pattern(e),
-        }),
-        Expr::Array(_, items) => items.iter().all(|e| match e {
-            ArrayLiteralMember::Expr(e) => expr_is_pattern(e),
-            ArrayLiteralMember::Elision(_) => true,
-            ArrayLiteralMember::Spread(e) => expr_is_pattern(e),
-        }),
-        _ => false,
+        Expr::Var(ident) => Some(Pattern::Var(ident.clone())),
+        Expr::Object(span, obj) => obj_literal_to_pattern(*span, obj),
+        Expr::Array(span, items) => array_literal_to_pattern(*span, items),
+        Expr::Prop(span, lhs, member) => Some(Pattern::Prop(
+            *span,
+            Box::new(*lhs.clone()),
+            ObjectKey::Ident(member.clone()),
+        )),
+        Expr::Index(span, lhs, index) => Some(Pattern::Prop(
+            *span,
+            Box::new(*lhs.clone()),
+            ObjectKey::Computed(*index.clone()),
+        )),
+        _ => None,
     }
 }
 
@@ -2249,7 +2310,7 @@ verifyProperty(Date.prototype, "toGMTString", {
         let Expr::Assign(_, z, AssignOp::Eq, a) = *alt else {
             panic!("Expected z = a to be parsed as an assignment; Found {alt:?}");
         };
-        assert_matches!(*z, Expr::Var(.., ident!("z")));
+        assert_matches!(*z, Pattern::Var(.., ident!("z")));
         assert_matches!(*a, Expr::Var(.., ident!("a")));
     }
 
