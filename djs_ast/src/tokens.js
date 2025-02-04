@@ -2,6 +2,10 @@
 const tokens = [
   "Ident",
 
+  ["True", "true"],
+  ["False", "false"],
+  ["Null", "null"],
+  ["Undefined", "undefined"],
   ["Let", "let"],
   ["Var", "var"],
   ["Const", "const"],
@@ -30,8 +34,6 @@ const tokens = [
   ["Delete", "delete"],
   ["Typeof", "typeof"],
   ["Void", "void"],
-  ["True", "true"],
-  ["False", "false"],
   ["Class", "class"],
   ["Extends", "extends"],
   ["Static", "static"],

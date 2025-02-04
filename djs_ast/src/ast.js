@@ -199,6 +199,8 @@ const DExpr = Enum(
   ["String", Text],
   ["Number", Text],
   ["Boolean", "bool"],
+  ["Null"],
+  ["Undefined"],
   ["Object", Vec(ObjectLiteralEntry)],
   ["Throw", { tags: ["span"] }, Box(Expr)],
   ["PostIncrement", { tags: ["span"] }, Box(Expr)],
@@ -540,4 +542,8 @@ function Vec(type) {
   return ["Vec", type];
 }
 
-module.exports = { ast_items };
+const items_by_name = Object.fromEntries(
+  ast_items.map((item) => [item.name, item]),
+);
+
+module.exports = { ast_items, items_by_name };
