@@ -774,6 +774,10 @@ impl<'src> Parser<'src> {
     pub(super) fn parse_primary_expr(&mut self) -> Result<Expr<'src>> {
         match self.current()?.kind {
             T::Ident => Ok(Expr::Var(self.parse_ident()?)),
+            T::True => Ok(Expr::Boolean(self.advance()?.span, true)),
+            T::False => Ok(Expr::Boolean(self.advance()?.span, false)),
+            T::Null => Ok(Expr::Null(self.advance()?.span)),
+            T::Undefined => Ok(Expr::Undefined(self.advance()?.span)),
             T::String => {
                 let tok = self.advance()?;
                 Ok(Expr::String(Text {
@@ -862,8 +866,6 @@ impl<'src> Parser<'src> {
                     text: tok.text,
                 }))
             }
-            T::True => Ok(Expr::Boolean(self.advance()?.span, true)),
-            T::False => Ok(Expr::Boolean(self.advance()?.span, false)),
             T::Super => Ok(Expr::Super(self.advance()?.span)),
             T::Class => {
                 let cls = self.parse_class()?;
