@@ -546,4 +546,57 @@ const items_by_name = Object.fromEntries(
   ast_items.map((item) => [item.name, item]),
 );
 
-module.exports = { ast_items, items_by_name };
+const needs_lifetime_param = needs_lifetime_param_set();
+function needs_lifetime_param_set() {
+  const result = new Set();
+
+  for (const item of ast_items) {
+    if (item_contains_ident_or_text(item)) {
+      result.add(item.name);
+    }
+  }
+
+  return result;
+
+  /**
+   * @param {Item} item
+   * @returns {boolean}
+   **/
+  function item_contains_ident_or_text(item) {
+    if (result.has(item.name)) {
+      return true;
+    }
+    switch (item.kind) {
+      case "struct":
+        return item.fields.some(([_, type]) =>
+          type_contains_ident_or_text(type),
+        );
+      case "enum":
+        return item.variants.some(
+          (variant) =>
+            variant.args.length > 0 &&
+            variant.args.some(type_contains_ident_or_text),
+        );
+    }
+  }
+
+  /**
+   * @param {Type} type
+   * @returns {boolean}
+   */
+  function type_contains_ident_or_text(type) {
+    if (typeof type === "string") {
+      if (type === "str") {
+        return true;
+      }
+      if (items_by_name[type] === undefined) {
+        throw new Error(`Unknown type: ${type}`);
+      }
+      return item_contains_ident_or_text(items_by_name[type]);
+    } else {
+      return type.slice(1).some(type_contains_ident_or_text);
+    }
+  }
+}
+
+module.exports = { ast_items, items_by_name, needs_lifetime_param };

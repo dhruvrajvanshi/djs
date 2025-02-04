@@ -1,6 +1,8 @@
-const { ast_items, items_by_name } = require("./src/ast.js");
-
-const needs_lifetime_param = needs_lifetime_param_set();
+const {
+  ast_items,
+  items_by_name,
+  needs_lifetime_param,
+} = require("./src/ast.js");
 
 let result = `
 // This file is generated automatically
@@ -176,58 +178,6 @@ function gen_type(type) {
     }
   } else {
     return `${type[0]}<${type.slice(1).map(gen_type).join(", ")}>`;
-  }
-}
-
-function needs_lifetime_param_set() {
-  const result = new Set();
-
-  for (const item of ast_items) {
-    if (item_contains_ident_or_text(item)) {
-      result.add(item.name);
-    }
-  }
-
-  return result;
-
-  /**
-   * @param {Item} item
-   * @returns {boolean}
-   **/
-  function item_contains_ident_or_text(item) {
-    if (result.has(item.name)) {
-      return true;
-    }
-    switch (item.kind) {
-      case "struct":
-        return item.fields.some(([_, type]) =>
-          type_contains_ident_or_text(type),
-        );
-      case "enum":
-        return item.variants.some(
-          (variant) =>
-            variant.args.length > 0 &&
-            variant.args.some(type_contains_ident_or_text),
-        );
-    }
-  }
-
-  /**
-   * @param {Type} type
-   * @returns {boolean}
-   */
-  function type_contains_ident_or_text(type) {
-    if (typeof type === "string") {
-      if (type === "str") {
-        return true;
-      }
-      if (items_by_name[type] === undefined) {
-        throw new Error(`Unknown type: ${type}`);
-      }
-      return item_contains_ident_or_text(items_by_name[type]);
-    } else {
-      return type.slice(1).some(type_contains_ident_or_text);
-    }
   }
 }
 
