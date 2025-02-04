@@ -1,8 +1,4 @@
-const { ast_items } = require("./src/ast.js");
-
-const items_by_name = Object.fromEntries(
-  ast_items.map((item) => [item.name, item]),
-);
+const { ast_items, items_by_name } = require("./src/ast.js");
 
 const needs_lifetime_param = needs_lifetime_param_set();
 
