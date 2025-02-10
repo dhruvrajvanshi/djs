@@ -154,7 +154,7 @@ const SourceFile = "SourceFile";
 
 const DPattern = Enum(
   Pattern,
-  ["span", "clone"],
+  ["span", "clone", "visit"],
   ["Var", Ident],
   ["Assignment", Box(Pattern), Box(Expr)],
   ["Array", Vec(Pattern)],
@@ -165,7 +165,7 @@ const DPattern = Enum(
 );
 const DStmt = Enum(
   Stmt,
-  ["span", "clone"],
+  ["span", "clone", "visit"],
   [Expr, Box(Expr)],
   ["Block", Block],
   ["Return", Option(Expr)],
@@ -188,7 +188,7 @@ const DStmt = Enum(
 
 const DExpr = Enum(
   Expr,
-  ["span", "clone"],
+  ["span", "clone", "visit"],
   ["Var", Ident],
   ["BinOp", Box(Expr), BinOp, Box(Expr)],
   ["ArrowFn", ParamList, ArrowFnBody],
@@ -303,7 +303,7 @@ const DBlock = Struct(Block, ["span", "clone"], ["stmts", Vec(Stmt)]);
 const DText = Struct(Text, ["span", "clone"], ["text", "str"]);
 const DLabel = Struct(Label, ["span", "clone"], ["name", "str"]);
 
-const DSourceFile = Struct(SourceFile, ["span"], ["stmts", Vec(Stmt)]);
+const DSourceFile = Struct(SourceFile, ["span", "visit"], ["stmts", Vec(Stmt)]);
 const DSwitchCase = Struct(
   SwitchCase,
   ["span", "clone"],
