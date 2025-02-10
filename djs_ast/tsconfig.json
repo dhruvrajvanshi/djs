@@ -9,6 +9,7 @@
     "files": [
         "index.d.ts",
         "src/ast.js",
-        "gen_ast.js"
+        "gen_ast.js",
+	"gen_visitor.js",
     ]
 }
