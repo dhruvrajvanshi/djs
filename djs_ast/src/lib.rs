@@ -8,3 +8,7 @@ mod ast {
 pub use ast::*;
 
 include!(concat!(env!("OUT_DIR"), "/tokens.rs"));
+
+pub mod visitor {
+    include!(concat!(env!("OUT_DIR"), "/visitor.rs"));
+}

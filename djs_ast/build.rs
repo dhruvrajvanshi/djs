@@ -30,10 +30,12 @@ fn main() {
 
     run_node_script_and_format("gen_ast.js", "ast.rs");
     run_node_script_and_format("gen_tokens.js", "tokens.rs");
+    run_node_script_and_format("gen_visitor.js", "visitor.rs");
 
     println!("cargo::rerun-if-changed=build.rs");
     println!("cargo::rerun-if-changed=src/ast.js");
     println!("cargo::rerun-if-changed=gen_ast.js");
     println!("cargo::rerun-if-changed=src/tokens.js");
-    println!("cargo::rerun-if-changed=src/gen_tokens.js");
+    println!("cargo::rerun-if-changed=gen_tokens.js");
+    println!("cargo::rerun-if-changed=gen_visitor.js");
 }
