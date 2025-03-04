@@ -41,7 +41,12 @@ jobs:
         fi
 
     - name: Install the coverage tool
-      run: cargo install cargo-llvm-cov
+      run: |
+        if ! cargo llvm-cov --version; then
+          cargo install cargo-llvm-cov
+        else
+          echo "cargo-cov is already installed"
+        fi
 
     - name: Run tests
       run: cargo llvm-cov --lcov --output-path lcov.info
