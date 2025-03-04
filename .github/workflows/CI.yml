@@ -41,7 +41,7 @@ jobs:
         fi
 
     - name: Install the coverage tool
-      run: cargo install cargo-cov
+      run: cargo install cargo-llvm-cov
 
     - name: Run tests
       run: cargo llvm-cov --lcov --output-path lcov.info
