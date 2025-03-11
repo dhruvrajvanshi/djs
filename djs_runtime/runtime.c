@@ -58,28 +58,44 @@ bool djs_key_eq(DJSObject *left, DJSObject *right) {
 
 DJSObject *djs_string_as_obj(DJSString *string) { return (DJSObject *)string; }
 
+DJSObjectEntry *DJSObject_get_own_entry(DJSObject *self, DJSString *key) {
+  DJSObjectEntry *current = self->properties;
+  while (current) {
+    if (djs_eqeqeq(DJS_OBJECT_AS_VALUE(key),
+                   DJS_OBJECT_AS_VALUE(current->key))) {
+      return current;
+    } else {
+      current = current->next;
+    }
+  }
+  return NULL;
+}
+
 DJSCompletion djs_object_get(DJSRuntime *UNUSED(runtime), DJSObject *object,
                              DJSString *key) {
-  DJSCompletion completion = {.value = DJS_UNDEFINED, .abrupt = false};
-  DJSObjectEntry *current_entry = object->properties;
-  while (current_entry != NULL) {
-    if (djs_key_eq(current_entry->key, djs_string_as_obj(key))) {
-      return (DJSCompletion){.value = current_entry->value, .abrupt = false};
-    };
-    current_entry = current_entry->next;
+  DJSObjectEntry *entry = DJSObject_get_own_entry(object, key);
+  if (entry == NULL) {
+    return (DJSCompletion){.abrupt = false, .value = DJS_UNDEFINED};
   }
-  return completion;
+  return (DJSCompletion){.abrupt = false, .value = entry->value};
 }
 
 DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
                              DJSString *key, DJSValue value) {
 
-  if (object->properties == NULL) {
+  DJSObjectEntry *existing = DJSObject_get_own_entry(object, key);
+
+  if (!existing) {
     object->properties = malloc(sizeof(DJSObjectEntry));
     object->properties->key = (DJSObject *)key;
     object->properties->value = value;
+    object->properties->next = NULL;
   } else {
-    DJS_TODO();
+    DJSObjectEntry *new_entry = malloc(sizeof(DJSObjectEntry));
+    new_entry->next = object->properties;
+    new_entry->key = (DJSObject *)key;
+    new_entry->value = value;
+    object->properties = new_entry;
   }
 
   return (DJSCompletion){.value = DJS_UNDEFINED, .abrupt = false};

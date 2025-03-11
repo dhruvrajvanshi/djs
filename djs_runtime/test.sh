@@ -3,7 +3,7 @@ set -e
 
 mkdir -p target
 
-CC=gcc
+CC=clang
 CFLAGS="-Wall -fsanitize=undefined,address -std=c11 -g"
 
 RUNTIME_SOURCES="runtime.c print.c"
