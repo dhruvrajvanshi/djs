@@ -36,3 +36,35 @@ void DJSValue_print(FILE *file, const DJSValue *value) {
     break;
   }
 }
+
+void DJSValue_pretty_print(FILE *file, const DJSValue *value) {
+  switch (value->type) {
+  case DJS_TYPE_UNDEFINED:
+    fprintf(file, "undefined");
+    break;
+  case DJS_TYPE_NULL:
+    fprintf(file, "null");
+    break;
+  case DJS_TYPE_BOOLEAN:
+    if (value->as.boolean) {
+      fprintf(file, "true");
+    } else {
+      fprintf(file, "false");
+    }
+    break;
+  case DJS_TYPE_NUMBER:
+    fprintf(file, "%f", value->as.number);
+    break;
+  case DJS_TYPE_OBJECT:
+    switch (value->as.object->type) {
+    case DJS_OBJECT_STRING:
+      fputc('"', file);
+      DJSString_print(file, (DJSString *)(value->as.object));
+      fputc('"', file);
+      break;
+    default:
+      fprintf(file, "[object: Object]");
+    }
+    break;
+  }
+}
