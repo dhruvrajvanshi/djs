@@ -1,5 +1,6 @@
 #include "./runtime.h"
 #include "./print.h"
+#include <gc.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,19 +10,20 @@ typedef struct DJSRuntime {
 } DJSRuntime;
 
 DJSRuntime *djs_new_runtime() {
+  GC_init();
   DJSRuntime *runtime = malloc(sizeof(DJSRuntime));
   return runtime;
 }
 void djs_free_runtime(DJSRuntime *runtime) { free(runtime); }
 
 DJSInstance *djs_new_instance(DJSRuntime *UNUSED(runtime)) {
-  DJSInstance *instance = malloc(sizeof(DJSObject));
+  DJSInstance *instance = GC_malloc(sizeof(DJSObject));
   instance->obj = (DJSObject){.type = DJS_OBJECT_INSTANCE, .properties = NULL};
   return instance;
 }
 
 DJSString *djs_new_string(DJSRuntime *UNUSED(runtime), const char *value) {
-  DJSString *string = malloc(sizeof(DJSString));
+  DJSString *string = GC_malloc(sizeof(DJSString));
   string->obj = (DJSObject){.type = DJS_OBJECT_STRING, .properties = NULL};
   string->value = strdup(value);
   string->length = strlen(value);
@@ -86,12 +88,12 @@ DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
   DJSObjectEntry *existing = DJSObject_get_own_entry(object, key);
 
   if (!existing) {
-    object->properties = malloc(sizeof(DJSObjectEntry));
+    object->properties = GC_malloc(sizeof(DJSObjectEntry));
     object->properties->key = (DJSObject *)key;
     object->properties->value = value;
     object->properties->next = NULL;
   } else {
-    DJSObjectEntry *new_entry = malloc(sizeof(DJSObjectEntry));
+    DJSObjectEntry *new_entry = GC_malloc(sizeof(DJSObjectEntry));
     new_entry->next = object->properties;
     new_entry->key = (DJSObject *)key;
     new_entry->value = value;
