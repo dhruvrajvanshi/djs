@@ -4,7 +4,7 @@ set -e
 mkdir -p target
 
 CC=clang
-CFLAGS="-Wall -fsanitize=undefined,address -std=c11 -g"
+CFLAGS="-Wall -fsanitize=undefined,address -L/opt/homebrew/lib -std=c11 -g -lgc -I/opt/homebrew/include"
 
 RUNTIME_SOURCES="runtime.c print.c"
 
