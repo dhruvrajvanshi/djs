@@ -1,10 +1,13 @@
 #pragma once
 
+#include "./object.h"
+#include "./value.h"
 #include <assert.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+
 #ifdef __GNUC__
 #define UNUSED(x) UNUSED_##x __attribute__((__unused__))
 #else
@@ -22,55 +25,6 @@
 #else
 #error "auto is not supported"
 #endif
-
-typedef enum DJSObjectType {
-  DJS_OBJECT_STRING,
-  DJS_OBJECT_INSTANCE,
-} DJSObjectType;
-
-typedef struct DJSObject DJSObject;
-
-typedef enum DJSValueType {
-  DJS_TYPE_UNDEFINED,
-  DJS_TYPE_NULL,
-  DJS_TYPE_BOOLEAN,
-  DJS_TYPE_NUMBER,
-  DJS_TYPE_OBJECT,
-} DJSValueType;
-
-typedef struct DJSValue {
-  DJSValueType type;
-  union {
-    bool undefined;
-    bool null;
-    bool boolean;
-    double number;
-    DJSObject *object;
-  } as;
-} DJSValue;
-
-typedef struct DJSObjectEntry DJSObjectEntry;
-
-typedef struct DJSObjectEntry {
-  DJSObject *key;
-  DJSValue value;
-  DJSObjectEntry *next;
-} DJSObjectEntry;
-
-typedef struct DJSObject {
-  DJSObjectType type;
-  DJSObjectEntry *properties;
-} DJSObject;
-
-typedef struct DJSInstance {
-  DJSObject obj;
-} DJSInstance;
-
-typedef struct DJSString {
-  DJSObject obj;
-  size_t length;
-  const char *value;
-} DJSString;
 
 typedef struct DJSCompletion {
   DJSValue value;
