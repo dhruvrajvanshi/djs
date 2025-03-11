@@ -6,10 +6,12 @@ mkdir -p target
 CC=gcc
 CFLAGS="-Wall -fsanitize=undefined,address -std=c11 -g"
 
+RUNTIME_SOURCES="runtime.c print.c"
+
 for SOURCE in `ls test_*.c`; do
   echo "TEST: $SOURCE"
   BASENAME=`basename $SOURCE`
-  CMD="$CC $CFLAGS -o target/$BASENAME runtime.c $SOURCE"
+  CMD="$CC $CFLAGS -o target/$BASENAME $RUNTIME_SOURCES $SOURCE"
   echo $CMD
   $CMD
 
