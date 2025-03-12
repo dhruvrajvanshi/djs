@@ -1,3 +1,4 @@
+#include "./prelude.h"
 #include "./print.h"
 #include "./runtime.h"
 #include <assert.h>
