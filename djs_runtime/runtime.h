@@ -29,11 +29,7 @@ typedef struct DJSCompletion {
 typedef struct DJSRuntime DJSRuntime;
 DJSRuntime *djs_new_runtime(void);
 void djs_free_runtime(DJSRuntime *);
-
-#define DJS_OBJECT_AS_VALUE(obj)                                               \
-  ((DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = (DJSObject *)obj}})
-
-DJSInstance *djs_new_instance(DJSRuntime *);
+DJSObject *djs_new_object(DJSRuntime *);
 DJSString *djs_new_string(DJSRuntime *, const char *value);
 
 DJSCompletion djs_object_set(DJSRuntime *, DJSObject *obj, DJSString *key,
@@ -41,6 +37,7 @@ DJSCompletion djs_object_set(DJSRuntime *, DJSObject *obj, DJSString *key,
 
 DJSCompletion djs_object_get(DJSRuntime *, DJSObject *obj, DJSString *key);
 
-bool djs_eqeqeq(DJSValue left, DJSValue right);
+/// https://tc39.es/ecma262/#sec-isstrictlyequal
+bool DJS_IsStrictlyEqual(DJSValue left, DJSValue right);
 
 void djs_console_log(DJSRuntime *, DJSValue value);

@@ -1,5 +1,6 @@
 #include "./print.h"
-#include "./runtime.h"
+#include "value.h"
+#include <stdio.h>
 
 void DJSString_print(FILE *file, const DJSString *str) {
   for (size_t i = 0; i < str->length; i++) {
@@ -7,8 +8,8 @@ void DJSString_print(FILE *file, const DJSString *str) {
   }
 }
 
-void DJSValue_print(FILE *file, const DJSValue *value) {
-  switch (value->type) {
+void DJSValue_print(FILE *file, DJSValue value) {
+  switch (value.type) {
   case DJS_TYPE_UNDEFINED:
     fprintf(file, "undefined");
     break;
@@ -16,29 +17,29 @@ void DJSValue_print(FILE *file, const DJSValue *value) {
     fprintf(file, "null");
     break;
   case DJS_TYPE_BOOLEAN:
-    if (value->as.boolean) {
+    if (value.as.boolean) {
       fprintf(file, "true");
     } else {
       fprintf(file, "false");
     }
     break;
   case DJS_TYPE_NUMBER:
-    fprintf(file, "%f", value->as.number);
+    fprintf(file, "%f", value.as.number);
     break;
   case DJS_TYPE_OBJECT:
-    switch (value->as.object->type) {
-    case DJS_OBJECT_STRING:
-      DJSString_print(file, (DJSString *)(value->as.object));
-      break;
-    default:
-      fprintf(file, "[object: Object]");
-    }
+    fprintf(file, "[object: Object]");
+    break;
+  case DJS_TYPE_STRING:
+    DJSString_print(file, value.as.string);
+    break;
+  case DJS_TYPE_SYMBOL:
+    fprintf(file, "[symbol: %zu]", value.as.symbol.id);
     break;
   }
 }
 
-void DJSValue_pretty_print(FILE *file, const DJSValue *value) {
-  switch (value->type) {
+void DJSValue_pretty_print(FILE *file, DJSValue value) {
+  switch (value.type) {
   case DJS_TYPE_UNDEFINED:
     fprintf(file, "undefined");
     break;
@@ -46,25 +47,25 @@ void DJSValue_pretty_print(FILE *file, const DJSValue *value) {
     fprintf(file, "null");
     break;
   case DJS_TYPE_BOOLEAN:
-    if (value->as.boolean) {
+    if (value.as.boolean) {
       fprintf(file, "true");
     } else {
       fprintf(file, "false");
     }
     break;
   case DJS_TYPE_NUMBER:
-    fprintf(file, "%f", value->as.number);
+    fprintf(file, "%f", value.as.number);
     break;
   case DJS_TYPE_OBJECT:
-    switch (value->as.object->type) {
-    case DJS_OBJECT_STRING:
-      fputc('"', file);
-      DJSString_print(file, (DJSString *)(value->as.object));
-      fputc('"', file);
-      break;
-    default:
-      fprintf(file, "[object: Object]");
-    }
+    fprintf(file, "[object: Object]");
+    break;
+  case DJS_TYPE_STRING:
+    fprintf(file, "\"");
+    DJSString_print(file, value.as.string);
+    fprintf(file, "\"");
+    break;
+  case DJS_TYPE_SYMBOL:
+    fprintf(file, "[symbol: %zu]", value.as.symbol.id);
     break;
   }
 }
