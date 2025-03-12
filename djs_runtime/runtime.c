@@ -1,6 +1,8 @@
 #include "./runtime.h"
 #include "./prelude.h"
 #include "./print.h"
+#include "object.h"
+#include "value.h"
 #include <gc.h>
 
 #include <stdio.h>
@@ -17,17 +19,22 @@ DJSRuntime *djs_new_runtime() {
 }
 void djs_free_runtime(DJSRuntime *runtime) { free(runtime); }
 
+void DJSObject_init(DJSObject *self, DJSObjectType type) {
+  self->properties = NULL;
+  self->type = type;
+}
+
 DJSInstance *djs_new_instance(DJSRuntime *UNUSED(runtime)) {
   DJSInstance *instance = GC_malloc(sizeof(DJSObject));
-  instance->obj = (DJSObject){.type = DJS_OBJECT_INSTANCE, .properties = NULL};
+  DJSObject_init(&instance->obj, DJS_OBJECT_INSTANCE);
   return instance;
 }
 
 DJSString *djs_new_string(DJSRuntime *UNUSED(runtime), const char *value) {
   DJSString *string = GC_malloc(sizeof(DJSString));
-  string->obj = (DJSObject){.type = DJS_OBJECT_STRING, .properties = NULL};
-  string->value = strdup(value);
+  DJSObject_init(&string->obj, DJS_OBJECT_STRING);
   string->length = strlen(value);
+  string->value = GC_malloc_atomic(string->length);
   return string;
 }
 
