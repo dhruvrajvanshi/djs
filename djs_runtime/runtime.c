@@ -1,4 +1,5 @@
 #include "./runtime.h"
+#include "./prelude.h"
 #include "./print.h"
 #include <gc.h>
 
