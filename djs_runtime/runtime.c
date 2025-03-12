@@ -19,60 +19,33 @@ DJSRuntime *djs_new_runtime() {
 }
 void djs_free_runtime(DJSRuntime *runtime) { free(runtime); }
 
-void DJSObject_init(DJSObject *self, DJSObjectType type) {
-  self->properties = NULL;
-  self->type = type;
-}
+void DJSObject_init(DJSObject *self) { self->properties = NULL; }
 
-DJSInstance *djs_new_instance(DJSRuntime *UNUSED(runtime)) {
-  DJSInstance *instance = GC_malloc(sizeof(DJSObject));
-  DJSObject_init(&instance->obj, DJS_OBJECT_INSTANCE);
-  return instance;
+DJSObject *djs_new_object(DJSRuntime *UNUSED(runtime)) {
+  DJSObject *obj = GC_malloc(sizeof(DJSObject));
+  DJSObject_init(obj);
+  return obj;
 }
 
 DJSString *djs_new_string(DJSRuntime *UNUSED(runtime), const char *value) {
   DJSString *string = GC_malloc(sizeof(DJSString));
-  DJSObject_init(&string->obj, DJS_OBJECT_STRING);
-  string->length = strlen(value);
-  string->value = GC_malloc_atomic(string->length);
+  size_t length = strlen(value);
+  char *buffer = GC_malloc_atomic(length);
+  memcpy(buffer, value, length);
+
+  string->length = length;
+  string->value = buffer;
   return string;
 }
 
 static const DJSValue DJS_UNDEFINED = {.type = DJS_TYPE_UNDEFINED,
                                        .as = {.undefined = true}};
 
-#define DJS_KEY_EQ(left, right)                                                \
-  djs_key_eq((DJSObject *)left, (DJSObject *)right)
-
-bool djs_string_eq(DJSString *left, DJSString *right) {
-  if (left->length != right->length) {
-    return false;
-  }
-  return memcmp(left->value, right->value, left->length) == 0;
-}
-
-bool djs_key_eq(DJSObject *left, DJSObject *right) {
-  if (left->type != right->type) {
-    return false;
-  }
-  switch (left->type) {
-  case DJS_OBJECT_STRING: {
-    DJSString *left_str = (DJSString *)left;
-    DJSString *right_str = (DJSString *)right;
-    return djs_string_eq(left_str, right_str);
-  }
-  default:
-    return false;
-  }
-}
-
-DJSObject *djs_string_as_obj(DJSString *string) { return (DJSObject *)string; }
-
 DJSObjectEntry *DJSObject_get_own_entry(DJSObject *self, DJSString *key) {
   DJSObjectEntry *current = self->properties;
+  DJSPropertyKey property_key = DJSPropertyKey_string(*key);
   while (current) {
-    if (djs_eqeqeq(DJS_OBJECT_AS_VALUE(key),
-                   DJS_OBJECT_AS_VALUE(current->key))) {
+    if (DJSPropertyKey_eq(current->key, property_key)) {
       return current;
     } else {
       current = current->next;
@@ -97,13 +70,13 @@ DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
 
   if (!existing) {
     object->properties = GC_malloc(sizeof(DJSObjectEntry));
-    object->properties->key = (DJSObject *)key;
+    object->properties->key = DJSPropertyKey_string(*key);
     object->properties->value = value;
     object->properties->next = NULL;
   } else {
     DJSObjectEntry *new_entry = GC_malloc(sizeof(DJSObjectEntry));
     new_entry->next = object->properties;
-    new_entry->key = (DJSObject *)key;
+    new_entry->key = DJSPropertyKey_string(*key);
     new_entry->value = value;
     object->properties = new_entry;
   }
@@ -113,11 +86,11 @@ DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
 
 void djs_console_log(__attribute__((unused)) DJSRuntime *runtime,
                      DJSValue value) {
-  DJSValue_print(stdout, &value);
+  DJSValue_print(stdout, value);
   puts("");
 }
 
-bool djs_eqeqeq(DJSValue left, DJSValue right) {
+bool DJS_IsStrictlyEqual(DJSValue left, DJSValue right) {
   if (left.type != right.type) {
     return false;
   }
@@ -134,13 +107,8 @@ bool djs_eqeqeq(DJSValue left, DJSValue right) {
     if (left.as.object == right.as.object) {
       return true;
     }
-    if (left.as.object->type != right.as.object->type) {
-      return false;
-    }
-    if (left.as.object->type == DJS_OBJECT_STRING) {
-      return djs_string_eq((DJSString *)(left.as.object),
-                           (DJSString *)(right.as.object));
-    }
+  case DJS_TYPE_STRING:
+    return DJSString_eq(*left.as.string, *right.as.string);
   default:
     DJS_PANIC("Unknown value type");
   }
