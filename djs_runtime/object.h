@@ -3,6 +3,7 @@
 #include <stddef.h>
 
 typedef struct DJSObjectEntry DJSObjectEntry;
+typedef struct DJSRuntime DJSRuntime;
 
 typedef struct DJSPropertyKey {
   enum {
@@ -51,3 +52,5 @@ static inline DJSPropertyKey DJSPropertyKey_symbol(DJSSymbol symbol) {
 static inline DJSValue DJSObject_as_value(DJSObject *object) {
   return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
 }
+
+DJSObject *DJS_MakeBasicObject(DJSRuntime *runtime);
