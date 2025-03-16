@@ -13,6 +13,14 @@ typedef struct DJSCompletion {
   bool abrupt;
 } DJSCompletion;
 
+static inline DJSCompletion DJSCompletion_normal(DJSValue value) {
+  return (DJSCompletion){.value = value, .abrupt = false};
+}
+
+static inline DJSCompletion DJSCompletion_abrupt(DJSValue value) {
+  return (DJSCompletion){.value = value, .abrupt = true};
+}
+
 typedef struct DJSRuntime DJSRuntime;
 DJSRuntime *djs_new_runtime(void);
 void djs_free_runtime(DJSRuntime *);
