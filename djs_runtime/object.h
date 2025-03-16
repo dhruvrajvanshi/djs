@@ -47,24 +47,26 @@ static const DJSPropertyFlags DJS_PROPERTY_ENUMERABLE = 1 << 1;
 static const DJSPropertyFlags DJS_PROPERTY_CONFIGURABLE = 1 << 2;
 static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
 
-static bool __attribute__((unused))
-DJSProperty_is_writable(DJSPropertyDescriptor descriptor) {
+static inline bool DJSProperty_is_writable(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_WRITABLE;
 }
-static bool __attribute__((unused))
-DJSPRoperty_is_enumerable(DJSPropertyDescriptor descriptor) {
+static inline bool DJSPRoperty_is_enumerable(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_ENUMERABLE;
 }
-static bool __attribute__((unused))
+static inline bool
 DJSProperty_is_configurable(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_CONFIGURABLE;
 }
-static bool DJSProperty_is_accessor(DJSPropertyDescriptor descriptor) {
+static inline bool DJSProperty_is_accessor(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_TYPE_MASK;
 }
-static bool __attribute__((unused))
-DJSProperty_is_data(DJSPropertyDescriptor descriptor) {
+static inline bool DJSProperty_is_data(DJSPropertyDescriptor descriptor) {
   return !DJSProperty_is_accessor(descriptor);
+}
+
+static inline DJSValue DJSProperty_value(DJSPropertyDescriptor descriptor) {
+  assert(DJSProperty_is_data(descriptor));
+  return descriptor.as.data.value;
 }
 
 static DJSPropertyDescriptor __attribute__((unused))
