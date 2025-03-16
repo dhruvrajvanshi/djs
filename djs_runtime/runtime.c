@@ -19,14 +19,6 @@ DJSRuntime *djs_new_runtime() {
 }
 void djs_free_runtime(DJSRuntime *runtime) { free(runtime); }
 
-void DJSObject_init(DJSObject *self) { self->properties = NULL; }
-
-DJSObject *djs_new_object(DJSRuntime *UNUSED(runtime)) {
-  DJSObject *obj = GC_malloc(sizeof(DJSObject));
-  DJSObject_init(obj);
-  return obj;
-}
-
 DJSString *djs_new_string(DJSRuntime *UNUSED(runtime), const char *value) {
   DJSString *string = GC_malloc(sizeof(DJSString));
   size_t length = strlen(value);

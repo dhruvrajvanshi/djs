@@ -1,5 +1,6 @@
 #include "./print.h"
 #include "./runtime.h"
+#include "object.h"
 #include "value.h"
 #include <assert.h>
 
@@ -20,7 +21,7 @@
 
 int main(void) {
   DJSRuntime *runtime = djs_new_runtime();
-  DJSObject *obj = djs_new_object(runtime);
+  DJSObject *obj = DJS_MakeBasicObject(runtime);
   DJSString *key = djs_new_string(runtime, "Key");
 
   auto get_result = djs_object_get(runtime, obj, key);
