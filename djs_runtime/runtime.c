@@ -34,38 +34,30 @@ DJSString *djs_new_string(DJSRuntime *UNUSED(runtime), const char *value) {
 static const DJSValue DJS_UNDEFINED = {.type = DJS_TYPE_UNDEFINED,
                                        .as = {.undefined = true}};
 
-DJSObjectEntry *DJSObject_get_own_entry(DJSObject *self, DJSString *key) {
-  DJSObjectEntry *current = self->properties;
-  DJSPropertyKey property_key = DJSPropertyKey_string(*key);
-  while (current) {
-    if (DJSPropertyKey_eq(current->key, property_key)) {
-      return current;
-    } else {
-      current = current->next;
-    }
-  }
-  return NULL;
-}
-
 DJSCompletion djs_object_get(DJSRuntime *UNUSED(runtime), DJSObject *object,
                              DJSString *key) {
-  DJSObjectEntry *entry = DJSObject_get_own_entry(object, key);
-  if (entry == NULL) {
-    return (DJSCompletion){.abrupt = false, .value = DJS_UNDEFINED};
+  OptPropertyDescriptor opt_descriptor =
+      DJS_OrdinaryGetOwnProperty(object, DJSPropertyKey_string(*key));
+
+  if (opt_descriptor.is_present) {
+    if (DJSProperty_is_accessor(opt_descriptor.value)) {
+      DJS_TODO();
+    } else {
+      assert(DJSProperty_is_data(opt_descriptor.value));
+      return DJSCompletion_normal(DJSProperty_value(opt_descriptor.value));
+    }
+  } else {
+    return DJSCompletion_normal(DJS_UNDEFINED);
   }
-  if (!DJSProperty_is_data(entry->descriptor)) {
-    DJS_TODO();
-  }
-  return (DJSCompletion){.abrupt = false,
-                         .value = entry->descriptor.as.data.value};
 }
 
 DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
                              DJSString *key, DJSValue value) {
 
-  DJSObjectEntry *existing = DJSObject_get_own_entry(object, key);
+  OptPropertyDescriptor existing =
+      DJS_OrdinaryGetOwnProperty(object, DJSPropertyKey_string(*key));
 
-  if (!existing) {
+  if (!existing.is_present) {
     object->properties = GC_malloc(sizeof(DJSObjectEntry));
     object->properties->key = DJSPropertyKey_string(*key);
     object->properties->descriptor =
