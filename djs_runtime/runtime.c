@@ -5,6 +5,7 @@
 #include "value.h"
 #include <gc.h>
 
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -52,7 +53,11 @@ DJSCompletion djs_object_get(DJSRuntime *UNUSED(runtime), DJSObject *object,
   if (entry == NULL) {
     return (DJSCompletion){.abrupt = false, .value = DJS_UNDEFINED};
   }
-  return (DJSCompletion){.abrupt = false, .value = entry->value};
+  if (!DJSProperty_is_data(entry->descriptor)) {
+    DJS_TODO();
+  }
+  return (DJSCompletion){.abrupt = false,
+                         .value = entry->descriptor.as.data.value};
 }
 
 DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
@@ -63,13 +68,14 @@ DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
   if (!existing) {
     object->properties = GC_malloc(sizeof(DJSObjectEntry));
     object->properties->key = DJSPropertyKey_string(*key);
-    object->properties->value = value;
+    object->properties->descriptor =
+        DJSProperty_data(value, DJS_PROPERTY_WRITABLE);
     object->properties->next = NULL;
   } else {
     DJSObjectEntry *new_entry = GC_malloc(sizeof(DJSObjectEntry));
     new_entry->next = object->properties;
     new_entry->key = DJSPropertyKey_string(*key);
-    new_entry->value = value;
+    new_entry->descriptor = DJSProperty_data(value, DJS_PROPERTY_WRITABLE);
     object->properties = new_entry;
   }
 
