@@ -6,7 +6,11 @@ mkdir -p target
 CC=clang
 CFLAGS="-Wall -fsanitize=undefined,address -L/opt/homebrew/lib -std=c11 -g -lgc -I/opt/homebrew/include"
 
-RUNTIME_SOURCES="runtime.c print.c"
+RUNTIME_SOURCES="
+  object.c
+  print.c
+  runtime.c 
+"
 
 for SOURCE in `ls test_*.c`; do
   echo "TEST: $SOURCE"

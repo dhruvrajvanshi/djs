@@ -29,7 +29,6 @@ typedef struct DJSCompletion {
 typedef struct DJSRuntime DJSRuntime;
 DJSRuntime *djs_new_runtime(void);
 void djs_free_runtime(DJSRuntime *);
-DJSObject *djs_new_object(DJSRuntime *);
 DJSString *djs_new_string(DJSRuntime *, const char *value);
 
 DJSCompletion djs_object_set(DJSRuntime *, DJSObject *obj, DJSString *key,
