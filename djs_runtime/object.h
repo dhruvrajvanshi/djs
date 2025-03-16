@@ -40,29 +40,35 @@ typedef struct DJSPropertyDescriptor {
   } as;
 } DJSPropertyDescriptor;
 
+MK_OPT(OptPropertyDescriptor, DJSPropertyDescriptor);
+
 static const DJSPropertyFlags DJS_PROPERTY_WRITABLE = 1 << 0;
 static const DJSPropertyFlags DJS_PROPERTY_ENUMERABLE = 1 << 1;
 static const DJSPropertyFlags DJS_PROPERTY_CONFIGURABLE = 1 << 2;
 static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
 
-static bool DJSProperty_is_writable(DJSPropertyDescriptor descriptor) {
+static bool __attribute__((unused))
+DJSProperty_is_writable(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_WRITABLE;
 }
-static bool DJSPRoperty_is_enumerable(DJSPropertyDescriptor descriptor) {
+static bool __attribute__((unused))
+DJSPRoperty_is_enumerable(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_ENUMERABLE;
 }
-static bool DJSProperty_is_configurable(DJSPropertyDescriptor descriptor) {
+static bool __attribute__((unused))
+DJSProperty_is_configurable(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_CONFIGURABLE;
 }
 static bool DJSProperty_is_accessor(DJSPropertyDescriptor descriptor) {
   return descriptor.flags & DJS_PROPERTY_TYPE_MASK;
 }
-static bool DJSProperty_is_data(DJSPropertyDescriptor descriptor) {
+static bool __attribute__((unused))
+DJSProperty_is_data(DJSPropertyDescriptor descriptor) {
   return !DJSProperty_is_accessor(descriptor);
 }
 
-static DJSPropertyDescriptor DJSProperty_data(DJSValue value,
-                                              DJSPropertyFlags flags) {
+static DJSPropertyDescriptor __attribute__((unused))
+DJSProperty_data(DJSValue value, DJSPropertyFlags flags) {
   assert(!(flags & DJS_PROPERTY_TYPE_MASK) &&
          "Property type should not be set");
   return (DJSPropertyDescriptor){.flags = flags,
@@ -103,3 +109,7 @@ static inline DJSValue DJSObject_as_value(DJSObject *object) {
 }
 
 DJSObject *DJS_MakeBasicObject(DJSRuntime *runtime);
+
+/// https://tc39.es/ecma262/#sec-ordinarygetownproperty
+OptPropertyDescriptor DJS_OrdinaryGetOwnProperty(DJSObject *obj,
+                                                 DJSPropertyKey);
