@@ -13,19 +13,6 @@ typedef struct DJSCompletion {
   bool abrupt;
 } DJSCompletion;
 
-#define DJS_PANIC(msg)                                                         \
-  do {                                                                         \
-    fprintf(stderr, "PANIC at %s:%d in function %s: %s\n", __FILE__, __LINE__, \
-            __FUNCTION__, msg);                                                \
-    exit(1);                                                                   \
-  } while (0)
-#define DJS_TODO()                                                             \
-  do {                                                                         \
-    fprintf(stderr, "TODO at %s:%d in function %s\n", __FILE__, __LINE__,      \
-            __FUNCTION__);                                                     \
-    exit(1);                                                                   \
-  } while (0)
-
 typedef struct DJSRuntime DJSRuntime;
 DJSRuntime *djs_new_runtime(void);
 void djs_free_runtime(DJSRuntime *);
