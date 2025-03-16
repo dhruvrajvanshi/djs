@@ -1,6 +1,8 @@
 #pragma once
 #include "./value.h"
+#include <assert.h>
 #include <stddef.h>
+#include <stdint.h>
 
 typedef struct DJSObjectEntry DJSObjectEntry;
 typedef struct DJSRuntime DJSRuntime;
@@ -20,9 +22,56 @@ typedef struct DJSObject {
   DJSObjectEntry *properties;
 } DJSObject;
 
+typedef struct DJSDataProperty {
+  DJSValue value;
+} DJSDataProperty;
+
+typedef struct DJSAccessorProperty {
+  DJSObject *get;
+  DJSObject *set;
+} DJSAccessorProperty;
+
+typedef uint8_t DJSPropertyFlags;
+typedef struct DJSPropertyDescriptor {
+  DJSPropertyFlags flags;
+  union {
+    DJSDataProperty data;
+    DJSAccessorProperty accessor;
+  } as;
+} DJSPropertyDescriptor;
+
+static const DJSPropertyFlags DJS_PROPERTY_WRITABLE = 1 << 0;
+static const DJSPropertyFlags DJS_PROPERTY_ENUMERABLE = 1 << 1;
+static const DJSPropertyFlags DJS_PROPERTY_CONFIGURABLE = 1 << 2;
+static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
+
+static bool DJSProperty_is_writable(DJSPropertyDescriptor descriptor) {
+  return descriptor.flags & DJS_PROPERTY_WRITABLE;
+}
+static bool DJSPRoperty_is_enumerable(DJSPropertyDescriptor descriptor) {
+  return descriptor.flags & DJS_PROPERTY_ENUMERABLE;
+}
+static bool DJSProperty_is_configurable(DJSPropertyDescriptor descriptor) {
+  return descriptor.flags & DJS_PROPERTY_CONFIGURABLE;
+}
+static bool DJSProperty_is_accessor(DJSPropertyDescriptor descriptor) {
+  return descriptor.flags & DJS_PROPERTY_TYPE_MASK;
+}
+static bool DJSProperty_is_data(DJSPropertyDescriptor descriptor) {
+  return !DJSProperty_is_accessor(descriptor);
+}
+
+static DJSPropertyDescriptor DJSProperty_data(DJSValue value,
+                                              DJSPropertyFlags flags) {
+  assert(!(flags & DJS_PROPERTY_TYPE_MASK) &&
+         "Property type should not be set");
+  return (DJSPropertyDescriptor){.flags = flags,
+                                 .as = {.data = {.value = value}}};
+}
+
 typedef struct DJSObjectEntry {
   DJSPropertyKey key;
-  DJSValue value;
+  DJSPropertyDescriptor descriptor;
   DJSObjectEntry *next;
 } DJSObjectEntry;
 
