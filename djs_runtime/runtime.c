@@ -36,7 +36,7 @@ static const DJSValue DJS_UNDEFINED = {.type = DJS_TYPE_UNDEFINED,
 
 DJSCompletion djs_object_get(DJSRuntime *UNUSED(runtime), DJSObject *object,
                              DJSString *key) {
-  OptPropertyDescriptor opt_descriptor =
+  OptDJSProperty opt_descriptor =
       DJS_OrdinaryGetOwnProperty(object, DJSPropertyKey_string(*key));
 
   if (opt_descriptor.is_present) {
@@ -54,7 +54,7 @@ DJSCompletion djs_object_get(DJSRuntime *UNUSED(runtime), DJSObject *object,
 DJSCompletion djs_object_set(DJSRuntime *UNUSED(runtime), DJSObject *object,
                              DJSString *key, DJSValue value) {
 
-  OptPropertyDescriptor existing =
+  OptDJSProperty existing =
       DJS_OrdinaryGetOwnProperty(object, DJSPropertyKey_string(*key));
 
   if (!existing.is_present) {
