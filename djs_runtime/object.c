@@ -1,6 +1,7 @@
 #include "./object.h"
 #include "./prelude.h"
 #include "gc.h"
+#include "property.h"
 #include <assert.h>
 
 void DJSObject_init(DJSObject *self) { self->properties = NULL; }
@@ -21,16 +22,15 @@ DJSObject *DJS_MakeBasicObject(DJSRuntime *UNUSED(runtime)) {
   }
 
 /// https://tc39.es/ecma262/#sec-ordinarygetownproperty
-OptPropertyDescriptor DJS_OrdinaryGetOwnProperty(DJSObject *obj,
-                                                 DJSPropertyKey key) {
+OptDJSProperty DJS_OrdinaryGetOwnProperty(DJSObject *obj, DJSPropertyKey key) {
   FOR_EACH_ENTRY(obj, entry, {
     if (DJSPropertyKey_eq(entry->key, key)) {
-      DJSPropertyDescriptor descriptor = entry->descriptor;
+      DJSProperty descriptor = entry->descriptor;
       if (!DJSProperty_is_data(descriptor)) {
         assert(DJSProperty_is_accessor(descriptor));
       }
-      return OptPropertyDescriptor_of(descriptor);
+      return OptDJSProperty_of(descriptor);
     };
   });
-  return OptPropertyDescriptor_empty();
+  return OptDJSProperty_empty();
 }
