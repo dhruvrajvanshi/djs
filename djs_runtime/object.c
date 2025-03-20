@@ -1,7 +1,7 @@
 #include "./object.h"
 #include "./prelude.h"
+#include "./property.h"
 #include "gc.h"
-#include "property.h"
 #include <assert.h>
 
 typedef struct DJSObjectVTable {
@@ -9,6 +9,8 @@ typedef struct DJSObjectVTable {
 } DJSObjectVTable;
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable;
+
+typedef struct DJSObjectEntry DJSObjectEntry;
 
 typedef struct DJSObject {
   DJSObjectEntry *properties;
