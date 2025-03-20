@@ -4,6 +4,16 @@
 #include "property.h"
 #include <assert.h>
 
+typedef struct DJSObject {
+  DJSObjectEntry *properties;
+} DJSObject;
+
+typedef struct DJSObjectEntry {
+  DJSPropertyKey key;
+  DJSProperty descriptor;
+  DJSObjectEntry *next;
+} DJSObjectEntry;
+
 void DJSObject_init(DJSObject *self) { self->properties = NULL; }
 
 DJSObject *DJS_MakeBasicObject(DJSRuntime *UNUSED(runtime)) {
