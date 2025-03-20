@@ -1,3 +1,4 @@
+#include "./runtime.h"
 #include <assert.h>
 
 #define ASSERT_EQEQEQ(left, right)                                             \
@@ -15,4 +16,8 @@
     exit(1);                                                                   \
   }
 
-int main(void) {}
+int main(void) {
+  DJSRuntime *runtime = djs_new_runtime();
+
+  djs_free_runtime(runtime);
+}
