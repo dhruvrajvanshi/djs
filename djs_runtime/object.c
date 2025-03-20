@@ -12,18 +12,12 @@ DJSObject *DJS_MakeBasicObject(DJSRuntime *UNUSED(runtime)) {
   return obj;
 }
 
-#define FOR_EACH_ENTRY(obj, entry, block)                                      \
-  {                                                                            \
-    DJSObjectEntry *entry = obj->properties;                                   \
-    while (entry) {                                                            \
-      block;                                                                   \
-      entry = entry->next;                                                     \
-    }                                                                          \
-  }
+#define FOR_EACH_ENTRY(obj, entry)                                             \
+  for (DJSObjectEntry *entry = obj->properties; entry; entry = entry->next)
 
 /// https://tc39.es/ecma262/#sec-ordinarygetownproperty
 OptDJSProperty DJS_OrdinaryGetOwnProperty(DJSObject *obj, DJSPropertyKey key) {
-  FOR_EACH_ENTRY(obj, entry, {
+  FOR_EACH_ENTRY(obj, entry) {
     if (DJSPropertyKey_eq(entry->key, key)) {
       DJSProperty descriptor = entry->descriptor;
       if (!DJSProperty_is_data(descriptor)) {
@@ -31,6 +25,6 @@ OptDJSProperty DJS_OrdinaryGetOwnProperty(DJSObject *obj, DJSPropertyKey key) {
       }
       return OptDJSProperty_of(descriptor);
     };
-  });
+  }
   return OptDJSProperty_empty();
 }
