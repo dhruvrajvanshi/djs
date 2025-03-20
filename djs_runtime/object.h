@@ -7,16 +7,7 @@
 
 typedef struct DJSObjectEntry DJSObjectEntry;
 typedef struct DJSRuntime DJSRuntime;
-
-typedef struct DJSObject {
-  DJSObjectEntry *properties;
-} DJSObject;
-
-typedef struct DJSObjectEntry {
-  DJSPropertyKey key;
-  DJSProperty descriptor;
-  DJSObjectEntry *next;
-} DJSObjectEntry;
+typedef struct DJSObject DJSObject;
 
 DJSObject *DJS_MakeBasicObject(DJSRuntime *runtime);
 
