@@ -4,8 +4,15 @@
 #include "property.h"
 #include <assert.h>
 
+typedef struct DJSObjectVTable {
+  OptDJSProperty (*GetOwnProperty)(DJSObject *obj, DJSPropertyKey key);
+} DJSObjectVTable;
+
+static const DJSObjectVTable DJSOrdinaryObjectVTable;
+
 typedef struct DJSObject {
   DJSObjectEntry *properties;
+  const DJSObjectVTable *vtable;
 } DJSObject;
 
 typedef struct DJSObjectEntry {
@@ -14,11 +21,14 @@ typedef struct DJSObjectEntry {
   DJSObjectEntry *next;
 } DJSObjectEntry;
 
-void DJSObject_init(DJSObject *self) { self->properties = NULL; }
+void DJSObject_init(DJSObject *self, const DJSObjectVTable *vtable) {
+  self->properties = NULL;
+  self->vtable = vtable;
+}
 
 DJSObject *DJS_MakeBasicObject(DJSRuntime *UNUSED(runtime)) {
   DJSObject *obj = GC_malloc(sizeof(DJSObject));
-  DJSObject_init(obj);
+  DJSObject_init(obj, &DJSOrdinaryObjectVTable);
   return obj;
 }
 
@@ -38,3 +48,7 @@ OptDJSProperty DJS_OrdinaryGetOwnProperty(DJSObject *obj, DJSPropertyKey key) {
   }
   return OptDJSProperty_empty();
 }
+
+static const DJSObjectVTable DJSOrdinaryObjectVTable = {
+    .GetOwnProperty = DJS_OrdinaryGetOwnProperty,
+};
