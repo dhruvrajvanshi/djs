@@ -1,5 +1,4 @@
 #pragma once
-#include "./prelude.h"
 #include <memory.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -51,4 +50,18 @@ typedef struct DJSValue {
 
 static inline DJSValue DJSString_to_value(DJSString *string) {
   return (DJSValue){.type = DJS_TYPE_STRING, .as = {.string = string}};
+}
+
+static inline DJSValue DJSValue_undefined() {
+  return (DJSValue){.type = DJS_TYPE_UNDEFINED, .as = {.undefined = true}};
+}
+static inline DJSValue DJSValue_object(DJSObject *object) {
+  return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
+}
+static inline DJSValue DJSValue_bool(bool value) {
+  return (DJSValue){.type = DJS_TYPE_BOOLEAN, .as = {.boolean = value}};
+}
+static inline DJSValue DJSValue_symbol(size_t value) {
+  return (DJSValue){.type = DJS_TYPE_SYMBOL,
+                    .as = {.symbol = (DJSSymbol){value}}};
 }

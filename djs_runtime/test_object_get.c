@@ -1,4 +1,7 @@
+#include "./object.h"
+#include "./property.h"
 #include "./runtime.h"
+#include "prelude.h"
 #include <assert.h>
 
 #define ASSERT_EQEQEQ(left, right)                                             \
@@ -18,6 +21,12 @@
 
 int main(void) {
   DJSRuntime *runtime = djs_new_runtime();
+  DJSObject *obj = DJS_MakeBasicObject(runtime);
+  DJSValue key = DJSValue_symbol(0);
+  DJSValue descriptor;
+  DJS_TODO();
+
+  DJSObject_DefineOwnProperty(runtime, obj, key, descriptor);
 
   djs_free_runtime(runtime);
 }
