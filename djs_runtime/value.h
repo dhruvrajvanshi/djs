@@ -18,14 +18,14 @@ typedef enum DJSValueType {
 
 typedef struct DJSString {
   size_t length;
-  const char *value;
+  const char* value;
 } DJSString;
 
 static inline bool DJSString_eq(DJSString left, DJSString right) {
   if (left.length != right.length) {
     return false;
   }
-  return memcmp((void *)left.value, (void *)right.value, left.length) == 0;
+  return memcmp((void*)left.value, (void*)right.value, left.length) == 0;
 }
 
 typedef struct DJSSymbol {
@@ -42,20 +42,20 @@ typedef struct DJSValue {
     bool null;
     bool boolean;
     double number;
-    DJSString *string;
-    DJSObject *object;
+    DJSString* string;
+    DJSObject* object;
     DJSSymbol symbol;
   } as;
 } DJSValue;
 
-static inline DJSValue DJSString_to_value(DJSString *string) {
+static inline DJSValue DJSString_to_value(DJSString* string) {
   return (DJSValue){.type = DJS_TYPE_STRING, .as = {.string = string}};
 }
 
 static inline DJSValue DJSValue_undefined() {
   return (DJSValue){.type = DJS_TYPE_UNDEFINED, .as = {.undefined = true}};
 }
-static inline DJSValue DJSValue_object(DJSObject *object) {
+static inline DJSValue DJSValue_object(DJSObject* object) {
   return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
 }
 static inline DJSValue DJSValue_bool(bool value) {

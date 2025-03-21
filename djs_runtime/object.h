@@ -1,9 +1,9 @@
 #pragma once
-#include "./completion.h"
-#include "./value.h"
 #include <assert.h>
 #include <stddef.h>
 #include <stdint.h>
+#include "./completion.h"
+#include "./value.h"
 
 typedef struct DJSRuntime DJSRuntime;
 typedef struct DJSObject DJSObject;
@@ -24,17 +24,20 @@ static inline DJSPropertyKey DJSPropertyKey_symbol(DJSSymbol symbol) {
                           .as = {.symbol = symbol}};
 }
 
-DJSObject *DJS_MakeBasicObject(DJSRuntime *runtime);
+DJSObject* DJS_MakeBasicObject(DJSRuntime* runtime);
 
-DJSCompletion DJSObject_IsExtensible(DJSRuntime *runtime, DJSObject *obj);
-DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime *runtime, DJSObject *obj,
+DJSCompletion DJSObject_IsExtensible(DJSRuntime* runtime, DJSObject* obj);
+DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime* runtime,
+                                          DJSObject* obj,
                                           DJSPropertyKey key,
-                                          DJSProperty *descriptor);
-DJSCompletion DJSObject_GetOwnProperty(DJSRuntime *runtime, DJSObject *obj,
+                                          DJSProperty* descriptor);
+DJSCompletion DJSObject_GetOwnProperty(DJSRuntime* runtime,
+                                       DJSObject* obj,
                                        DJSPropertyKey key);
-DJSCompletion DJSObject_CreateDataProperty(DJSRuntime *, DJSObject *obj,
+DJSCompletion DJSObject_CreateDataProperty(DJSRuntime*,
+                                           DJSObject* obj,
                                            DJSPropertyKey key,
-                                           DJSProperty *value);
+                                           DJSProperty* value);
 
 typedef uint8_t DJSPropertyFlags;
 
@@ -43,5 +46,6 @@ static const DJSPropertyFlags DJS_PROPERTY_ENUMERABLE = 1 << 1;
 static const DJSPropertyFlags DJS_PROPERTY_CONFIGURABLE = 1 << 2;
 static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
 
-DJSProperty *DJSProperty_new_data_property(DJSRuntime *runtime, DJSValue value,
+DJSProperty* DJSProperty_new_data_property(DJSRuntime* runtime,
+                                           DJSValue value,
                                            DJSPropertyFlags flags);
