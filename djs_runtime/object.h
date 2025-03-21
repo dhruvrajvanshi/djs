@@ -19,11 +19,29 @@ typedef struct DJSPropertyKey {
     DJSSymbol symbol;
   } as;
 } DJSPropertyKey;
+static inline DJSPropertyKey DJSPropertyKey_symbol(DJSSymbol symbol) {
+  return (DJSPropertyKey){.type = DJS_PROPERTY_KEY_SYMBOL,
+                          .as = {.symbol = symbol}};
+}
 
 DJSObject *DJS_MakeBasicObject(DJSRuntime *runtime);
 
 DJSCompletion DJSObject_IsExtensible(DJSRuntime *runtime, DJSObject *obj);
 DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime *runtime, DJSObject *obj,
-                                          DJSValue key, DJSValue descriptor);
+                                          DJSPropertyKey key,
+                                          DJSProperty *descriptor);
 DJSCompletion DJSObject_GetOwnProperty(DJSRuntime *runtime, DJSObject *obj,
-                                       DJSValue key);
+                                       DJSPropertyKey key);
+DJSCompletion DJSObject_CreateDataProperty(DJSRuntime *, DJSObject *obj,
+                                           DJSPropertyKey key,
+                                           DJSProperty *value);
+
+typedef uint8_t DJSPropertyFlags;
+
+static const DJSPropertyFlags DJS_PROPERTY_WRITABLE = 1 << 0;
+static const DJSPropertyFlags DJS_PROPERTY_ENUMERABLE = 1 << 1;
+static const DJSPropertyFlags DJS_PROPERTY_CONFIGURABLE = 1 << 2;
+static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
+
+DJSProperty *DJSProperty_new_data_property(DJSRuntime *runtime, DJSValue value,
+                                           DJSPropertyFlags flags);

@@ -1,8 +1,8 @@
 #include "./object.h"
 #include "./property.h"
 #include "./runtime.h"
-#include "prelude.h"
 #include <assert.h>
+#include <gc.h>
 
 #define ASSERT_EQEQEQ(left, right)                                             \
   if (!DJS_IsStrictlyEqual(left, right)) {                                     \
@@ -22,9 +22,9 @@
 int main(void) {
   DJSRuntime *runtime = djs_new_runtime();
   DJSObject *obj = DJS_MakeBasicObject(runtime);
-  DJSValue key = DJSValue_symbol(0);
-  DJSValue descriptor;
-  DJS_TODO();
+  DJSPropertyKey key = DJSPropertyKey_symbol((DJSSymbol){0});
+  DJSProperty *descriptor = DJSProperty_new_data_property(
+      runtime, DJSValue_bool(true), DJS_PROPERTY_WRITABLE);
 
   DJSObject_DefineOwnProperty(runtime, obj, key, descriptor);
 
