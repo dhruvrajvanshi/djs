@@ -1,9 +1,11 @@
 #include "./comparison_ops.h"
-#include "value.h"
 #include <assert.h>
 #include <math.h>
+#include "value.h"
 
-bool DJS_SameType(DJSValue x, DJSValue y) { return x.type == y.type; }
+bool DJS_SameType(DJSValue x, DJSValue y) {
+  return x.type == y.type;
+}
 
 /// https://tc39.es/ecma262/#sec-numeric-types-number-equal
 bool NumberEqual(double x, double y) {
