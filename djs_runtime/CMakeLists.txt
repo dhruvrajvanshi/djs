@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.27)
 project(djs_runtime)
 
 SET_PROPERTY(GLOBAL PROPERTY C_STANDARD 23)
+enable_testing()
 
 # Find the bdw-gc package
 find_path(BDWGC_INCLUDE_DIR gc/gc.h
@@ -27,5 +28,7 @@ endif()
 add_executable(test_object_get test_object_get.c runtime.c object.c print.c)
 target_include_directories(test_object_get PRIVATE ${BDWGC_INCLUDE_DIR})
 target_link_libraries(test_object_get PRIVATE ${BDWGC_LIBRARY})
+
+add_test(NAME test_object_get COMMAND test_object_get)
 
 
