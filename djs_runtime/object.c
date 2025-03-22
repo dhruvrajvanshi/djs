@@ -180,6 +180,17 @@ DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime* runtime,
   return obj->vtable->DefineOwnProperty(runtime, obj, key, descriptor);
 }
 
+DJSCompletion DJSObject_CreateDataProperty(DJSRuntime* runtime,
+                                           DJSObject* obj,
+                                           DJSPropertyKey key,
+                                           DJSValue value) {
+  DJSProperty* descriptor = DJSProperty_new_data_property(
+      runtime, value,
+      DJS_PROPERTY_WRITABLE | DJS_PROPERTY_ENUMERABLE |
+          DJS_PROPERTY_CONFIGURABLE);
+  return obj->vtable->DefineOwnProperty(runtime, obj, key, descriptor);
+}
+
 DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
                                        DJSObject* obj,
                                        DJSPropertyKey key) {
