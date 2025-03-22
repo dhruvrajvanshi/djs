@@ -179,3 +179,15 @@ DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime* runtime,
                                           DJSProperty* descriptor) {
   return obj->vtable->DefineOwnProperty(runtime, obj, key, descriptor);
 }
+
+DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
+                                       DJSObject* obj,
+                                       DJSPropertyKey key) {
+  DJSValue own_property;
+  DJS_COMPLETION_SET(own_property, DJSObject_GetOwnProperty(runtime, obj, key));
+  if (DJSValue_is_undefined(own_property)) {
+    return DJSCompletion_normal(DJSValue_bool(false));
+  } else {
+    return DJSCompletion_normal(DJSValue_bool(true));
+  }
+}

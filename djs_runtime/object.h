@@ -32,6 +32,9 @@ DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime* runtime,
 DJSCompletion DJSObject_GetOwnProperty(DJSRuntime* runtime,
                                        DJSObject* obj,
                                        DJSPropertyKey key);
+DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
+                                       DJSObject* obj,
+                                       DJSPropertyKey key);
 DJSCompletion DJSObject_CreateDataProperty(DJSRuntime*,
                                            DJSObject* obj,
                                            DJSPropertyKey key,

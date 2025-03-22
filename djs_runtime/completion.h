@@ -23,3 +23,10 @@ static inline DJSCompletion DJSCompletion_normal(DJSValue value) {
 static inline DJSCompletion DJSCompletion_abrupt(DJSValue value) {
   return (DJSCompletion){.value = value, .abrupt = true};
 }
+
+static inline bool DJSCompletion_is_abrupt(DJSCompletion completion) {
+  return completion.abrupt;
+}
+static inline bool DJSCompletion_is_normal(DJSCompletion completion) {
+  return !completion.abrupt;
+}
