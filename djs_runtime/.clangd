@@ -1,9 +1,0 @@
-CompileFlags:
-  Add:
-    - -Wall
-    - -Wextra
-    - -std=c11
-    - -xc
-    - -lgc
-    - -I/opt/homebrew/include
-    - -L/opt/homebrew/lib
