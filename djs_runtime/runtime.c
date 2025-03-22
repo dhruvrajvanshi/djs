@@ -5,17 +5,18 @@
 #include "object.h"
 #include "value.h"
 
-#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 typedef struct DJSRuntime {
+  void* _;
 } DJSRuntime;
 
-DJSRuntime* djs_new_runtime() {
+DJSRuntime* djs_new_runtime(void) {
   GC_init();
   DJSRuntime* runtime = malloc(sizeof(DJSRuntime));
+  runtime->_ = NULL;
   return runtime;
 }
 void djs_free_runtime(DJSRuntime* runtime) {
