@@ -1,6 +1,7 @@
 #include "./object.h"
 #include <assert.h>
 #include <gc.h>
+#include <stdio.h>
 #include "./completion.h"
 #include "./prelude.h"
 #include "./value.h"
@@ -14,8 +15,29 @@ typedef struct DJSAccessorProperty {
   DJSObject* set;
 } DJSAccessorProperty;
 
+typedef struct DJSObjectVTable {
+  DJSCompletion (*GetOwnProperty)(DJSRuntime*,
+                                  DJSObject* self,
+                                  DJSPropertyKey key);
+  DJSCompletion (*DefineOwnProperty)(DJSRuntime*,
+                                     DJSObject* self,
+                                     DJSPropertyKey key,
+                                     DJSProperty* descriptor);
+  DJSCompletion (*IsExtensible)(DJSRuntime*, DJSObject*);
+} DJSObjectVTable;
+
+static const DJSObjectVTable DJSOrdinaryObjectVTable;
+
+typedef struct DJSObjectEntry DJSObjectEntry;
+
+typedef struct DJSObject {
+  DJSObjectEntry* properties;
+  bool is_extensible;
+  const DJSObjectVTable* vtable;
+} DJSObject;
+
 typedef struct DJSProperty {
-  DJSObject* object;
+  DJSObject object;
   DJSPropertyFlags flags;
   union {
     DJSDataProperty data;
@@ -47,6 +69,9 @@ DJSProperty* DJSProperty_new_data_property(DJSRuntime* UNUSED(runtime),
                                            DJSValue value,
                                            DJSPropertyFlags flags) {
   DJSProperty* result = GC_MALLOC(sizeof(DJSProperty));
+  result->object.is_extensible = true;
+  result->object.vtable = &DJSOrdinaryObjectVTable;
+  result->object.properties = NULL;
   result->flags = flags | (DJS_PROPERTY_TYPE_MASK & 0);
   result->as.data.value = value;
   return result;
@@ -79,27 +104,6 @@ static inline bool DJSPropertyKey_eq(DJSPropertyKey left,
   }
 }
 
-typedef struct DJSObjectVTable {
-  DJSCompletion (*GetOwnProperty)(DJSRuntime*,
-                                  DJSObject* self,
-                                  DJSPropertyKey key);
-  DJSCompletion (*DefineOwnProperty)(DJSRuntime*,
-                                     DJSObject* self,
-                                     DJSPropertyKey key,
-                                     DJSProperty* descriptor);
-  DJSCompletion (*IsExtensible)(DJSRuntime*, DJSObject*);
-} DJSObjectVTable;
-
-static const DJSObjectVTable DJSOrdinaryObjectVTable;
-
-typedef struct DJSObjectEntry DJSObjectEntry;
-
-typedef struct DJSObject {
-  DJSObjectEntry* properties;
-  bool is_extensible;
-  const DJSObjectVTable* vtable;
-} DJSObject;
-
 typedef struct DJSObjectEntry {
   DJSPropertyKey key;
   DJSProperty* descriptor;
@@ -110,7 +114,7 @@ void DJSObject_init(DJSObject* self, const DJSObjectVTable* vtable) {
   *self = (DJSObject){0};
   self->properties = NULL;
   self->vtable = vtable;
-  self->is_extensible = false;
+  self->is_extensible = true;
 }
 
 DJSObject* DJS_MakeBasicObject(DJSRuntime* UNUSED(runtime)) {
@@ -138,18 +142,49 @@ DJSCompletion OrdinaryGetOwnProperty(DJSRuntime* UNUSED(runtime),
   return DJSCompletion_normal(DJSValue_undefined());
 }
 
+bool ValidateAndApplyPropertyDescriptor(DJSObject* O,
+                                        DJSPropertyKey P,
+                                        DJSValue extensible,
+                                        DJSProperty* Desc,
+                                        DJSValue current
+
+) {
+  if (DJSValue_is_undefined(current)) {
+    if (DJSValue_is_false(extensible)) {
+      return false;
+    }
+    if (O == NULL) {
+      return true;
+    }
+    if (DJSProperty_is_accessor(*Desc)) {
+      DJS_TODO();
+    } else {
+      DJSObjectEntry* entry = GC_MALLOC(sizeof(DJSObjectEntry));
+      entry->key = P;
+      entry->next = O->properties;
+      entry->descriptor = GC_MALLOC(sizeof(DJSProperty));
+      *entry->descriptor = *Desc;
+      O->properties = entry;
+      return true;
+    }
+  }
+  DJS_TODO();
+}
+
 /// https://tc39.es/ecma262/#sec-ordinarydefineownproperty
 DJSCompletion OrdinaryDefineOwnProperty(DJSRuntime* runtime,
                                         DJSObject* self,
                                         DJSPropertyKey key,
                                         DJSProperty* descriptor) {
-  DJSValue obj;
-  DJS_COMPLETION_SET(obj, DJSObject_GetOwnProperty(runtime, self, key));
+  DJSValue current;
+  DJS_COMPLETION_SET(current, DJSObject_GetOwnProperty(runtime, self, key));
 
   DJSValue extensible;
   DJS_COMPLETION_SET(extensible, DJSObject_IsExtensible(runtime, self));
 
-  DJS_TODO();
+  bool result = ValidateAndApplyPropertyDescriptor(self, key, extensible,
+                                                   descriptor, current);
+  return DJSCompletion_normal(DJSValue_bool(result));
 }
 
 DJSCompletion OrdinaryIsExtensible(DJSRuntime* UNUSED(runtime),

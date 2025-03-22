@@ -67,6 +67,12 @@ static inline DJSValue DJSValue_bool(bool value) {
 static inline bool DJSValue_is_bool(DJSValue value) {
   return value.type == DJS_TYPE_BOOLEAN;
 }
+static inline bool DJSValue_is_false(DJSValue value) {
+  return DJSValue_is_bool(value) && !value.as.boolean;
+}
+static inline bool DJSValue_is_true(DJSValue value) {
+  return DJSValue_is_bool(value) && value.as.boolean;
+}
 static inline DJSValue DJSValue_symbol(size_t value) {
   return (DJSValue){.type = DJS_TYPE_SYMBOL,
                     .as = {.symbol = (DJSSymbol){value}}};
