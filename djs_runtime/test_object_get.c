@@ -24,11 +24,18 @@ int main(void) {
   DJSRuntime* runtime = djs_new_runtime();
   DJSObject* obj = DJS_MakeBasicObject(runtime);
   DJSPropertyKey key = DJSPropertyKey_symbol((DJSSymbol){0});
-  DJSProperty* descriptor = DJSProperty_new_data_property(
-      runtime, DJSValue_bool(true), DJS_PROPERTY_WRITABLE);
+  DJSCompletion completion;
 
-  DJSObject_DefineOwnProperty(runtime, obj, key, descriptor);
-  DJSCompletion completion = DJSObject_HasOwnProperty(runtime, obj, key);
+  completion =
+      DJSObject_CreateDataProperty(runtime, obj, key, DJSValue_bool(true));
+  assert(DJSCompletion_is_normal(completion) ||
+         "Expected CreateDataProperty to return a normal completion");
+  assert(DJSValue_is_bool(completion.value) ||
+         "Expected CreateDataProperty to return a boolean");
+  assert(completion.value.as.boolean ||
+         "Expected CreateDataProperty to return true");
+
+  completion = DJSObject_HasOwnProperty(runtime, obj, key);
   assert(DJSCompletion_is_normal(completion));
   assert(DJSValue_is_bool(completion.value));
   assert(completion.value.as.boolean);
