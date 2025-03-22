@@ -52,14 +52,20 @@ static inline DJSValue DJSString_to_value(DJSString* string) {
   return (DJSValue){.type = DJS_TYPE_STRING, .as = {.string = string}};
 }
 
-static inline DJSValue DJSValue_undefined() {
+static inline DJSValue DJSValue_undefined(void) {
   return (DJSValue){.type = DJS_TYPE_UNDEFINED, .as = {.undefined = true}};
+}
+static inline bool DJSValue_is_undefined(DJSValue value) {
+  return value.type == DJS_TYPE_UNDEFINED;
 }
 static inline DJSValue DJSValue_object(DJSObject* object) {
   return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
 }
 static inline DJSValue DJSValue_bool(bool value) {
   return (DJSValue){.type = DJS_TYPE_BOOLEAN, .as = {.boolean = value}};
+}
+static inline bool DJSValue_is_bool(DJSValue value) {
+  return value.type == DJS_TYPE_BOOLEAN;
 }
 static inline DJSValue DJSValue_symbol(size_t value) {
   return (DJSValue){.type = DJS_TYPE_SYMBOL,

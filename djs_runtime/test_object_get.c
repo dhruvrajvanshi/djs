@@ -1,5 +1,6 @@
 #include <assert.h>
 #include <gc.h>
+#include "./completion.h"
 #include "./object.h"
 #include "./property.h"
 #include "./runtime.h"
@@ -27,6 +28,10 @@ int main(void) {
       runtime, DJSValue_bool(true), DJS_PROPERTY_WRITABLE);
 
   DJSObject_DefineOwnProperty(runtime, obj, key, descriptor);
+  DJSCompletion completion = DJSObject_HasOwnProperty(runtime, obj, key);
+  assert(DJSCompletion_is_normal(completion));
+  assert(DJSValue_is_bool(completion.value));
+  assert(completion.value.as.boolean);
 
   djs_free_runtime(runtime);
 }
