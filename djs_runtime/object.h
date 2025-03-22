@@ -38,7 +38,7 @@ DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
 DJSCompletion DJSObject_CreateDataProperty(DJSRuntime*,
                                            DJSObject* obj,
                                            DJSPropertyKey key,
-                                           DJSProperty* value);
+                                           DJSValue value);
 
 typedef uint8_t DJSPropertyFlags;
 
