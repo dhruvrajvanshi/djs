@@ -27,6 +27,7 @@ typedef struct DJSObjectVTable {
 } DJSObjectVTable;
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable;
+static const DJSObjectVTable DJSPropertyVTable;
 
 typedef struct DJSObjectEntry DJSObjectEntry;
 
@@ -56,30 +57,41 @@ static inline bool DJSProperty_is_enumerable(DJSProperty property) {
 static inline bool DJSProperty_is_configurable(DJSProperty property) {
   return property.flags & DJS_PROPERTY_CONFIGURABLE;
 }
-static inline bool DJSProperty_is_accessor(DJSProperty property) {
-  return property.flags & DJS_PROPERTY_TYPE_MASK;
+bool DJSProperty_is_accessor(const DJSProperty* property) {
+  return property->flags & DJS_PROPERTY_TYPE_MASK;
 }
-static inline bool DJSProperty_is_data(DJSProperty property) {
+bool DJSProperty_is_data(const DJSProperty* property) {
   return !DJSProperty_is_accessor(property);
 }
 static inline DJSValue DJSProperty_as_value(DJSProperty* property) {
   return DJSValue_object((DJSObject*)property);
+}
+
+DJSValue DJSProperty_value(DJSProperty* property) {
+  assert(DJSProperty_is_data(property));
+  return property->as.data.value;
+}
+
+/// Returns NULL if the value is not a property.
+DJSProperty* DJSProperty_from_value(DJSValue value) {
+  if (value.type != DJS_TYPE_OBJECT) {
+    return NULL;
+  }
+  if (value.as.object->vtable != &DJSPropertyVTable) {
+    return NULL;
+  }
+  return (DJSProperty*)value.as.object;
 }
 DJSProperty* DJSProperty_new_data_property(DJSRuntime* UNUSED(runtime),
                                            DJSValue value,
                                            DJSPropertyFlags flags) {
   DJSProperty* result = GC_MALLOC(sizeof(DJSProperty));
   result->object.is_extensible = true;
-  result->object.vtable = &DJSOrdinaryObjectVTable;
+  result->object.vtable = &DJSPropertyVTable;
   result->object.properties = NULL;
   result->flags = flags | (DJS_PROPERTY_TYPE_MASK & 0);
   result->as.data.value = value;
   return result;
-}
-
-static inline DJSValue DJSProperty_value(DJSProperty property) {
-  assert(DJSProperty_is_data(property));
-  return property.as.data.value;
 }
 
 static DJSProperty __attribute__((unused))
@@ -133,8 +145,8 @@ DJSCompletion OrdinaryGetOwnProperty(DJSRuntime* UNUSED(runtime),
   FOR_EACH_ENTRY(obj, entry) {
     if (DJSPropertyKey_eq(entry->key, key)) {
       DJSProperty* descriptor = entry->descriptor;
-      if (!DJSProperty_is_data(*descriptor)) {
-        assert(DJSProperty_is_accessor(*descriptor));
+      if (!DJSProperty_is_data(descriptor)) {
+        assert(DJSProperty_is_accessor(descriptor));
       }
       return DJSCompletion_normal(DJSProperty_as_value(descriptor));
     };
@@ -156,7 +168,7 @@ bool ValidateAndApplyPropertyDescriptor(DJSObject* O,
     if (O == NULL) {
       return true;
     }
-    if (DJSProperty_is_accessor(*Desc)) {
+    if (DJSProperty_is_accessor(Desc)) {
       DJS_TODO();
     } else {
       DJSObjectEntry* entry = GC_MALLOC(sizeof(DJSObjectEntry));
@@ -193,6 +205,11 @@ DJSCompletion OrdinaryIsExtensible(DJSRuntime* UNUSED(runtime),
 }
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable = {
+    .GetOwnProperty = OrdinaryGetOwnProperty,
+    .DefineOwnProperty = OrdinaryDefineOwnProperty,
+    .IsExtensible = OrdinaryIsExtensible,
+};
+static const DJSObjectVTable DJSPropertyVTable = {
     .GetOwnProperty = OrdinaryGetOwnProperty,
     .DefineOwnProperty = OrdinaryDefineOwnProperty,
     .IsExtensible = OrdinaryIsExtensible,
