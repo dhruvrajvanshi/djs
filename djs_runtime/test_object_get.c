@@ -60,6 +60,15 @@ int main(void) {
       DJSObject_CreateDataProperty(runtime, obj, key, DJSValue_bool(false));
   assert(DJSCompletion_is_normal(completion) &&
          "Expected CreateDataProperty to return a normal completion");
+  ASSERT_EQEQEQ(completion.value, DJSValue_bool(true));
+
+  completion = DJSObject_GetOwnProperty(runtime, obj, key);
+  assert(DJSCompletion_is_normal(completion));
+  DJSProperty* updated_property = DJSProperty_from_value(completion.value);
+  assert(updated_property && "Expected the completion to contain a property");
+  assert(DJSProperty_is_data(updated_property) &&
+         "Expected the property to be a data property");
+  ASSERT_EQEQEQ(DJSProperty_value(updated_property), DJSValue_bool(false));
 
   djs_free_runtime(runtime);
 }
