@@ -45,3 +45,13 @@ bool DJS_IsStrictlyEqual(DJSValue x, DJSValue y) {
   }
   return DJS_SameValueNonNumber(x, y);
 }
+
+bool DJS_SameValue(DJSValue x, DJSValue y) {
+  if (!DJS_SameType(x, y)) {
+    return false;
+  }
+  if (x.type == DJS_TYPE_NUMBER) {
+    return NumberEqual(x.as.number, y.as.number);
+  }
+  return DJS_SameValueNonNumber(x, y);
+}
