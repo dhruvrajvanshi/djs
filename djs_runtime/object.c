@@ -1,7 +1,6 @@
 #include "./object.h"
 #include <assert.h>
 #include <gc.h>
-#include <stdio.h>
 #include "./completion.h"
 #include "./prelude.h"
 #include "./value.h"
@@ -48,13 +47,7 @@ typedef struct DJSProperty {
 
 MK_OPT(OptDJSProperty, DJSProperty);
 
-static inline bool DJSProperty_is_writable(DJSProperty property) {
-  return property.flags & DJS_PROPERTY_WRITABLE;
-}
-static inline bool DJSProperty_is_enumerable(DJSProperty property) {
-  return property.flags & DJS_PROPERTY_ENUMERABLE;
-}
-static inline bool DJSProperty_is_configurable(DJSProperty property) {
+static bool DJSProperty_is_configurable(DJSProperty property) {
   return property.flags & DJS_PROPERTY_CONFIGURABLE;
 }
 bool DJSProperty_is_accessor(const DJSProperty* property) {
