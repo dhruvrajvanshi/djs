@@ -13,12 +13,6 @@
 #define UNUSED_FUNCTION(x) UNUSED_##x
 #endif
 
-#ifdef __GNUC__
-#define auto __auto_type
-#else
-#error "auto is not supported"
-#endif
-
 #define MK_OPT(Name, T)                                           \
   typedef struct Name {                                           \
     bool is_present;                                              \
