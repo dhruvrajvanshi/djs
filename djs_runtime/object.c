@@ -1,9 +1,9 @@
 #include "./object.h"
 #include <assert.h>
+#include <gc.h>
 #include "./completion.h"
 #include "./prelude.h"
 #include "./value.h"
-#include "gc.h"
 
 typedef struct DJSDataProperty {
   DJSValue value;
