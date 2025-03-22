@@ -180,7 +180,23 @@ bool ValidateAndApplyPropertyDescriptor(DJSObject* O,
       return true;
     }
   }
-  DJS_TODO();
+  DJSProperty* current_property = DJSProperty_from_value(current);
+  assert(current_property && "Expected current to be a property");
+  if (!DJSProperty_is_configurable(*current_property)) {
+    DJS_TODO();
+  }
+  if (O != NULL) {
+    if (DJSProperty_is_data(current_property) &&
+        DJSProperty_is_accessor(Desc)) {
+      DJS_TODO();
+    } else if (DJSProperty_is_accessor(current_property) &&
+               DJSProperty_is_data(Desc)) {
+      DJS_TODO();
+    } else {
+      *current_property = *Desc;
+    }
+  }
+  return true;
 }
 
 /// https://tc39.es/ecma262/#sec-ordinarydefineownproperty
