@@ -1,5 +1,4 @@
 #include <assert.h>
-#include <gc.h>
 #include "./completion.h"
 #include "./object.h"
 #include "./print.h"
