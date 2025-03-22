@@ -50,3 +50,6 @@ static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
 DJSProperty* DJSProperty_new_data_property(DJSRuntime* runtime,
                                            DJSValue value,
                                            DJSPropertyFlags flags);
+DJSProperty* DJSProperty_from_value(DJSValue value);
+bool DJSProperty_is_data(const DJSProperty* property);
+DJSValue DJSProperty_value(DJSProperty* property);
