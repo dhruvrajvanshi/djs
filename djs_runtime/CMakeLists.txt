@@ -6,11 +6,11 @@ SET_PROPERTY(GLOBAL PROPERTY C_STANDARD 23)
 enable_testing()
 
 # For all targets
-if(MSVC)
-    add_compile_options(/W4 /WX)
-else()
-    add_compile_options(-Wall -Wextra -Wpedantic)
-endif()
+# if(MSVC)
+#     add_compile_options(/W4 /WX)
+# else()
+#     add_compile_options(-Wall -Wextra -Wpedantic)
+# endif()
 
 # Find the bdw-gc package
 find_path(BDWGC_INCLUDE_DIR gc/gc.h

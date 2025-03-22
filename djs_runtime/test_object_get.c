@@ -2,8 +2,10 @@
 #include <gc.h>
 #include "./completion.h"
 #include "./object.h"
+#include "./print.h"
 #include "./property.h"
 #include "./runtime.h"
+#include "./value.h"
 
 #define ASSERT_EQEQEQ(left, right)                                           \
   if (!DJS_IsStrictlyEqual(left, right)) {                                   \
@@ -25,20 +27,19 @@ int main(void) {
   DJSObject* obj = DJS_MakeBasicObject(runtime);
   DJSPropertyKey key = DJSPropertyKey_symbol((DJSSymbol){0});
   DJSCompletion completion;
+  completion = DJSObject_HasOwnProperty(runtime, obj, key);
+  assert(DJSCompletion_is_normal(completion));
+  ASSERT_EQEQEQ(completion.value, DJSValue_bool(false));
 
   completion =
       DJSObject_CreateDataProperty(runtime, obj, key, DJSValue_bool(true));
   assert(DJSCompletion_is_normal(completion) ||
          "Expected CreateDataProperty to return a normal completion");
-  assert(DJSValue_is_bool(completion.value) ||
-         "Expected CreateDataProperty to return a boolean");
-  assert(completion.value.as.boolean ||
-         "Expected CreateDataProperty to return true");
+  ASSERT_EQEQEQ(completion.value, DJSValue_bool(true));
 
   completion = DJSObject_HasOwnProperty(runtime, obj, key);
   assert(DJSCompletion_is_normal(completion));
-  assert(DJSValue_is_bool(completion.value));
-  assert(completion.value.as.boolean);
+  ASSERT_EQEQEQ(completion.value, DJSValue_bool(true));
 
   djs_free_runtime(runtime);
 }
