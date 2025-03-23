@@ -1,10 +1,6 @@
 #pragma once
 
-#include <assert.h>
 #include <stdbool.h>
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include "./object.h"
 #include "./value.h"
 
