@@ -4,7 +4,7 @@
 #include "./value.h"
 
 typedef struct DJSRuntime DJSRuntime;
-typedef struct DJSObject DJSObject;
+typedef DJSObject DJSObject;
 typedef struct DJSProperty DJSProperty;
 
 typedef struct DJSPropertyKey {
