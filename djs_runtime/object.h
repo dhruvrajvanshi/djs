@@ -6,12 +6,12 @@
 typedef struct DJSRuntime DJSRuntime;
 typedef DJSObject DJSObject;
 typedef struct DJSProperty DJSProperty;
-
+enum DJSPropertyKeyType {
+  DJS_PROPERTY_KEY_STRING = 0,
+  DJS_PROPERTY_KEY_SYMBOL = 1,
+};
 typedef struct DJSPropertyKey {
-  enum {
-    DJS_PROPERTY_KEY_STRING = 0,
-    DJS_PROPERTY_KEY_SYMBOL = 1,
-  } type;
+  enum DJSPropertyKeyType type;
   union {
     DJSString string;
     DJSSymbol symbol;
