@@ -2,48 +2,12 @@
 #include <assert.h>
 #include <gc.h>
 #include "./completion.h"
+#include "./object_layout.h"
 #include "./prelude.h"
 #include "./value.h"
 
-typedef struct DJSDataProperty {
-  DJSValue value;
-} DJSDataProperty;
-
-typedef struct DJSAccessorProperty {
-  DJSObject* get;
-  DJSObject* set;
-} DJSAccessorProperty;
-
-typedef struct DJSObjectVTable {
-  DJSCompletion (*GetOwnProperty)(DJSRuntime*,
-                                  DJSObject* self,
-                                  DJSPropertyKey key);
-  DJSCompletion (*DefineOwnProperty)(DJSRuntime*,
-                                     DJSObject* self,
-                                     DJSPropertyKey key,
-                                     DJSProperty* descriptor);
-  DJSCompletion (*IsExtensible)(DJSRuntime*, DJSObject*);
-} DJSObjectVTable;
-
 static const DJSObjectVTable DJSOrdinaryObjectVTable;
 static const DJSObjectVTable DJSPropertyVTable;
-
-typedef struct DJSObjectEntry DJSObjectEntry;
-
-typedef struct DJSObject {
-  DJSObjectEntry* properties;
-  bool is_extensible;
-  const DJSObjectVTable* vtable;
-} DJSObject;
-
-typedef struct DJSProperty {
-  DJSObject object;
-  DJSPropertyFlags flags;
-  union {
-    DJSDataProperty data;
-    DJSAccessorProperty accessor;
-  } as;
-} DJSProperty;
 
 MK_OPT(OptDJSProperty, DJSProperty);
 
@@ -109,12 +73,6 @@ static inline bool DJSPropertyKey_eq(DJSPropertyKey left,
   }
 }
 
-typedef struct DJSObjectEntry {
-  DJSPropertyKey key;
-  DJSProperty* descriptor;
-  DJSObjectEntry* next;
-} DJSObjectEntry;
-
 void DJSObject_init(DJSObject* self, const DJSObjectVTable* vtable) {
   assert(self != NULL);
   *self = (DJSObject){0};
@@ -128,9 +86,6 @@ DJSObject* DJS_MakeBasicObject(DJSRuntime* UNUSED(runtime)) {
   DJSObject_init(obj, &DJSOrdinaryObjectVTable);
   return obj;
 }
-
-#define FOR_EACH_ENTRY(obj, entry) \
-  for (DJSObjectEntry* entry = obj->properties; entry; entry = entry->next)
 
 /// https://tc39.es/ecma262/#sec-ordinarygetownproperty
 DJSCompletion OrdinaryGetOwnProperty(DJSRuntime* UNUSED(runtime),
