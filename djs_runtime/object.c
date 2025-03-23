@@ -116,6 +116,7 @@ typedef struct DJSObjectEntry {
 } DJSObjectEntry;
 
 void DJSObject_init(DJSObject* self, const DJSObjectVTable* vtable) {
+  assert(self != NULL);
   *self = (DJSObject){0};
   self->properties = NULL;
   self->vtable = vtable;
@@ -148,10 +149,10 @@ DJSCompletion OrdinaryGetOwnProperty(DJSRuntime* UNUSED(runtime),
 }
 
 bool ValidateAndApplyPropertyDescriptor(DJSObject* O,
-                                        DJSPropertyKey P,
-                                        DJSValue extensible,
-                                        DJSProperty* Desc,
-                                        DJSValue current
+                                        const DJSPropertyKey P,
+                                        const DJSValue extensible,
+                                        const DJSProperty* Desc,
+                                        const DJSValue current
 
 ) {
   if (DJSValue_is_undefined(current)) {
@@ -174,7 +175,7 @@ bool ValidateAndApplyPropertyDescriptor(DJSObject* O,
     }
   }
   DJSProperty* current_property = DJSProperty_from_value(current);
-  assert(current_property && "Expected current to be a property");
+  assert(current_property);
   if (!DJSProperty_is_configurable(*current_property)) {
     DJS_TODO();
   }
