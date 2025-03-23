@@ -73,14 +73,6 @@ static inline bool DJSPropertyKey_eq(DJSPropertyKey left,
   }
 }
 
-void DJSObject_init(DJSObject* self, const DJSObjectVTable* vtable) {
-  assert(self != NULL);
-  *self = (DJSObject){0};
-  self->properties = NULL;
-  self->vtable = vtable;
-  self->is_extensible = true;
-}
-
 DJSObject* DJS_MakeBasicObject(DJSRuntime* UNUSED(runtime)) {
   DJSObject* obj = GC_malloc(sizeof(DJSObject));
   DJSObject_init(obj, &DJSOrdinaryObjectVTable);
@@ -169,15 +161,11 @@ DJSCompletion OrdinaryIsExtensible(DJSRuntime* UNUSED(runtime),
   return DJSCompletion_normal(DJSValue_bool(obj->is_extensible));
 }
 
-static const DJSObjectVTable DJSOrdinaryObjectVTable = {
-    .GetOwnProperty = OrdinaryGetOwnProperty,
-    .DefineOwnProperty = OrdinaryDefineOwnProperty,
-    .IsExtensible = OrdinaryIsExtensible,
-};
 static const DJSObjectVTable DJSPropertyVTable = {
     .GetOwnProperty = OrdinaryGetOwnProperty,
     .DefineOwnProperty = OrdinaryDefineOwnProperty,
     .IsExtensible = OrdinaryIsExtensible,
+    .Call = NULL,
 };
 
 DJSCompletion DJSObject_IsExtensible(DJSRuntime* runtime, DJSObject* obj) {
@@ -218,4 +206,24 @@ DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
   } else {
     return DJSCompletion_normal(DJSValue_bool(true));
   }
+}
+
+DJSValue DJS_new_string(DJSRuntime* runtime, const char* cstr) {
+  DJSString* string = GC_MALLOC_ATOMIC(sizeof(DJSString));
+  string->length = strlen(cstr);
+  const char* buffer = GC_MALLOC_ATOMIC(string->length + 1);
+  memcpy((void*)buffer, cstr, string->length);
+  string->value = buffer;
+  return DJSString_to_value(string);
+}
+DJSCompletion DJSObject_Call(DJSRuntime* runtime,
+                             DJSObject* f,
+                             DJSValue this,
+                             DJSValue* args,
+                             size_t argc) {
+  if (f->vtable->Call == NULL) {
+    return DJSCompletion_abrupt(
+        DJS_new_string(runtime, "TypeError: Object is not callable"));
+  }
+  return f->vtable->Call(runtime, f, this, args, argc);
 }
