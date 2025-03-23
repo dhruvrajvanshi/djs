@@ -24,6 +24,12 @@ static inline DJSPropertyKey DJSPropertyKey_symbol(DJSSymbol symbol) {
 
 DJSObject* DJS_MakeBasicObject(DJSRuntime* runtime);
 
+DJSCompletion DJSObject_Call(DJSRuntime* runtime,
+                             DJSObject* f,
+                             DJSValue this,
+                             DJSValue* args,
+                             size_t argc);
+
 DJSCompletion DJSObject_IsExtensible(DJSRuntime* runtime, DJSObject* obj);
 DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime* runtime,
                                           DJSObject* obj,
