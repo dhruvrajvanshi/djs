@@ -19,7 +19,7 @@ typedef struct DJSString {
   const char* value;
 } DJSString;
 
-static bool DJSString_eq(DJSString left, DJSString right) {
+static inline bool DJSString_eq(DJSString left, DJSString right) {
   if (left.length != right.length) {
     return false;
   }
@@ -29,7 +29,7 @@ static bool DJSString_eq(DJSString left, DJSString right) {
 typedef struct DJSSymbol {
   size_t id;
 } DJSSymbol;
-static bool DJSSymbol_eq(DJSSymbol left, DJSSymbol right) {
+static inline bool DJSSymbol_eq(DJSSymbol left, DJSSymbol right) {
   return left.id == right.id;
 }
 
@@ -46,32 +46,32 @@ typedef struct DJSValue {
   } as;
 } DJSValue;
 
-static DJSValue DJSString_to_value(DJSString* string) {
+static inline DJSValue DJSString_to_value(DJSString* string) {
   return (DJSValue){.type = DJS_TYPE_STRING, .as = {.string = string}};
 }
 
-static DJSValue DJSValue_undefined(void) {
+static inline DJSValue DJSValue_undefined(void) {
   return (DJSValue){.type = DJS_TYPE_UNDEFINED, .as = {.undefined = true}};
 }
-static bool DJSValue_is_undefined(DJSValue value) {
+static inline bool DJSValue_is_undefined(DJSValue value) {
   return value.type == DJS_TYPE_UNDEFINED;
 }
-static DJSValue DJSValue_object(DJSObject* object) {
+static inline DJSValue DJSValue_object(DJSObject* object) {
   return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
 }
-static DJSValue DJSValue_bool(bool value) {
+static inline DJSValue DJSValue_bool(bool value) {
   return (DJSValue){.type = DJS_TYPE_BOOLEAN, .as = {.boolean = value}};
 }
-static bool DJSValue_is_bool(DJSValue value) {
+static inline bool DJSValue_is_bool(DJSValue value) {
   return value.type == DJS_TYPE_BOOLEAN;
 }
-static bool DJSValue_is_false(DJSValue value) {
+static inline bool DJSValue_is_false(DJSValue value) {
   return DJSValue_is_bool(value) && !value.as.boolean;
 }
-static bool DJSValue_is_true(DJSValue value) {
+static inline bool DJSValue_is_true(DJSValue value) {
   return DJSValue_is_bool(value) && value.as.boolean;
 }
-static DJSValue DJSValue_symbol(size_t value) {
+static inline DJSValue DJSValue_symbol(size_t value) {
   return (DJSValue){.type = DJS_TYPE_SYMBOL,
                     .as = {.symbol = (DJSSymbol){value}}};
 }
