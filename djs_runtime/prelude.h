@@ -38,3 +38,6 @@
             __FUNCTION__);                                                \
     exit(1);                                                              \
   } while (0)
+
+#define NULLABLE _Nullable
+#define NONNULL _Nonnull

@@ -1,5 +1,3 @@
-#pragma once
-
 #include "./function.h"
 #include <assert.h>
 #include <gc.h>

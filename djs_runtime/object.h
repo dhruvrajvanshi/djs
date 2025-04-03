@@ -45,6 +45,9 @@ DJSCompletion DJSObject_CreateDataProperty(DJSRuntime*,
                                            DJSObject* obj,
                                            DJSPropertyKey key,
                                            DJSValue value);
+DJSCompletion DJSObject_SetPrototypeOf(DJSRuntime* runtime,
+                                       DJSObject* obj,
+                                       DJSObject* proto);
 
 typedef uint8_t DJSPropertyFlags;
 
