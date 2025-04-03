@@ -20,6 +20,13 @@ static inline DJSCompletion DJSCompletion_normal(DJSValue value) {
   return (DJSCompletion){.value = value, .abrupt = false};
 }
 
+static inline DJSCompletion DJSCompletion_true() {
+  return (DJSCompletion){.value = DJSValue_bool(true), .abrupt = false};
+}
+static inline DJSCompletion DJSCompletion_false() {
+  return (DJSCompletion){.value = DJSValue_bool(false), .abrupt = false};
+}
+
 static inline DJSCompletion DJSCompletion_abrupt(DJSValue value) {
   return (DJSCompletion){.value = value, .abrupt = true};
 }

@@ -1,14 +1,17 @@
 project('djs_runtime', 'c')
 
+add_global_arguments('-Wno-nullability-completeness', language : 'c')
+
 djs_runtime = library(
   'djs_runtime',
-  ['runtime.c', 'object.c', 'print.c', 'function.c'],
+  ['runtime.c', 'object.c', 'print.c', 'function.c', 'value.c'],
   dependencies: dependency('bdw-gc')
 )
 
 tests = [
   'test_object_get.c',
   'test_call.c',
+  'test_get_from_prototype.c',
 ]
 
 foreach test: tests
