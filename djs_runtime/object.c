@@ -1,6 +1,7 @@
 #include "./object.h"
 #include <assert.h>
 #include <gc.h>
+#include "./comparison_ops.h"
 #include "./completion.h"
 #include "./object_layout.h"
 #include "./prelude.h"
@@ -161,12 +162,56 @@ DJSCompletion OrdinaryIsExtensible(DJSRuntime* UNUSED(runtime),
   return DJSCompletion_normal(DJSValue_bool(obj->is_extensible));
 }
 
+DJSCompletion OrdinaryGetPrototypeOf(DJSRuntime* runtime, DJSObject* obj) {
+  DJS_TODO();
+}
+
+DJSCompletion OrdinarySetPrototypeOf(DJSRuntime* UNUSED(runtime),
+                                     DJSObject* O,
+                                     DJSObject* NULLABLE V) {
+  DJSObject* current = O->prototype;
+  if (DJS_SameValueObject(V, current)) {
+    return DJSCompletion_true();
+  }
+  bool extensible = O->is_extensible;
+  if (!extensible) {
+    return DJSCompletion_false();
+  }
+  DJSObject* p = V;
+  bool done = false;
+
+  while (!done) {
+    if (p == NULL) {
+      done = true;
+      break;
+    }
+    if (DJS_SameValueObject(O, p)) {
+      return DJSCompletion_false();
+    }
+    if (p->vtable->GetPrototypeOf != OrdinaryGetPrototypeOf) {
+      done = true;
+      break;
+    } else {
+      p = p->prototype;
+    }
+  }
+  O->prototype = V;
+
+  return DJSCompletion_true();
+}
+
 static const DJSObjectVTable DJSPropertyVTable = {
     .GetOwnProperty = OrdinaryGetOwnProperty,
     .DefineOwnProperty = OrdinaryDefineOwnProperty,
     .IsExtensible = OrdinaryIsExtensible,
     .Call = NULL,
 };
+
+DJSCompletion DJSObject_SetPrototypeOf(DJSRuntime* runtime,
+                                       DJSObject* obj,
+                                       DJSObject* NULLABLE proto) {
+  return obj->vtable->SetPrototypeOf(runtime, obj, proto);
+}
 
 DJSCompletion DJSObject_IsExtensible(DJSRuntime* runtime, DJSObject* obj) {
   return obj->vtable->IsExtensible(runtime, obj);

@@ -2,8 +2,8 @@
 #include <gc.h>
 #include "./prelude.h"
 #include "./print.h"
+#include "./value.h"
 #include "object.h"
-#include "value.h"
 
 #include <stdio.h>
 #include <stdlib.h>

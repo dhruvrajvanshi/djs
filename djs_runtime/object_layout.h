@@ -2,6 +2,7 @@
 #include <assert.h>
 #include "./completion.h"
 #include "./object.h"
+#include "./prelude.h"
 #include "./value.h"
 
 typedef struct DJSRuntime DJSRuntime;
@@ -11,8 +12,8 @@ typedef struct DJSDataProperty {
 } DJSDataProperty;
 
 typedef struct DJSAccessorProperty {
-  DJSObject* get;
-  DJSObject* set;
+  DJSObject* NULLABLE get;
+  DJSObject* NULLABLE set;
 } DJSAccessorProperty;
 
 typedef struct DJSObjectVTable {
@@ -29,6 +30,10 @@ typedef struct DJSObjectVTable {
                         DJSValue this,
                         DJSValue* args,
                         size_t argc);
+  DJSCompletion (*SetPrototypeOf)(DJSRuntime*,
+                                  DJSObject* self,
+                                  DJSObject* proto);
+  DJSCompletion (*GetPrototypeOf)(DJSRuntime*, DJSObject* self);
 } DJSObjectVTable;
 
 typedef struct DJSObjectEntry {
@@ -38,6 +43,7 @@ typedef struct DJSObjectEntry {
 } DJSObjectEntry;
 
 typedef struct DJSObject {
+  DJSObject* NULLABLE prototype;
   DJSObjectEntry* properties;
   bool is_extensible;
   const DJSObjectVTable* vtable;
@@ -55,7 +61,8 @@ typedef struct DJSProperty {
   } as;
 } DJSProperty;
 
-static void DJSObject_init(DJSObject* self, const DJSObjectVTable* vtable) {
+static inline void DJSObject_init(DJSObject* self,
+                                  const DJSObjectVTable* vtable) {
   assert(self != NULL);
   *self = (DJSObject){0};
   self->properties = NULL;
@@ -75,10 +82,17 @@ DJSCompletion OrdinaryDefineOwnProperty(DJSRuntime* runtime,
                                         DJSProperty* descriptor);
 
 DJSCompletion OrdinaryIsExtensible(DJSRuntime* runtime, DJSObject* obj);
+DJSCompletion OrdinarySetPrototypeOf(DJSRuntime* runtime,
+                                     DJSObject* obj,
+                                     DJSObject* proto);
+
+DJSCompletion OrdinaryGetPrototypeOf(DJSRuntime* runtime, DJSObject* obj);
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable = {
     .GetOwnProperty = OrdinaryGetOwnProperty,
     .DefineOwnProperty = OrdinaryDefineOwnProperty,
     .IsExtensible = OrdinaryIsExtensible,
     .Call = NULL,
+    .SetPrototypeOf = OrdinarySetPrototypeOf,
+    .GetPrototypeOf = OrdinaryGetPrototypeOf,
 };
