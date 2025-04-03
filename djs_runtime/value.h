@@ -56,6 +56,13 @@ static inline DJSValue DJSValue_undefined(void) {
 static inline bool DJSValue_is_undefined(DJSValue value) {
   return value.type == DJS_TYPE_UNDEFINED;
 }
+
+static inline DJSValue DJSValue_null(void) {
+  return (DJSValue){.type = DJS_TYPE_NULL, .as = {.null = true}};
+}
+static inline bool DJSValue_is_null(DJSValue value) {
+  return value.type == DJS_TYPE_NULL;
+}
 static inline DJSValue DJSValue_object(DJSObject* object) {
   return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
 }

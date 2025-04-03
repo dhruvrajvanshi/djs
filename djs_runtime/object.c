@@ -163,7 +163,10 @@ DJSCompletion OrdinaryIsExtensible(DJSRuntime* UNUSED(runtime),
 }
 
 DJSCompletion OrdinaryGetPrototypeOf(DJSRuntime* runtime, DJSObject* obj) {
-  DJS_TODO();
+  if (obj->prototype == NULL) {
+    return DJSCompletion_normal(DJSValue_null());
+  }
+  return DJSCompletion_normal(DJSValue_object(obj->prototype));
 }
 
 DJSCompletion OrdinarySetPrototypeOf(DJSRuntime* UNUSED(runtime),
