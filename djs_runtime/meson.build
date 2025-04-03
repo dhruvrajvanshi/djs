@@ -6,16 +6,18 @@ djs_runtime = library(
   dependencies: dependency('bdw-gc')
 )
 
-test_object_get = executable(
-  'test_object_get',
-  ['test_object_get.c'],
-  link_with: [djs_runtime]
-)
-test('object get', test_object_get)
+tests = [
+  'test_object_get.c',
+  'test_call.c',
+]
 
-test_call = executable(
-  'test_call',
-  ['test_call.c'],
-  link_with: [djs_runtime]
-)
-test('call', test_call)
+foreach test: tests
+  test_name = test.split('.')[0]
+  test_executable = executable(
+    test_name,
+    [test],
+    link_with: [djs_runtime]
+  )
+  test(test_name, test_executable)
+
+endforeach
