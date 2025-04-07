@@ -42,9 +42,7 @@ bool DJS_IsStrictlyEqual(DJSValue left, DJSValue right) {
     case DJS_TYPE_NUMBER:
       return left.as.number == right.as.number;
     case DJS_TYPE_OBJECT:
-      if (left.as.object == right.as.object) {
-        return true;
-      }
+      return left.as.object == right.as.object;
     case DJS_TYPE_STRING:
       return DJSString_eq(*left.as.string, *right.as.string);
     default:

@@ -22,6 +22,11 @@ static inline DJSPropertyKey DJSPropertyKey_symbol(DJSSymbol symbol) {
                           .as = {.symbol = symbol}};
 }
 
+static inline DJSPropertyKey DJSPropertyKey_string(DJSString string) {
+  return (DJSPropertyKey){.type = DJS_PROPERTY_KEY_STRING,
+                          .as = {.string = string}};
+}
+
 DJSObject* DJS_MakeBasicObject(DJSRuntime* runtime);
 
 DJSCompletion DJSObject_Call(DJSRuntime* runtime,

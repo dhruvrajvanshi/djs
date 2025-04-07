@@ -11,7 +11,7 @@
     DJSValue left_value = left;                                              \
     DJSValue right_value = right;                                            \
     fprintf(stderr, "Assertion failed:%s:%d: in function %s:\n\t%s == %s\n", \
-            __FILE__, __LINE__, __FUNCTION__, #left, #right);                \
+            __FILE__, __LINE__, __func__, #left, #right);                    \
     fprintf(stderr, "Because:\n");                                           \
     fprintf(stderr, "\t");                                                   \
     DJSValue_pretty_print(stderr, left_value);                               \
@@ -27,7 +27,7 @@
     DJSValue expected = expected_expr;                                         \
     if (completion.abrupt) {                                                   \
       fprintf(stderr, "Assertion failed:%s:%d: in function %s:\n\t", __FILE__, \
-              __LINE__, __FUNCTION__);                                         \
+              __LINE__, __func__);                                             \
       fprintf(stderr, "Expected %s to not throw an exception\n",               \
               #completion_expr);                                               \
       fprintf(stderr, "But the following exception was thrown:\n\t");          \
@@ -37,7 +37,7 @@
     }                                                                          \
     if (!DJS_IsStrictlyEqual(completion.value, expected)) {                    \
       fprintf(stderr, "Assertion failed:%s:%d: in function %s:\n\t", __FILE__, \
-              __LINE__, __FUNCTION__);                                         \
+              __LINE__, __func__);                                             \
       fprintf(stderr, "%s !== %s:\n", #completion_expr, #expected_expr);       \
       fprintf(stderr, "Because:\n");                                           \
       fprintf(stderr, "\t");                                                   \
@@ -54,7 +54,7 @@
     DJSCompletion completion = completion_expr;                                \
     if (!completion.abrupt) {                                                  \
       fprintf(stderr, "Assertion failed:%s:%d: in function %s:\n\t", __FILE__, \
-              __LINE__, __FUNCTION__);                                         \
+              __LINE__, __func__);                                             \
       fprintf(stderr, "Expected %s to throw an exception\n",                   \
               #completion_expr);                                               \
       fprintf(stderr, "But it returned normally with value:\n\t");             \

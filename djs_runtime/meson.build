@@ -3,7 +3,7 @@ project(
   'c',
   default_options: [
     'warning_level=3',
-    'c_std=c2x',
+    'c_std=gnu2x',
     'werror=true',
   ]
 )
