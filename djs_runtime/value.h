@@ -1,6 +1,7 @@
 #pragma once
 #include <memory.h>
 #include <stdbool.h>
+#include "./prelude.h"
 
 typedef struct DJSObject DJSObject;
 
@@ -65,6 +66,16 @@ static inline bool DJSValue_is_null(DJSValue value) {
 }
 static inline DJSValue DJSValue_object(DJSObject* object) {
   return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
+}
+static inline bool DJSValue_is_object(DJSValue value) {
+  return value.type == DJS_TYPE_OBJECT;
+}
+static inline DJSObject* NULLABLE DJSValue_as_object(DJSValue value) {
+  if (DJSValue_is_object(value)) {
+    return value.as.object;
+  } else {
+    return NULL;
+  }
 }
 static inline DJSValue DJSValue_string(DJSString* str) {
   return DJSString_to_value(str);

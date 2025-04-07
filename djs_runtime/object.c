@@ -205,6 +205,42 @@ DJSCompletion OrdinarySetPrototypeOf(DJSRuntime* UNUSED(runtime),
   return DJSCompletion_true();
 }
 
+DJSCompletion OrdinaryGet(DJSRuntime* runtime,
+                          DJSObject* O,
+                          DJSPropertyKey key,
+                          DJSValue receiver) {
+  DJSValue desc_value;
+  // 1. Let desc be ? O.[[GetOwnProperty]](P).
+  DJS_COMPLETION_SET(desc_value, O->vtable->GetOwnProperty(runtime, O, key));
+  // 2. If desc is undefined, then
+  if (DJSValue_is_undefined(desc_value)) {
+    // a. Let parent be ? O.[[GetPrototypeOf]]().
+    DJSValue parent_value;
+    DJS_COMPLETION_SET(parent_value, O->vtable->GetPrototypeOf(runtime, O));
+    // b. If parent is null, return undefined.
+    if (DJSValue_is_null(parent_value)) {
+      return DJSCompletion_normal(DJSValue_undefined());
+    }
+
+    // c. Return ? parent.[[Get]](P, Receiver).
+    DJSObject* parent = DJSValue_as_object(parent_value);
+    assert(parent ||
+           "O->vtable->GetPrototypeOf returned a non-object, non-null value");
+
+    return parent->vtable->Get(runtime, parent, key, receiver);
+  }
+  DJSProperty* desc = DJSProperty_from_value(desc_value);
+  assert(desc ||
+         "O->vtable->GetOwnProperty returned a non-descriptor, non undefined "
+         "value");
+  // 3. If IsDataDescriptor(desc) is true, return desc.[[Value]].
+  if (DJSProperty_is_data(desc)) {
+    return DJSCompletion_normal(desc->as.data.value);
+  }
+
+  DJS_TODO();
+}
+
 static const DJSObjectVTable DJSPropertyVTable = {
     .GetOwnProperty = OrdinaryGetOwnProperty,
     .DefineOwnProperty = OrdinaryDefineOwnProperty,
@@ -212,6 +248,7 @@ static const DJSObjectVTable DJSPropertyVTable = {
     .Call = NULL,
     .SetPrototypeOf = OrdinarySetPrototypeOf,
     .GetPrototypeOf = OrdinaryGetPrototypeOf,
+    .Get = OrdinaryGet,
 };
 
 DJSCompletion DJSObject_SetPrototypeOf(DJSRuntime* runtime,
@@ -228,6 +265,11 @@ DJSCompletion DJSObject_GetOwnProperty(DJSRuntime* runtime,
                                        DJSObject* obj,
                                        DJSPropertyKey key) {
   return obj->vtable->GetOwnProperty(runtime, obj, key);
+}
+DJSCompletion DJSObject_Get(DJSRuntime* runtime,
+                            DJSObject* obj,
+                            DJSPropertyKey key) {
+  return obj->vtable->Get(runtime, obj, key, DJSValue_object(obj));
 }
 
 DJSCompletion DJSObject_DefineOwnProperty(DJSRuntime* runtime,
