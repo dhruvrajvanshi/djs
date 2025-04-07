@@ -31,7 +31,10 @@ foreach test: tests
   test_executable = executable(
     test_name,
     [test],
-    link_with: [djs_runtime]
+    link_with: [djs_runtime],
+    override_options: [
+      'werror=false',
+    ]
   )
   test(test_name, test_executable)
 
