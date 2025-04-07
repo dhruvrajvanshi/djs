@@ -54,6 +54,10 @@ DJSCompletion DJSObject_SetPrototypeOf(DJSRuntime* runtime,
                                        DJSObject* obj,
                                        DJSObject* proto);
 
+DJSCompletion DJSObject_Get(DJSRuntime* runtime,
+                            DJSObject* obj,
+                            DJSPropertyKey key);
+
 typedef uint8_t DJSPropertyFlags;
 
 static const DJSPropertyFlags DJS_PROPERTY_WRITABLE = 1 << 0;

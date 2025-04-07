@@ -19,5 +19,13 @@ int main(void) {
   ASSERT_NORMAL(DJSObject_CreateDataProperty(vm, proto, key, value),
                 djs_value(true));
 
+  // assert(obj[key] === "value");
+
+  ASSERT_NORMAL(DJSObject_Get(vm, obj, key), value);
+
+  ASSERT_NORMAL(
+      DJSObject_Get(vm, obj, djs_property_key(*DJS_new_string(vm, "key2"))),
+      DJSValue_undefined());
+
   djs_free_runtime(vm);
 }
