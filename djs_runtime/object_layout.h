@@ -34,6 +34,10 @@ typedef struct DJSObjectVTable {
                                   DJSObject* self,
                                   DJSObject* proto);
   DJSCompletion (*GetPrototypeOf)(DJSRuntime*, DJSObject* self);
+  DJSCompletion (*Get)(DJSRuntime*,
+                       DJSObject* O,
+                       DJSPropertyKey P,
+                       DJSValue receiver);
 } DJSObjectVTable;
 
 typedef struct DJSObjectEntry {
@@ -87,6 +91,10 @@ DJSCompletion OrdinarySetPrototypeOf(DJSRuntime* runtime,
                                      DJSObject* proto);
 
 DJSCompletion OrdinaryGetPrototypeOf(DJSRuntime* runtime, DJSObject* obj);
+DJSCompletion OrdinaryGet(DJSRuntime* runtime,
+                          DJSObject* O,
+                          DJSPropertyKey key,
+                          DJSValue receiver);
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable = {
     .GetOwnProperty = OrdinaryGetOwnProperty,
@@ -95,4 +103,5 @@ static const DJSObjectVTable DJSOrdinaryObjectVTable = {
     .Call = NULL,
     .SetPrototypeOf = OrdinarySetPrototypeOf,
     .GetPrototypeOf = OrdinaryGetPrototypeOf,
+    .Get = OrdinaryGet,
 };
