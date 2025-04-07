@@ -27,6 +27,8 @@ static const DJSObjectVTable DJSFunctionVTable = {
     .GetOwnProperty = DJSOrdinaryObjectVTable.GetOwnProperty,
     .IsExtensible = DJSOrdinaryObjectVTable.IsExtensible,
     .Call = DJSFunctionCall,
+    .SetPrototypeOf = DJSOrdinaryObjectVTable.SetPrototypeOf,
+    .GetPrototypeOf = DJSOrdinaryObjectVTable.GetPrototypeOf,
 };
 
 static DJSObject* DJSFunction_as_object(DJSFunction* function) {

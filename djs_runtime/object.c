@@ -210,6 +210,8 @@ static const DJSObjectVTable DJSPropertyVTable = {
     .DefineOwnProperty = OrdinaryDefineOwnProperty,
     .IsExtensible = OrdinaryIsExtensible,
     .Call = NULL,
+    .SetPrototypeOf = OrdinarySetPrototypeOf,
+    .GetPrototypeOf = OrdinaryGetPrototypeOf,
 };
 
 DJSCompletion DJSObject_SetPrototypeOf(DJSRuntime* runtime,
