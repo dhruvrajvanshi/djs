@@ -1,6 +1,17 @@
-project('djs_runtime', 'c')
+project(
+  'djs_runtime',
+  'c',
+  default_options: [
+    'warning_level=3',
+    'c_std=c23',
+    'werror=true',
+  ]
+)
 
-add_global_arguments('-Wno-nullability-completeness', language : 'c')
+add_global_arguments(
+  '-Wno-nullability-completeness',
+  language : 'c'
+)
 
 djs_runtime = library(
   'djs_runtime',
