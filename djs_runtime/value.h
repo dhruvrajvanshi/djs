@@ -66,6 +66,9 @@ static inline bool DJSValue_is_null(DJSValue value) {
 static inline DJSValue DJSValue_object(DJSObject* object) {
   return (DJSValue){.type = DJS_TYPE_OBJECT, .as = {.object = object}};
 }
+static inline DJSValue DJSValue_string(DJSString* str) {
+  return DJSString_to_value(str);
+}
 static inline DJSValue DJSValue_bool(bool value) {
   return (DJSValue){.type = DJS_TYPE_BOOLEAN, .as = {.boolean = value}};
 }

@@ -4,19 +4,20 @@
 #include "value.h"
 
 int main(void) {
-  DJSRuntime* vm = djs_new_runtime();
+  auto vm = djs_new_runtime();
 
-  DJSObject* obj = DJS_MakeBasicObject(vm);
-  DJSObject* proto = DJS_MakeBasicObject(vm);
+  auto obj = DJS_MakeBasicObject(vm);
+  auto proto = DJS_MakeBasicObject(vm);
 
   // Object.setPrototypeOf(obj, proto);
-  DJSObject_SetPrototypeOf(vm, obj, proto);
+  ASSERT_NORMAL(DJSObject_SetPrototypeOf(vm, obj, proto), djs_value(true));
 
-  auto key = DJSPropertyKey_string(*DJS_new_string(vm, "key"));
-  auto value = DJS_new_string_as_value(vm, "value");
+  auto key = djs_property_key(*DJS_new_string(vm, "key"));
+  auto value = djs_value(DJS_new_string(vm, "value"));
 
   // proto[key] = value;
-  DJSObject_CreateDataProperty(vm, proto, key, value);
+  ASSERT_NORMAL(DJSObject_CreateDataProperty(vm, proto, key, value),
+                djs_value(true));
 
   djs_free_runtime(vm);
 }
