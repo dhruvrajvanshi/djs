@@ -63,3 +63,20 @@
       exit(1);                                                                 \
     }                                                                          \
   }
+
+#define djs_property_key(X)             \
+  _Generic((X),                         \
+      DJSString: DJSPropertyKey_string, \
+      DJSSymbol: DJSPropertyKey_symbol)(X)
+
+static inline DJSValue value_id(DJSValue value) {
+  return value;
+}
+#define djs_value(X)                     \
+  _Generic((X),                          \
+      DJSObject *: DJSValue_object,      \
+      DJSValue: value_id,                \
+      bool: DJSValue_bool,               \
+      const DJSString*: DJSValue_string, \
+      DJSString*: DJSValue_string,       \
+      DJSSymbol: DJSValue_symbol)(X)

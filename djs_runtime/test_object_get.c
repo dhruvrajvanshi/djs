@@ -1,9 +1,9 @@
+#include <assert.h>
 #include "./completion.h"
 #include "./object.h"
 #include "./runtime.h"
-#include "./value.h"
 #include "./test_prelude.h"
-#include <assert.h>
+#include "./value.h"
 
 int main(void) {
   DJSRuntime* runtime = djs_new_runtime();
