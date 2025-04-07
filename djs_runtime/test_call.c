@@ -15,11 +15,13 @@ DJSCompletion bool_not(DJSRuntime* runtime,
                        DJSValue* args,
                        size_t argc) {
   if (argc != 1) {
-    return DJSCompletion_abrupt(DJS_new_string(runtime, "Expected 1 argument"));
+    return DJSCompletion_abrupt(
+        DJS_new_string_as_value(runtime, "Expected 1 argument"));
   }
   DJSValue arg = args[0];
   if (!DJSValue_is_bool(arg)) {
-    return DJSCompletion_abrupt(DJS_new_string(runtime, "Expected a boolean"));
+    return DJSCompletion_abrupt(
+        DJS_new_string_as_value(runtime, "Expected a boolean"));
   }
   if (DJSValue_is_true(arg)) {
     return DJSCompletion_normal(DJSValue_bool(false));

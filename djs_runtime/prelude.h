@@ -29,13 +29,13 @@
 #define DJS_PANIC(msg)                                                         \
   do {                                                                         \
     fprintf(stderr, "PANIC at %s:%d in function %s: %s\n", __FILE__, __LINE__, \
-            __FUNCTION__, msg);                                                \
+            __func__, msg);                                                    \
     exit(1);                                                                   \
   } while (0)
 #define DJS_TODO()                                                        \
   do {                                                                    \
     fprintf(stderr, "TODO at %s:%d in function %s\n", __FILE__, __LINE__, \
-            __FUNCTION__);                                                \
+            __func__);                                                    \
     exit(1);                                                              \
   } while (0)
 

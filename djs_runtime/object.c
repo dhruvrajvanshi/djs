@@ -6,6 +6,7 @@
 #include "./object_layout.h"
 #include "./prelude.h"
 #include "./value.h"
+#include "runtime.h"
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable;
 static const DJSObjectVTable DJSPropertyVTable;
@@ -212,7 +213,7 @@ static const DJSObjectVTable DJSPropertyVTable = {
 };
 
 DJSCompletion DJSObject_SetPrototypeOf(DJSRuntime* runtime,
-                                       DJSObject* obj,
+                                       DJSObject* NONNULL obj,
                                        DJSObject* NULLABLE proto) {
   return obj->vtable->SetPrototypeOf(runtime, obj, proto);
 }
@@ -257,14 +258,19 @@ DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
   }
 }
 
-DJSValue DJS_new_string(DJSRuntime* UNUSED(runtime), const char* cstr) {
+DJSString* DJS_new_string(DJSRuntime* UNUSED(runtime), const char* cstr) {
   DJSString* string = GC_MALLOC_ATOMIC(sizeof(DJSString));
   string->length = strlen(cstr);
   const char* buffer = GC_MALLOC_ATOMIC(string->length + 1);
   memcpy((void*)buffer, cstr, string->length);
   string->value = buffer;
-  return DJSString_to_value(string);
+  return string;
 }
+
+DJSValue DJS_new_string_as_value(DJSRuntime* runtime, const char* cstr) {
+  return DJSString_to_value(DJS_new_string(runtime, cstr));
+}
+
 DJSCompletion DJSObject_Call(DJSRuntime* runtime,
                              DJSObject* f,
                              DJSValue this,
@@ -272,7 +278,7 @@ DJSCompletion DJSObject_Call(DJSRuntime* runtime,
                              size_t argc) {
   if (f->vtable->Call == NULL) {
     return DJSCompletion_abrupt(
-        DJS_new_string(runtime, "TypeError: Object is not callable"));
+        DJS_new_string_as_value(runtime, "TypeError: Object is not callable"));
   }
   return f->vtable->Call(runtime, f, this, args, argc);
 }
