@@ -10,7 +10,7 @@
 static const DJSObjectVTable DJSOrdinaryObjectVTable;
 static const DJSObjectVTable DJSPropertyVTable;
 
-MK_OPT(OptDJSProperty, DJSProperty);
+MK_OPT(OptDJSProperty, DJSProperty)
 
 static bool DJSProperty_is_configurable(DJSProperty property) {
   return property.flags & DJS_PROPERTY_CONFIGURABLE;
@@ -162,7 +162,8 @@ DJSCompletion OrdinaryIsExtensible(DJSRuntime* UNUSED(runtime),
   return DJSCompletion_normal(DJSValue_bool(obj->is_extensible));
 }
 
-DJSCompletion OrdinaryGetPrototypeOf(DJSRuntime* runtime, DJSObject* obj) {
+DJSCompletion OrdinaryGetPrototypeOf(DJSRuntime* UNUSED(runtime),
+                                     DJSObject* obj) {
   if (obj->prototype == NULL) {
     return DJSCompletion_normal(DJSValue_null());
   }
@@ -256,7 +257,7 @@ DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
   }
 }
 
-DJSValue DJS_new_string(DJSRuntime* runtime, const char* cstr) {
+DJSValue DJS_new_string(DJSRuntime* UNUSED(runtime), const char* cstr) {
   DJSString* string = GC_MALLOC_ATOMIC(sizeof(DJSString));
   string->length = strlen(cstr);
   const char* buffer = GC_MALLOC_ATOMIC(string->length + 1);
