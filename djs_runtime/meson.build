@@ -10,12 +10,13 @@ project(
 
 add_global_arguments(
   '-Wno-nullability-completeness',
+  '-Wno-nullability-extension',
   language : 'c'
 )
 
 djs_runtime = library(
   'djs_runtime',
-  ['runtime.c', 'object.c', 'print.c', 'function.c', 'value.c'],
+  ['runtime.c', 'object.c', 'print.c', 'function.c'],
   dependencies: dependency('bdw-gc')
 )
 

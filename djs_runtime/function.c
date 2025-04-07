@@ -35,7 +35,7 @@ static DJSObject* DJSFunction_as_object(DJSFunction* function) {
 }
 
 DJSFunction* DJSFunction_new(
-    DJSRuntime* runtime,
+    DJSRuntime* UNUSED(runtime),
     DJSCompletion (*call)(DJSRuntime*, DJSValue, DJSValue*, size_t)) {
   DJSFunction* f = GC_MALLOC(sizeof(DJSFunction));
   DJSObject_init(DJSFunction_as_object(f), &DJSFunctionVTable);
