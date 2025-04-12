@@ -1,6 +1,7 @@
 #pragma once
 #include <assert.h>
 #include "./completion.h"
+#include "./function.h"
 #include "./object.h"
 #include "./prelude.h"
 #include "./value.h"
@@ -12,8 +13,8 @@ typedef struct DJSDataProperty {
 } DJSDataProperty;
 
 typedef struct DJSAccessorProperty {
-  DJSObject* NULLABLE get;
-  DJSObject* NULLABLE set;
+  DJSFunction* NULLABLE get;
+  DJSFunction* NULLABLE set;
 } DJSAccessorProperty;
 
 typedef struct DJSObjectVTable {
