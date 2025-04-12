@@ -1,6 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "./completion.h"
+#include "./function.h"
 #include "./value.h"
 
 typedef struct DJSRuntime DJSRuntime;
@@ -68,6 +69,10 @@ static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
 DJSProperty* DJSProperty_new_data_property(DJSRuntime* runtime,
                                            DJSValue value,
                                            DJSPropertyFlags flags);
+DJSProperty* DJSProperty_new_accessor_property(DJSRuntime* UNUSED(runtime),
+                                               DJSFunction* NULLABLE getter,
+                                               DJSFunction* NULLABLE setter,
+                                               DJSPropertyFlags flags);
 DJSProperty* DJSProperty_from_value(DJSValue value);
 bool DJSProperty_is_data(const DJSProperty* property);
 DJSValue DJSProperty_value(DJSProperty* property);

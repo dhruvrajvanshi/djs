@@ -24,6 +24,7 @@ tests = [
   'test_object_get.c',
   'test_call.c',
   'test_get_from_prototype.c',
+  'test_getter.c',
 ]
 
 foreach test: tests

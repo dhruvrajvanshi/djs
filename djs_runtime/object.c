@@ -6,6 +6,7 @@
 #include "./object_layout.h"
 #include "./prelude.h"
 #include "./value.h"
+#include "gc/gc.h"
 #include "runtime.h"
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable;
@@ -50,6 +51,20 @@ DJSProperty* DJSProperty_new_data_property(DJSRuntime* UNUSED(runtime),
   result->object.properties = NULL;
   result->flags = flags | (DJS_PROPERTY_TYPE_MASK & 0);
   result->as.data.value = value;
+  return result;
+}
+
+DJSProperty* DJSProperty_new_accessor_property(DJSRuntime* UNUSED(runtime),
+                                               DJSFunction* NULLABLE getter,
+                                               DJSFunction* NULLABLE setter,
+                                               DJSPropertyFlags flags) {
+  DJSProperty* result = GC_MALLOC(sizeof(DJSProperty));
+  result->object.is_extensible = true;
+  result->object.vtable = &DJSPropertyVTable;
+  result->object.properties = NULL;
+  result->flags = flags | DJS_PROPERTY_TYPE_MASK;
+  result->as.accessor.get = getter;
+  result->as.accessor.set = setter;
   return result;
 }
 
@@ -112,7 +127,13 @@ bool ValidateAndApplyPropertyDescriptor(DJSObject* O,
       return true;
     }
     if (DJSProperty_is_accessor(Desc)) {
-      DJS_TODO();
+      DJSObjectEntry* entry = GC_MALLOC(sizeof(DJSObjectEntry));
+      entry->key = P;
+      entry->next = O->properties;
+      entry->descriptor = GC_MALLOC(sizeof(DJSProperty));
+      *entry->descriptor = *Desc;
+      O->properties = entry;
+      return true;
     } else {
       DJSObjectEntry* entry = GC_MALLOC(sizeof(DJSObjectEntry));
       entry->key = P;
@@ -237,8 +258,15 @@ DJSCompletion OrdinaryGet(DJSRuntime* runtime,
   if (DJSProperty_is_data(desc)) {
     return DJSCompletion_normal(desc->as.data.value);
   }
-
-  DJS_TODO();
+  assert(DJSProperty_is_accessor(desc));
+  DJSFunction* getter = desc->as.accessor.get;
+  if (getter == NULL) {
+    return DJSCompletion_normal(DJSValue_undefined());
+  }
+  return DJSObject_Call(
+      runtime,
+      // cast is safe because DJSFunction has a DJSObject as its first member
+      (DJSObject*)getter, receiver, nullptr, 0);
 }
 
 static const DJSObjectVTable DJSPropertyVTable = {
