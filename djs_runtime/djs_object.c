@@ -4,118 +4,12 @@
 #include "./djs.h"
 #include "./djs_comparison_ops.h"
 #include "./djs_completion.h"
+#include "./djs_object_ops.h"
 #include "./djs_prelude.h"
-#include "./djs_string.h"
+#include "./djs_property.h"
 #include "gc/gc.h"
 
 static const DJSObjectVTable DJSOrdinaryObjectVTable;
-static const DJSObjectVTable DJSPropertyVTable;
-
-MK_OPT(OptDJSProperty, DJSProperty)
-
-static bool djs_property_is_configurable(DJSProperty property) {
-  return property.flags & DJS_PROPERTY_CONFIGURABLE;
-}
-
-void djs_property_set_configurable(DJSProperty* property, bool configurable) {
-  if (configurable) {
-    property->flags |= DJS_PROPERTY_CONFIGURABLE;
-  } else {
-    property->flags &= ~DJS_PROPERTY_CONFIGURABLE;
-  }
-}
-
-void djs_property_set_enumerable(DJSProperty* property, bool enumerable) {
-  if (enumerable) {
-    property->flags |= DJS_PROPERTY_ENUMERABLE;
-  } else {
-    property->flags &= ~DJS_PROPERTY_ENUMERABLE;
-  }
-}
-
-void djs_property_set_writable(DJSProperty* property, bool writable) {
-  if (writable) {
-    property->flags |= DJS_PROPERTY_WRITABLE;
-  } else {
-    property->flags &= ~DJS_PROPERTY_WRITABLE;
-  }
-}
-
-bool djs_property_is_accessor(const DJSProperty* property) {
-  return property->flags & DJS_PROPERTY_TYPE_MASK;
-}
-bool djs_property_is_data(const DJSProperty* property) {
-  return !djs_property_is_accessor(property);
-}
-DJSValue djs_property_as_value(DJSProperty* property) {
-  return djs_value_from(&property->object);
-}
-
-DJSValue djs_property_value(DJSProperty* property) {
-  assert(djs_property_is_data(property));
-  return property->as.data.value;
-}
-
-/// Returns NULL if the value is not a property.
-DJSProperty* djs_property_from_value(DJSValue value) {
-  if (value.type != DJS_TYPE_OBJECT) {
-    return NULL;
-  }
-  if (value.as.object->vtable != &DJSPropertyVTable) {
-    return NULL;
-  }
-  return (DJSProperty*)value.as.object;
-}
-DJSProperty* djs_property_new_data(DJSRuntime* UNUSED(runtime),
-                                   DJSValue value) {
-  DJSProperty* result = GC_MALLOC(sizeof(DJSProperty));
-  result->object.is_extensible = true;
-  result->object.vtable = &DJSPropertyVTable;
-  result->object.properties = NULL;
-  result->flags = (DJS_PROPERTY_TYPE_MASK & 0);
-  djs_property_set_configurable(result, true);
-  djs_property_set_enumerable(result, true);
-  djs_property_set_writable(result, true);
-  result->as.data.value = value;
-  return result;
-}
-
-DJSProperty* djs_property_new_accessor(DJSRuntime* UNUSED(runtime),
-                                       DJSFunction* NULLABLE getter,
-                                       DJSFunction* NULLABLE setter) {
-  DJSProperty* result = GC_MALLOC(sizeof(DJSProperty));
-  result->object.is_extensible = true;
-  result->object.vtable = &DJSPropertyVTable;
-  result->object.properties = NULL;
-  result->flags = 0 | DJS_PROPERTY_TYPE_MASK;
-  djs_property_set_configurable(result, true);
-  djs_property_set_enumerable(result, true);
-  djs_property_set_writable(result, true);
-  result->as.accessor.get = getter;
-  result->as.accessor.set = setter;
-  return result;
-}
-
-static DJSProperty __attribute__((unused))
-DJSProperty_data(DJSValue value, DJSPropertyFlags flags) {
-  assert(!(flags & DJS_PROPERTY_TYPE_MASK) &&
-         "Property type should not be set");
-  return (DJSProperty){.flags = flags, .as = {.data = {.value = value}}};
-}
-
-bool property_key_eq(DJSPropertyKey left, DJSPropertyKey right) {
-  if (left.type != right.type) {
-    return false;
-  }
-  switch (left.type) {
-    case DJS_PROPERTY_KEY_STRING:
-      return djs_string_eq(left.as.string, right.as.string);
-    case DJS_PROPERTY_KEY_SYMBOL:
-      return left.as.symbol.id == right.as.symbol.id;
-    default:
-      return false;
-  }
-}
 
 DJSObject* MakeBasicObject(DJSRuntime* UNUSED(runtime)) {
   DJSObject* obj = GC_malloc(sizeof(DJSObject));
@@ -323,16 +217,6 @@ DJSCompletion OrdinaryGet(DJSRuntime* runtime,
       (DJSObject*)getter, receiver, nullptr, 0);
 }
 
-static const DJSObjectVTable DJSPropertyVTable = {
-    .GetOwnProperty = OrdinaryGetOwnProperty,
-    .DefineOwnProperty = OrdinaryDefineOwnProperty,
-    .IsExtensible = OrdinaryIsExtensible,
-    .Call = NULL,
-    .SetPrototypeOf = OrdinarySetPrototypeOf,
-    .GetPrototypeOf = OrdinaryGetPrototypeOf,
-    .Get = OrdinaryGet,
-};
-
 DJSCompletion djs_object_set_prototype_of(DJSRuntime* runtime,
                                           DJSObject* NONNULL obj,
                                           DJSObject* NULLABLE proto) {
@@ -391,17 +275,4 @@ DJSCompletion djs_object_has_own_property(DJSRuntime* runtime,
                                           DJSObject* obj,
                                           DJSPropertyKey key) {
   return HasOwnProperty(runtime, obj, key);
-}
-
-DJSPropertyKey djs_property_key_from_symbol(DJSSymbol symbol) {
-  return (DJSPropertyKey){
-      .type = DJS_PROPERTY_KEY_SYMBOL,
-      .as = {.symbol = symbol},
-  };
-}
-DJSPropertyKey djs_property_key_from_string(const DJSString* string) {
-  return (DJSPropertyKey){
-      .type = DJS_PROPERTY_KEY_STRING,
-      .as = {.string = string},
-  };
 }

@@ -1,6 +1,6 @@
 #include <assert.h>
 #include <gc.h>
-#include "./djs_object.h"
+#include "./djs_object_ops.h"
 
 typedef struct DJSFunction {
   DJSObject obj;
