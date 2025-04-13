@@ -3,6 +3,7 @@
 #include <gc.h>
 #include "./comparison_ops.h"
 #include "./completion.h"
+#include "./djs.h"
 #include "./object_layout.h"
 #include "./prelude.h"
 #include "./value.h"
@@ -82,7 +83,7 @@ static inline bool DJSPropertyKey_eq(DJSPropertyKey left,
   }
   switch (left.type) {
     case DJS_PROPERTY_KEY_STRING:
-      return DJSString_eq(left.as.string, right.as.string);
+      return DJSString_eq(*left.as.string, *right.as.string);
     case DJS_PROPERTY_KEY_SYMBOL:
       return DJSSymbol_eq(left.as.symbol, right.as.symbol);
     default:
@@ -330,7 +331,7 @@ DJSCompletion DJSObject_HasOwnProperty(DJSRuntime* runtime,
   }
 }
 
-DJSString* DJS_new_string(DJSRuntime* UNUSED(runtime), const char* cstr) {
+const DJSString* DJS_new_string(DJSRuntime* UNUSED(runtime), const char* cstr) {
   DJSString* string = GC_MALLOC_ATOMIC(sizeof(DJSString));
   string->length = strlen(cstr);
   const char* buffer = GC_MALLOC_ATOMIC(string->length + 1);

@@ -1,6 +1,8 @@
 #include <assert.h>
 #include <stdio.h>
 #include <string.h>
+#include "./djs.h"
+
 #include "./function.h"
 #include "./prelude.h"
 #include "./runtime.h"
