@@ -1,57 +1,54 @@
 #include <assert.h>
-#include "./completion.h"
-#include "./object.h"
-#include "./runtime.h"
+#include "./djs.h"
 #include "./test_prelude.h"
-#include "./value.h"
 
 int main(void) {
   DJSRuntime* runtime = djs_new_runtime();
   // obj = {}
-  DJSObject* obj = DJS_MakeBasicObject(runtime);
-  DJSPropertyKey key = DJSPropertyKey_symbol((DJSSymbol){0});
+  DJSObject* obj = djs_object_new(runtime);
+  DJSPropertyKey key = djs_property_key_from(djs_symbol_new(runtime));
   DJSCompletion completion;
 
   // Object.hasOwnProperty(obj, key) === false
-  completion = DJSObject_HasOwnProperty(runtime, obj, key);
-  assert(DJSCompletion_is_normal(completion));
-  ASSERT_EQEQEQ(completion.value, DJSValue_bool(false));
+  completion = djs_object_has_own_property(runtime, obj, key);
+  assert(djs_completion_is_normal(completion));
+  ASSERT_EQEQEQ(completion.value, djs_false());
 
-  // o[key] = true
-  completion =
-      DJSObject_CreateDataProperty(runtime, obj, key, DJSValue_bool(true));
-  assert(DJSCompletion_is_normal(completion) &&
+  // Object.defineOwnProperty(o, key,  {value: true })
+  completion = djs_object_define_own_property(
+      runtime, obj, key, djs_property_new_data(runtime, djs_true()));
+  assert(djs_completion_is_normal(completion) &&
          "Expected CreateDataProperty to return a normal completion");
-  ASSERT_EQEQEQ(completion.value, DJSValue_bool(true));
+  ASSERT_EQEQEQ(completion.value, djs_true());
 
   // Object.hasOwnProperty(obj, key) === true
-  completion = DJSObject_HasOwnProperty(runtime, obj, key);
-  assert(DJSCompletion_is_normal(completion));
-  ASSERT_EQEQEQ(completion.value, DJSValue_bool(true));
+  completion = djs_object_has_own_property(runtime, obj, key);
+  assert(djs_completion_is_normal(completion));
+  ASSERT_EQEQEQ(completion.value, djs_true());
 
   // Object.getOwnProperty(obj, key).value === true
-  completion = DJSObject_GetOwnProperty(runtime, obj, key);
-  assert(DJSCompletion_is_normal(completion));
-  DJSProperty* existing_property = DJSProperty_from_value(completion.value);
+  completion = djs_object_get_own_property(runtime, obj, key);
+  assert(djs_completion_is_normal(completion));
+  DJSProperty* existing_property = djs_property_from_value(completion.value);
   assert(existing_property && "Expected the completion to contain a property");
-  assert(DJSProperty_is_data(existing_property) &&
+  assert(djs_property_is_data(existing_property) &&
          "Expected the property to be a data property");
-  ASSERT_EQEQEQ(DJSProperty_value(existing_property), DJSValue_bool(true));
+  ASSERT_EQEQEQ(djs_property_value(existing_property), djs_true());
 
   // Object.defineOwnProperty(obj, key, {value: false})
-  completion =
-      DJSObject_CreateDataProperty(runtime, obj, key, DJSValue_bool(false));
-  assert(DJSCompletion_is_normal(completion) &&
+  completion = djs_object_define_own_property(
+      runtime, obj, key, djs_property_new_data(runtime, djs_false()));
+  assert(djs_completion_is_normal(completion) &&
          "Expected CreateDataProperty to return a normal completion");
-  ASSERT_EQEQEQ(completion.value, DJSValue_bool(true));
+  ASSERT_EQEQEQ(completion.value, djs_true());
 
-  completion = DJSObject_GetOwnProperty(runtime, obj, key);
-  assert(DJSCompletion_is_normal(completion));
-  DJSProperty* updated_property = DJSProperty_from_value(completion.value);
+  completion = djs_object_get_own_property(runtime, obj, key);
+  assert(djs_completion_is_normal(completion));
+  DJSProperty* updated_property = djs_property_from_value(completion.value);
   assert(updated_property && "Expected the completion to contain a property");
-  assert(DJSProperty_is_data(updated_property) &&
+  assert(djs_property_is_data(updated_property) &&
          "Expected the property to be a data property");
-  ASSERT_EQEQEQ(DJSProperty_value(updated_property), DJSValue_bool(false));
+  ASSERT_EQEQEQ(djs_property_value(updated_property), djs_false());
 
   djs_free_runtime(runtime);
 }

@@ -2,49 +2,39 @@
 #include <stdio.h>
 #include <string.h>
 #include "./djs.h"
-
-#include "./function.h"
-#include "./prelude.h"
-#include "./runtime.h"
-#include "./value.h"
-#include "completion.h"
-#include "object.h"
 #include "test_prelude.h"
-#include "value.h"
 
 DJSCompletion bool_not(DJSRuntime* runtime,
                        DJSValue UNUSED(this),
                        DJSValue* args,
                        size_t argc) {
   if (argc != 1) {
-    return DJSCompletion_abrupt(
-        DJS_new_string_as_value(runtime, "Expected 1 argument"));
+    return djs_completion_abrupt(
+        djs_value_from(djs_string_new(runtime, "Expected 1 argument")));
   }
   DJSValue arg = args[0];
-  if (!DJSValue_is_bool(arg)) {
-    return DJSCompletion_abrupt(
-        DJS_new_string_as_value(runtime, "Expected a boolean"));
+  if (!djs_is_bool(arg)) {
+    return djs_completion_abrupt(
+        djs_value_from(djs_string_new(runtime, "Expected a boolean")));
   }
-  if (DJSValue_is_true(arg)) {
-    return DJSCompletion_normal(DJSValue_bool(false));
+  if (djs_is_bool(arg) && djs_value_as_bool(arg)) {
+    return djs_completion_normal(djs_false());
   } else {
-    return DJSCompletion_normal(DJSValue_bool(true));
+    return djs_completion_normal(djs_true());
   }
 }
 
 int main(void) {
   DJSRuntime* runtime = djs_new_runtime();
 
-  DJSObject* func = (DJSObject*)DJSFunction_new(runtime, bool_not);
-  DJSValue t = DJSValue_bool(true);
-  DJSValue f = DJSValue_bool(false);
-  ASSERT_NORMAL(DJSObject_Call(runtime, func, DJSValue_undefined(), &t, 1),
-                DJSValue_bool(false));
+  DJSObject* func = (DJSObject*)djs_function_new(runtime, bool_not);
+  DJSValue t = djs_true();
+  DJSValue f = djs_false();
+  ASSERT_NORMAL(djs_call(runtime, func, djs_undefined(), &t, 1), djs_false());
 
-  ASSERT_NORMAL(DJSObject_Call(runtime, func, DJSValue_undefined(), &f, 1),
-                DJSValue_bool(true));
+  ASSERT_NORMAL(djs_call(runtime, func, djs_undefined(), &f, 1), djs_true());
 
-  ASSERT_ABRUPT(DJSObject_Call(runtime, func, DJSValue_undefined(), NULL, 0));
+  ASSERT_ABRUPT(djs_call(runtime, func, djs_undefined(), NULL, 0));
 
   djs_free_runtime(runtime);
 }

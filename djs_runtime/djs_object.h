@@ -1,10 +1,13 @@
 #pragma once
 #include <assert.h>
-#include "./completion.h"
-#include "./function.h"
-#include "./object.h"
-#include "./prelude.h"
-#include "./value.h"
+#include <stdint.h>
+#include "./djs.h"
+#include "./djs_prelude.h"
+
+static const DJSPropertyFlags DJS_PROPERTY_WRITABLE = 1 << 0;
+static const DJSPropertyFlags DJS_PROPERTY_ENUMERABLE = 1 << 1;
+static const DJSPropertyFlags DJS_PROPERTY_CONFIGURABLE = 1 << 2;
+static const DJSPropertyFlags DJS_PROPERTY_TYPE_MASK = 1 << 3;
 
 typedef struct DJSRuntime DJSRuntime;
 

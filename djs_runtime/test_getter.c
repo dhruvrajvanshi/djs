@@ -1,28 +1,24 @@
-#include "./object_layout.h"
-#include "./runtime.h"
 #include "./test_prelude.h"
-#include "function.h"
-#include "object.h"
+#include "djs.h"
 
 static DJSCompletion getter_callback(DJSRuntime* rt,
                                      DJSValue UNUSED(this),
                                      DJSValue* UNUSED(args),
                                      size_t UNUSED(argc)) {
-  DJSValue value = djs_value(DJS_new_string(rt, "Hello from the getter!"));
-  return DJSCompletion_normal(value);
+  DJSValue value = djs_value_from(djs_string_new(rt, "Hello from the getter!"));
+  return djs_completion_normal(value);
 }
 
 int main(void) {
   auto rt = djs_new_runtime();
-  auto obj = DJS_MakeBasicObject(rt);
-  auto key = DJSPropertyKey_symbol((DJSSymbol){0});
-  auto getter = DJSFunction_new(rt, getter_callback);
-  DJSProperty* desc = DJSProperty_new_accessor_property(rt, getter, nullptr, 0);
+  auto obj = djs_object_new(rt);
+  auto key = djs_property_key_from(djs_symbol_new(rt));
+  auto getter = djs_function_new(rt, getter_callback);
+  DJSProperty* desc = djs_property_new_accessor(rt, getter, nullptr);
 
-  ASSERT_NORMAL(DJSObject_DefineOwnProperty(rt, obj, key, desc),
-                djs_value(true));
+  ASSERT_NORMAL(djs_object_define_own_property(rt, obj, key, desc), djs_true());
 
-  ASSERT_NORMAL(DJSObject_Get(rt, obj, key),
-                DJS_new_string_as_value(rt, "Hello from the getter!"));
+  ASSERT_NORMAL(djs_object_get(rt, obj, key),
+                djs_value_from(djs_string_new(rt, "Hello from the getter!")));
   djs_free_runtime(rt);
 }
