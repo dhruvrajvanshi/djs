@@ -6,16 +6,6 @@
 
 typedef struct DJSObject DJSObject;
 
-typedef enum DJSValueType {
-  DJS_TYPE_UNDEFINED,
-  DJS_TYPE_NULL,
-  DJS_TYPE_BOOLEAN,
-  DJS_TYPE_NUMBER,
-  DJS_TYPE_OBJECT,
-  DJS_TYPE_STRING,
-  DJS_TYPE_SYMBOL,
-} DJSValueType;
-
 typedef struct DJSString {
   size_t length;
   const char* value;
@@ -31,19 +21,6 @@ static inline bool DJSString_eq(DJSString left, DJSString right) {
 static inline bool DJSSymbol_eq(DJSSymbol left, DJSSymbol right) {
   return left.id == right.id;
 }
-
-typedef struct DJSValue {
-  DJSValueType type;
-  union {
-    bool undefined;
-    bool null;
-    bool boolean;
-    double number;
-    const DJSString* string;
-    DJSObject* object;
-    DJSSymbol symbol;
-  } as;
-} DJSValue;
 
 static inline DJSValue DJSString_to_value(const DJSString* string) {
   return (DJSValue){.type = DJS_TYPE_STRING, .as = {.string = string}};

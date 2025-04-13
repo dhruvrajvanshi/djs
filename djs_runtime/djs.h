@@ -10,6 +10,29 @@ typedef struct DJSSymbol {
   size_t id;
 } DJSSymbol;
 
+typedef enum DJSValueType {
+  DJS_TYPE_UNDEFINED,
+  DJS_TYPE_NULL,
+  DJS_TYPE_BOOLEAN,
+  DJS_TYPE_NUMBER,
+  DJS_TYPE_OBJECT,
+  DJS_TYPE_STRING,
+  DJS_TYPE_SYMBOL,
+} DJSValueType;
+
+typedef struct DJSValue {
+  DJSValueType type;
+  union {
+    bool undefined;
+    bool null;
+    bool boolean;
+    double number;
+    const DJSString* string;
+    DJSObject* object;
+    DJSSymbol symbol;
+  } as;
+} DJSValue;
+
 typedef struct DJSRuntime DJSRuntime;
 typedef DJSObject DJSObject;
 typedef struct DJSProperty DJSProperty;
