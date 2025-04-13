@@ -1,34 +1,33 @@
-#include "./runtime.h"
 #include <gc.h>
-#include "./prelude.h"
-#include "./print.h"
-#include "./value.h"
-#include "object.h"
+#include "./djs_prelude.h"
+#include "./djs_string.h"
 
 #include <stdio.h>
 #include <stdlib.h>
 
 typedef struct DJSRuntime {
-  void* _;
+  size_t next_symbol;
 } DJSRuntime;
 
 DJSRuntime* djs_new_runtime(void) {
   GC_init();
   DJSRuntime* runtime = malloc(sizeof(DJSRuntime));
-  runtime->_ = NULL;
+  runtime->next_symbol = 0;
   return runtime;
 }
+
+DJSSymbol djs_symbol_new(DJSRuntime* runtime) {
+  size_t id = runtime->next_symbol;
+  runtime->next_symbol++;
+  DJSSymbol symbol = {id};
+  return symbol;
+}
+
 void djs_free_runtime(DJSRuntime* runtime) {
   free(runtime);
 }
 
-void djs_console_log(__attribute__((unused)) DJSRuntime* runtime,
-                     DJSValue value) {
-  DJSValue_print(stdout, value);
-  puts("");
-}
-
-bool DJS_IsStrictlyEqual(DJSValue left, DJSValue right) {
+bool IsStrictlyEqual(DJSValue left, DJSValue right) {
   if (left.type != right.type) {
     return false;
   }
@@ -44,8 +43,11 @@ bool DJS_IsStrictlyEqual(DJSValue left, DJSValue right) {
     case DJS_TYPE_OBJECT:
       return left.as.object == right.as.object;
     case DJS_TYPE_STRING:
-      return DJSString_eq(*left.as.string, *right.as.string);
+      return djs_string_eq(left.as.string, right.as.string);
     default:
       DJS_PANIC("Unknown value type");
   }
+}
+bool djs_is_strictly_equal(DJSValue left, DJSValue right) {
+  return IsStrictlyEqual(left, right);
 }
