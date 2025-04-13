@@ -1,6 +1,7 @@
 #pragma once
 #include <memory.h>
 #include <stdbool.h>
+#include "./djs.h"
 #include "./prelude.h"
 
 typedef struct DJSObject DJSObject;
@@ -27,9 +28,6 @@ static inline bool DJSString_eq(DJSString left, DJSString right) {
   return memcmp((void*)left.value, (void*)right.value, left.length) == 0;
 }
 
-typedef struct DJSSymbol {
-  size_t id;
-} DJSSymbol;
 static inline bool DJSSymbol_eq(DJSSymbol left, DJSSymbol right) {
   return left.id == right.id;
 }
@@ -41,13 +39,13 @@ typedef struct DJSValue {
     bool null;
     bool boolean;
     double number;
-    DJSString* string;
+    const DJSString* string;
     DJSObject* object;
     DJSSymbol symbol;
   } as;
 } DJSValue;
 
-static inline DJSValue DJSString_to_value(DJSString* string) {
+static inline DJSValue DJSString_to_value(const DJSString* string) {
   return (DJSValue){.type = DJS_TYPE_STRING, .as = {.string = string}};
 }
 
@@ -77,7 +75,7 @@ static inline DJSObject* NULLABLE DJSValue_as_object(DJSValue value) {
     return NULL;
   }
 }
-static inline DJSValue DJSValue_string(DJSString* str) {
+static inline DJSValue DJSValue_string(const DJSString* str) {
   return DJSString_to_value(str);
 }
 static inline DJSValue DJSValue_bool(bool value) {

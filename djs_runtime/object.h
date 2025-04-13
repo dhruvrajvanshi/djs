@@ -1,29 +1,16 @@
 #pragma once
 #include <stdint.h>
 #include "./completion.h"
+#include "./djs.h"
 #include "./function.h"
 #include "./value.h"
 
-typedef struct DJSRuntime DJSRuntime;
-typedef DJSObject DJSObject;
-typedef struct DJSProperty DJSProperty;
-enum DJSPropertyKeyType {
-  DJS_PROPERTY_KEY_STRING = 0,
-  DJS_PROPERTY_KEY_SYMBOL = 1,
-};
-typedef struct DJSPropertyKey {
-  enum DJSPropertyKeyType type;
-  union {
-    DJSString string;
-    DJSSymbol symbol;
-  } as;
-} DJSPropertyKey;
 static inline DJSPropertyKey DJSPropertyKey_symbol(DJSSymbol symbol) {
   return (DJSPropertyKey){.type = DJS_PROPERTY_KEY_SYMBOL,
                           .as = {.symbol = symbol}};
 }
 
-static inline DJSPropertyKey DJSPropertyKey_string(DJSString string) {
+static inline DJSPropertyKey DJSPropertyKey_string(const DJSString* string) {
   return (DJSPropertyKey){.type = DJS_PROPERTY_KEY_STRING,
                           .as = {.string = string}};
 }
