@@ -16,7 +16,7 @@ add_global_arguments(
 
 djs_runtime = library(
   'djs_runtime',
-  ['djs_runtime.c', 'djs_object.c', 'djs_pretty_print.c', 'djs_string.c', 'djs_function.c'],
+  ['djs_runtime.c', 'djs_object.c', 'djs_pretty_print.c', 'djs_property.c', 'djs_string.c', 'djs_function.c'],
   dependencies: dependency('bdw-gc')
 )
 

@@ -168,7 +168,6 @@ DJSCompletion djs_call(DJSRuntime* runtime,
                        DJSValue* args,
                        size_t argc);
 
-typedef uint8_t DJSPropertyFlags;
 DJSProperty* djs_property_new_data(DJSRuntime* runtime, DJSValue value);
 DJSProperty* djs_property_new_accessor(DJSRuntime* runtime,
                                        DJSFunction* getter,
