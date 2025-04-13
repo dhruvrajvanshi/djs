@@ -64,9 +64,9 @@
     }                                                                          \
   }
 
-#define djs_property_key(X)             \
-  _Generic((X),                         \
-      DJSString: DJSPropertyKey_string, \
+#define djs_property_key(X)                    \
+  _Generic((X),                                \
+      const DJSString*: DJSPropertyKey_string, \
       DJSSymbol: DJSPropertyKey_symbol)(X)
 
 static inline DJSValue value_id(DJSValue value) {
@@ -78,5 +78,4 @@ static inline DJSValue value_id(DJSValue value) {
       DJSValue: value_id,                \
       bool: DJSValue_bool,               \
       const DJSString*: DJSValue_string, \
-      DJSString*: DJSValue_string,       \
       DJSSymbol: DJSValue_symbol)(X)
