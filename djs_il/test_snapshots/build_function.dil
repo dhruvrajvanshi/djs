@@ -1,0 +1,6 @@
+function @test() {
+.entry:
+  %obj = make_object
+  set %obj["key"] = "value"
+  %result = get %obj["key"]
+}
