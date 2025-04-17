@@ -1,0 +1,19 @@
+{
+  "name": "djs_il",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "lint": "biome lint",
+    "format": "prettier --check",
+    "test": "vitest"
+  },
+  "license": "UNLCENCED",
+  "packageManager": "pnpm@10.8.0",
+  "devDependencies": {
+    "@biomejs/biome": "1.9.4",
+    "prettier": "^3.5.3",
+    "typescript": "5.8.3",
+    "vitest": "^3.1.1"
+  },
+  "$schema": "https://json.schemastore.org/package.json"
+}
