@@ -1,0 +1,6 @@
+packages:
+  - djs_il
+
+onlyBuiltDependencies:
+  - '@biomejs/biome'
+  - esbuild
