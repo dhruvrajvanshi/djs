@@ -13,17 +13,65 @@ export type DILInstruction =
       object: DILOperand
       property: DILOperand
     }>
+  | ro<{
+      kind: 'call'
+      name: DILLocalRef
+      callee: DILOperand
+      args: DILOperand[]
+    }>
+  | ro<{ kind: 'return'; value: DILOperand }>
+
+const InstructionBuilders = Object.freeze({
+  emit_set: (object: DILOperand, property: DILOperand, value: DILOperand) =>
+    ({
+      kind: 'set',
+      object,
+      property,
+      value,
+    }) as const,
+  emit_get: (name: DILLocalRef, object: DILOperand, property: DILOperand) =>
+    ({
+      kind: 'get',
+      name,
+      object,
+      property,
+    }) as const,
+  emit_make_object: (name: DILLocalRef) =>
+    ({
+      kind: 'make_object',
+      name,
+    }) as const,
+  emit_call: (name: DILLocalRef, callee: DILOperand, args: DILOperand[]) =>
+    ({
+      kind: 'call',
+      name,
+      callee,
+      args,
+    }) as const,
+  emit_return: (value: DILOperand) =>
+    ({
+      kind: 'return',
+      value,
+    }) as const,
+})
 
 type DILLocalRef = `%${string}`
 type DILParamRef = `$${string}`
 export type DILOperand =
   | { kind: 'local'; name: DILLocalRef }
   | { kind: 'constant'; value: DILConstant }
+  | { kind: 'global'; name: GlobalRef }
 
 export const op = Object.freeze({
   local(name: DILLocalRef): DILOperand {
     return {
       kind: 'local',
+      name,
+    }
+  },
+  global(name: GlobalRef): DILOperand {
+    return {
+      kind: 'global',
       name,
     }
   },
@@ -92,35 +140,13 @@ type DILFunctionBuilder = Prettify<
     }
 >
 
-export const Instruction = Object.freeze({
-  set: (object: DILOperand, property: DILOperand, value: DILOperand) =>
-    ({
-      kind: 'set',
-      object,
-      property,
-      value,
-    }) as const,
-  get: (name: DILLocalRef, object: DILOperand, property: DILOperand) =>
-    ({
-      kind: 'get',
-      name,
-      object,
-      property,
-    }) as const,
-  make_object: (name: DILLocalRef) =>
-    ({
-      kind: 'make_object',
-      name,
-    }) as const,
-})
-
 type AsVoidResult<T> = T extends (...args: infer Args) => unknown
   ? (...args: Args) => void
   : never
 
 type InstructionEmitters = {
-  [K in keyof typeof Instruction as `emit_${K}`]: AsVoidResult<
-    (typeof Instruction)[K]
+  [K in keyof typeof InstructionBuilders]: AsVoidResult<
+    (typeof InstructionBuilders)[K]
   >
 }
 
@@ -171,6 +197,14 @@ export function buildFunction(
     currentBlock.instructions.push(instruction)
     return instruction
   }
+  const e = <Args extends unknown[], I extends DILInstruction>(
+    f: (...args: Args) => I,
+  ) => {
+    return (...args: Args) => {
+      emit(f(...args))
+    }
+  }
+  const i = InstructionBuilders
   const builder: DILFunctionBuilder = {
     add_block(name) {
       const block: DILBasicBlock = {
@@ -180,10 +214,11 @@ export function buildFunction(
       currentBlock = block
     },
     emit,
-
-    emit_get: (...args) => emit(Instruction.get(...args)),
-    emit_set: (...args) => emit(Instruction.set(...args)),
-    emit_make_object: (...args) => emit(Instruction.make_object(...args)),
+    emit_get: e(i.emit_get),
+    emit_set: e(i.emit_set),
+    emit_make_object: e(i.emit_make_object),
+    emit_call: e(i.emit_call),
+    emit_return: e(i.emit_return),
     ...op,
   }
   build(builder)
@@ -226,6 +261,14 @@ export function prettyPrint(f: DILFunction) {
         return `set ${ppOperand(instruction.object)}[${ppOperand(instruction.property)}] = ${ppOperand(instruction.value)}`
       case 'get':
         return `${instruction.name} = get ${ppOperand(instruction.object)}[${ppOperand(instruction.property)}]`
+      case 'call':
+        return `${instruction.name} = call ${ppOperand(instruction.callee)}(${instruction.args
+          .map(ppOperand)
+          .join(', ')})`
+      case 'return':
+        return `return ${ppOperand(instruction.value)}`
+      default:
+        assertNever(instruction)
     }
   }
 
@@ -235,6 +278,10 @@ export function prettyPrint(f: DILFunction) {
         return operand.name
       case 'constant':
         return ppConstant(operand.value)
+      case 'global':
+        return operand.name
+      default:
+        assertNever(operand)
     }
   }
   function ppConstant(constant: DILConstant) {
@@ -245,6 +292,11 @@ export function prettyPrint(f: DILFunction) {
         return `${constant.value}`
       case 'boolean':
         return `${constant.value}`
+      default:
+        assertNever(constant)
     }
   }
+}
+function assertNever(x: never): never {
+  throw new Error(`Unexpected object: ${x}`)
 }

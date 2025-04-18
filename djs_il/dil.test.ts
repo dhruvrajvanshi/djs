@@ -11,7 +11,11 @@ test('buildF', async () => {
       build_function('@test', [], (b) => {
         b.emit_make_object('%obj')
         b.emit_set(b.local('%obj'), b.string('key'), b.string('value'))
-        b.emit_get('%result', op.local('%obj'), op.string('key'))
+        b.emit_get('%value', op.local('%obj'), op.string('key'))
+        b.emit_call('%capitalized', b.global('@builtin.capitalize'), [
+          b.local('%value'),
+        ]),
+          b.emit_return(b.local('%capitalized'))
       }),
     ),
   ).toMatchFileSnapshot('test_snapshots/build_function.dil')
