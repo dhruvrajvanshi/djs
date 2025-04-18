@@ -3,21 +3,21 @@ import type {
   Constant,
   Func,
   Instr,
-  Op,
+  Operand,
   Param,
   Type,
 } from './il_nodes.js'
 
 export function pretty_print(f: Func) {
   const header = `function ${f.name}`
-  const params = f.params.map(ppParam).join(', ')
+  const params = f.params.map(pp_param).join(', ')
   const blocks = f.blocks.map(pp_block).join('\n')
   return `${header}(${params}) {\n${blocks}\n}`
 
-  function ppParam(param: { name: Param; type: Type }) {
-    return `${param.name}: ${ppType(param.type)}`
+  function pp_param(param: { name: Param; type: Type }) {
+    return `${param.name}: ${pp_type(param.type)}`
   }
-  function ppType(type: Type): string {
+  function pp_type(type: Type): string {
     switch (type.kind) {
       case 'top':
         return 'top'
@@ -31,28 +31,47 @@ export function pretty_print(f: Func) {
     return `${block.label}:\n${instructions}`
   }
 
-  function pp_instr(instruction: Instr) {
-    switch (instruction.kind) {
+  type PP = string | Operand | PP[]
+  function pp(template: TemplateStringsArray, ...args: PP[]) {
+    let result = ''
+    for (let i = 0; i < Math.max(template.length, args.length); i++) {
+      const str = template[i]
+      const arg = args[i]
+      result += str
+      if (arg) result += pp_pp(arg)
+    }
+    return result
+  }
+  function pp_pp(arg: PP): string {
+    if (typeof arg === 'string') {
+      return arg
+    }
+    if (Array.isArray(arg)) {
+      return arg.map(pp_pp).join(', ')
+    }
+    return pp_operand(arg)
+  }
+
+  function pp_instr(instr: Instr) {
+    switch (instr.kind) {
       case 'make_object':
-        return `${instruction.name} = make_object`
+        return `${instr.name} = make_object`
       case 'set':
-        return `set ${pp_operand(instruction.object)}[${pp_operand(instruction.property)}] = ${pp_operand(instruction.value)}`
+        return pp`set ${instr.object}[${instr.property}] = ${instr.value}`
       case 'get':
-        return `${instruction.name} = get ${pp_operand(instruction.object)}[${pp_operand(instruction.property)}]`
+        return pp`${instr.name} = get ${instr.object}[${instr.property}]`
       case 'call':
-        return `${instruction.name} = call ${pp_operand(instruction.callee)}(${instruction.args
-          .map(pp_operand)
-          .join(', ')})`
+        return pp`${instr.name} = call ${instr.callee}(${instr.args})`
       case 'return':
-        return `return ${pp_operand(instruction.value)}`
+        return pp`return ${instr.value}`
       case 'jump_if':
-        return `jump_if ${pp_operand(instruction.condition)} then: ${instruction.if_truthy} else: ${instruction.if_falsy}`
+        return pp`jump_if ${instr.condition} then: ${instr.if_truthy} else: ${instr.if_falsy}`
       default:
-        assert_never(instruction)
+        assert_never(instr)
     }
   }
 
-  function pp_operand(operand: Op) {
+  function pp_operand(operand: Operand) {
     switch (operand.kind) {
       case 'local':
         return operand.name

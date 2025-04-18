@@ -3,40 +3,40 @@ export type Instr =
   | ro<{ kind: 'make_object'; name: Local }>
   | ro<{
       kind: 'set'
-      object: Op
-      property: Op
-      value: Op
+      object: Operand
+      property: Operand
+      value: Operand
     }>
   | ro<{
       kind: 'get'
       name: Local
-      object: Op
-      property: Op
+      object: Operand
+      property: Operand
     }>
   | ro<{
       kind: 'call'
       name: Local
-      callee: Op
-      args: Op[]
+      callee: Operand
+      args: Operand[]
     }>
-  | ro<{ kind: 'return'; value: Op }>
+  | ro<{ kind: 'return'; value: Operand }>
   | TerminatorInstr
 
 export type TerminatorInstr = ro<{
   kind: 'jump_if'
-  condition: Op
+  condition: Operand
   if_truthy: BlockLabel
   if_falsy: BlockLabel
 }>
 const InstructionBuilders = {
-  emit_set: (object: Op, property: Op, value: Op) =>
+  emit_set: (object: Operand, property: Operand, value: Operand) =>
     ({
       kind: 'set',
       object,
       property,
       value,
     }) as const,
-  emit_get: (name: Local, object: Op, property: Op) =>
+  emit_get: (name: Local, object: Operand, property: Operand) =>
     ({
       kind: 'get',
       name,
@@ -48,20 +48,20 @@ const InstructionBuilders = {
       kind: 'make_object',
       name,
     }) as const,
-  emit_call: (name: Local, callee: Op, args: Op[]) =>
+  emit_call: (name: Local, callee: Operand, args: Operand[]) =>
     ({
       kind: 'call',
       name,
       callee,
       args,
     }) as const,
-  emit_return: (value: Op) =>
+  emit_return: (value: Operand) =>
     ({
       kind: 'return',
       value,
     }) as const,
   emit_jump_if: (
-    condition: Op,
+    condition: Operand,
     if_truthy: BlockLabel,
     if_falsy: BlockLabel,
   ) => ({
@@ -76,25 +76,25 @@ const InstructionBuilders = {
 
 export type Local = `%${string}`
 export type Param = `$${string}`
-export type Op =
+export type Operand =
   | { kind: 'local'; name: Local }
   | { kind: 'constant'; value: Constant }
   | { kind: 'global'; name: Global }
 
 const op = Object.freeze({
-  local(name: Local): Op {
+  local(name: Local): Operand {
     return {
       kind: 'local',
       name,
     }
   },
-  global(name: Global): Op {
+  global(name: Global): Operand {
     return {
       kind: 'global',
       name,
     }
   },
-  string(value: string): Op {
+  string(value: string): Operand {
     return {
       kind: 'constant',
       value: {
@@ -103,7 +103,7 @@ const op = Object.freeze({
       },
     }
   },
-  number(value: number): Op {
+  number(value: number): Operand {
     return {
       kind: 'constant',
       value: {
@@ -112,7 +112,7 @@ const op = Object.freeze({
       },
     }
   },
-  boolean(value: boolean): Op {
+  boolean(value: boolean): Operand {
     return {
       kind: 'constant',
       value: {
