@@ -20,8 +20,16 @@ type Instr =
       args: Op[]
     }>
   | ro<{ kind: 'return'; value: Op }>
+  | TerminatorInstr
 
-const InstructionBuilders = Object.freeze({
+type TerminatorInstr = ro<{
+  kind: 'jump_if'
+  condition: Op
+  if_truthy: BlockLabel
+  if_falsy: BlockLabel
+}>
+
+const InstructionBuilders = {
   emit_set: (object: Op, property: Op, value: Op) =>
     ({
       kind: 'set',
@@ -53,7 +61,19 @@ const InstructionBuilders = Object.freeze({
       kind: 'return',
       value,
     }) as const,
-})
+  emit_jump_if: (
+    condition: Op,
+    if_truthy: BlockLabel,
+    if_falsy: BlockLabel,
+  ) => ({
+    kind: 'jump_if',
+    condition,
+    if_truthy,
+    if_falsy,
+  }),
+} as const satisfies {
+  [K in `emit_${Instr['kind']}`]: (...args: never[]) => Instr
+}
 
 type Local = `%${string}`
 type Param = `$${string}`
@@ -132,12 +152,12 @@ export function buildFunction(
   params: { name: Param; type: Type }[],
   build: (builder: FunctionBuilder) => void,
 ): Func {
-  let currentBlock: BasicBlock = {
+  let current_block: BasicBlock = {
     label: '.entry',
     instructions: [],
   }
   const emit = (instruction: Instr) => {
-    currentBlock.instructions.push(instruction)
+    current_block.instructions.push(instruction)
     return instruction
   }
   const e = <Args extends unknown[], I extends Instr>(
@@ -147,14 +167,25 @@ export function buildFunction(
       emit(f(...args))
     }
   }
+
+  const blocks: [BasicBlock, ...BasicBlock[]] = [current_block]
   const i = InstructionBuilders
   const builder: FunctionBuilder = {
-    add_block(name) {
+    add_block(name, build) {
       const block: BasicBlock = {
         label: name,
         instructions: [],
       }
-      currentBlock = block
+      blocks.push(block)
+      const last_block = current_block
+      current_block = block
+      build()
+      if (current_block !== block) {
+        throw new Error(
+          `Current block changed from ${last_block.label} to ${current_block.label}`,
+        )
+      }
+      current_block = last_block
     },
     emit,
     emit_get: e(i.emit_get),
@@ -162,10 +193,10 @@ export function buildFunction(
     emit_make_object: e(i.emit_make_object),
     emit_call: e(i.emit_call),
     emit_return: e(i.emit_return),
+    emit_jump_if: e(i.emit_jump_if),
     ...op,
   }
   build(builder)
-  const blocks: [BasicBlock, ...BasicBlock[]] = [currentBlock]
   return {
     name,
     params,
@@ -180,7 +211,7 @@ type Prettify<T> = {
 type FunctionBuilder = Prettify<
   typeof op &
     InstructionEmitters & {
-      add_block(name: BlockLabel): void
+      add_block(name: BlockLabel, build_block: () => void): void
       emit(instruction: Instr): void
     }
 >
@@ -232,6 +263,8 @@ export function prettyPrint(f: Func) {
           .join(', ')})`
       case 'return':
         return `return ${ppOperand(instruction.value)}`
+      case 'jump_if':
+        return `jump_if ${ppOperand(instruction.condition)} then: ${instruction.if_truthy} else: ${instruction.if_falsy}`
       default:
         assertNever(instruction)
     }
