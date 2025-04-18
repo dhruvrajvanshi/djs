@@ -1,81 +1,81 @@
 type ro<T> = Readonly<T>
-export type DILInstruction =
-  | ro<{ kind: 'make_object'; name: DILLocalRef }>
+type Instr =
+  | ro<{ kind: 'make_object'; name: Local }>
   | ro<{
       kind: 'set'
-      object: DILOperand
-      property: DILOperand
-      value: DILOperand
+      object: Op
+      property: Op
+      value: Op
     }>
   | ro<{
       kind: 'get'
-      name: DILLocalRef
-      object: DILOperand
-      property: DILOperand
+      name: Local
+      object: Op
+      property: Op
     }>
   | ro<{
       kind: 'call'
-      name: DILLocalRef
-      callee: DILOperand
-      args: DILOperand[]
+      name: Local
+      callee: Op
+      args: Op[]
     }>
-  | ro<{ kind: 'return'; value: DILOperand }>
+  | ro<{ kind: 'return'; value: Op }>
 
 const InstructionBuilders = Object.freeze({
-  emit_set: (object: DILOperand, property: DILOperand, value: DILOperand) =>
+  emit_set: (object: Op, property: Op, value: Op) =>
     ({
       kind: 'set',
       object,
       property,
       value,
     }) as const,
-  emit_get: (name: DILLocalRef, object: DILOperand, property: DILOperand) =>
+  emit_get: (name: Local, object: Op, property: Op) =>
     ({
       kind: 'get',
       name,
       object,
       property,
     }) as const,
-  emit_make_object: (name: DILLocalRef) =>
+  emit_make_object: (name: Local) =>
     ({
       kind: 'make_object',
       name,
     }) as const,
-  emit_call: (name: DILLocalRef, callee: DILOperand, args: DILOperand[]) =>
+  emit_call: (name: Local, callee: Op, args: Op[]) =>
     ({
       kind: 'call',
       name,
       callee,
       args,
     }) as const,
-  emit_return: (value: DILOperand) =>
+  emit_return: (value: Op) =>
     ({
       kind: 'return',
       value,
     }) as const,
 })
 
-type DILLocalRef = `%${string}`
-type DILParamRef = `$${string}`
-export type DILOperand =
-  | { kind: 'local'; name: DILLocalRef }
-  | { kind: 'constant'; value: DILConstant }
-  | { kind: 'global'; name: GlobalRef }
+type Local = `%${string}`
+type Param = `$${string}`
+type Op =
+  | { kind: 'local'; name: Local }
+  | { kind: 'constant'; value: Constant }
+  | { kind: 'global'; name: Global }
 
-export const op = Object.freeze({
-  local(name: DILLocalRef): DILOperand {
+const op = Object.freeze({
+  local(name: Local): Op {
     return {
       kind: 'local',
       name,
     }
   },
-  global(name: GlobalRef): DILOperand {
+  global(name: Global): Op {
     return {
       kind: 'global',
       name,
     }
   },
-  string(value: string): DILOperand {
+  string(value: string): Op {
     return {
       kind: 'constant',
       value: {
@@ -84,7 +84,7 @@ export const op = Object.freeze({
       },
     }
   },
-  number(value: number): DILOperand {
+  number(value: number): Op {
     return {
       kind: 'constant',
       value: {
@@ -93,7 +93,7 @@ export const op = Object.freeze({
       },
     }
   },
-  boolean(value: boolean): DILOperand {
+  boolean(value: boolean): Op {
     return {
       kind: 'constant',
       value: {
@@ -104,7 +104,7 @@ export const op = Object.freeze({
   },
 })
 
-export type DILConstant =
+type Constant =
   | {
       kind: 'string'
       value: string
@@ -112,92 +112,35 @@ export type DILConstant =
   | { kind: 'number'; value: number }
   | { kind: 'boolean'; value: boolean }
 
-export type BlockLabel = `.${string}`
-type GlobalRef = `@${string}`
-export type DILBasicBlock = {
+type BlockLabel = `.${string}`
+type Global = `@${string}`
+type BasicBlock = {
   label: BlockLabel
-  instructions: DILInstruction[]
+  instructions: Instr[]
 }
 
-export type DILType = { kind: 'top' }
-export type DILParam = { name: DILParamRef; type: DILType }
+type Type = { kind: 'top' }
 
-export type DILFunction = {
+type Func = {
   name: string
-  params: DILParam[]
-  blocks: [entry: DILBasicBlock, ...DILBasicBlock[]]
-}
-
-type Prettify<T> = {
-  [K in keyof T]: T[K]
-} & {}
-
-type DILFunctionBuilder = Prettify<
-  typeof op &
-    InstructionEmitters & {
-      add_block(name: BlockLabel): void
-      emit(instruction: DILInstruction): void
-    }
->
-
-type AsVoidResult<T> = T extends (...args: infer Args) => unknown
-  ? (...args: Args) => void
-  : never
-
-type InstructionEmitters = {
-  [K in keyof typeof InstructionBuilders]: AsVoidResult<
-    (typeof InstructionBuilders)[K]
-  >
-}
-
-export function localRef(name: DILLocalRef): DILOperand {
-  return {
-    kind: 'local',
-    name,
-  }
-}
-export function constString(value: string): DILOperand {
-  return {
-    kind: 'constant',
-    value: {
-      kind: 'string',
-      value,
-    },
-  }
-}
-export function constNumber(value: number): DILOperand {
-  return {
-    kind: 'constant',
-    value: {
-      kind: 'number',
-      value,
-    },
-  }
-}
-export function constBoolean(value: boolean): DILOperand {
-  return {
-    kind: 'constant',
-    value: {
-      kind: 'boolean',
-      value,
-    },
-  }
+  params: { name: Param; type: Type }[]
+  blocks: [entry: BasicBlock, ...BasicBlock[]]
 }
 
 export function buildFunction(
-  name: GlobalRef,
-  params: DILParam[],
-  build: (builder: DILFunctionBuilder) => void,
-): DILFunction {
-  let currentBlock: DILBasicBlock = {
+  name: Global,
+  params: { name: Param; type: Type }[],
+  build: (builder: FunctionBuilder) => void,
+): Func {
+  let currentBlock: BasicBlock = {
     label: '.entry',
     instructions: [],
   }
-  const emit = (instruction: DILInstruction) => {
+  const emit = (instruction: Instr) => {
     currentBlock.instructions.push(instruction)
     return instruction
   }
-  const e = <Args extends unknown[], I extends DILInstruction>(
+  const e = <Args extends unknown[], I extends Instr>(
     f: (...args: Args) => I,
   ) => {
     return (...args: Args) => {
@@ -205,9 +148,9 @@ export function buildFunction(
     }
   }
   const i = InstructionBuilders
-  const builder: DILFunctionBuilder = {
+  const builder: FunctionBuilder = {
     add_block(name) {
-      const block: DILBasicBlock = {
+      const block: BasicBlock = {
         label: name,
         instructions: [],
       }
@@ -222,7 +165,7 @@ export function buildFunction(
     ...op,
   }
   build(builder)
-  const blocks: [DILBasicBlock, ...DILBasicBlock[]] = [currentBlock]
+  const blocks: [BasicBlock, ...BasicBlock[]] = [currentBlock]
   return {
     name,
     params,
@@ -230,22 +173,44 @@ export function buildFunction(
   }
 }
 
-export function prettyPrint(f: DILFunction) {
+type Prettify<T> = {
+  [K in keyof T]: T[K]
+} & {}
+
+type FunctionBuilder = Prettify<
+  typeof op &
+    InstructionEmitters & {
+      add_block(name: BlockLabel): void
+      emit(instruction: Instr): void
+    }
+>
+
+type AsVoidResult<T> = T extends (...args: infer Args) => unknown
+  ? (...args: Args) => void
+  : never
+
+type InstructionEmitters = {
+  [K in keyof typeof InstructionBuilders]: AsVoidResult<
+    (typeof InstructionBuilders)[K]
+  >
+}
+
+export function prettyPrint(f: Func) {
   const header = `function ${f.name}`
   const params = f.params.map(ppParam).join(', ')
   const blocks = f.blocks.map(ppBlock).join('\n')
   return `${header}(${params}) {\n${blocks}\n}`
 
-  function ppParam(param: DILParam) {
+  function ppParam(param: { name: Param; type: Type }) {
     return `${param.name}: ${ppType(param.type)}`
   }
-  function ppType(type: DILType): string {
+  function ppType(type: Type): string {
     switch (type.kind) {
       case 'top':
         return 'top'
     }
   }
-  function ppBlock(block: DILBasicBlock) {
+  function ppBlock(block: BasicBlock) {
     const instructions = block.instructions
       .map(ppInstruction)
       .map((it) => `  ${it}`)
@@ -253,7 +218,7 @@ export function prettyPrint(f: DILFunction) {
     return `${block.label}:\n${instructions}`
   }
 
-  function ppInstruction(instruction: DILInstruction) {
+  function ppInstruction(instruction: Instr) {
     switch (instruction.kind) {
       case 'make_object':
         return `${instruction.name} = make_object`
@@ -272,7 +237,7 @@ export function prettyPrint(f: DILFunction) {
     }
   }
 
-  function ppOperand(operand: DILOperand) {
+  function ppOperand(operand: Op) {
     switch (operand.kind) {
       case 'local':
         return operand.name
@@ -284,7 +249,7 @@ export function prettyPrint(f: DILFunction) {
         assertNever(operand)
     }
   }
-  function ppConstant(constant: DILConstant) {
+  function ppConstant(constant: Constant) {
     switch (constant.kind) {
       case 'string':
         return JSON.stringify(constant.value)
