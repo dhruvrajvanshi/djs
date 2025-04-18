@@ -1,3 +1,5 @@
+import type { Prettify } from './util.js'
+
 type ro<T> = Readonly<T>
 export type Instr =
   | ro<{ kind: 'make_object'; name: Local }>
@@ -12,6 +14,30 @@ export type Instr =
       name: Local
       object: Operand
       property: Operand
+    }>
+  | ro<{
+      kind: 'strict_eq'
+      name: Local
+      left: Operand
+      right: Operand
+    }>
+  | ro<{
+      kind: 'or'
+      name: Local
+      left: Operand
+      right: Operand
+    }>
+  | ro<{
+      kind: 'add'
+      name: Local
+      left: Operand
+      right: Operand
+    }>
+  | ro<{
+      kind: 'sub'
+      name: Local
+      left: Operand
+      right: Operand
     }>
   | ro<{
       kind: 'call'
@@ -70,6 +96,34 @@ const InstructionBuilders = {
     if_truthy,
     if_falsy,
   }),
+  emit_strict_eq: (name: Local, left: Operand, right: Operand) =>
+    ({
+      kind: 'strict_eq',
+      name,
+      left,
+      right,
+    }) as const,
+  emit_or: (name: Local, left: Operand, right: Operand) =>
+    ({
+      kind: 'or',
+      name,
+      left,
+      right,
+    }) as const,
+  emit_add: (name: Local, left: Operand, right: Operand) =>
+    ({
+      kind: 'add',
+      name,
+      left,
+      right,
+    }) as const,
+  emit_sub: (name: Local, left: Operand, right: Operand) =>
+    ({
+      kind: 'sub',
+      name,
+      left,
+      right,
+    }) as const,
 } as const satisfies {
   [K in `emit_${Instr['kind']}`]: (...args: never[]) => Instr
 }
@@ -78,6 +132,7 @@ export type Local = `%${string}`
 export type Param = `$${string}`
 export type Operand =
   | { kind: 'local'; name: Local }
+  | { kind: 'param'; name: Param }
   | { kind: 'constant'; value: Constant }
   | { kind: 'global'; name: Global }
 
@@ -91,6 +146,12 @@ const op = Object.freeze({
   global(name: Global): Operand {
     return {
       kind: 'global',
+      name,
+    }
+  },
+  param(name: Param): Operand {
+    return {
+      kind: 'param',
       name,
     }
   },
@@ -123,6 +184,10 @@ const op = Object.freeze({
   },
 })
 
+const ty = Object.freeze({
+  ty_top: { kind: 'top' } as const,
+})
+
 export type Constant =
   | {
       kind: 'string'
@@ -138,17 +203,17 @@ export type BasicBlock = {
   instructions: Instr[]
 }
 
-export type Type = { kind: 'top' }
+export type Type = ro<{ kind: 'top' }>
 
+export type FuncParam = { name: Param; type: Type }
 export type Func = {
   name: string
-  params: { name: Param; type: Type }[]
+  params: FuncParam[]
   blocks: [entry: BasicBlock, ...BasicBlock[]]
 }
 
 export function build_function(
   name: Global,
-  params: { name: Param; type: Type }[],
   build: (builder: FunctionBuilder) => void,
 ): Func {
   let current_block: BasicBlock = {
@@ -186,15 +251,23 @@ export function build_function(
       }
       current_block = last_block
     },
-    emit,
+    add_param: (name: Param, type: Type) => {
+      params.push({ name, type })
+    },
     emit_get: e(i.emit_get),
     emit_set: e(i.emit_set),
     emit_make_object: e(i.emit_make_object),
     emit_call: e(i.emit_call),
     emit_return: e(i.emit_return),
     emit_jump_if: e(i.emit_jump_if),
+    emit_strict_eq: e(i.emit_strict_eq),
+    emit_or: e(i.emit_or),
+    emit_add: e(i.emit_add),
+    emit_sub: e(i.emit_sub),
     ...op,
+    ...ty,
   }
+  const params: FuncParam[] = []
   build(builder)
   return {
     name,
@@ -203,24 +276,17 @@ export function build_function(
   }
 }
 
-type Prettify<T> = {
-  [K in keyof T]: T[K]
-} & {}
-
 type FunctionBuilder = Prettify<
-  typeof op &
-    InstructionEmitters & {
-      add_block(name: BlockLabel, build_block: () => void): void
-      emit(instruction: Instr): void
-    }
+  {
+    add_block(name: BlockLabel, build_block: () => void): void
+    add_param(name: Param, type: Type): void
+  } & typeof op &
+    typeof ty &
+    InstrEmitters
 >
 
-type AsVoidResult<T> = T extends (...args: infer Args) => unknown
-  ? (...args: Args) => void
-  : never
-
-type InstructionEmitters = {
-  [K in keyof typeof InstructionBuilders]: AsVoidResult<
-    (typeof InstructionBuilders)[K]
-  >
-}
+type InstrEmitters = Prettify<{
+  readonly [K in keyof typeof InstructionBuilders]: (
+    ...args: Parameters<(typeof InstructionBuilders)[K]>
+  ) => void
+}>
