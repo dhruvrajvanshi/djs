@@ -1,5 +1,5 @@
 type ro<T> = Readonly<T>
-type Instr =
+export type Instr =
   | ro<{ kind: 'make_object'; name: Local }>
   | ro<{
       kind: 'set'
@@ -22,13 +22,12 @@ type Instr =
   | ro<{ kind: 'return'; value: Op }>
   | TerminatorInstr
 
-type TerminatorInstr = ro<{
+export type TerminatorInstr = ro<{
   kind: 'jump_if'
   condition: Op
   if_truthy: BlockLabel
   if_falsy: BlockLabel
 }>
-
 const InstructionBuilders = {
   emit_set: (object: Op, property: Op, value: Op) =>
     ({
@@ -75,9 +74,9 @@ const InstructionBuilders = {
   [K in `emit_${Instr['kind']}`]: (...args: never[]) => Instr
 }
 
-type Local = `%${string}`
-type Param = `$${string}`
-type Op =
+export type Local = `%${string}`
+export type Param = `$${string}`
+export type Op =
   | { kind: 'local'; name: Local }
   | { kind: 'constant'; value: Constant }
   | { kind: 'global'; name: Global }
@@ -124,7 +123,7 @@ const op = Object.freeze({
   },
 })
 
-type Constant =
+export type Constant =
   | {
       kind: 'string'
       value: string
@@ -132,22 +131,22 @@ type Constant =
   | { kind: 'number'; value: number }
   | { kind: 'boolean'; value: boolean }
 
-type BlockLabel = `.${string}`
-type Global = `@${string}`
-type BasicBlock = {
+export type BlockLabel = `.${string}`
+export type Global = `@${string}`
+export type BasicBlock = {
   label: BlockLabel
   instructions: Instr[]
 }
 
-type Type = { kind: 'top' }
+export type Type = { kind: 'top' }
 
-type Func = {
+export type Func = {
   name: string
   params: { name: Param; type: Type }[]
   blocks: [entry: BasicBlock, ...BasicBlock[]]
 }
 
-export function buildFunction(
+export function build_function(
   name: Global,
   params: { name: Param; type: Type }[],
   build: (builder: FunctionBuilder) => void,
@@ -224,77 +223,4 @@ type InstructionEmitters = {
   [K in keyof typeof InstructionBuilders]: AsVoidResult<
     (typeof InstructionBuilders)[K]
   >
-}
-
-export function prettyPrint(f: Func) {
-  const header = `function ${f.name}`
-  const params = f.params.map(ppParam).join(', ')
-  const blocks = f.blocks.map(ppBlock).join('\n')
-  return `${header}(${params}) {\n${blocks}\n}`
-
-  function ppParam(param: { name: Param; type: Type }) {
-    return `${param.name}: ${ppType(param.type)}`
-  }
-  function ppType(type: Type): string {
-    switch (type.kind) {
-      case 'top':
-        return 'top'
-    }
-  }
-  function ppBlock(block: BasicBlock) {
-    const instructions = block.instructions
-      .map(ppInstruction)
-      .map((it) => `  ${it}`)
-      .join('\n')
-    return `${block.label}:\n${instructions}`
-  }
-
-  function ppInstruction(instruction: Instr) {
-    switch (instruction.kind) {
-      case 'make_object':
-        return `${instruction.name} = make_object`
-      case 'set':
-        return `set ${ppOperand(instruction.object)}[${ppOperand(instruction.property)}] = ${ppOperand(instruction.value)}`
-      case 'get':
-        return `${instruction.name} = get ${ppOperand(instruction.object)}[${ppOperand(instruction.property)}]`
-      case 'call':
-        return `${instruction.name} = call ${ppOperand(instruction.callee)}(${instruction.args
-          .map(ppOperand)
-          .join(', ')})`
-      case 'return':
-        return `return ${ppOperand(instruction.value)}`
-      case 'jump_if':
-        return `jump_if ${ppOperand(instruction.condition)} then: ${instruction.if_truthy} else: ${instruction.if_falsy}`
-      default:
-        assertNever(instruction)
-    }
-  }
-
-  function ppOperand(operand: Op) {
-    switch (operand.kind) {
-      case 'local':
-        return operand.name
-      case 'constant':
-        return ppConstant(operand.value)
-      case 'global':
-        return operand.name
-      default:
-        assertNever(operand)
-    }
-  }
-  function ppConstant(constant: Constant) {
-    switch (constant.kind) {
-      case 'string':
-        return JSON.stringify(constant.value)
-      case 'number':
-        return `${constant.value}`
-      case 'boolean':
-        return `${constant.value}`
-      default:
-        assertNever(constant)
-    }
-  }
-}
-function assertNever(x: never): never {
-  throw new Error(`Unexpected object: ${x}`)
 }
