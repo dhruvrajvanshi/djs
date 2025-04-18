@@ -1,0 +1,16 @@
+function @fib($0: top) {
+.entry:
+  %is_zero = strict_eq 0, $0
+  %is_one = strict_eq 1, $0
+  %should_ret_zero = or %is_zero, %is_one
+  jump_if %should_ret_zero then: .ret_zero else: .recur
+.ret_zero:
+  return 0
+.recur:
+  %n_minus_1 = sub $0, 1
+  %n_minus_2 = sub $0, 2
+  %fib_minus_1 = call @fib(%n_minus_1)
+  %fib_minus_2 = call @fib(%n_minus_2)
+  %result = add %fib_minus_1, %fib_minus_2
+  return %result
+}
