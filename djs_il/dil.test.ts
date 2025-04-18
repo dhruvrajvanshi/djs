@@ -1,8 +1,6 @@
 import { expect, test } from 'vitest'
-import {
-  buildFunction as build_function,
-  prettyPrint as pretty_print,
-} from './index'
+import { build_function } from './il_nodes.js'
+import { pretty_print } from './pretty_print.js'
 
 test('builder and pretty printer', async () => {
   await expect(
