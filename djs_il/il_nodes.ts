@@ -207,7 +207,7 @@ export type Type = ro<{ kind: 'top' }>
 
 export type FuncParam = { name: Param; type: Type }
 export type Func = {
-  name: string
+  name: Global
   params: FuncParam[]
   blocks: [entry: BasicBlock, ...BasicBlock[]]
 }
