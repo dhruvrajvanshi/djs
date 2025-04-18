@@ -7,6 +7,7 @@ import type {
   Param,
   Type,
 } from './il_nodes.js'
+import { assert_never } from './util.js'
 
 export function pretty_print(f: Func) {
   const header = `function ${f.name}`
@@ -95,7 +96,4 @@ export function pretty_print(f: Func) {
         assert_never(constant)
     }
   }
-}
-function assert_never(x: never): never {
-  throw new Error(`Unexpected object: ${x}`)
 }
