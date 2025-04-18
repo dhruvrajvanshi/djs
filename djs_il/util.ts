@@ -10,3 +10,11 @@ export function assert(
     throw new Error(`Assertion failed: ${message()}`)
   }
 }
+
+export function todo(message: () => string = () => 'Unimplemented'): never {
+  throw new Error(`TODO: ${message()}`)
+}
+
+export type Prettify<T> = {
+  [K in keyof T]: T[K]
+} & {}

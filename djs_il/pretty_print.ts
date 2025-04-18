@@ -67,6 +67,14 @@ export function pretty_print(f: Func) {
         return pp`return ${instr.value}`
       case 'jump_if':
         return pp`jump_if ${instr.condition} then: ${instr.if_truthy} else: ${instr.if_falsy}`
+      case 'or':
+        return pp`${instr.name} = or ${instr.left}, ${instr.right}`
+      case 'strict_eq':
+        return pp`${instr.name} = strict_eq ${instr.left}, ${instr.right}`
+      case 'add':
+        return pp`${instr.name} = add ${instr.left}, ${instr.right}`
+      case 'sub':
+        return pp`${instr.name} = sub ${instr.left}, ${instr.right}`
       default:
         assert_never(instr)
     }
@@ -79,6 +87,8 @@ export function pretty_print(f: Func) {
       case 'constant':
         return pp_constant(operand.value)
       case 'global':
+        return operand.name
+      case 'param':
         return operand.name
       default:
         assert_never(operand)
