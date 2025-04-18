@@ -2,5 +2,7 @@ function @test() {
 .entry:
   %obj = make_object
   set %obj["key"] = "value"
-  %result = get %obj["key"]
+  %value = get %obj["key"]
+  %capitalized = call @builtin.capitalize(%value)
+  return %capitalized
 }
