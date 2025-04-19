@@ -2,7 +2,7 @@ import type { BasicBlock, BlockLabel } from './basic_block'
 import { Instr } from './instructions'
 import { Operand, type Param, type Global } from './operand'
 import { Type } from './type'
-import type { Prettify } from './util'
+import { objMapEntries, type Prettify } from './util'
 
 export type FuncParam = { name: Param; type: Type }
 export type Func = {
@@ -13,7 +13,7 @@ export type Func = {
 
 export function build_function(
   name: Global,
-  build: (builder: FunctionBuilder) => void,
+  build: (builder: FunctionBuilder, emit: UnprefixedInstrEmitters) => void,
 ): Func {
   let current_block: BasicBlock = {
     label: '.entry',
@@ -33,6 +33,22 @@ export function build_function(
 
   const blocks: [BasicBlock, ...BasicBlock[]] = [current_block]
   const i = Instr
+  const unprefixed_instr_emitters: UnprefixedInstrEmitters = {
+    get: e(i.get),
+    set: e(i.set),
+    make_object: e(i.make_object),
+    call: e(i.call),
+    return: e(i.return),
+    jump_if: e(i.jump_if),
+    strict_eq: e(i.strict_eq),
+    or: e(i.or),
+    add: e(i.add),
+    sub: e(i.sub),
+  } as const
+  const prefixed_instr_emitters: InstrEmitters = objMapEntries(
+    unprefixed_instr_emitters,
+    ([key, value]) => [`emit_${key}`, value],
+  ) as never
   const builder: FunctionBuilder = {
     add_block(name, build) {
       const block: BasicBlock = {
@@ -53,21 +69,12 @@ export function build_function(
     add_param: (name: Param, type: Type) => {
       params.push({ name, type })
     },
-    emit_get: e(i.emit_get),
-    emit_set: e(i.emit_set),
-    emit_make_object: e(i.emit_make_object),
-    emit_call: e(i.emit_call),
-    emit_return: e(i.emit_return),
-    emit_jump_if: e(i.emit_jump_if),
-    emit_strict_eq: e(i.emit_strict_eq),
-    emit_or: e(i.emit_or),
-    emit_add: e(i.emit_add),
-    emit_sub: e(i.emit_sub),
+    ...prefixed_instr_emitters,
     ...Type,
     ...Operand,
   }
   const params: FuncParam[] = []
-  build(builder)
+  build(builder, unprefixed_instr_emitters)
   return {
     name,
     params,
@@ -84,8 +91,24 @@ type FunctionBuilder = Prettify<
     InstrEmitters
 >
 
-type InstrEmitters = Prettify<{
+/**
+ * {
+ *    make_object: (...args) => void
+ *    set: (...args) => void
+ *    ...
+ * }
+ */
+type UnprefixedInstrEmitters = Prettify<{
   readonly [K in keyof typeof Instr]: (
+    ...args: Parameters<(typeof Instr)[K]>
+  ) => void
+}>
+
+/**
+ * { emit_get, emit_set, ... }
+ */
+type InstrEmitters = Prettify<{
+  readonly [K in keyof typeof Instr as `emit_${K}`]: (
     ...args: Parameters<(typeof Instr)[K]>
   ) => void
 }>

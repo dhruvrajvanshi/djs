@@ -55,38 +55,38 @@ export type Instr =
     }>
 
 export const Instr = {
-  emit_set: (object: Operand, property: Operand, value: Operand) =>
+  set: (object: Operand, property: Operand, value: Operand) =>
     ({
       kind: 'set',
       object,
       property,
       value,
     }) as const,
-  emit_get: (name: Local, object: Operand, property: Operand) =>
+  get: (name: Local, object: Operand, property: Operand) =>
     ({
       kind: 'get',
       result: name,
       object,
       property,
     }) as const,
-  emit_make_object: (name: Local) =>
+  make_object: (name: Local) =>
     ({
       kind: 'make_object',
       result: name,
     }) as const,
-  emit_call: (name: Local, callee: Operand, args: Operand[]) =>
+  call: (name: Local, callee: Operand, args: Operand[]) =>
     ({
       kind: 'call',
       result: name,
       callee,
       args,
     }) as const,
-  emit_return: (value: Operand) =>
+  return: (value: Operand) =>
     ({
       kind: 'return',
       value,
     }) as const,
-  emit_jump_if: (
+  jump_if: (
     condition: Operand,
     if_truthy: BlockLabel,
     if_falsy: BlockLabel,
@@ -96,28 +96,28 @@ export const Instr = {
     if_truthy,
     if_falsy,
   }),
-  emit_strict_eq: (name: Local, left: Operand, right: Operand) =>
+  strict_eq: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'strict_eq',
       result: name,
       left,
       right,
     }) as const,
-  emit_or: (name: Local, left: Operand, right: Operand) =>
+  or: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'or',
       result: name,
       left,
       right,
     }) as const,
-  emit_add: (name: Local, left: Operand, right: Operand) =>
+  add: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'add',
       result: name,
       left,
       right,
     }) as const,
-  emit_sub: (name: Local, left: Operand, right: Operand) =>
+  sub: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'sub',
       result: name,
@@ -125,5 +125,5 @@ export const Instr = {
       right,
     }) as const,
 } as const satisfies {
-  [K in `emit_${Instr['kind']}`]: (...args: never[]) => Instr
+  [K in Instr['kind']]: (...args: never[]) => Instr
 }

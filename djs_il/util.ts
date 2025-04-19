@@ -20,3 +20,16 @@ export type Prettify<T> = {
 } & {}
 
 export type ro<T> = Readonly<T>
+export function objMapEntries<
+  K extends PropertyKey,
+  V,
+  K1 extends PropertyKey,
+  V1,
+>(
+  obj: Record<K, V>,
+  fn: (entry: readonly [K, V]) => readonly [K1, V1],
+): Record<K1, V1> {
+  return Object.fromEntries<V1>(
+    Object.entries<V>(obj).map(fn as never),
+  ) as never
+}
