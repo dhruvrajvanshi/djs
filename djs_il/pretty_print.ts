@@ -80,7 +80,7 @@ export function pretty_print(f: Func) {
         return pp`set ${instr.object}[${instr.property}] = ${instr.value}`
       case 'get':
         return pp`${instr.result} = get ${instr.object}[${instr.property}]`
-      case 'call':
+      case 'unboxed_call':
         return pp`${instr.result} = call ${instr.callee}(${instr.args})`
       case 'return':
         return pp`return ${instr.value}`

@@ -8,7 +8,7 @@ import {
   type Constant,
 } from './operand'
 import { Type } from './type'
-import { todo, type Prettify, assert } from './util'
+import { type Prettify, assert } from './util'
 
 export type FuncParam = { name: Param; type: Type }
 export type Func = {
@@ -66,7 +66,7 @@ export function build_function(
     switch (instr.kind) {
       case 'get':
         return Type.value
-      case 'call': {
+      case 'unboxed_call': {
         const callee_ty = infer_operand(instr.callee)
         assert(
           callee_ty.kind === 'unboxed_func',
@@ -112,7 +112,7 @@ export function build_function(
     get: e(i.get),
     set: e(i.set),
     make_object: e(i.make_object),
-    call: e(i.call),
+    unboxed_call: e(i.unboxed_call),
     return: e(i.return),
     jump_if: e(i.jump_if),
     strict_eq: e(i.strict_eq),

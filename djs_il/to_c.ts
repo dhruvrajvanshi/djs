@@ -196,7 +196,7 @@ function to_c_node(f: Func): CNode {
           return { kind: 'return', value: lower_op(instr.value) }
         }
         return { kind: 'return', value: null }
-      case 'call':
+      case 'unboxed_call':
         return local_var(
           cident(instr.result),
           ctype.DJSValue,

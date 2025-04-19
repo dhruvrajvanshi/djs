@@ -8,7 +8,7 @@ const SSAInstrKinds = [
   'or',
   'add',
   'sub',
-  'call',
+  'unboxed_call',
   'make_object',
 ] as const satisfies readonly Instr['kind'][]
 type SSAInstrKinds = (typeof SSAInstrKinds)[number]
@@ -59,7 +59,7 @@ export type Instr =
       right: Operand
     }>
   | ro<{
-      kind: 'call'
+      kind: 'unboxed_call'
       result: Local
       callee: Operand
       args: Operand[]
@@ -92,9 +92,9 @@ export const Instr = {
       kind: 'make_object',
       result: name,
     }) as const,
-  call: (name: Local, callee: Operand, args: Operand[]) =>
+  unboxed_call: (name: Local, callee: Operand, args: Operand[]) =>
     ({
-      kind: 'call',
+      kind: 'unboxed_call',
       result: name,
       callee,
       args,
@@ -143,7 +143,7 @@ export const Instr = {
       right,
     }) as const,
 } as const satisfies {
-  [K in Instr['kind']]: (...args: never[]) => Instr
+  [K in Instr['kind']]: (...args: never[]) => Extract<Instr, { kind: K }>
 }
 
 type InstrWithResult = Extract<Instr, { result: Local }>

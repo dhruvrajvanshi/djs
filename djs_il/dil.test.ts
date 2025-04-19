@@ -16,7 +16,7 @@ test('builder and pretty printer', async () => {
         i.get('%value', o.local('%obj'), o.string('key'))
         i.jump_if(o.local('%value'), '.if_true', '.if_false')
         b.add_block('.if_true', () => {
-          i.call('%capitalized', o.global('@builtin.capitalize'), [
+          i.unboxed_call('%capitalized', o.global('@builtin.capitalize'), [
             o.local('%value'),
           ])
           i.return(o.local('%capitalized'))
@@ -42,8 +42,8 @@ const fib = build_function('@fib', {}, (ctx) => {
   b.add_block('.recur', () => {
     i.sub('%n_minus_1', o.param('$0'), o.number(1))
     i.sub('%n_minus_2', o.param('$0'), o.number(2))
-    i.call('%fib_minus_1', o.global('@fib'), [o.local('%n_minus_1')])
-    i.call('%fib_minus_2', o.global('@fib'), [o.local('%n_minus_2')])
+    i.unboxed_call('%fib_minus_1', o.global('@fib'), [o.local('%n_minus_1')])
+    i.unboxed_call('%fib_minus_2', o.global('@fib'), [o.local('%n_minus_2')])
     i.add('%result', o.local('%fib_minus_1'), o.local('%fib_minus_2'))
     i.return(o.local('%result'))
   })
