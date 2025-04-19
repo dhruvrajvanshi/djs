@@ -7,7 +7,7 @@ import type {
   Operand,
   Type,
 } from './il.js'
-import { assert, is_defined, todo } from './util.js'
+import { assert, assert_never, is_defined, todo } from './util.js'
 type CName = string & { __cname: never }
 
 type CIdent = { kind: 'ident'; name: string }
@@ -35,6 +35,7 @@ type CNode =
   | { kind: 'param'; name: CIdent; type: CNode }
   | { kind: 'literal'; value: string }
   | { kind: 'return'; value: CNode | null }
+  | { kind: 'if'; cond: CNode; then: CNode; else: CNode | null }
 
 const ctype = {
   void: { kind: 'literal', value: 'void' },
@@ -120,8 +121,10 @@ function to_c_node(f: Func): CNode {
         return lower_constant(op.value)
       case 'param':
         return cident(op.name)
+      case 'global':
+        return cident(mangle_global(op.name))
       default:
-        return raw(`/* TODO: lower_op ${op.kind} */`)
+        return assert_never(op)
     }
   }
   function local_var(name: CIdent, type: CNode, value: CNode): CNode {
@@ -130,6 +133,18 @@ function to_c_node(f: Func): CNode {
       name,
       type,
       value,
+    }
+  }
+  function if_stmt(
+    cond: CNode,
+    then: CNode,
+    else_: CNode | null = null,
+  ): CNode {
+    return {
+      kind: 'if',
+      cond,
+      then,
+      else: else_ ? else_ : null,
     }
   }
   function call(f: CNode, ...args: CNode[]): CNode {
@@ -171,7 +186,11 @@ function to_c_node(f: Func): CNode {
           call(cident('djs_add'), lower_op(instr.left), lower_op(instr.right)),
         )
       case 'jump_if':
-        return raw('/* TODO: jump_if */')
+        return if_stmt(
+          lower_op(instr.condition),
+          { kind: 'block_label', label: instr.if_truthy },
+          { kind: 'block_label', label: instr.if_falsy },
+        )
       case 'return':
         if (instr.value) {
           return { kind: 'return', value: lower_op(instr.value) }
@@ -257,6 +276,11 @@ function pp_node(node: CNode): string {
         return pp`return ${node.value};`
       }
       return 'return;'
+    case 'if':
+      if (node.else) {
+        return pp`if (${node.cond}) goto ${node.then}; else goto ${node.else};`
+      }
+      return pp`if (${node.cond}) goto ${node.then};`
     default:
       return todo(() => `Unimplemented: ${JSON.stringify(node)}`)
   }
