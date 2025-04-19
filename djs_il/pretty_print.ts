@@ -6,7 +6,7 @@ import type {
   Operand,
   Param,
   Type,
-} from './il_nodes.js'
+} from './il.js'
 import { assert_never } from './util.js'
 
 export function pretty_print(f: Func) {
@@ -20,8 +20,27 @@ export function pretty_print(f: Func) {
   }
   function pp_type(type: Type): string {
     switch (type.kind) {
-      case 'top':
-        return 'top'
+      case 'value':
+        return 'value'
+      case 'object':
+        return 'object'
+      case 'null':
+        return 'null'
+      case 'undefined':
+        return 'undefined'
+      case 'boolean':
+        return 'boolean'
+      case 'number':
+        return 'number'
+      case 'string':
+        return 'string'
+      case 'unboxed_func': {
+        const params = type.params.map(pp_type).join(', ')
+        const ret = pp_type(type.returns)
+        return `#(${params}) => ${ret}`
+      }
+      default:
+        assert_never(type)
     }
   }
   function pp_block(block: BasicBlock) {
@@ -56,25 +75,25 @@ export function pretty_print(f: Func) {
   function pp_instr(instr: Instr) {
     switch (instr.kind) {
       case 'make_object':
-        return `${instr.name} = make_object`
+        return `${instr.result} = make_object`
       case 'set':
         return pp`set ${instr.object}[${instr.property}] = ${instr.value}`
       case 'get':
-        return pp`${instr.name} = get ${instr.object}[${instr.property}]`
-      case 'call':
-        return pp`${instr.name} = call ${instr.callee}(${instr.args})`
+        return pp`${instr.result} = get ${instr.object}[${instr.property}]`
+      case 'unboxed_call':
+        return pp`${instr.result} = call ${instr.callee}(${instr.args})`
       case 'return':
         return pp`return ${instr.value}`
       case 'jump_if':
         return pp`jump_if ${instr.condition} then: ${instr.if_truthy} else: ${instr.if_falsy}`
       case 'or':
-        return pp`${instr.name} = or ${instr.left}, ${instr.right}`
+        return pp`${instr.result} = or ${instr.left}, ${instr.right}`
       case 'strict_eq':
-        return pp`${instr.name} = strict_eq ${instr.left}, ${instr.right}`
+        return pp`${instr.result} = strict_eq ${instr.left}, ${instr.right}`
       case 'add':
-        return pp`${instr.name} = add ${instr.left}, ${instr.right}`
+        return pp`${instr.result} = add ${instr.left}, ${instr.right}`
       case 'sub':
-        return pp`${instr.name} = sub ${instr.left}, ${instr.right}`
+        return pp`${instr.result} = sub ${instr.left}, ${instr.right}`
       default:
         assert_never(instr)
     }
