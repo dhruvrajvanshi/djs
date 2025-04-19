@@ -2,7 +2,7 @@ import type { Prettify } from './util.js'
 
 type ro<T> = Readonly<T>
 export type Instr =
-  | ro<{ kind: 'make_object'; name: Local }>
+  | ro<{ kind: 'make_object'; result: Local }>
   | ro<{
       kind: 'set'
       object: Operand
@@ -11,37 +11,37 @@ export type Instr =
     }>
   | ro<{
       kind: 'get'
-      name: Local
+      result: Local
       object: Operand
       property: Operand
     }>
   | ro<{
       kind: 'strict_eq'
-      name: Local
+      result: Local
       left: Operand
       right: Operand
     }>
   | ro<{
       kind: 'or'
-      name: Local
+      result: Local
       left: Operand
       right: Operand
     }>
   | ro<{
       kind: 'add'
-      name: Local
+      result: Local
       left: Operand
       right: Operand
     }>
   | ro<{
       kind: 'sub'
-      name: Local
+      result: Local
       left: Operand
       right: Operand
     }>
   | ro<{
       kind: 'call'
-      name: Local
+      result: Local
       callee: Operand
       args: Operand[]
     }>
@@ -65,19 +65,19 @@ const InstructionBuilders = {
   emit_get: (name: Local, object: Operand, property: Operand) =>
     ({
       kind: 'get',
-      name,
+      result: name,
       object,
       property,
     }) as const,
   emit_make_object: (name: Local) =>
     ({
       kind: 'make_object',
-      name,
+      result: name,
     }) as const,
   emit_call: (name: Local, callee: Operand, args: Operand[]) =>
     ({
       kind: 'call',
-      name,
+      result: name,
       callee,
       args,
     }) as const,
@@ -99,28 +99,28 @@ const InstructionBuilders = {
   emit_strict_eq: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'strict_eq',
-      name,
+      result: name,
       left,
       right,
     }) as const,
   emit_or: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'or',
-      name,
+      result: name,
       left,
       right,
     }) as const,
   emit_add: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'add',
-      name,
+      result: name,
       left,
       right,
     }) as const,
   emit_sub: (name: Local, left: Operand, right: Operand) =>
     ({
       kind: 'sub',
-      name,
+      result: name,
       left,
       right,
     }) as const,

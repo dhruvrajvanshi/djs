@@ -140,7 +140,7 @@ function to_c_node(f: Func): CNode {
     switch (instr.kind) {
       case 'strict_eq':
         return local_var(
-          cident(instr.name),
+          cident(instr.result),
           ctype.DJSValue,
           call(
             cident('djs_strict_eq'),
@@ -151,19 +151,19 @@ function to_c_node(f: Func): CNode {
 
       case 'or':
         return local_var(
-          cident(instr.name),
+          cident(instr.result),
           ctype.DJSValue,
           call(cident('djs_or'), lower_op(instr.left), lower_op(instr.right)),
         )
       case 'sub':
         return local_var(
-          cident(instr.name),
+          cident(instr.result),
           ctype.DJSValue,
           call(cident('djs_sub'), lower_op(instr.left), lower_op(instr.right)),
         )
       case 'add':
         return local_var(
-          cident(instr.name),
+          cident(instr.result),
           ctype.DJSValue,
           call(cident('djs_add'), lower_op(instr.left), lower_op(instr.right)),
         )
@@ -176,7 +176,7 @@ function to_c_node(f: Func): CNode {
         return { kind: 'return', value: null }
       case 'call':
         return local_var(
-          cident(instr.name),
+          cident(instr.result),
           ctype.DJSValue,
           call(lower_op(instr.callee), ...instr.args.map(lower_op)),
         )
