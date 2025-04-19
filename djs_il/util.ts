@@ -33,3 +33,7 @@ export function objMapEntries<
     Object.entries<V>(obj).map(fn as never),
   ) as never
 }
+
+export function is_defined<T>(x: T | undefined | null): x is T {
+  return x !== undefined && x !== null
+}

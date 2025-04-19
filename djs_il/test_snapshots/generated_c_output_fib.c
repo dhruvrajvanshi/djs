@@ -1,7 +1,8 @@
+#include "../../djs_runtime/djs.h"
+
 DJSValue fib(DJSValue _0);
 DJSValue fib(DJSValue _0) {
-.entry:
-  DJSValue is_zero = djs_strict_eq(djs_number(0), _0)
+    DJSValue is_zero = djs_strict_eq(djs_number(0), _0)
   DJSValue is_one = djs_strict_eq(djs_number(1), _0)
   DJSValue should_ret_zero = djs_or(is_zero, is_one)
   /* TODO: jump_if */

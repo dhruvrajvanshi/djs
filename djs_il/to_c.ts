@@ -7,7 +7,7 @@ import type {
   Operand,
   Type,
 } from './il.js'
-import { assert, todo } from './util.js'
+import { assert, is_defined, todo } from './util.js'
 type CName = string & { __cname: never }
 
 type CIdent = { kind: 'ident'; name: string }
@@ -64,6 +64,7 @@ function to_c_node(f: Func): CNode {
   return {
     kind: 'decls',
     decls: [
+      raw('#include "../../djs_runtime/djs.h"\n'),
       {
         kind: 'function_decl',
         name: cident(f.name),
@@ -92,9 +93,11 @@ function to_c_node(f: Func): CNode {
     return {
       kind: 'block',
       stmts: [
-        { kind: 'block_label', label: block.label },
+        block.label === '.entry'
+          ? undefined
+          : ({ kind: 'block_label', label: block.label } as const),
         ...block.instructions.map(lower_instr),
-      ],
+      ].filter(is_defined),
     }
   }
   function lower_constant(value: Constant): CNode {
