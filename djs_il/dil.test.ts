@@ -25,7 +25,7 @@ test('builder and pretty printer', async () => {
 })
 
 const fib = build_function('@fib', (b) => {
-  b.add_param('$0', b.ty_top)
+  b.add_param('$0', b.js_value)
   b.emit_strict_eq('%is_zero', b.number(0), b.param('$0'))
   b.emit_strict_eq('%is_one', b.number(1), b.param('$0'))
   b.emit_or('%should_ret_zero', b.local('%is_zero'), b.local('%is_one'))

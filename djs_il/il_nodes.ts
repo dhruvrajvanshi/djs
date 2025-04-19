@@ -185,7 +185,7 @@ const op = Object.freeze({
 })
 
 const ty = Object.freeze({
-  ty_top: { kind: 'top' } as const,
+  js_value: { kind: 'js_value' } as const,
 })
 
 export type Constant =
@@ -203,7 +203,7 @@ export type BasicBlock = {
   instructions: Instr[]
 }
 
-export type Type = ro<{ kind: 'top' }>
+export type Type = ro<{ kind: 'js_value' }>
 
 export type FuncParam = { name: Param; type: Type }
 export type Func = {

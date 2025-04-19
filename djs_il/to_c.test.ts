@@ -3,11 +3,13 @@ import { build_function } from './il_nodes.js'
 import { to_c } from './to_c.js'
 
 test('generated_c_output_fib', async () => {
-  expect(to_c(fib)).toMatchFileSnapshot('test_snapshots/generated_c_output_fib.c')
+  await expect(to_c(fib)).toMatchFileSnapshot(
+    'test_snapshots/generated_c_output_fib.c',
+  )
 })
 
 const fib = build_function('@fib', (b) => {
-  b.add_param('$0', b.ty_top)
+  b.add_param('$0', b.js_value)
   b.emit_strict_eq('%is_zero', b.number(0), b.param('$0'))
   b.emit_strict_eq('%is_one', b.number(1), b.param('$0'))
   b.emit_or('%should_ret_zero', b.local('%is_zero'), b.local('%is_one'))

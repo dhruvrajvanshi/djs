@@ -20,8 +20,8 @@ export function pretty_print(f: Func) {
   }
   function pp_type(type: Type): string {
     switch (type.kind) {
-      case 'top':
-        return 'top'
+      case 'js_value':
+        return 'JSValue'
     }
   }
   function pp_block(block: BasicBlock) {

@@ -194,7 +194,7 @@ function to_c_node(f: Func): CNode {
     return name.replace('@', '') as CName
   }
   function ty_to_c(ty: Type): CNode {
-    assert(ty.kind === 'top', () => `Unimplemented: ${JSON.stringify(ty)}`)
+    assert(ty.kind === 'js_value', () => `Unimplemented: ${JSON.stringify(ty)}`)
     return ctype.DJSValue
   }
 }
