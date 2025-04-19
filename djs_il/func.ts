@@ -1,8 +1,14 @@
 import type { BasicBlock, BlockLabel } from './basic_block'
-import { Instr } from './instructions'
-import { Operand, type Param, type Global } from './operand'
+import { Instr, is_ssa_instr, type SSAInstr } from './instructions'
+import {
+  Operand,
+  type Param,
+  type Global,
+  type Local,
+  type Constant,
+} from './operand'
 import { Type } from './type'
-import { objMapEntries, type Prettify } from './util'
+import { todo, type Prettify, assert } from './util'
 
 export type FuncParam = { name: Param; type: Type }
 export type Func = {
@@ -13,13 +19,83 @@ export type Func = {
 
 export function build_function(
   name: Global,
-  build: (builder: FunctionBuilder, emit: UnprefixedInstrEmitters) => void,
+  external_env: Record<Global, Type>,
+  build: (ctx: FunctionBuilderCtx) => void,
 ): Func {
   let current_block: BasicBlock = {
     label: '.entry',
     instructions: [],
   }
+
+  const blocks: [BasicBlock, ...BasicBlock[]] = [current_block]
+  const params: FuncParam[] = []
+  const locals = new Map<Local, Type>()
+  assert(
+    !(name in external_env),
+    () => `Name ${name} is defined in use in the environment`,
+  )
+  const env: Record<Global, Type> = {
+    ...external_env,
+    get [name](): Type {
+      return Type.unboxed_func(Type.value, ...params.map((param) => param.type))
+    },
+  }
+  const infer_constant = (constant: Constant): Type => {
+    switch (constant.kind) {
+      case 'string':
+        return Type.string
+      case 'number':
+        return Type.number
+      case 'boolean':
+        return Type.boolean
+    }
+  }
+  const infer_operand = (operand: Operand): Type => {
+    switch (operand.kind) {
+      case 'local':
+        return infer_local(operand.name)
+      case 'param':
+        return infer_param(operand.name)
+      case 'global':
+        return infer_global(operand.name)
+      case 'constant':
+        return infer_constant(operand.value)
+    }
+  }
+  const infer_instr_result = (instr: SSAInstr): Type => {
+    switch (instr.kind) {
+      case 'get':
+        return Type.value
+      case 'call': {
+        const callee_ty = infer_operand(instr.callee)
+        assert(
+          callee_ty.kind === 'unboxed_func',
+          () => `Expected function type, got ${JSON.stringify(callee_ty)}`,
+        )
+        return callee_ty.returns
+      }
+      case 'make_object':
+        return Type.object
+      case 'strict_eq':
+        return Type.boolean
+      case 'or':
+        return Type.boolean
+      case 'add':
+        return Type.number
+      case 'sub':
+        return Type.number
+    }
+  }
   const emit = (instruction: Instr) => {
+    if (is_ssa_instr(instruction)) {
+      const existing = locals.get(instruction.result)
+      if (existing) {
+        throw new Error(
+          `Duplicate local ${instruction.result} found; Previously declared with type: ${JSON.stringify(existing, null, 2)}`,
+        )
+      }
+      locals.set(instruction.result, infer_instr_result(instruction))
+    }
     current_block.instructions.push(instruction)
     return instruction
   }
@@ -31,9 +107,8 @@ export function build_function(
     }
   }
 
-  const blocks: [BasicBlock, ...BasicBlock[]] = [current_block]
   const i = Instr
-  const unprefixed_instr_emitters: UnprefixedInstrEmitters = {
+  const emitters: InstructionEmitter = {
     get: e(i.get),
     set: e(i.set),
     make_object: e(i.make_object),
@@ -45,11 +120,44 @@ export function build_function(
     add: e(i.add),
     sub: e(i.sub),
   } as const
-  const prefixed_instr_emitters: InstrEmitters = objMapEntries(
-    unprefixed_instr_emitters,
-    ([key, value]) => [`emit_${key}`, value],
-  ) as never
-  const builder: FunctionBuilder = {
+
+  const infer_local = (name: Local): Type => {
+    const local = locals.get(name)
+    if (!local) {
+      throw new Error(`Local ${name} not found; locals: ${Array.from(locals)}`)
+    }
+    return local
+  }
+  const infer_param = (name: Param): Type => {
+    const param = params.find((p) => p.name === name)
+    assert(
+      param,
+      () => `Param ${name} not found; params: ${params.map((p) => p.name)}`,
+    )
+    return param.type
+  }
+  const infer_global = (name: Global): Type => {
+    const ty = env[name]
+    assert(ty, () => `Global ${name} not found; globals: ${Object.keys(env)}`)
+    return ty
+  }
+
+  const OperandBuilder: OperandBuilder = {
+    string: Operand.string,
+    number: Operand.number,
+    boolean: Operand.boolean,
+    local: (name) => Operand.local(name, infer_local(name)),
+    param: (name) => Operand.param(name, infer_param(name)),
+    global: (name) => Operand.global(name, infer_global(name)),
+  }
+
+  const builder: FunctionBuilderCtx = {
+    declare_global(name, type) {
+      if (name in env) {
+        throw new Error(`Global ${name} already declared`)
+      }
+      env[name] = type
+    },
     add_block(name, build) {
       const block: BasicBlock = {
         label: name,
@@ -69,27 +177,35 @@ export function build_function(
     add_param: (name: Param, type: Type) => {
       params.push({ name, type })
     },
-    ...prefixed_instr_emitters,
-    ...Type,
-    ...Operand,
+    emit: emitters,
+    operand: OperandBuilder,
+    type: Type,
   }
-  const params: FuncParam[] = []
-  build(builder, unprefixed_instr_emitters)
+  build(builder)
   return {
     name,
     params,
     blocks,
   }
 }
+type OperandBuilder = {
+  string: (value: string) => Operand
+  number: (value: number) => Operand
+  boolean: (value: boolean) => Operand
+  local: (name: Local) => Operand
+  param: (name: Param) => Operand
+  global: (name: Global) => Operand
+}
 
-type FunctionBuilder = Prettify<
-  {
-    add_block(name: BlockLabel, build_block: () => void): void
-    add_param(name: Param, type: Type): void
-  } & typeof Operand &
-    typeof Type &
-    InstrEmitters
->
+type TypeBuilder = typeof Type
+interface FunctionBuilderCtx {
+  add_block(name: BlockLabel, build_block: () => void): void
+  add_param(name: Param, type: Type): void
+  declare_global(name: Global, type: Type): void
+  operand: OperandBuilder
+  emit: InstructionEmitter
+  type: TypeBuilder
+}
 
 /**
  * {
@@ -98,17 +214,8 @@ type FunctionBuilder = Prettify<
  *    ...
  * }
  */
-type UnprefixedInstrEmitters = Prettify<{
+type InstructionEmitter = Prettify<{
   readonly [K in keyof typeof Instr]: (
-    ...args: Parameters<(typeof Instr)[K]>
-  ) => void
-}>
-
-/**
- * { emit_get, emit_set, ... }
- */
-type InstrEmitters = Prettify<{
-  readonly [K in keyof typeof Instr as `emit_${K}`]: (
     ...args: Parameters<(typeof Instr)[K]>
   ) => void
 }>

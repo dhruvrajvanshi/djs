@@ -19,7 +19,7 @@ export type Prettify<T> = {
   [K in keyof T]: T[K]
 } & {}
 
-export type ro<T> = Readonly<T>
+export type ro<T> = Prettify<Readonly<T>>
 export function objMapEntries<
   K extends PropertyKey,
   V,
@@ -37,3 +37,5 @@ export function objMapEntries<
 export function is_defined<T>(x: T | undefined | null): x is T {
   return x !== undefined && x !== null
 }
+
+export type StringUnionDiff<T, U> = T extends U ? never : T

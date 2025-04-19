@@ -1,6 +1,24 @@
 import type { BlockLabel } from './basic_block.js'
 import type { Local, Operand } from './operand.js'
-import type { ro } from './util.js'
+import type { ro, StringUnionDiff } from './util.js'
+
+const SSAInstrKinds = [
+  'get',
+  'strict_eq',
+  'or',
+  'add',
+  'sub',
+  'call',
+  'make_object',
+] as const satisfies readonly Instr['kind'][]
+type SSAInstrKinds = (typeof SSAInstrKinds)[number]
+type InstrWithKind<K extends Instr['kind']> = Extract<Instr, { kind: K }>
+
+export type SSAInstr = InstrWithKind<SSAInstrKinds>
+
+export function is_ssa_instr(instr: Instr): instr is SSAInstr {
+  return SSAInstrKinds.includes(instr.kind as SSAInstrKinds)
+}
 
 export type Instr =
   | ro<{ kind: 'make_object'; result: Local }>
@@ -126,4 +144,16 @@ export const Instr = {
     }) as const,
 } as const satisfies {
   [K in Instr['kind']]: (...args: never[]) => Instr
+}
+
+type InstrWithResult = Extract<Instr, { result: Local }>
+export const internal_type_assertions = {
+  ssa_instr_kinds_assertion: { kind: 'get' } satisfies Partial<
+    InstrWithResult extends InstrWithKind<SSAInstrKinds>
+      ? InstrWithKind<SSAInstrKinds>
+      : `ERROR: Missing value in SSAInstrKinds: ${StringUnionDiff<
+          InstrWithResult['kind'],
+          SSAInstrKinds
+        >}`
+  >,
 }

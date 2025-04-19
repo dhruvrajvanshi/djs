@@ -20,8 +20,27 @@ export function pretty_print(f: Func) {
   }
   function pp_type(type: Type): string {
     switch (type.kind) {
-      case 'js_value':
-        return 'JSValue'
+      case 'value':
+        return 'value'
+      case 'object':
+        return 'object'
+      case 'null':
+        return 'null'
+      case 'undefined':
+        return 'undefined'
+      case 'boolean':
+        return 'boolean'
+      case 'number':
+        return 'number'
+      case 'string':
+        return 'string'
+      case 'unboxed_func': {
+        const params = type.params.map(pp_type).join(', ')
+        const ret = pp_type(type.returns)
+        return `#(${params}) => ${ret}`
+      }
+      default:
+        assert_never(type)
     }
   }
   function pp_block(block: BasicBlock) {

@@ -8,21 +8,22 @@ test('generated_c_output_fib', async () => {
   )
 })
 
-const fib = build_function('@fib', (b, i) => {
-  b.add_param('$0', b.js_value)
-  i.strict_eq('%is_zero', b.number(0), b.param('$0'))
-  i.strict_eq('%is_one', b.number(1), b.param('$0'))
-  i.or('%should_ret_zero', b.local('%is_zero'), b.local('%is_one'))
-  i.jump_if(b.local('%should_ret_zero'), '.ret_zero', '.recur')
+const fib = build_function('@fib', {}, (ctx) => {
+  const { emit: i, type: t, operand: o, ...b } = ctx
+  b.add_param('$0', t.value)
+  i.strict_eq('%is_zero', o.number(0), o.param('$0'))
+  i.strict_eq('%is_one', o.number(1), o.param('$0'))
+  i.or('%should_ret_zero', o.local('%is_zero'), o.local('%is_one'))
+  i.jump_if(o.local('%should_ret_zero'), '.ret_zero', '.recur')
   b.add_block('.ret_zero', () => {
-    i.return(b.number(0))
+    i.return(o.number(0))
   })
   b.add_block('.recur', () => {
-    i.sub('%n_minus_1', b.param('$0'), b.number(1))
-    i.sub('%n_minus_2', b.param('$0'), b.number(2))
-    i.call('%fib_minus_1', b.global('@fib'), [b.local('%n_minus_1')])
-    i.call('%fib_minus_2', b.global('@fib'), [b.local('%n_minus_2')])
-    i.add('%result', b.local('%fib_minus_1'), b.local('%fib_minus_2'))
-    i.return(b.local('%result'))
+    i.sub('%n_minus_1', o.param('$0'), o.number(1))
+    i.sub('%n_minus_2', o.param('$0'), o.number(2))
+    i.call('%fib_minus_1', o.global('@fib'), [o.local('%n_minus_1')])
+    i.call('%fib_minus_2', o.global('@fib'), [o.local('%n_minus_2')])
+    i.add('%result', o.local('%fib_minus_1'), o.local('%fib_minus_2'))
+    i.return(o.local('%result'))
   })
 })

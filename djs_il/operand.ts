@@ -1,3 +1,5 @@
+import type { Type } from './type'
+
 export type Constant =
   | {
       kind: 'string'
@@ -9,30 +11,27 @@ export type Local = `%${string}`
 export type Param = `$${string}`
 export type Global = `@${string}`
 export type Operand =
-  | { kind: 'local'; name: Local }
-  | { kind: 'param'; name: Param }
+  | { kind: 'local'; name: Local; type: Type }
+  | { kind: 'param'; name: Param; type: Type }
   | { kind: 'constant'; value: Constant }
-  | { kind: 'global'; name: Global }
+  | { kind: 'global'; name: Global; type: Type }
 
 export const Operand = Object.freeze({
-  local(name: Local): Operand {
-    return {
-      kind: 'local',
-      name,
-    }
-  },
-  global(name: Global): Operand {
-    return {
-      kind: 'global',
-      name,
-    }
-  },
-  param(name: Param): Operand {
-    return {
-      kind: 'param',
-      name,
-    }
-  },
+  local: (name: Local, type: Type): Operand => ({
+    kind: 'local',
+    name,
+    type,
+  }),
+  global: (name: Global, type: Type): Operand => ({
+    kind: 'global',
+    name,
+    type,
+  }),
+  param: (name: Param, type: Type): Operand => ({
+    kind: 'param',
+    name,
+    type,
+  }),
   string(value: string): Operand {
     return {
       kind: 'constant',

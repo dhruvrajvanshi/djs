@@ -5,41 +5,47 @@ import { pretty_print } from './pretty_print.js'
 test('builder and pretty printer', async () => {
   await expect(
     pretty_print(
-      build_function('@test', (b, i) => {
+      build_function('@test', {}, (ctx) => {
+        const { emit: i, operand: o, type: t, ...b } = ctx
+        b.declare_global(
+          '@builtin.capitalize',
+          t.unboxed_func(t.value, t.value),
+        )
         i.make_object('%obj')
-        i.set(b.local('%obj'), b.string('key'), b.string('value'))
-        i.get('%value', b.local('%obj'), b.string('key'))
-        i.jump_if(b.local('%value'), '.if_true', '.if_false')
+        i.set(o.local('%obj'), o.string('key'), o.string('value'))
+        i.get('%value', o.local('%obj'), o.string('key'))
+        i.jump_if(o.local('%value'), '.if_true', '.if_false')
         b.add_block('.if_true', () => {
-          i.call('%capitalized', b.global('@builtin.capitalize'), [
-            b.local('%value'),
+          i.call('%capitalized', o.global('@builtin.capitalize'), [
+            o.local('%value'),
           ])
-          i.return(b.local('%capitalized'))
+          i.return(o.local('%capitalized'))
         })
         b.add_block('.if_false', () => {
-          i.return(b.string('default'))
+          i.return(o.string('default'))
         })
       }),
     ),
   ).toMatchFileSnapshot('test_snapshots/build_function.dil')
 })
 
-const fib = build_function('@fib', (b, i) => {
-  b.add_param('$0', b.js_value)
-  i.strict_eq('%is_zero', b.number(0), b.param('$0'))
-  i.strict_eq('%is_one', b.number(1), b.param('$0'))
-  i.or('%should_ret_zero', b.local('%is_zero'), b.local('%is_one'))
-  i.jump_if(b.local('%should_ret_zero'), '.ret_zero', '.recur')
+const fib = build_function('@fib', {}, (ctx) => {
+  const { emit: i, operand: o, type: t, ...b } = ctx
+  b.add_param('$0', t.value)
+  i.strict_eq('%is_zero', o.number(0), o.param('$0'))
+  i.strict_eq('%is_one', o.number(1), o.param('$0'))
+  i.or('%should_ret_zero', o.local('%is_zero'), o.local('%is_one'))
+  i.jump_if(o.local('%should_ret_zero'), '.ret_zero', '.recur')
   b.add_block('.ret_zero', () => {
-    i.return(b.number(0))
+    i.return(o.number(0))
   })
   b.add_block('.recur', () => {
-    i.sub('%n_minus_1', b.param('$0'), b.number(1))
-    i.sub('%n_minus_2', b.param('$0'), b.number(2))
-    i.call('%fib_minus_1', b.global('@fib'), [b.local('%n_minus_1')])
-    i.call('%fib_minus_2', b.global('@fib'), [b.local('%n_minus_2')])
-    i.add('%result', b.local('%fib_minus_1'), b.local('%fib_minus_2'))
-    i.return(b.local('%result'))
+    i.sub('%n_minus_1', o.param('$0'), o.number(1))
+    i.sub('%n_minus_2', o.param('$0'), o.number(2))
+    i.call('%fib_minus_1', o.global('@fib'), [o.local('%n_minus_1')])
+    i.call('%fib_minus_2', o.global('@fib'), [o.local('%n_minus_2')])
+    i.add('%result', o.local('%fib_minus_1'), o.local('%fib_minus_2'))
+    i.return(o.local('%result'))
   })
 })
 test('pretty print fibonacci', async () =>
