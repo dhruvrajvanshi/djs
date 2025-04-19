@@ -6,7 +6,7 @@ import type {
   Operand,
   Param,
   Type,
-} from './il_nodes.js'
+} from './il.js'
 import { assert_never } from './util.js'
 
 export function pretty_print(f: Func) {

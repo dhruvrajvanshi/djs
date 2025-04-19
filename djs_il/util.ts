@@ -18,3 +18,5 @@ export function todo(message: () => string = () => 'Unimplemented'): never {
 export type Prettify<T> = {
   [K in keyof T]: T[K]
 } & {}
+
+export type ro<T> = Readonly<T>

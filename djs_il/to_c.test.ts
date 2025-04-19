@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest'
-import { build_function } from './il_nodes.js'
+import { build_function } from './il.js'
 import { to_c } from './to_c.js'
 
 test('generated_c_output_fib', async () => {

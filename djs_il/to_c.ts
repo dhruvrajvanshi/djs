@@ -6,7 +6,7 @@ import type {
   Instr,
   Operand,
   Type,
-} from './il_nodes.js'
+} from './il.js'
 import { assert, todo } from './util.js'
 type CName = string & { __cname: never }
 
