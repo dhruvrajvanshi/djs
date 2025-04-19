@@ -1,4 +1,4 @@
-function @fib($0: top) {
+function @fib($0: value) {
 .entry:
   %is_zero = strict_eq 0, $0
   %is_one = strict_eq 1, $0

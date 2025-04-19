@@ -1,0 +1,6 @@
+export { build_function } from './func.js'
+export type { FuncParam, Func } from './func.js'
+export type { Instr } from './instructions.js'
+export type { Operand, Param, Global, Local, Constant } from './operand.js'
+export type { BasicBlock, BlockLabel } from './basic_block.js'
+export type { Type } from './type.js'
