@@ -43,4 +43,4 @@ const fib = build_function('@fib', (b) => {
   })
 })
 test('pretty print fibonacci', async () =>
-  expect(pretty_print(fib)).toMatchFileSnapshot('test_snapshots/fib.dil'))
+  await expect(pretty_print(fib)).toMatchFileSnapshot('test_snapshots/fib.dil'))
