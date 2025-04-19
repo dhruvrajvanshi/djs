@@ -224,7 +224,10 @@ function pp_node(node: CNode): string {
     case 'block_label':
       return `${node.label}:`
     case 'block':
-      return node.stmts.map(pp_node).join('\n')
+      return node.stmts
+        .map(pp_node)
+        .map((it) => (it.startsWith('.') ? it : `  ${it}`))
+        .join('\n')
     case 'op':
       return `(${node.args.map(pp_node).join(` ${node.op} `)})`
     case 'local':
