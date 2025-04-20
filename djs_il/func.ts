@@ -1,12 +1,18 @@
 import { AssertionError } from 'node:assert'
 import type { BasicBlock, BlockLabel } from './basic_block.js'
-import { Instr, is_ssa_instr, type SSAInstr } from './instructions.js'
+import {
+  Instr,
+  type InstrOfKind,
+  is_ssa_instr,
+  type SSAInstr,
+} from './instructions.js'
 import {
   Operand,
   type Param,
   type Global,
   type Local,
   type Constant,
+  type LocalOperand,
 } from './operand.js'
 import { pretty_print_type } from './pretty_print.js'
 import { Type, type_eq } from './type.js'
@@ -128,20 +134,30 @@ export function build_function(
       }
     }
   }
-  const emit = (instruction: Instr) => {
+
+  const emit = <I extends Instr>(instruction: I): EmitterResult<I> => {
     if (is_ssa_instr(instruction)) {
       validate_instruction(instruction)
       locals.set(instruction.result, infer_instr_result(instruction))
     }
     current_block.instructions.push(instruction)
-    return instruction
+    if (is_ssa_instr(instruction)) {
+      const local: LocalOperand = {
+        kind: 'local',
+        type: infer_local(instruction.result),
+        name: instruction.result,
+      }
+      // Cast is safe because EmitterResult<SSAInstruction> is Local
+      return local as EmitterResult<I>
+    }
+    return undefined as EmitterResult<I>
   }
   const e = <Args extends unknown[], I extends Instr>(
     f: (...args: Args) => I,
   ) => {
-    const emitter = (...args: Args) => {
+    const emitter = (...args: Args): EmitterResult<I> => {
       caller = emitter
-      emit(f(...args))
+      return emit(f(...args))
     }
     return emitter
   }
@@ -273,5 +289,9 @@ interface FunctionBuilderCtx {
 type InstructionEmitter = Prettify<{
   readonly [K in keyof typeof Instr]: (
     ...args: Parameters<(typeof Instr)[K]>
-  ) => void
+  ) => EmitterResult<InstrOfKind<K>>
 }>
+
+type EmitterResult<I extends Instr> = I extends SSAInstr
+  ? LocalOperand
+  : undefined
