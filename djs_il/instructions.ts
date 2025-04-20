@@ -75,37 +75,32 @@ export type Instr =
     }>
 
 export const Instr = {
-  set: (object: Operand, property: Operand, value: Operand) =>
-    ({
-      kind: 'set',
-      object,
-      property,
-      value,
-    }) as const,
-  get: (name: Local, object: Operand, property: Operand) =>
-    ({
-      kind: 'get',
-      result: name,
-      object,
-      property,
-    }) as const,
-  make_object: (name: Local) =>
-    ({
-      kind: 'make_object',
-      result: name,
-    }) as const,
-  unboxed_call: (name: Local, callee: Operand, args: Operand[]) =>
-    ({
-      kind: 'unboxed_call',
-      result: name,
-      callee,
-      args,
-    }) as const,
-  return: (value: Operand) =>
-    ({
-      kind: 'return',
-      value,
-    }) as const,
+  set: (object: Operand, property: Operand, value: Operand) => ({
+    kind: 'set',
+    object,
+    property,
+    value,
+  }),
+  get: (name: Local, object: Operand, property: Operand) => ({
+    kind: 'get',
+    result: name,
+    object,
+    property,
+  }),
+  make_object: (name: Local) => ({
+    kind: 'make_object',
+    result: name,
+  }),
+  unboxed_call: (name: Local, callee: Operand, args: Operand[]) => ({
+    kind: 'unboxed_call',
+    result: name,
+    callee,
+    args,
+  }),
+  return: (value: Operand) => ({
+    kind: 'return',
+    value,
+  }),
   jump_if: (
     condition: Operand,
     if_truthy: BlockLabel,
@@ -116,40 +111,35 @@ export const Instr = {
     if_truthy,
     if_falsy,
   }),
-  strict_eq: (name: Local, left: Operand, right: Operand) =>
-    ({
-      kind: 'strict_eq',
-      result: name,
-      left,
-      right,
-    }) as const,
-  or: (name: Local, left: Operand, right: Operand) =>
-    ({
-      kind: 'or',
-      result: name,
-      left,
-      right,
-    }) as const,
-  add: (name: Local, left: Operand, right: Operand) =>
-    ({
-      kind: 'add',
-      result: name,
-      left,
-      right,
-    }) as const,
-  sub: (name: Local, left: Operand, right: Operand) =>
-    ({
-      kind: 'sub',
-      result: name,
-      left,
-      right,
-    }) as const,
-  to_value: (result: Local, value: Operand) =>
-    ({
-      kind: 'to_value',
-      result,
-      value,
-    }) as const,
+  strict_eq: (name: Local, left: Operand, right: Operand) => ({
+    kind: 'strict_eq',
+    result: name,
+    left,
+    right,
+  }),
+  or: (name: Local, left: Operand, right: Operand) => ({
+    kind: 'or',
+    result: name,
+    left,
+    right,
+  }),
+  add: (name: Local, left: Operand, right: Operand) => ({
+    kind: 'add',
+    result: name,
+    left,
+    right,
+  }),
+  sub: (name: Local, left: Operand, right: Operand) => ({
+    kind: 'sub',
+    result: name,
+    left,
+    right,
+  }),
+  to_value: (result: Local, value: Operand) => ({
+    kind: 'to_value',
+    result,
+    value,
+  }),
 } as const satisfies {
   [K in Instr['kind']]: (...args: never[]) => Extract<Instr, { kind: K }>
 }
