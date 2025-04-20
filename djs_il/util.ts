@@ -1,4 +1,4 @@
-import { AssertionError } from 'node:assert'
+import { AssertionError, fail } from 'node:assert'
 
 export function assert_never(x: never): never {
   throw new AssertionError({
@@ -10,11 +10,12 @@ export function assert_never(x: never): never {
 export function assert(
   condition: unknown,
   message: () => string = () => '',
+  caller: (...args: never[]) => unknown = assert,
 ): asserts condition {
   if (!condition) {
     throw new AssertionError({
       message: message(),
-      stackStartFn: assert,
+      stackStartFn: caller,
     })
   }
 }
