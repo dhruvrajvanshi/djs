@@ -11,8 +11,10 @@ DJSValue fib(DJSValue _0) {
 .recur:
   DJSValue n_minus_1 = djs_sub(_0, djs_number(1))
   DJSValue n_minus_2 = djs_sub(_0, djs_number(2))
-  DJSValue fib_minus_1 = fib(n_minus_1)
-  DJSValue fib_minus_2 = fib(n_minus_2)
+  DJSValue v_n_minus_1 = n_minus_1
+  DJSValue v_n_minus_2 = n_minus_2
+  DJSValue fib_minus_1 = fib(v_n_minus_1)
+  DJSValue fib_minus_2 = fib(v_n_minus_2)
   DJSValue result = djs_add(fib_minus_1, fib_minus_2)
   return result;
 }

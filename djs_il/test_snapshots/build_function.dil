@@ -5,7 +5,7 @@ function @test() {
   %value = get %obj["key"]
   jump_if %value then: .if_true else: .if_false
 .if_true:
-  %capitalized = call @builtin.capitalize(%value)
+  %capitalized = unboxed_call @builtin.capitalize(%value)
   return %capitalized
 .if_false:
   return "default"

@@ -83,9 +83,12 @@ export function build_function(
         return Type.number
       case 'sub':
         return Type.number
+      case 'to_value':
+        return Type.value
     }
   }
-  const validate_instruction = (instr: Instr, caller: () => unknown) => {
+  let caller: () => unknown
+  const validate_instruction = (instr: Instr) => {
     if (is_ssa_instr(instr)) {
       const existing = locals.get(instr.result)
       if (existing) {
@@ -125,9 +128,9 @@ export function build_function(
       }
     }
   }
-  const emit = (instruction: Instr, emitter: () => unknown) => {
+  const emit = (instruction: Instr) => {
     if (is_ssa_instr(instruction)) {
-      validate_instruction(instruction, emitter)
+      validate_instruction(instruction)
       locals.set(instruction.result, infer_instr_result(instruction))
     }
     current_block.instructions.push(instruction)
@@ -137,7 +140,8 @@ export function build_function(
     f: (...args: Args) => I,
   ) => {
     const emitter = (...args: Args) => {
-      emit(f(...args), emitter)
+      caller = emitter
+      emit(f(...args))
     }
     return emitter
   }
@@ -154,21 +158,38 @@ export function build_function(
     or: e(i.or),
     add: e(i.add),
     sub: e(i.sub),
+    to_value: e(i.to_value),
   } as const
+
+  function error_at_caller(
+    message: string,
+    opts: { actual?: unknown; expected?: unknown } = {},
+  ) {
+    return new AssertionError({
+      message,
+      stackStartFn: caller,
+      ...opts,
+    })
+  }
 
   const infer_local = (name: Local): Type => {
     const local = locals.get(name)
     if (!local) {
-      throw new Error(`Local ${name} not found; locals: ${Array.from(locals)}`)
+      throw error_at_caller(`Local ${name} not found`, {
+        actual: [name],
+        expected: Array.from(locals.keys()),
+      })
     }
     return local
   }
   const infer_param = (name: Param): Type => {
     const param = params.find((p) => p.name === name)
-    assert(
-      param,
-      () => `Param ${name} not found; params: ${params.map((p) => p.name)}`,
-    )
+    if (!param) {
+      throw error_at_caller(`Param ${name} not found;`, {
+        expected: params.map((it) => it.name),
+        actual: name,
+      })
+    }
     return param.type
   }
   const infer_global = (name: Global): Type => {

@@ -202,6 +202,12 @@ function to_c_node(f: Func): CNode {
           ctype.DJSValue,
           call(lower_op(instr.callee), ...instr.args.map(lower_op)),
         )
+      case 'to_value':
+        return local_var(
+          cident(instr.result),
+          ctype.DJSValue,
+          lower_op(instr.value),
+        )
       default:
         todo(() => `Unimplemented: ${instr.kind}`)
     }
