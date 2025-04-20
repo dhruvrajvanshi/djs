@@ -56,7 +56,7 @@ export function pretty_print(f: Func) {
       case 'get':
         return pp`${instr.result} = get ${instr.object}[${instr.property}]`
       case 'unboxed_call':
-        return pp`${instr.result} = call ${instr.callee}(${instr.args})`
+        return pp`${instr.result} = unboxed_call ${instr.callee}(${instr.args})`
       case 'return':
         return pp`return ${instr.value}`
       case 'jump_if':
@@ -69,6 +69,8 @@ export function pretty_print(f: Func) {
         return pp`${instr.result} = add ${instr.left}, ${instr.right}`
       case 'sub':
         return pp`${instr.result} = sub ${instr.left}, ${instr.right}`
+      case 'to_value':
+        return pp`${instr.result} = to_value ${instr.value}`
       default:
         assert_never(instr)
     }

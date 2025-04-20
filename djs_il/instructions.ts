@@ -10,6 +10,7 @@ const SSAInstrKinds = [
   'sub',
   'unboxed_call',
   'make_object',
+  'to_value',
 ] as const satisfies readonly Instr['kind'][]
 type SSAInstrKinds = (typeof SSAInstrKinds)[number]
 type InstrWithKind<K extends Instr['kind']> = Extract<Instr, { kind: K }>
@@ -65,6 +66,7 @@ export type Instr =
       args: Operand[]
     }>
   | ro<{ kind: 'return'; value: Operand }>
+  | ro<{ kind: 'to_value'; result: Local; value: Operand }>
   | ro<{
       kind: 'jump_if'
       condition: Operand
@@ -141,6 +143,12 @@ export const Instr = {
       result: name,
       left,
       right,
+    }) as const,
+  to_value: (result: Local, value: Operand) =>
+    ({
+      kind: 'to_value',
+      result,
+      value,
     }) as const,
 } as const satisfies {
   [K in Instr['kind']]: (...args: never[]) => Extract<Instr, { kind: K }>
