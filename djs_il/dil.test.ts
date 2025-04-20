@@ -40,12 +40,19 @@ const fib = build_function('@fib', {}, (ctx) => {
     i.return(o.number(0))
   })
   b.add_block('.recur', () => {
-    i.sub('%n_minus_1', o.param('$0'), o.number(1))
-    i.sub('%n_minus_2', o.param('$0'), o.number(2))
-    i.to_value('%v_n_minus_1', o.local('%n_minus_1'))
-    i.to_value('%v_n_minus_2', o.local('%n_minus_2'))
-    i.unboxed_call('%fib_minus_1', o.global('@fib'), [o.local('%v_n_minus_1')])
-    i.unboxed_call('%fib_minus_2', o.global('@fib'), [o.local('%v_n_minus_2')])
+    const fib = o.global('@fib')
+    i.unboxed_call('%fib_minus_1', fib, [
+      i.to_value(
+        '%v_n_minus_1',
+        i.sub('%n_minus_1', o.param('$0'), o.number(1)),
+      ),
+    ])
+    i.unboxed_call('%fib_minus_2', fib, [
+      i.to_value(
+        '%v_n_minus_2',
+        i.sub('%n_minus_2', o.param('$0'), o.number(2)),
+      ),
+    ])
     i.add('%result', o.local('%fib_minus_1'), o.local('%fib_minus_2'))
     i.return(o.local('%result'))
   })

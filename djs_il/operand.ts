@@ -10,6 +10,7 @@ export type Constant =
 export type Local = `%${string}`
 export type Param = `$${string}`
 export type Global = `@${string}`
+export type LocalOperand = Extract<Operand, { kind: 'local' }>
 export type Operand =
   | { kind: 'local'; name: Local; type: Type }
   | { kind: 'param'; name: Param; type: Type }

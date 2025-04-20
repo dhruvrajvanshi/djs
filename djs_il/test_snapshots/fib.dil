@@ -8,10 +8,10 @@ function @fib($0: value) {
   return 0
 .recur:
   %n_minus_1 = sub $0, 1
-  %n_minus_2 = sub $0, 2
   %v_n_minus_1 = to_value %n_minus_1
-  %v_n_minus_2 = to_value %n_minus_2
   %fib_minus_1 = unboxed_call @fib(%v_n_minus_1)
+  %n_minus_2 = sub $0, 2
+  %v_n_minus_2 = to_value %n_minus_2
   %fib_minus_2 = unboxed_call @fib(%v_n_minus_2)
   %result = add %fib_minus_1, %fib_minus_2
   return %result
