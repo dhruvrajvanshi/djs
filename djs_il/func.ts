@@ -1,14 +1,16 @@
-import type { BasicBlock, BlockLabel } from './basic_block'
-import { Instr, is_ssa_instr, type SSAInstr } from './instructions'
+import { AssertionError } from 'node:assert'
+import type { BasicBlock, BlockLabel } from './basic_block.js'
+import { Instr, is_ssa_instr, type SSAInstr } from './instructions.js'
 import {
   Operand,
   type Param,
   type Global,
   type Local,
   type Constant,
-} from './operand'
-import { Type } from './type'
-import { type Prettify, assert } from './util'
+} from './operand.js'
+import { pretty_print_type } from './pretty_print.js'
+import { Type, type_eq } from './type.js'
+import { type Prettify, assert } from './util.js'
 
 export type FuncParam = { name: Param; type: Type }
 export type Func = {
@@ -30,10 +32,7 @@ export function build_function(
   const blocks: [BasicBlock, ...BasicBlock[]] = [current_block]
   const params: FuncParam[] = []
   const locals = new Map<Local, Type>()
-  assert(
-    !(name in external_env),
-    () => `Name ${name} is defined in use in the environment`,
-  )
+  assert(!(name in external_env), () => `Name ${name} is already defined`)
   const env: Record<Global, Type> = {
     ...external_env,
     get [name](): Type {
@@ -86,14 +85,49 @@ export function build_function(
         return Type.number
     }
   }
-  const emit = (instruction: Instr) => {
-    if (is_ssa_instr(instruction)) {
-      const existing = locals.get(instruction.result)
+  const validate_instruction = (instr: Instr, caller: () => unknown) => {
+    if (is_ssa_instr(instr)) {
+      const existing = locals.get(instr.result)
       if (existing) {
-        throw new Error(
-          `Duplicate local ${instruction.result} found; Previously declared with type: ${JSON.stringify(existing, null, 2)}`,
-        )
+        throw new AssertionError({
+          message: `Duplicate local ${instr.result} found: Previously declared with type: ${pretty_print_type(existing)}`,
+          stackStartFn: caller,
+        })
       }
+    }
+    if (instr.kind === 'unboxed_call') {
+      const callee_ty = infer_operand(instr.callee)
+
+      assert(
+        callee_ty.kind === 'unboxed_func',
+        () => `Expected function type, got ${pretty_print_type(callee_ty)}`,
+        caller,
+      )
+      assert(
+        callee_ty.params.length === instr.args.length,
+        () =>
+          `Expected ${callee_ty.params.length} arguments, got ${instr.args.length}`,
+      )
+      for (let i = 0; i < callee_ty.params.length; i++) {
+        const arg = instr.args[i]
+        const arg_ty = infer_operand(arg)
+        const param_ty = callee_ty.params[i]
+        if (!type_eq(arg_ty, param_ty)) {
+          throw new AssertionError({
+            message: `Argument ${i} type mismatch: expected ${pretty_print_type(
+              param_ty,
+            )}, got ${pretty_print_type(arg_ty)}`,
+            expected: param_ty,
+            actual: arg_ty,
+            stackStartFn: caller,
+          })
+        }
+      }
+    }
+  }
+  const emit = (instruction: Instr, emitter: () => unknown) => {
+    if (is_ssa_instr(instruction)) {
+      validate_instruction(instruction, emitter)
       locals.set(instruction.result, infer_instr_result(instruction))
     }
     current_block.instructions.push(instruction)
@@ -102,9 +136,10 @@ export function build_function(
   const e = <Args extends unknown[], I extends Instr>(
     f: (...args: Args) => I,
   ) => {
-    return (...args: Args) => {
-      emit(f(...args))
+    const emitter = (...args: Args) => {
+      emit(f(...args), emitter)
     }
+    return emitter
   }
 
   const i = Instr
