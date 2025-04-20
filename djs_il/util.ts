@@ -4,15 +4,18 @@ export function assert_never(x: never): never {
 
 export function assert(
   condition: unknown,
-  message: () => string,
+  message: () => string = () => '',
 ): asserts condition {
   if (!condition) {
-    throw new Error(`Assertion failed: ${message()}`)
+    throw new Error(`Assertion failed: ${message()}\n    ${caller_location()}`)
   }
+}
+function caller_location(): string {
+  return new Error().stack?.split('\n')[3]?.trim() ?? 'unknown'
 }
 
 export function todo(message: () => string = () => 'Unimplemented'): never {
-  throw new Error(`TODO: ${message()}`)
+  throw new Error(`TODO: ${message()}\n  ${caller_location()}`)
 }
 
 export type Prettify<T> = {
