@@ -1,5 +1,10 @@
+import { AssertionError } from 'node:assert'
+
 export function assert_never(x: never): never {
-  throw new Error(`Unexpected object: ${x}`)
+  throw new AssertionError({
+    message: `Unreachable object: ${x}`,
+    stackStartFn: assert_never,
+  })
 }
 
 export function assert(
@@ -7,15 +12,18 @@ export function assert(
   message: () => string = () => '',
 ): asserts condition {
   if (!condition) {
-    throw new Error(`Assertion failed: ${message()}\n    ${caller_location()}`)
+    throw new AssertionError({
+      message: message(),
+      stackStartFn: assert,
+    })
   }
-}
-function caller_location(): string {
-  return new Error().stack?.split('\n')[3]?.trim() ?? 'unknown'
 }
 
 export function todo(message: () => string = () => 'Unimplemented'): never {
-  throw new Error(`TODO: ${message()}\n  ${caller_location()}`)
+  throw new AssertionError({
+    message: `TODO: ${message()}`,
+    stackStartFn: todo,
+  })
 }
 
 export type Prettify<T> = {
