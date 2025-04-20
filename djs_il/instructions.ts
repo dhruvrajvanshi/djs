@@ -16,6 +16,7 @@ type SSAInstrKinds = (typeof SSAInstrKinds)[number]
 type InstrWithKind<K extends Instr['kind']> = Extract<Instr, { kind: K }>
 
 export type SSAInstr = InstrWithKind<SSAInstrKinds>
+export type InstrOfKind<K extends Instr['kind']> = Extract<Instr, { kind: K }>
 
 export function is_ssa_instr(instr: Instr): instr is SSAInstr {
   return SSAInstrKinds.includes(instr.kind as SSAInstrKinds)
