@@ -16,32 +16,7 @@ export function pretty_print(f: Func) {
   return `${header}(${params}) {\n${blocks}\n}`
 
   function pp_param(param: { name: Param; type: Type }) {
-    return `${param.name}: ${pp_type(param.type)}`
-  }
-  function pp_type(type: Type): string {
-    switch (type.kind) {
-      case 'value':
-        return 'value'
-      case 'object':
-        return 'object'
-      case 'null':
-        return 'null'
-      case 'undefined':
-        return 'undefined'
-      case 'boolean':
-        return 'boolean'
-      case 'number':
-        return 'number'
-      case 'string':
-        return 'string'
-      case 'unboxed_func': {
-        const params = type.params.map(pp_type).join(', ')
-        const ret = pp_type(type.returns)
-        return `#(${params}) => ${ret}`
-      }
-      default:
-        assert_never(type)
-    }
+    return `${param.name}: ${pretty_print_type(param.type)}`
   }
   function pp_block(block: BasicBlock) {
     const instructions = block.instructions
@@ -124,5 +99,30 @@ export function pretty_print(f: Func) {
       default:
         assert_never(constant)
     }
+  }
+}
+export function pretty_print_type(type: Type): string {
+  switch (type.kind) {
+    case 'value':
+      return 'value'
+    case 'object':
+      return 'object'
+    case 'null':
+      return 'null'
+    case 'undefined':
+      return 'undefined'
+    case 'boolean':
+      return 'boolean'
+    case 'number':
+      return 'number'
+    case 'string':
+      return 'string'
+    case 'unboxed_func': {
+      const params = type.params.map(pretty_print_type).join(', ')
+      const ret = pretty_print_type(type.returns)
+      return `#(${params}) => ${ret}`
+    }
+    default:
+      assert_never(type)
   }
 }

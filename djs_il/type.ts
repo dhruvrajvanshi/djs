@@ -1,4 +1,4 @@
-import type { ro } from './util.js'
+import { type ro, assert } from './util.js'
 
 export const Type = Object.freeze({
   value: { kind: 'value' } as const,
@@ -21,3 +21,18 @@ export type Type =
   | ro<{ kind: 'undefined' }>
   | ro<{ kind: 'null' }>
   | ro<{ kind: 'unboxed_func'; returns: Type; params: readonly Type[] }>
+
+export function type_eq(left: Type, right: Type): boolean {
+  if (left.kind !== right.kind) return false
+  switch (left.kind) {
+    case 'unboxed_func':
+      assert(right.kind === 'unboxed_func')
+      return (
+        type_eq(left.returns, right.returns) &&
+        left.params.length === right.params.length &&
+        left.params.every((param, i) => type_eq(param, right.params[i]))
+      )
+    default:
+      return true
+  }
+}

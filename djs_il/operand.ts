@@ -1,4 +1,4 @@
-import type { Type } from './type'
+import type { Type } from './type.js'
 
 export type Constant =
   | {
