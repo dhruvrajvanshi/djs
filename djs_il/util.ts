@@ -1,9 +1,11 @@
-import { AssertionError, fail } from 'node:assert'
+import { AssertionError } from 'node:assert'
 
 export function assert_never(x: never): never {
   throw new AssertionError({
     message: `Unreachable object: ${x}`,
     stackStartFn: assert_never,
+    expected: 'unreachable',
+    actual: x,
   })
 }
 
@@ -51,3 +53,34 @@ export function is_defined<T>(x: T | undefined | null): x is T {
 }
 
 export type StringUnionDiff<T, U> = T extends U ? never : T
+
+export function obj_key_by<V, K extends PropertyKey>(
+  items: readonly V[],
+  keyOf: (value: V) => K,
+): Record<K, V> {
+  const result = {} as Record<K, V>
+  for (const value of items) {
+    const key = keyOf(value)
+    if (key in result) {
+      throw new Error(`Duplicate key found: ${key.toString()}`)
+    }
+    result[key] = value
+  }
+  return result
+}
+
+export function obj_from_entries<V, K extends PropertyKey>(
+  entries: readonly [K, V][],
+): Record<K, V> {
+  return Object.fromEntries<V>(entries) as Record<K, V>
+}
+export function obj_map<V, U, K extends PropertyKey>(
+  obj: Record<K, V>,
+  func: (value: V, key: K) => U,
+): Record<K, U> {
+  const result = {} as Record<K, U>
+  for (const key in obj) {
+    result[key] = func(obj[key], key)
+  }
+  return result
+}

@@ -24,6 +24,9 @@ export type Func = {
   params: FuncParam[]
   blocks: [entry: BasicBlock, ...BasicBlock[]]
 }
+export function func_entry_block(f: Func): BasicBlock {
+  return f.blocks[0]
+}
 
 export function build_function(
   name: Global,
@@ -175,6 +178,7 @@ export function build_function(
     add: e(i.add),
     sub: e(i.sub),
     to_value: e(i.to_value),
+    jump: e(i.jump),
   } as const
 
   function error_at_caller(
