@@ -15,7 +15,15 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true
+			"recommended": true,
+      "correctness": {
+        "noUnusedVariables": { "level": "warn" },
+        "useYield": { "level": "warn" }
+      },
+      "style": {
+        "useImportType": { "level": "warn" },
+        "useConst": { "level": "warn" }
+      }
 		}
 	},
   "formatter": {
