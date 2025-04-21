@@ -1,3 +1,4 @@
+import { BlockList } from 'net'
 import type { BlockLabel } from './basic_block.js'
 import type { Local, Operand } from './operand.js'
 import type { ro, StringUnionDiff } from './util.js'
@@ -74,6 +75,10 @@ export type Instr =
       if_truthy: BlockLabel
       if_falsy: BlockLabel
     }>
+  | ro<{
+      kind: 'jump'
+      to: BlockLabel
+    }>
 
 export const Instr = {
   set: (object: Operand, property: Operand, value: Operand) => ({
@@ -140,6 +145,10 @@ export const Instr = {
     kind: 'to_value',
     result,
     value,
+  }),
+  jump: (to: BlockLabel) => ({
+    kind: 'jump',
+    to,
   }),
 } as const satisfies {
   [K in Instr['kind']]: (...args: never[]) => Extract<Instr, { kind: K }>
