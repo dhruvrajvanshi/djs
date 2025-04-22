@@ -59,25 +59,28 @@ function* compile_block_gen(
     yield* compile_instr(blocks_by_name, instr)
   }
 }
+
 function* compile_instr(
   blocks_by_name: Record<BlockLabel, BasicBlock>,
   instr: Instr,
 ): IterableIterator<CompiledInstruction> {
+  function i(cb: (frame: CallFrame) => void): CompiledInstruction {
+    Object.defineProperty(cb, 'name', {
+      value: pretty_print_instr(instr),
+    })
+    return cb
+  }
   switch (instr.kind) {
     case 'make_object': {
       const { result } = instr
-      const f: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         frame.registers.set(result, value_from_object({}))
         cont(frame)
-      }
-      Object.defineProperty(f, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield f
       break
     }
     case 'set': {
-      const f: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         const object = eval_op(instr.object, frame)
         const property = eval_op(instr.property, frame)
         if (typeof object !== 'object') {
@@ -97,27 +100,19 @@ function* compile_instr(
         const value = eval_op(instr.value, frame)
         object[property] = value
         cont(frame)
-      }
-      Object.defineProperty(f, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield f
       break
     }
     case 'jump': {
       const { to } = instr
-      const jump: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         assert(to in blocks_by_name, () => `Unknown block: ${to}`)
         jmp(to, frame)
-      }
-      Object.defineProperty(jump, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield jump
       break
     }
     case 'get': {
-      const get: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         const object = eval_op(instr.object, frame)
         const property = eval_op(instr.property, frame)
         if (object === null || typeof object !== 'object') {
@@ -138,15 +133,11 @@ function* compile_instr(
 
         frame.registers.set(instr.result, value)
         cont(frame)
-      }
-      Object.defineProperty(get, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield get
       break
     }
     case 'add': {
-      const add: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         const left = eval_op(instr.left, frame)
         const right = eval_op(instr.right, frame)
         // TODO: Implement the JS rules for the plus operator
@@ -159,15 +150,11 @@ function* compile_instr(
         }
         frame.registers.set(instr.result, value_from_primitive(left + right))
         cont(frame)
-      }
-      Object.defineProperty(add, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield add
       break
     }
     case 'strict_eq': {
-      const strict_eq: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         frame.registers.set(
           instr.result,
           value_from_primitive(
@@ -175,63 +162,43 @@ function* compile_instr(
           ),
         )
         cont(frame)
-      }
-      Object.defineProperty(strict_eq, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield strict_eq
       break
     }
     case 'jump_if': {
       const { condition, if_truthy, if_falsy } = instr
-      const jump_if: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         if (eval_op(condition, frame)) {
           jmp(if_truthy, frame)
         } else {
           jmp(if_falsy, frame)
         }
-      }
-      Object.defineProperty(jump_if, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield jump_if
       break
     }
     case 'to_value': {
-      const to_value: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         const value = eval_op(instr.value, frame)
         frame.registers.set(instr.result, value)
         cont(frame)
-      }
-      Object.defineProperty(to_value, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield to_value
       break
     }
     case 'return': {
-      const return_: CompiledInstruction = (frame) => {
+      yield i((frame) => {
         const value = eval_op(instr.value, frame)
         ret(value, frame)
-      }
-      Object.defineProperty(return_, 'name', {
-        value: pretty_print_instr(instr),
       })
-      yield return_
       break
     }
     default: {
-      const unimplemented = () => {
+      yield i(() => {
         throw new AssertionError({
           message: `Unimplemented: ${instr.kind}`,
           actual: instr.kind,
           expected: {},
         })
-      }
-      Object.defineProperty(unimplemented, 'name', {
-        value: `#unimplemented: ${pretty_print_instr(instr)}`,
       })
-      yield unimplemented
     }
   }
 }
