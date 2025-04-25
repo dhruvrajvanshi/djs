@@ -1,18 +1,18 @@
 function @fib($0: value) {
 .entry:
-  %is_zero = strict_eq 0, $0
-  %is_one = strict_eq 1, $0
-  %should_ret_zero = or %is_zero, %is_one
+  %is_zero: boolean = strict_eq 0, $0
+  %is_one: boolean = strict_eq 1, $0
+  %should_ret_zero: value = or %is_zero, %is_one
   jump_if %should_ret_zero then: .ret_zero else: .recur
 .ret_zero:
   return 0
 .recur:
-  %n_minus_1 = sub $0, 1
-  %v_n_minus_1 = to_value %n_minus_1
-  %fib_minus_1 = unboxed_call @fib(%v_n_minus_1)
-  %n_minus_2 = sub $0, 2
-  %v_n_minus_2 = to_value %n_minus_2
-  %fib_minus_2 = unboxed_call @fib(%v_n_minus_2)
-  %result = add %fib_minus_1, %fib_minus_2
+  %n_minus_1: value = sub $0, 1
+  %v_n_minus_1: value = to_value %n_minus_1
+  %fib_minus_1: value = unboxed_call @fib(%v_n_minus_1)
+  %n_minus_2: value = sub $0, 2
+  %v_n_minus_2: value = to_value %n_minus_2
+  %fib_minus_2: value = unboxed_call @fib(%v_n_minus_2)
+  %result: value = add %fib_minus_1, %fib_minus_2
   return %result
 }

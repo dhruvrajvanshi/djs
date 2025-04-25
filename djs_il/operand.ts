@@ -1,4 +1,4 @@
-import type { Type } from './type.js'
+import { Type } from './type.js'
 
 export type Constant =
   | {
@@ -16,6 +16,24 @@ export type Operand =
   | { kind: 'param'; name: Param; type: Type }
   | { kind: 'constant'; value: Constant }
   | { kind: 'global'; name: Global; type: Type }
+
+export function operand_type(operand: Operand): Type {
+  if ('type' in operand) {
+    return operand.type
+  }
+  return constant_type(operand.value)
+}
+
+function constant_type(constant: Constant): Type {
+  switch (constant.kind) {
+    case 'string':
+      return Type.string
+    case 'number':
+      return Type.number
+    case 'boolean':
+      return Type.boolean
+  }
+}
 
 export const Operand = Object.freeze({
   local: (name: Local, type: Type): Operand => ({
