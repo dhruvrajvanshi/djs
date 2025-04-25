@@ -1,4 +1,3 @@
-import { BlockList } from 'net'
 import type { BlockLabel } from './basic_block.js'
 import type { Local, Operand } from './operand.js'
 import type { ro, StringUnionDiff } from './util.js'
