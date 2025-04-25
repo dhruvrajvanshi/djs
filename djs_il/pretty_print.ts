@@ -7,6 +7,7 @@ import type {
   Param,
   Type,
 } from './il.js'
+import { instr_type, SSAInstr } from './instructions.js'
 import { assert_never } from './util.js'
 
 export function pretty_print(f: Func) {
@@ -49,29 +50,32 @@ function pp_pp(arg: PP): string {
 }
 
 export function pretty_print_instr(instr: Instr) {
+  function ssa_ty(instr: SSAInstr): string {
+    return pretty_print_type(instr_type(instr))
+  }
   switch (instr.kind) {
     case 'make_object':
-      return `${instr.result} = make_object`
+      return `${instr.result}: ${ssa_ty(instr)} = make_object`
     case 'set':
       return pp`set ${instr.object}[${instr.property}] = ${instr.value}`
     case 'get':
-      return pp`${instr.result} = get ${instr.object}[${instr.property}]`
+      return pp`${instr.result}: ${ssa_ty(instr)} = get ${instr.object}[${instr.property}]`
     case 'unboxed_call':
-      return pp`${instr.result} = unboxed_call ${instr.callee}(${instr.args})`
+      return pp`${instr.result}: ${ssa_ty(instr)} = unboxed_call ${instr.callee}(${instr.args})`
     case 'return':
       return pp`return ${instr.value}`
     case 'jump_if':
       return pp`jump_if ${instr.condition} then: ${instr.if_truthy} else: ${instr.if_falsy}`
     case 'or':
-      return pp`${instr.result} = or ${instr.left}, ${instr.right}`
+      return pp`${instr.result}: ${ssa_ty(instr)} = or ${instr.left}, ${instr.right}`
     case 'strict_eq':
-      return pp`${instr.result} = strict_eq ${instr.left}, ${instr.right}`
+      return pp`${instr.result}: ${ssa_ty(instr)} = strict_eq ${instr.left}, ${instr.right}`
     case 'add':
-      return pp`${instr.result} = add ${instr.left}, ${instr.right}`
+      return pp`${instr.result}: ${ssa_ty(instr)} = add ${instr.left}, ${instr.right}`
     case 'sub':
-      return pp`${instr.result} = sub ${instr.left}, ${instr.right}`
+      return pp`${instr.result}: ${ssa_ty(instr)} = sub ${instr.left}, ${instr.right}`
     case 'to_value':
-      return pp`${instr.result} = to_value ${instr.value}`
+      return pp`${instr.result}: ${ssa_ty(instr)} = to_value ${instr.value}`
     case 'jump':
       return `jump ${instr.to}`
     default:
