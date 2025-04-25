@@ -22,6 +22,8 @@ export type Type =
   | ro<{ kind: 'null' }>
   | ro<{ kind: 'unboxed_func'; returns: Type; params: readonly Type[] }>
 
+export type TypeWithKind<K extends Type['kind']> = Extract<Type, { kind: K }>
+
 export function type_eq(left: Type, right: Type): boolean {
   if (left.kind !== right.kind) return false
   switch (left.kind) {

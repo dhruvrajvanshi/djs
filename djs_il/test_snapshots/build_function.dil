@@ -1,11 +1,11 @@
 function @test() {
 .entry:
-  %obj = make_object
+  %obj: object = make_object
   set %obj["key"] = "value"
-  %value = get %obj["key"]
+  %value: value = get %obj["key"]
   jump_if %value then: .if_true else: .if_false
 .if_true:
-  %capitalized = unboxed_call @builtin.capitalize(%value)
+  %capitalized: value = unboxed_call @builtin.capitalize(%value)
   return %capitalized
 .if_false:
   return "default"

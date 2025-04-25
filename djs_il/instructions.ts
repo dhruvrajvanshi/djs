@@ -1,6 +1,7 @@
 import type { BlockLabel } from './basic_block.js'
-import type { Local, Operand } from './operand.js'
-import type { ro, StringUnionDiff } from './util.js'
+import { operand_type, type Local, type Operand } from './operand.js'
+import { Type } from './type.js'
+import { assert, assert_never, type ro, type StringUnionDiff } from './util.js'
 
 const SSAInstrKinds = [
   'get',
@@ -20,6 +21,29 @@ export type InstrOfKind<K extends Instr['kind']> = Extract<Instr, { kind: K }>
 
 export function is_ssa_instr(instr: Instr): instr is SSAInstr {
   return SSAInstrKinds.includes(instr.kind as SSAInstrKinds)
+}
+
+export function instr_type(instr: SSAInstr): Type {
+  switch (instr.kind) {
+    case 'make_object':
+      return Type.object
+    case 'or':
+      return Type.value
+    case 'add':
+      return Type.value
+    case 'sub':
+      return Type.value
+    case 'unboxed_call':
+      return Type.value
+    case 'get':
+      return Type.value
+    case 'strict_eq':
+      return Type.boolean
+    case 'to_value':
+      return Type.value
+    default:
+      assert_never(instr)
+  }
 }
 
 export type Instr =
@@ -96,12 +120,15 @@ export const Instr = {
     kind: 'make_object',
     result: name,
   }),
-  unboxed_call: (name: Local, callee: Operand, args: Operand[]) => ({
-    kind: 'unboxed_call',
-    result: name,
-    callee,
-    args,
-  }),
+  unboxed_call: (name: Local, callee: Operand, args: Operand[]) => {
+    assert(operand_type(callee).kind === 'unboxed_func')
+    return {
+      kind: 'unboxed_call',
+      result: name,
+      callee,
+      args,
+    }
+  },
   return: (value: Operand) => ({
     kind: 'return',
     value,
