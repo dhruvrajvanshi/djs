@@ -1,0 +1,9 @@
+{
+  "name": "djs_ast",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "prettier": "^3.5.3"
+  }
+}

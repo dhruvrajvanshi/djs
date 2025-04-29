@@ -1,8 +1,8 @@
-const {
+import {
   ast_items,
   items_by_name,
   needs_lifetime_param,
-} = require("./src/ast.js");
+} from "./src/ast.js";
 
 let result = `
 // This file is generated automatically

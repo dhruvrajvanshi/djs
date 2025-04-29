@@ -599,4 +599,4 @@ function needs_lifetime_param_set() {
   }
 }
 
-module.exports = { ast_items, items_by_name, needs_lifetime_param };
+export { ast_items, items_by_name, needs_lifetime_param };
