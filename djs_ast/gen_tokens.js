@@ -1,4 +1,4 @@
-const { tokens } = require("./src/tokens.js");
+import { tokens } from "./src/tokens.js";
 
 let output = "";
 
@@ -27,7 +27,8 @@ output += `
       match s {
         ${keywords
           .map(
-            ({ text, variant }) => `\"${text}\" => Some(TokenKind::${variant}),`
+            ({ text, variant }) =>
+              `\"${text}\" => Some(TokenKind::${variant}),`,
           )
           .join("\n        ")}
         _ => None,

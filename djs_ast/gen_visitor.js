@@ -1,4 +1,4 @@
-const { ast_items, items_by_name } = require("./src/ast.js");
+import { ast_items, items_by_name } from "./src/ast.js";
 
 console.log("use crate::ast::*;");
 console.log("pub trait Visitor<'s>: Sized {");
