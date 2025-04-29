@@ -28,7 +28,7 @@ output += `
       .join("\n    ")}
   })
 
-  type TokenKind = typeof TokenKinds[keyof typeof TokenKinds];
+  export type TokenKind = typeof TokenKinds[keyof typeof TokenKinds];
   export const TokenKind = Object.freeze({
     ...TokenKinds,
     from_str(s: string): TokenKind | null {
