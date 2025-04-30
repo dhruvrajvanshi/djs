@@ -156,31 +156,31 @@ const DPattern = Enum(
   Pattern,
   ["span", "clone", "visit"],
   ["Var", Ident],
-  ["Assignment", Box(Pattern), Box(Expr)],
-  ["Array", Vec(Pattern)],
+  ["Assignment", Pattern, Expr],
+  ["Array", Array(Pattern)],
   ["Object", ObjectPattern],
-  ["Prop", Box(Expr), ObjectKey],
+  ["Prop", Expr, ObjectKey],
   "Elision",
-  ["Rest", Box(Pattern)],
+  ["Rest", Pattern],
 );
 const DStmt = Enum(
   Stmt,
   ["span", "clone", "visit"],
-  [Expr, Box(Expr)],
+  [Expr, Expr],
   ["Block", Block],
   ["Return", Option(Expr)],
   ["VarDecl", VarDecl],
-  ["If", Box(Expr), Box(Stmt), Option(Box(Stmt))],
-  ["Switch", Box(Expr), Vec(SwitchCase)],
-  ["While", Box(Expr), Box(Stmt)],
-  ["DoWhile", Box(Stmt), Box(Expr)],
-  ["Try", Box(TryStmt)],
+  ["If", Expr, Stmt, Option(Stmt)],
+  ["Switch", Expr, Array(SwitchCase)],
+  ["While", Expr, Stmt],
+  ["DoWhile", Stmt, Expr],
+  ["Try", TryStmt],
   ["For", "For"],
   ["ForInOrOf", ForInOrOf],
   ["Break", Option(Label)],
   ["Continue", Option(Label)],
   ["Debugger"],
-  ["With", Box(Expr), Box(Stmt)],
+  ["With", Expr, Stmt],
   ["FunctionDecl", Function],
   ["ClassDecl", Class],
   ["Empty"],
@@ -190,44 +190,44 @@ const DExpr = Enum(
   Expr,
   ["span", "clone", "visit"],
   ["Var", Ident],
-  ["BinOp", Box(Expr), BinOp, Box(Expr)],
+  ["BinOp", Expr, BinOp, Expr],
   ["ArrowFn", ParamList, ArrowFnBody],
   ["Function", Function],
-  ["Call", Box(Expr), Vec(Expr)],
-  ["Index", Box(Expr), Box(Expr)],
-  ["Prop", Box(Expr), Ident],
+  ["Call", Expr, Array(Expr)],
+  ["Index", Expr, Expr],
+  ["Prop", Expr, Ident],
   ["String", Text],
   ["Number", Text],
   ["Boolean", "bool"],
   ["Null"],
   ["Undefined"],
-  ["Object", Vec(ObjectLiteralEntry)],
-  ["Throw", { tags: ["span"] }, Box(Expr)],
-  ["PostIncrement", { tags: ["span"] }, Box(Expr)],
-  ["PostDecrement", { tags: ["span"] }, Box(Expr)],
-  ["PreIncrement", { tags: ["span"] }, Box(Expr)],
-  ["PreDecrement", { tags: ["span"] }, Box(Expr)],
-  ["Array", Vec(ArrayLiteralMember)],
-  ["New", { tags: ["span"] }, Box(Expr)],
-  ["Yield", Option(Box(Expr))],
-  ["YieldFrom", { tags: ["span"] }, Box(Expr)],
-  ["Ternary", Box(Expr), Box(Expr), Box(Expr)],
-  ["Assign", Box(Pattern), AssignOp, Box(Expr)],
+  ["Object", Array(ObjectLiteralEntry)],
+  ["Throw", { tags: ["span"] }, Expr],
+  ["PostIncrement", { tags: ["span"] }, Expr],
+  ["PostDecrement", { tags: ["span"] }, Expr],
+  ["PreIncrement", { tags: ["span"] }, Expr],
+  ["PreDecrement", { tags: ["span"] }, Expr],
+  ["Array", Array(ArrayLiteralMember)],
+  ["New", { tags: ["span"] }, Expr],
+  ["Yield", Option(Expr)],
+  ["YieldFrom", { tags: ["span"] }, Expr],
+  ["Ternary", Expr, Expr, Expr],
+  ["Assign", Pattern, AssignOp, Expr],
   ["Regex", "Text"],
   // Unary operators
-  ["Delete", { tags: ["span"] }, Box(Expr)],
-  ["Void", { tags: ["span"] }, Box(Expr)],
-  ["TypeOf", { tags: ["span"] }, Box(Expr)],
-  ["UnaryPlus", { tags: ["span"] }, Box(Expr)],
-  ["UnaryMinus", { tags: ["span"] }, Box(Expr)],
-  ["BitNot", { tags: ["span"] }, Box(Expr)],
-  ["Not", { tags: ["span"] }, Box(Expr)],
-  ["Await", { tags: ["span"] }, Box(Expr)],
-  ["Comma", Vec(Expr)],
+  ["Delete", { tags: ["span"] }, Expr],
+  ["Void", { tags: ["span"] }, Expr],
+  ["TypeOf", { tags: ["span"] }, Expr],
+  ["UnaryPlus", { tags: ["span"] }, Expr],
+  ["UnaryMinus", { tags: ["span"] }, Expr],
+  ["BitNot", { tags: ["span"] }, Expr],
+  ["Not", { tags: ["span"] }, Expr],
+  ["Await", { tags: ["span"] }, Expr],
+  ["Comma", Array(Expr)],
 
   ["Super"],
-  ["Class", Box("Class")],
-  ["TemplateLiteral", Vec(TemplateLiteralFragment)],
+  ["Class", "Class"],
+  ["TemplateLiteral", Array(TemplateLiteralFragment)],
 );
 const DClass = Struct(
   Class,
@@ -239,7 +239,7 @@ const DClass = Struct(
 const DClassBody = Struct(
   ClassBody,
   ["span", "clone"],
-  ["members", Vec(ClassMember)],
+  ["members", Array(ClassMember)],
 );
 const DClassMember = Enum(
   ClassMember,
@@ -278,7 +278,7 @@ const DObjectLiteralEntry = Enum(
   ["Spread", Expr],
 );
 
-const DParamList = Struct(ParamList, ["span", "clone"], ["params", Vec(Param)]);
+const DParamList = Struct(ParamList, ["span", "clone"], ["params", Array(Param)]);
 
 const DParam = Struct(Param, ["span", "clone"], ["pattern", Pattern]);
 
@@ -299,16 +299,16 @@ const DFunction = Struct(
   ["is_generator", "bool"],
   ["is_async", "bool"],
 );
-const DBlock = Struct(Block, ["span", "clone"], ["stmts", Vec(Stmt)]);
+const DBlock = Struct(Block, ["span", "clone"], ["stmts", Array(Stmt)]);
 const DText = Struct(Text, ["span", "clone"], ["text", "str"]);
 const DLabel = Struct(Label, ["span", "clone"], ["name", "str"]);
 
-const DSourceFile = Struct(SourceFile, ["span", "visit"], ["stmts", Vec(Stmt)]);
+const DSourceFile = Struct(SourceFile, ["span", "visit"], ["stmts", Array(Stmt)]);
 const DSwitchCase = Struct(
   SwitchCase,
   ["span", "clone"],
   ["test", Option(Expr)],
-  ["body", Vec(Stmt)],
+  ["body", Array(Stmt)],
 );
 const DForInOrOf = Struct(
   ForInOrOf,
@@ -317,14 +317,14 @@ const DForInOrOf = Struct(
   ["lhs", Pattern],
   ["in_or_of", InOrOf],
   ["rhs", Expr],
-  ["body", Box(Stmt)],
+  ["body", Stmt],
 );
 const DInOrOf = Enum(InOrOf, ["clone"], "In", "Of");
 const DVarDecl = Struct(
   VarDecl,
   ["span", "clone"],
   ["decl_type", DeclType],
-  ["declarators", Vec(VarDeclarator)],
+  ["declarators", Array(VarDeclarator)],
 );
 const DVarDeclarator = Struct(
   VarDeclarator,
@@ -338,7 +338,7 @@ const DFor = Struct(
   ["init", ForInit],
   ["test", Option(Expr)],
   ["update", Option(Expr)],
-  ["body", Box(Stmt)],
+  ["body", Stmt],
 );
 const DForInit = Enum(ForInit, ["clone"], ["VarDecl", VarDecl], [Expr, Expr]);
 const DTryStmt = Struct(
@@ -352,7 +352,7 @@ const DTryStmt = Struct(
 const DArrowFnBody = Enum(
   ArrowFnBody,
   ["span", "clone"],
-  [Expr, Box(Expr)],
+  [Expr, Expr],
   ["Block", Block],
 );
 const DTemplateLiteralFragment = Enum(
@@ -364,8 +364,8 @@ const DTemplateLiteralFragment = Enum(
 const DObjectPattern = Struct(
   ObjectPattern,
   ["span", "clone"],
-  ["properties", Vec("ObjectPatternProperty")],
-  ["rest", Option(Box(Pattern))],
+  ["properties", Array("ObjectPatternProperty")],
+  ["rest", Option(Pattern)],
 );
 const DObjectPatternProperty = Struct(
   ObjectPatternProperty,
@@ -527,18 +527,9 @@ function Option(type) {
 /**
  * @template {Type} T
  * @param {T} type
- * @returns {["Box", T]}
- */
-function Box(type) {
-  return ["Box", type];
-}
-
-/**
- * @template {Type} T
- * @param {T} type
  * @returns {["Vec", T]}
  */
-function Vec(type) {
+function Array(type) {
   return ["Vec", type];
 }
 

@@ -1,5 +1,5 @@
 /// <reference path="./index.d.ts" />
-import { ast_items } from "./src/ast.js"
+import { ast_items } from "./src/ast.def.js"
 
 let output = ''
 for (const item of ast_items) {

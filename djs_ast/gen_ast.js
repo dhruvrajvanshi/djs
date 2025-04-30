@@ -2,7 +2,7 @@ import {
   ast_items,
   items_by_name,
   needs_lifetime_param,
-} from "./src/ast.js";
+} from "./src/ast.def.js";
 
 let result = `
 // This file is generated automatically
