@@ -52,7 +52,7 @@ const MethodDef = "MethodDef";
  */
 const Block = "Block";
 
-const DIdent = Struct(Ident, ["span", "clone"], ["text", "str"]);
+const DIdent = Struct(Ident, ["span"], ["text", "str"]);
 
 /**
  * {@link DPattern}
@@ -154,7 +154,7 @@ const SourceFile = "SourceFile";
 
 const DPattern = Enum(
   Pattern,
-  ["span", "clone", "visit"],
+  ["span", "visit"],
   ["Var", Ident],
   ["Assignment", Pattern, Expr],
   ["Array", Array(Pattern)],
@@ -165,7 +165,7 @@ const DPattern = Enum(
 );
 const DStmt = Enum(
   Stmt,
-  ["span", "clone", "visit"],
+  ["span", "visit"],
   [Expr, Expr],
   ["Block", Block],
   ["Return", Option(Expr)],
@@ -188,7 +188,7 @@ const DStmt = Enum(
 
 const DExpr = Enum(
   Expr,
-  ["span", "clone", "visit"],
+  ["span", "visit"],
   ["Var", Ident],
   ["BinOp", Expr, BinOp, Expr],
   ["ArrowFn", ParamList, ArrowFnBody],
@@ -231,31 +231,31 @@ const DExpr = Enum(
 );
 const DClass = Struct(
   Class,
-  ["span", "clone"],
+  ["span"],
   ["name", Option(Ident)],
   ["superclass", Option(Expr)],
   ["body", ClassBody],
 );
 const DClassBody = Struct(
   ClassBody,
-  ["span", "clone"],
+  ["span"],
   ["members", Array(ClassMember)],
 );
 const DClassMember = Enum(
   ClassMember,
-  ["clone"],
+  [],
   ["MethodDef", MethodDef],
   ["FieldDef", FieldDef],
 );
 const DFieldDef = Struct(
   "FieldDef",
-  ["span", "clone"],
+  ["span"],
   ["name", Ident],
   ["initializer", Option(Expr)],
 );
 const DMethodDef = Struct(
   MethodDef,
-  ["span", "clone"],
+  ["span"],
   ["name", ObjectKey],
   ["body", Function],
   ["accessor_type", Option(AccessorType)],
@@ -263,7 +263,7 @@ const DMethodDef = Struct(
 
 const DObjectKey = Enum(
   ObjectKey,
-  ["span", "clone"],
+  ["span", ],
   [Ident, Ident],
   ["String", Text],
   ["Computed", Expr],
@@ -271,20 +271,20 @@ const DObjectKey = Enum(
 
 const DObjectLiteralEntry = Enum(
   ObjectLiteralEntry,
-  ["span", "clone"],
+  ["span", ],
   [Ident, Ident],
   ["Prop", ObjectKey, Expr],
   ["Method", MethodDef],
   ["Spread", Expr],
 );
 
-const DParamList = Struct(ParamList, ["span", "clone"], ["params", Array(Param)]);
+const DParamList = Struct(ParamList, ["span", ], ["params", Array(Param)]);
 
-const DParam = Struct(Param, ["span", "clone"], ["pattern", Pattern]);
+const DParam = Struct(Param, ["span", ], ["pattern", Pattern]);
 
 const DArrayLiteralMember = Enum(
   ArrayLiteralMember,
-  ["span", "clone"],
+  ["span", ],
   ["Expr", Expr],
   "Elision",
   ["Spread", Expr],
@@ -292,58 +292,58 @@ const DArrayLiteralMember = Enum(
 
 const DFunction = Struct(
   Function,
-  ["span", "clone"],
+  ["span", ],
   ["name", Option(Ident)],
   ["params", ParamList],
   ["body", Block],
   ["is_generator", "bool"],
   ["is_async", "bool"],
 );
-const DBlock = Struct(Block, ["span", "clone"], ["stmts", Array(Stmt)]);
-const DText = Struct(Text, ["span", "clone"], ["text", "str"]);
-const DLabel = Struct(Label, ["span", "clone"], ["name", "str"]);
+const DBlock = Struct(Block, ["span", ], ["stmts", Array(Stmt)]);
+const DText = Struct(Text, ["span", ], ["text", "str"]);
+const DLabel = Struct(Label, ["span", ], ["name", "str"]);
 
 const DSourceFile = Struct(SourceFile, ["span", "visit"], ["stmts", Array(Stmt)]);
 const DSwitchCase = Struct(
   SwitchCase,
-  ["span", "clone"],
+  ["span", ],
   ["test", Option(Expr)],
   ["body", Array(Stmt)],
 );
 const DForInOrOf = Struct(
   ForInOrOf,
-  ["span", "clone"],
+  ["span", ],
   ["decl_type", Option(DeclType)], // None for `for (x of y) {}`
   ["lhs", Pattern],
   ["in_or_of", InOrOf],
   ["rhs", Expr],
   ["body", Stmt],
 );
-const DInOrOf = Enum(InOrOf, ["clone"], "In", "Of");
+const DInOrOf = Enum(InOrOf, [], "In", "Of");
 const DVarDecl = Struct(
   VarDecl,
-  ["span", "clone"],
+  ["span", ],
   ["decl_type", DeclType],
   ["declarators", Array(VarDeclarator)],
 );
 const DVarDeclarator = Struct(
   VarDeclarator,
-  ["clone"],
+  [],
   ["pattern", Pattern],
   ["init", Option(Expr)],
 );
 const DFor = Struct(
   For,
-  ["span", "clone"],
+  ["span", ],
   ["init", ForInit],
   ["test", Option(Expr)],
   ["update", Option(Expr)],
   ["body", Stmt],
 );
-const DForInit = Enum(ForInit, ["clone"], ["VarDecl", VarDecl], [Expr, Expr]);
+const DForInit = Enum(ForInit, [], ["VarDecl", VarDecl], [Expr, Expr]);
 const DTryStmt = Struct(
   TryStmt,
-  ["span", "clone"],
+  ["span", ],
   ["try_block", Block],
   ["catch_pattern", Option(Pattern)],
   ["catch_block", Option(Block)],
@@ -351,31 +351,31 @@ const DTryStmt = Struct(
 );
 const DArrowFnBody = Enum(
   ArrowFnBody,
-  ["span", "clone"],
+  ["span", ],
   [Expr, Expr],
   ["Block", Block],
 );
 const DTemplateLiteralFragment = Enum(
   TemplateLiteralFragment,
-  ["span", "clone"],
+  ["span", ],
   ["Text", Text],
   ["Expr", Expr],
 );
 const DObjectPattern = Struct(
   ObjectPattern,
-  ["span", "clone"],
+  ["span", ],
   ["properties", Array("ObjectPatternProperty")],
   ["rest", Option(Pattern)],
 );
 const DObjectPatternProperty = Struct(
   ObjectPatternProperty,
-  ["span", "clone"],
+  ["span", ],
   ["key", ObjectKey],
   ["value", Pattern],
 );
 const DBinOp = Enum(
   BinOp,
-  ["clone"],
+  [],
   // Arithmetic
   "Add",
   "Sub",
@@ -409,7 +409,7 @@ const DBinOp = Enum(
 );
 const DAssignOp = Enum(
   AssignOp,
-  ["clone"],
+  [],
   "Eq",
   "MulEq",
   "DivEq",
@@ -424,8 +424,8 @@ const DAssignOp = Enum(
   "BitOrEq",
   "ExponentEq",
 );
-const DDeclType = Enum(DeclType, ["clone"], "Let", "Const", "Var");
-const DAccessorType = Enum(AccessorType, ["clone"], "Get", "Set");
+const DDeclType = Enum(DeclType, [], "Let", "Const", "Var");
+const DAccessorType = Enum(AccessorType, [], "Get", "Set");
 
 const ast_items = [
   DSourceFile,

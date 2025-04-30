@@ -8,8 +8,10 @@
     },
     "files": [
         "index.d.ts",
-        "src/ast.js",
-        "gen_ast.js",
-	"gen_visitor.js",
+        "src/ast.def.js",
+        "src/tokens.def.js",
+        "gen_ts_ast.js",
+        "gen_ts_tokens.js",
+	      "gen_visitor.js"
     ]
 }
