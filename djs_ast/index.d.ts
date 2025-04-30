@@ -1,7 +1,11 @@
 type Type1 = ["Vec" | "Option", Type];
 type Type = string | Type1;
 type Tag = "span" | "visit";
-type EnumVariant = { name: string; args: Type[]; tags: Tag[] };
+type EnumVariant = {
+  name: string;
+  args: Record<string, Type>;
+  tags: Tag[];
+};
 type EnumItem = {
   kind: "enum";
   name: string;

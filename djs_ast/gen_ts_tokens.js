@@ -1,4 +1,4 @@
-import { tokens } from "./src/tokens.js";
+import { tokens } from "./src/tokens.def.js";
 
 let output = `
 // This file is generated automatically

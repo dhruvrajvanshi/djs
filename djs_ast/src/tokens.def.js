@@ -1,4 +1,4 @@
-/** @type {string | [string, string][]} */
+/** @type {(string | [string, string])[]} */
 export const tokens = [
   "Ident",
 

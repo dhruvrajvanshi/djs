@@ -11,7 +11,6 @@
         "src/ast.def.js",
         "src/tokens.def.js",
         "gen_ts_ast.js",
-        "gen_ts_tokens.js",
-	      "gen_visitor.js"
+        "gen_ts_tokens.js"
     ]
 }

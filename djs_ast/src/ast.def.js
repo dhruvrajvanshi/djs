@@ -96,21 +96,9 @@ const AccessorType = "AccessorType";
  */
 const VarDecl = "VarDecl";
 /**
- * {@link DFor}
- */
-const For = "For";
-/**
- * {@link DTryStmt}
- */
-const TryStmt = "TryStmt";
-/**
  * {@link DSwitchCase}
  */
 const SwitchCase = "SwitchCase";
-/**
- * {@link DForInOrOf}
- */
-const ForInOrOf = "ForInOrOf";
 /**
  * {@link DInOrOf}
  */
@@ -155,79 +143,102 @@ const SourceFile = "SourceFile";
 const DPattern = Enum(
   Pattern,
   ["span", "visit"],
-  ["Var", Ident],
-  ["Assignment", Pattern, Expr],
-  ["Array", Array(Pattern)],
-  ["Object", ObjectPattern],
-  ["Prop", Expr, ObjectKey],
+  ["Var", { ident: Ident }],
+  ["Assignment", { pattern: Pattern, initializer: Expr }],
+  ["Array", { items: Array(Pattern) }],
+  [
+    "Object",
+    { properties: Array("ObjectPatternProperty"), rest: Option(Pattern) },
+  ],
+  ["Prop", { expr: Expr, key: ObjectKey }],
   "Elision",
-  ["Rest", Pattern],
+  ["Rest", { pattern: Pattern }],
 );
 const DStmt = Enum(
   Stmt,
   ["span", "visit"],
-  [Expr, Expr],
-  ["Block", Block],
-  ["Return", Option(Expr)],
-  ["VarDecl", VarDecl],
-  ["If", Expr, Stmt, Option(Stmt)],
-  ["Switch", Expr, Array(SwitchCase)],
-  ["While", Expr, Stmt],
-  ["DoWhile", Stmt, Expr],
-  ["Try", TryStmt],
-  ["For", "For"],
-  ["ForInOrOf", ForInOrOf],
-  ["Break", Option(Label)],
-  ["Continue", Option(Label)],
-  ["Debugger"],
-  ["With", Expr, Stmt],
-  ["FunctionDecl", Function],
-  ["ClassDecl", Class],
-  ["Empty"],
+  [Expr, { expr: Expr }],
+  ["Block", { block: Block }],
+  ["Return", { value: Option(Expr) }],
+  ["VarDecl", { decl: VarDecl }],
+  ["If", { condition: Expr, if_true: Stmt, if_false: Option(Stmt) }],
+  ["Switch", { condition: Expr, cases: Array(SwitchCase) }],
+  ["While", { condition: Expr, body: Stmt }],
+  ["DoWhile", { body: Stmt, condition: Expr }],
+  [
+    "Try",
+    {
+      try_block: Block,
+      catch_pattern: Option(Pattern),
+      catch_block: Option(Block),
+      finally_block: Option(Block),
+    },
+  ],
+  [
+    "For",
+    { init: ForInit, test: Option(Expr), update: Option(Expr), body: Stmt },
+  ],
+  [
+    "ForInOrOf",
+    {
+      decl_type: Option(DeclType), // None for `for (x of y) {}`
+      lhs: Pattern,
+      in_or_of: InOrOf,
+      rhs: Expr,
+      body: Stmt,
+    },
+  ],
+  ["Break", { label: Option(Label) }],
+  ["Continue", { label: Option(Label) }],
+  "Debugger",
+  ["With", { expr: Expr, body: Stmt }],
+  ["FunctionDecl", { func: Function }],
+  ["ClassDecl", { class: Class }],
+  "Empty",
 );
 
 const DExpr = Enum(
   Expr,
   ["span", "visit"],
-  ["Var", Ident],
-  ["BinOp", Expr, BinOp, Expr],
-  ["ArrowFn", ParamList, ArrowFnBody],
-  ["Function", Function],
-  ["Call", Expr, Array(Expr)],
-  ["Index", Expr, Expr],
-  ["Prop", Expr, Ident],
-  ["String", Text],
-  ["Number", Text],
-  ["Boolean", "bool"],
+  ["Var", { ident: Ident }],
+  ["BinOp", { lhs: Expr, operator: BinOp, rhs: Expr }],
+  ["ArrowFn", { params: ParamList, body: ArrowFnBody }],
+  ["Function", { func: Function }],
+  ["Call", { callee: Expr, args: Array(Expr) }],
+  ["Index", { lhs: Expr, property: Expr }],
+  ["Prop", { lhs: Expr, property: Ident }],
+  ["String", { text: Text }],
+  ["Number", { text: Text }],
+  ["Boolean", { value: "boolean" }],
   ["Null"],
   ["Undefined"],
-  ["Object", Array(ObjectLiteralEntry)],
-  ["Throw", { tags: ["span"] }, Expr],
-  ["PostIncrement", { tags: ["span"] }, Expr],
-  ["PostDecrement", { tags: ["span"] }, Expr],
-  ["PreIncrement", { tags: ["span"] }, Expr],
-  ["PreDecrement", { tags: ["span"] }, Expr],
-  ["Array", Array(ArrayLiteralMember)],
-  ["New", { tags: ["span"] }, Expr],
-  ["Yield", Option(Expr)],
-  ["YieldFrom", { tags: ["span"] }, Expr],
-  ["Ternary", Expr, Expr, Expr],
-  ["Assign", Pattern, AssignOp, Expr],
-  ["Regex", "Text"],
+  ["Object", { entries: Array(ObjectLiteralEntry) }],
+  ["Throw", { tags: ["span"] }, { value: Expr }],
+  ["PostIncrement", { tags: ["span"] }, { value: Expr }],
+  ["PostDecrement", { tags: ["span"] }, { value: Expr }],
+  ["PreIncrement", { tags: ["span"] }, { value: Expr }],
+  ["PreDecrement", { tags: ["span"] }, { value: Expr }],
+  ["Array", { items: Array(ArrayLiteralMember) }],
+  ["New", { tags: ["span"] }, { expr: Expr }],
+  ["Yield", { value: Option(Expr) }],
+  ["YieldFrom", { tags: ["span"] }, { expr: Expr }],
+  ["Ternary", { condition: Expr, if_true: Expr, if_false: Expr }],
+  ["Assign", { pattern: Pattern, operator: AssignOp, value: Expr }],
+  ["Regex", { text: "Text" }],
   // Unary operators
-  ["Delete", { tags: ["span"] }, Expr],
-  ["Void", { tags: ["span"] }, Expr],
-  ["TypeOf", { tags: ["span"] }, Expr],
-  ["UnaryPlus", { tags: ["span"] }, Expr],
-  ["UnaryMinus", { tags: ["span"] }, Expr],
-  ["BitNot", { tags: ["span"] }, Expr],
-  ["Not", { tags: ["span"] }, Expr],
-  ["Await", { tags: ["span"] }, Expr],
-  ["Comma", Array(Expr)],
+  ["Delete", { tags: ["span"] }, { expr: Expr }],
+  ["Void", { tags: ["span"] }, { expr: Expr }],
+  ["TypeOf", { tags: ["span"] }, { expr: Expr }],
+  ["UnaryPlus", { tags: ["span"] }, { expr: Expr }],
+  ["UnaryMinus", { tags: ["span"] }, { expr: Expr }],
+  ["BitNot", { tags: ["span"] }, { expr: Expr }],
+  ["Not", { tags: ["span"] }, { expr: Expr }],
+  ["Await", { tags: ["span"] }, { expr: Expr }],
+  ["Comma", { items: Array(Expr) }],
 
   ["Super"],
-  ["Class", "Class"],
-  ["TemplateLiteral", Array(TemplateLiteralFragment)],
+  ["Class", { class: "Class" }],
+  ["TemplateLiteral", { fragments: Array(TemplateLiteralFragment) }],
 );
 const DClass = Struct(
   Class,
@@ -236,16 +247,12 @@ const DClass = Struct(
   ["superclass", Option(Expr)],
   ["body", ClassBody],
 );
-const DClassBody = Struct(
-  ClassBody,
-  ["span"],
-  ["members", Array(ClassMember)],
-);
+const DClassBody = Struct(ClassBody, ["span"], ["members", Array(ClassMember)]);
 const DClassMember = Enum(
   ClassMember,
   [],
-  ["MethodDef", MethodDef],
-  ["FieldDef", FieldDef],
+  ["MethodDef", { method: MethodDef }],
+  ["FieldDef", { field: FieldDef }],
 );
 const DFieldDef = Struct(
   "FieldDef",
@@ -263,66 +270,61 @@ const DMethodDef = Struct(
 
 const DObjectKey = Enum(
   ObjectKey,
-  ["span", ],
-  [Ident, Ident],
-  ["String", Text],
-  ["Computed", Expr],
+  ["span"],
+  [Ident, { ident: Ident }],
+  ["String", { text: Text }],
+  ["Computed", { expr: Expr }],
 );
 
 const DObjectLiteralEntry = Enum(
   ObjectLiteralEntry,
-  ["span", ],
-  [Ident, Ident],
-  ["Prop", ObjectKey, Expr],
-  ["Method", MethodDef],
-  ["Spread", Expr],
+  ["span"],
+  [Ident, { ident: Ident }],
+  ["Prop", { key: ObjectKey, value: Expr }],
+  ["Method", { method: MethodDef }],
+  ["Spread", { expr: Expr }],
 );
 
-const DParamList = Struct(ParamList, ["span", ], ["params", Array(Param)]);
+const DParamList = Struct(ParamList, ["span"], ["params", Array(Param)]);
 
-const DParam = Struct(Param, ["span", ], ["pattern", Pattern]);
+const DParam = Struct(Param, ["span"], ["pattern", Pattern]);
 
 const DArrayLiteralMember = Enum(
   ArrayLiteralMember,
-  ["span", ],
-  ["Expr", Expr],
+  ["span"],
+  ["Expr", { expr: Expr }],
   "Elision",
-  ["Spread", Expr],
+  ["Spread", { expr: Expr }],
 );
 
 const DFunction = Struct(
   Function,
-  ["span", ],
+  ["span"],
   ["name", Option(Ident)],
   ["params", ParamList],
   ["body", Block],
-  ["is_generator", "bool"],
-  ["is_async", "bool"],
+  ["is_generator", "boolean"],
+  ["is_async", "boolean"],
 );
-const DBlock = Struct(Block, ["span", ], ["stmts", Array(Stmt)]);
-const DText = Struct(Text, ["span", ], ["text", "str"]);
-const DLabel = Struct(Label, ["span", ], ["name", "str"]);
+const DBlock = Struct(Block, ["span"], ["stmts", Array(Stmt)]);
+const DText = Struct(Text, ["span"], ["text", "str"]);
+const DLabel = Struct(Label, ["span"], ["name", "str"]);
 
-const DSourceFile = Struct(SourceFile, ["span", "visit"], ["stmts", Array(Stmt)]);
+const DSourceFile = Struct(
+  SourceFile,
+  ["span", "visit"],
+  ["stmts", Array(Stmt)],
+);
 const DSwitchCase = Struct(
   SwitchCase,
-  ["span", ],
+  ["span"],
   ["test", Option(Expr)],
   ["body", Array(Stmt)],
-);
-const DForInOrOf = Struct(
-  ForInOrOf,
-  ["span", ],
-  ["decl_type", Option(DeclType)], // None for `for (x of y) {}`
-  ["lhs", Pattern],
-  ["in_or_of", InOrOf],
-  ["rhs", Expr],
-  ["body", Stmt],
 );
 const DInOrOf = Enum(InOrOf, [], "In", "Of");
 const DVarDecl = Struct(
   VarDecl,
-  ["span", ],
+  ["span"],
   ["decl_type", DeclType],
   ["declarators", Array(VarDeclarator)],
 );
@@ -332,44 +334,28 @@ const DVarDeclarator = Struct(
   ["pattern", Pattern],
   ["init", Option(Expr)],
 );
-const DFor = Struct(
-  For,
-  ["span", ],
-  ["init", ForInit],
-  ["test", Option(Expr)],
-  ["update", Option(Expr)],
-  ["body", Stmt],
-);
-const DForInit = Enum(ForInit, [], ["VarDecl", VarDecl], [Expr, Expr]);
-const DTryStmt = Struct(
-  TryStmt,
-  ["span", ],
-  ["try_block", Block],
-  ["catch_pattern", Option(Pattern)],
-  ["catch_block", Option(Block)],
-  ["finally_block", Option(Block)],
+const DForInit = Enum(
+  ForInit,
+  [],
+  ["VarDecl", { decl: VarDecl }],
+  [Expr, { expr: Expr }],
 );
 const DArrowFnBody = Enum(
   ArrowFnBody,
-  ["span", ],
-  [Expr, Expr],
-  ["Block", Block],
+  ["span"],
+  [Expr, { expr: Expr }],
+  ["Block", { block: Block }],
 );
 const DTemplateLiteralFragment = Enum(
   TemplateLiteralFragment,
-  ["span", ],
-  ["Text", Text],
-  ["Expr", Expr],
+  ["span"],
+  ["Text", { text: Text }],
+  ["Expr", { expr: Expr }],
 );
-const DObjectPattern = Struct(
-  ObjectPattern,
-  ["span", ],
-  ["properties", Array("ObjectPatternProperty")],
-  ["rest", Option(Pattern)],
-);
+const DObjectPattern = Struct(ObjectPattern, ["span"]);
 const DObjectPatternProperty = Struct(
   ObjectPatternProperty,
-  ["span", ],
+  ["span"],
   ["key", ObjectKey],
   ["value", Pattern],
 );
@@ -441,13 +427,10 @@ const ast_items = [
   DPattern,
   DLabel,
   DSwitchCase,
-  DForInOrOf,
   DInOrOf,
   DVarDecl,
   DVarDeclarator,
-  DFor,
   DForInit,
-  DTryStmt,
   DExpr,
   DObjectLiteralEntry,
   DObjectKey,
@@ -468,7 +451,7 @@ const ast_items = [
 /**
  * @param {string} name
  * @param {Tag[]} tags
- * @param {...([string, ...Type[]] | ([string, { tags: Tag[] }, ...Type[]]) | string)} variants
+ * @param {...([string, Record<string, Type>] | ([string, { tags: Tag[] }, Record<string, Type>]) | [string] | string)} variants
  * @returns {EnumItem}
  */
 function Enum(name, tags, ...variants) {
@@ -482,17 +465,18 @@ function Enum(name, tags, ...variants) {
        */
       (variant) => {
         if (typeof variant === "string") {
-          return { name: variant, args: [], tags: [] };
-        } else if (typeof variant[1] === "object" && "tags" in variant[1]) {
+          return { name: variant, args: {}, tags: [] };
+        } else if (variant.length === 2) {
+          const name = variant[0];
           return {
-            name: variant[0],
-            tags: variant[1].tags,
-            // @ts-ignore - TS doesn't understand that the previous check guarantees this
-            args: variant.slice(2),
+            name,
+            tags: [],
+            args: variant[1],
           };
+        } else if (variant.length === 3) {
+          return { name: variant[0], args: variant[2], tags: variant[1].tags };
         } else {
-          // @ts-ignore - TS doesn't understand that the previous check guarantees this
-          return { name: variant[0], args: variant.slice(1), tags: [] };
+          return { name: variant[0], args: {}, tags: [] };
         }
       },
     ),
@@ -565,8 +549,8 @@ function needs_lifetime_param_set() {
       case "enum":
         return item.variants.some(
           (variant) =>
-            variant.args.length > 0 &&
-            variant.args.some(type_contains_ident_or_text),
+            Object.keys(variant.args).length > 0 &&
+            Object.values(variant.args).some(type_contains_ident_or_text),
         );
     }
   }

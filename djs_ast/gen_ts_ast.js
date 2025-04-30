@@ -1,42 +1,45 @@
 /// <reference path="./index.d.ts" />
-import { ast_items } from "./src/ast.def.js"
+import { ast_items } from "./src/ast.def.js";
 
-let output = ''
+let output = `
+// This file is generated automatically
+// DO NOT EDIT
+// node djs_ast/gen_ts_ast.js | pnpm prettier > src/ast.gen.ts
+
+import type { Span } from "./Span.js";
+`;
 for (const item of ast_items) {
   if (item.kind === "struct") {
-    output += gen_struct(item);
+    output += gen_struct(item) + "\n";
   } else {
-    output += gen_enum(item);
+    output += gen_enum(item) + "\n";
   }
 }
 console.log(output);
 
-
 /**
-  * @param {StructItem} item
-  */
+ * @param {StructItem} item
+ */
 function gen_struct(item) {
-  const span = item.tags.includes("span")
-    ? `readonly span: Span`
-    : ``;
+  const span = item.tags.includes("span") ? `readonly span: Span` : ``;
   return `
-    interface ${item.name} {
+    export interface ${item.name} {
       ${span}
       ${item.fields.map(([name, ty]) => `readonly ${name}: ${gen_type(ty)};`).join("\n")}
     }
-  `
+  `;
 }
 
 /**
-  * @param {Type} ty
-  * @returns {string}
-  */
+ * @param {Type} ty
+ * @returns {string}
+ */
 function gen_type(ty) {
   if (typeof ty === "string") {
     if (ty === "str") {
       return "string";
     }
-    return ty
+    return ty;
   } else {
     if (ty.length !== 2) {
       throw new Error(`Invalid type: ${ty}`);
@@ -47,34 +50,36 @@ function gen_type(ty) {
         return `readonly ${gen_type(arg)}[]`;
       case "Option":
         return `${gen_type(arg)} | null`;
-      case "Box":
-        return gen_type(arg);
     }
   }
 }
 
 /**
-  * @param {EnumItem} item
-  * @returns {string}
-  */
+ * @param {EnumItem} item
+ * @returns {string}
+ */
 function gen_enum(item) {
-  if (item.variants.some(v => v.args.length > 0)) {
+  if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
     const variants = item.variants.map(gen_variant).join(" | ");
-    return `type ${item.name} = ${variants};`
+    return `export type ${item.name} = ${variants};`;
   } else {
-    const variants = item.variants.map(v => v.name).map(JSON.stringify).join(" | ");
-    return `type ${item.name} = ${variants};`
+    const variants = item.variants
+      .map((v) => v.name)
+      .map((name) => JSON.stringify(name))
+      .join(" | ");
+    return `export type ${item.name} = ${variants};`;
   }
 
-
   /**
-    * @param {EnumVariant} variant
-    * @returns {string}
-    */
+   * @param {EnumVariant} variant
+   * @returns {string}
+   */
   function gen_variant(variant) {
-      return `{
+    return `{
         readonly kind: "${variant.name}",
-        readonly args: [${variant.args.map(gen_type).join(", ")}]
-      }`
+        ${Object.entries(variant.args)
+          .map(([name, type]) => "readonly " + name + ": " + gen_type(type))
+          .join(", ")}
+      }`;
   }
 }
