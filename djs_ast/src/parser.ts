@@ -1,3 +1,4 @@
+import assert from "node:assert"
 import { ArrayLiteralMember, Expr, Ident, SourceFile, Stmt } from "./ast.gen.js"
 import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
@@ -162,6 +163,104 @@ function parser_impl(_lexer: Lexer): Parser {
       )
     }
   }
+  function parse_stmt(): Stmt {
+    switch (current_token.kind) {
+      // case t.Let:
+      // case t.Const:
+      // case t.Var: {
+      //   const decl = parse_var_decl()
+      //   return Stmt.VarDecl(decl)
+      // }
+      // case t.If:
+      //   return parse_if_stmt()
+      // case t.Switch:
+      //   return parse_switch_stmt()
+      // case t.While:
+      //   return parse_while_stmt()
+      // case t.Do:
+      //   return parse_do_while_stmt()
+      // case t.Try:
+      //   return parse_try_stmt()
+      // case t.Return:
+      //   return parse_return_stmt()
+      case t.Semi: {
+        const tok = advance()
+        return Stmt.Empty(tok.span)
+      }
+      // case t.LBrace:
+      //   return Stmt.Block(parse_block())
+      // case t.For: {
+      //   let for_stmt_snapshot = clone()
+      //   try {
+      //     const stmt = for_stmt_snapshot.parse_for_stmt()
+      //     commit(for_stmt_snapshot)
+      //     return stmt
+      //   } catch {
+      //     return parse_for_in_of_stmt()
+      //   }
+      // }
+      case t.Break: {
+        const span = advance().span
+        expect_semi()
+        return Stmt.Break(span, null)
+      }
+      case t.Continue: {
+        const span = advance().span
+        expect_semi()
+        return Stmt.Continue(span, null)
+      }
+      case t.Debugger: {
+        const span = advance().span
+        expect_semi()
+        return Stmt.Debugger(span)
+      }
+      case t.With: {
+        const start = advance()
+        expect(t.LParen)
+        const obj = parse_expr()
+        expect(t.RParen)
+        const body = parse_stmt()
+        return Stmt.With(Span.between(start.span, body.span), obj, body)
+      }
+      // case t.Function: {
+      //   const f = parse_function()
+      //   return Stmt.FunctionDecl(f)
+      // }
+      // case t.Class: {
+      //   const c = parse_class()
+      //   return Stmt.ClassDecl(c)
+      // }
+      // case t.Async: {
+      //   if (next_is(t.Function)) {
+      //     advance()
+      //     const f = parse_function()
+      //     return Stmt.FunctionDecl(f)
+      //   } else {
+      //     return unexpected_token()
+      //   }
+      // }
+      default:
+        return parse_expr_stmt()
+    }
+  }
+  function parse_expr_stmt(): Stmt {
+    const expr = parse_expr()
+    expect_semi()
+    return Stmt.Expr(expr.span, expr)
+  }
+  function expect_semi(): void {
+    if (current_kind() === t.Semi) {
+      advance()
+      return
+    }
+    if (at(t.RBrace) || at(t.EndOfFile)) {
+      return
+    }
+    if (current_token.line !== last_token?.line) {
+      return
+    }
+    assert(false, "Missing semicolon")
+  }
 
   function parse_source_file(): SourceFile {
     const stmts: Stmt[] = []
@@ -173,12 +272,6 @@ function parser_impl(_lexer: Lexer): Parser {
       }
     }
     return { span, stmts }
-  }
-  function parse_stmt(): Stmt {
-    switch (current_kind()) {
-      default:
-        throw new Error(`Unexpected token: ${current_kind()}`)
-    }
   }
 
   function at(token_kind: TokenKind): boolean {
