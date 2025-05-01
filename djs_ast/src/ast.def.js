@@ -143,102 +143,94 @@ const SourceFile = "SourceFile";
 const DPattern = Enum(
   Pattern,
   ["span", "visit"],
-  ["Var", { ident: Ident }],
-  ["Assignment", { pattern: Pattern, initializer: Expr }],
-  ["Array", { items: Array(Pattern) }],
-  [
-    "Object",
-    { properties: Array("ObjectPatternProperty"), rest: Option(Pattern) },
-  ],
-  ["Prop", { expr: Expr, key: ObjectKey }],
-  "Elision",
-  ["Rest", { pattern: Pattern }],
+  {
+    Var: { ident: Ident },
+    Assignment: { pattern: Pattern, initializer: Expr },
+    Array: { items: Array(Pattern) },
+    Object: { properties: Array("ObjectPatternProperty"), rest: Option(Pattern) },
+    Prop: { expr: Expr, key: ObjectKey },
+    Elision: {},
+    Rest: { pattern: Pattern },
+  }
 );
 const DStmt = Enum(
   Stmt,
   ["span", "visit"],
-  [Expr, { expr: Expr }],
-  ["Block", { block: Block }],
-  ["Return", { value: Option(Expr) }],
-  ["VarDecl", { decl: VarDecl }],
-  ["If", { condition: Expr, if_true: Stmt, if_false: Option(Stmt) }],
-  ["Switch", { condition: Expr, cases: Array(SwitchCase) }],
-  ["While", { condition: Expr, body: Stmt }],
-  ["DoWhile", { body: Stmt, condition: Expr }],
-  [
-    "Try",
-    {
+  {
+    Expr: { expr: Expr },
+    Block: { block: Block },
+    Return: { value: Option(Expr) },
+    VarDecl: { decl: VarDecl },
+    If: { condition: Expr, if_true: Stmt, if_false: Option(Stmt) },
+    Switch: { condition: Expr, cases: Array(SwitchCase) },
+    While: { condition: Expr, body: Stmt },
+    DoWhile: { body: Stmt, condition: Expr },
+    Try: {
       try_block: Block,
       catch_pattern: Option(Pattern),
       catch_block: Option(Block),
       finally_block: Option(Block),
     },
-  ],
-  [
-    "For",
-    { init: ForInit, test: Option(Expr), update: Option(Expr), body: Stmt },
-  ],
-  [
-    "ForInOrOf",
-    {
+    For: { init: ForInit, test: Option(Expr), update: Option(Expr), body: Stmt },
+    ForInOrOf: {
       decl_type: Option(DeclType), // None for `for (x of y) {}`
       lhs: Pattern,
       in_or_of: InOrOf,
       rhs: Expr,
       body: Stmt,
     },
-  ],
-  ["Break", { label: Option(Label) }],
-  ["Continue", { label: Option(Label) }],
-  "Debugger",
-  ["With", { expr: Expr, body: Stmt }],
-  ["FunctionDecl", { func: Function }],
-  ["ClassDecl", { class: Class }],
-  "Empty",
+    Break: { label: Option(Label) },
+    Continue: { label: Option(Label) },
+    Debugger: {},
+    With: { expr: Expr, body: Stmt },
+    FunctionDecl: { func: Function },
+    ClassDecl: { class: Class },
+    Empty: {},
+  }
 );
 
 const DExpr = Enum(
   Expr,
   ["span", "visit"],
-  ["Var", { ident: Ident }],
-  ["BinOp", { lhs: Expr, operator: BinOp, rhs: Expr }],
-  ["ArrowFn", { params: ParamList, body: ArrowFnBody }],
-  ["Function", { func: Function }],
-  ["Call", { callee: Expr, args: Array(Expr) }],
-  ["Index", { lhs: Expr, property: Expr }],
-  ["Prop", { lhs: Expr, property: Ident }],
-  ["String", { text: Text }],
-  ["Number", { text: Text }],
-  ["Boolean", { value: "boolean" }],
-  ["Null"],
-  ["Undefined"],
-  ["Object", { entries: Array(ObjectLiteralEntry) }],
-  ["Throw", { tags: ["span"] }, { value: Expr }],
-  ["PostIncrement", { tags: ["span"] }, { value: Expr }],
-  ["PostDecrement", { tags: ["span"] }, { value: Expr }],
-  ["PreIncrement", { tags: ["span"] }, { value: Expr }],
-  ["PreDecrement", { tags: ["span"] }, { value: Expr }],
-  ["Array", { items: Array(ArrayLiteralMember) }],
-  ["New", { tags: ["span"] }, { expr: Expr }],
-  ["Yield", { value: Option(Expr) }],
-  ["YieldFrom", { tags: ["span"] }, { expr: Expr }],
-  ["Ternary", { condition: Expr, if_true: Expr, if_false: Expr }],
-  ["Assign", { pattern: Pattern, operator: AssignOp, value: Expr }],
-  ["Regex", { text: "Text" }],
-  // Unary operators
-  ["Delete", { tags: ["span"] }, { expr: Expr }],
-  ["Void", { tags: ["span"] }, { expr: Expr }],
-  ["TypeOf", { tags: ["span"] }, { expr: Expr }],
-  ["UnaryPlus", { tags: ["span"] }, { expr: Expr }],
-  ["UnaryMinus", { tags: ["span"] }, { expr: Expr }],
-  ["BitNot", { tags: ["span"] }, { expr: Expr }],
-  ["Not", { tags: ["span"] }, { expr: Expr }],
-  ["Await", { tags: ["span"] }, { expr: Expr }],
-  ["Comma", { items: Array(Expr) }],
-
-  ["Super"],
-  ["Class", { class: "Class" }],
-  ["TemplateLiteral", { fragments: Array(TemplateLiteralFragment) }],
+  {
+    Var: { ident: Ident },
+    BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
+    ArrowFn: { params: ParamList, body: ArrowFnBody },
+    Function: { func: Function },
+    Call: { callee: Expr, args: Array(Expr) },
+    Index: { lhs: Expr, property: Expr },
+    Prop: { lhs: Expr, property: Ident },
+    String: { text: Text },
+    Number: { text: Text },
+    Boolean: { value: "boolean" },
+    Null: {},
+    Undefined: {},
+    Object: { entries: Array(ObjectLiteralEntry) },
+    Throw: { value: Expr },
+    PostIncrement: { value: Expr },
+    PostDecrement: { value: Expr },
+    PreIncrement: { value: Expr },
+    PreDecrement: { value: Expr },
+    Array: { items: Array(ArrayLiteralMember) },
+    New: { expr: Expr },
+    Yield: { value: Option(Expr) },
+    YieldFrom: { expr: Expr },
+    Ternary: { condition: Expr, if_true: Expr, if_false: Expr },
+    Assign: { pattern: Pattern, operator: AssignOp, value: Expr },
+    Regex: { text: "Text" },
+    Delete: { expr: Expr },
+    Void: { expr: Expr },
+    TypeOf: { expr: Expr },
+    UnaryPlus: { expr: Expr },
+    UnaryMinus: { expr: Expr },
+    BitNot: { expr: Expr },
+    Not: { expr: Expr },
+    Await: { expr: Expr },
+    Comma: { items: Array(Expr) },
+    Super: {},
+    Class: { class: "Class" },
+    TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
+  }
 );
 const DClass = Struct(
   Class,
@@ -251,8 +243,10 @@ const DClassBody = Struct(ClassBody, ["span"], ["members", Array(ClassMember)]);
 const DClassMember = Enum(
   ClassMember,
   [],
-  ["MethodDef", { method: MethodDef }],
-  ["FieldDef", { field: FieldDef }],
+  {
+    MethodDef: { method: MethodDef },
+    FieldDef: { field: FieldDef },
+  }
 );
 const DFieldDef = Struct(
   "FieldDef",
@@ -271,18 +265,22 @@ const DMethodDef = Struct(
 const DObjectKey = Enum(
   ObjectKey,
   ["span"],
-  [Ident, { ident: Ident }],
-  ["String", { text: Text }],
-  ["Computed", { expr: Expr }],
+  {
+    Ident: { ident: Ident },
+    String: { text: Text },
+    Computed: { expr: Expr },
+  }
 );
 
 const DObjectLiteralEntry = Enum(
   ObjectLiteralEntry,
   ["span"],
-  [Ident, { ident: Ident }],
-  ["Prop", { key: ObjectKey, value: Expr }],
-  ["Method", { method: MethodDef }],
-  ["Spread", { expr: Expr }],
+  {
+    Ident: { ident: Ident },
+    Prop: { key: ObjectKey, value: Expr },
+    Method: { method: MethodDef },
+    Spread: { expr: Expr },
+  }
 );
 
 const DParamList = Struct(ParamList, ["span"], ["params", Array(Param)]);
@@ -292,9 +290,11 @@ const DParam = Struct(Param, ["span"], ["pattern", Pattern]);
 const DArrayLiteralMember = Enum(
   ArrayLiteralMember,
   ["span"],
-  ["Expr", { expr: Expr }],
-  "Elision",
-  ["Spread", { expr: Expr }],
+  {
+    Expr: { expr: Expr },
+    Elision: {},
+    Spread: { expr: Expr },
+  }
 );
 
 const DFunction = Struct(
@@ -321,7 +321,7 @@ const DSwitchCase = Struct(
   ["test", Option(Expr)],
   ["body", Array(Stmt)],
 );
-const DInOrOf = Enum(InOrOf, [], "In", "Of");
+const DInOrOf = StringUnion(InOrOf, "In", "Of");
 const DVarDecl = Struct(
   VarDecl,
   ["span"],
@@ -337,20 +337,26 @@ const DVarDeclarator = Struct(
 const DForInit = Enum(
   ForInit,
   [],
-  ["VarDecl", { decl: VarDecl }],
-  [Expr, { expr: Expr }],
+  {
+    VarDecl: { decl: VarDecl },
+    Expr: { expr: Expr },
+  }
 );
 const DArrowFnBody = Enum(
   ArrowFnBody,
   ["span"],
-  [Expr, { expr: Expr }],
-  ["Block", { block: Block }],
+  {
+    Expr: { expr: Expr },
+    Block: { block: Block },
+  }
 );
 const DTemplateLiteralFragment = Enum(
   TemplateLiteralFragment,
   ["span"],
-  ["Text", { text: Text }],
-  ["Expr", { expr: Expr }],
+  {
+    Text: { text: Text },
+    Expr: { expr: Expr },
+  }
 );
 const DObjectPattern = Struct(ObjectPattern, ["span"]);
 const DObjectPatternProperty = Struct(
@@ -359,9 +365,8 @@ const DObjectPatternProperty = Struct(
   ["key", ObjectKey],
   ["value", Pattern],
 );
-const DBinOp = Enum(
+const DBinOp = StringUnion(
   BinOp,
-  [],
   // Arithmetic
   "Add",
   "Sub",
@@ -393,9 +398,8 @@ const DBinOp = Enum(
   "RightShift",
   "UnsignedRightShift",
 );
-const DAssignOp = Enum(
+const DAssignOp = StringUnion(
   AssignOp,
-  [],
   "Eq",
   "MulEq",
   "DivEq",
@@ -410,8 +414,8 @@ const DAssignOp = Enum(
   "BitOrEq",
   "ExponentEq",
 );
-const DDeclType = Enum(DeclType, [], "Let", "Const", "Var");
-const DAccessorType = Enum(AccessorType, [], "Get", "Set");
+const DDeclType = StringUnion(DeclType,  "Let", "Const", "Var");
+const DAccessorType = StringUnion(AccessorType, "Get", "Set");
 
 const ast_items = [
   DSourceFile,
@@ -449,35 +453,46 @@ const ast_items = [
 ];
 
 /**
+ *
  * @param {string} name
- * @param {Tag[]} tags
- * @param {...([string, Record<string, Type>] | ([string, { tags: Tag[] }, Record<string, Type>]) | [string] | string)} variants
+ * @param  {...string} variants
  * @returns {EnumItem}
  */
-function Enum(name, tags, ...variants) {
+function StringUnion(name, ...variants) {
+  return {
+    kind: "enum",
+    name,
+    tags: [],
+    variants: variants.map((variant) => ({
+      name: variant,
+      args: {},
+      tags: [],
+    })),
+
+  }
+}
+
+/**
+ * @param {string} name
+ * @param {Tag[]} tags
+ * @param {Record<string, Record<string, Type>>} variants
+ * @returns {EnumItem}
+ */
+function Enum(name, tags, variants) {
   return {
     kind: "enum",
     name,
     tags,
-    variants: variants.map(
+    variants: Object.entries(variants).map(
       /**
        * @returns {EnumVariant}
        */
-      (variant) => {
-        if (typeof variant === "string") {
-          return { name: variant, args: {}, tags: [] };
-        } else if (variant.length === 2) {
-          const name = variant[0];
+      ([name, args]) => {
           return {
             name,
             tags: [],
-            args: variant[1],
+            args,
           };
-        } else if (variant.length === 3) {
-          return { name: variant[0], args: variant[2], tags: variant[1].tags };
-        } else {
-          return { name: variant[0], args: {}, tags: [] };
-        }
       },
     ),
   };
