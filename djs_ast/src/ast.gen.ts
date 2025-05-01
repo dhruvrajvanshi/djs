@@ -12,6 +12,12 @@ type Text = string
 export interface SourceFile {
   readonly span: Span
   readonly stmts: readonly Stmt[]
+  readonly errors: readonly ParseError[]
+}
+
+export interface ParseError {
+  readonly span: Span
+  readonly message: string
 }
 
 export type Stmt =

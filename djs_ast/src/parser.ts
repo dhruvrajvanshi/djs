@@ -1,5 +1,12 @@
-import assert from "node:assert"
-import { ArrayLiteralMember, Expr, Ident, SourceFile, Stmt } from "./ast.gen.js"
+import assert, { AssertionError } from "node:assert"
+import {
+  ArrayLiteralMember,
+  Expr,
+  Ident,
+  ParseError,
+  SourceFile,
+  Stmt,
+} from "./ast.gen.js"
 import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
@@ -18,6 +25,7 @@ function parser_impl(_lexer: Lexer): Parser {
   let lexer = _lexer
   let last_token: Token | null = null
   let current_token = lexer.next()
+  let errors: ParseError[] = []
   return { parse_source_file, parse_expr }
 
   function parse_expr(): Expr {
@@ -86,7 +94,7 @@ function parser_impl(_lexer: Lexer): Parser {
         return Expr.Throw(Span.between(start, expr.span), expr)
       }
       case t.LSquare:
-        parse_array_literal()
+        return parse_array_literal()
       // case t.Slash: {
       //   re_lex_regex()
       //   const tok = expect(t.Regex)
@@ -105,9 +113,9 @@ function parser_impl(_lexer: Lexer): Parser {
     }
   }
   function parse_paren_expr(): Expr {
-    expect(t.LParen)
+    expect_or_throw(t.LParen)
     const expr = parse_expr()
-    expect(t.RParen)
+    expect_or_throw(t.RParen)
     return expr
   }
 
@@ -139,7 +147,7 @@ function parser_impl(_lexer: Lexer): Parser {
           ArrayLiteralMember.Spread(Span.between(start, expr), expr),
         )
         if (at(t.RSquare)) break
-        expect(t.Comma)
+        expect_or_throw(t.Comma)
       } else if (current_token.kind === t.Comma) {
         const span = advance().span
         elements.push(ArrayLiteralMember.Elision(span))
@@ -147,20 +155,21 @@ function parser_impl(_lexer: Lexer): Parser {
         const e = parse_assignment_expr()
         elements.push(ArrayLiteralMember.Expr(e.span, e))
         if (at(t.RSquare)) break
-        expect(t.Comma)
+        expect_or_throw(t.Comma)
       }
     }
-    const end = expect(t.RSquare)
+    const end = expect_or_throw(t.RSquare)
     return Expr.Array(Span.between(start.span, end.span), elements)
   }
 
-  function expect(token_kind: TokenKind): Token {
+  function expect_or_throw(token_kind: TokenKind): Token {
     if (current_token.kind === token_kind) {
       return advance()
     } else {
-      throw new Error(
-        `Expected ${token_kind}, got ${current_token.kind} at ${current_token.span.start}`,
-      )
+      throw new AssertionError({
+        message: `Expected ${token_kind}, got ${current_token.kind} at ${current_token.span.start}`,
+        stackStartFn: expect_or_throw,
+      })
     }
   }
   function parse_stmt(): Stmt {
@@ -171,8 +180,8 @@ function parser_impl(_lexer: Lexer): Parser {
       //   const decl = parse_var_decl()
       //   return Stmt.VarDecl(decl)
       // }
-      // case t.If:
-      //   return parse_if_stmt()
+      case t.If:
+        return parse_if_stmt()
       // case t.Switch:
       //   return parse_switch_stmt()
       // case t.While:
@@ -216,9 +225,9 @@ function parser_impl(_lexer: Lexer): Parser {
       }
       case t.With: {
         const start = advance()
-        expect(t.LParen)
+        expect_or_error(t.LParen, "Expected a (")
         const obj = parse_expr()
-        expect(t.RParen)
+        expect_or_error(t.RParen, "Expected a )")
         const body = parse_stmt()
         return Stmt.With(Span.between(start.span, body.span), obj, body)
       }
@@ -243,6 +252,40 @@ function parser_impl(_lexer: Lexer): Parser {
         return parse_expr_stmt()
     }
   }
+
+  function emit_error(message: string): void {
+    errors.push({
+      message,
+      span: current_token.span,
+    })
+  }
+
+  function expect_or_error(kind: TokenKind, message: string): void {
+    if (at(kind)) {
+      advance()
+    } else {
+      emit_error(message)
+    }
+  }
+
+  function parse_if_stmt(): Stmt {
+    const start = expect_or_throw(t.If).span
+    expect_or_error(t.LParen, `Expected a '('`)
+
+    const cond = parse_expr()
+    expect_or_error(t.RParen, `Expected a ')'`)
+
+    const then_branch = parse_stmt()
+    const else_branch =
+      current_token.kind === t.Else ? (advance(), parse_stmt()) : null
+
+    return Stmt.If(
+      Span.between(start, else_branch ? else_branch.span : then_branch.span),
+      cond,
+      then_branch,
+      else_branch,
+    )
+  }
   function parse_expr_stmt(): Stmt {
     const expr = parse_expr()
     expect_semi()
@@ -259,7 +302,7 @@ function parser_impl(_lexer: Lexer): Parser {
     if (current_token.line !== last_token?.line) {
       return
     }
-    assert(false, "Missing semicolon")
+    emit_error("Missing semicolon")
   }
 
   function parse_source_file(): SourceFile {
@@ -271,7 +314,7 @@ function parser_impl(_lexer: Lexer): Parser {
         stmts.push(stmt)
       }
     }
-    return { span, stmts }
+    return { span, stmts, errors }
   }
 
   function at(token_kind: TokenKind): boolean {

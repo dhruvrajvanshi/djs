@@ -130,10 +130,6 @@ const ForInit = "ForInit"
  * {@link DArrayLiteralMember}
  */
 const ArrayLiteralMember = "ArrayLiteralMember"
-/**
- * {@link DSourceFile}
- */
-const SourceFile = "SourceFile"
 
 const DPattern = Enum(Pattern, ["span", "visit"], {
   Var: { ident: Ident },
@@ -279,8 +275,13 @@ const DLabel = Struct("Label", ["span"], {
   name: "str",
 })
 
+const DParseError = Struct("ParseError", ["span"], {
+  message: "str",
+})
+
 const DSourceFile = Struct("SourceFile", ["span", "visit"], {
   stmts: Array(Stmt),
+  errors: Array("ParseError"),
 })
 const DSwitchCase = Struct("SwitchCase", ["span"], {
   test: Option(Expr),
@@ -365,6 +366,7 @@ const DAccessorType = StringUnion(AccessorType, "Get", "Set")
 
 const ast_items = [
   DSourceFile,
+  DParseError,
   DStmt,
   DClass,
   DBlock,
