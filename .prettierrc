@@ -3,5 +3,6 @@
   "endOfLine": "lf",
   "tabWidth": 2,
   "trailingComma": "all",
-  "parser": "typescript"
+  "parser": "typescript",
+  "semi": false
 }
