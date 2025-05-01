@@ -10,7 +10,9 @@ export {
   type BinOp,
   type AssignOp,
 } from "./ast.gen.js"
-
+const COLOR_ERROR = "\x1b[31;1m"
+const COLOR_RESET = "\x1b[0m"
+const COLOR_DIMMED = "\x1b[2m"
 async function main(path: string) {
   const fs = await import("node:fs/promises")
   const { Parser } = await import("./parser.js")
@@ -23,16 +25,16 @@ async function main(path: string) {
       .map((line, idx) => `${idx + 1}: ${line}`)
       .join("\n"),
   )
-  const start_red_and_bold = "\x1b[31;1m"
-  const reset_color = "\x1b[0m"
+
   console.log(
     source_file.errors
       .map(
         (e) =>
-          `${start_red_and_bold}ERROR:${reset_color} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}`,
+          `${COLOR_ERROR}ERROR:${COLOR_RESET} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}`,
       )
       .join("\n\n"),
   )
+  console.log(`Found ${source_file.errors.length} error(s)`)
 }
 function preview_lines(source: string, span: Span) {
   const [start_line, col] = offset_to_line_and_col(source, span.start)
@@ -41,9 +43,14 @@ function preview_lines(source: string, span: Span) {
     .map((line, idx) => {
       const line_number = start_line + idx
       const prefix = `${line_number}|  `
-      const first = `${prefix}${line}`
+      const first = `${COLOR_DIMMED}${prefix}${COLOR_RESET}${line}`
       if (idx === 0) {
-        return first + "\n" + "~".repeat(prefix.length + col - 1) + "^"
+        return (
+          first +
+          "\n" +
+          " ".repeat(prefix.length + col - 1) +
+          `${COLOR_ERROR}^~~${COLOR_RESET}`
+        )
       } else return first
     })
     .join("\n")

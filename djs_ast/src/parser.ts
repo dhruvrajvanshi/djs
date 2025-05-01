@@ -251,7 +251,16 @@ function parser_impl(_lexer: Lexer): Parser {
       //   }
       // }
       default:
-        return parse_expr_stmt()
+        const expr_stmt = parse_expr_stmt()
+        if (expr_stmt.expr.kind === "ParseError") {
+          while (true) {
+            if (at(t.EndOfFile)) break
+            if (at(t.Semi)) break
+            if (at(t.RBrace)) break
+            advance()
+          }
+        }
+        return expr_stmt
     }
   }
 
@@ -288,7 +297,7 @@ function parser_impl(_lexer: Lexer): Parser {
       else_branch,
     )
   }
-  function parse_expr_stmt(): Stmt {
+  function parse_expr_stmt(): Extract<Stmt, { kind: "Expr" }> {
     const expr = parse_expr()
     expect_semi()
     return Stmt.Expr(expr.span, expr)
