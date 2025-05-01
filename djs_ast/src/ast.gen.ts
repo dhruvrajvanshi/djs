@@ -119,6 +119,156 @@ export type Stmt =
       readonly kind: "Empty"
       readonly span: Span
     }
+export type StmtWithKind<K extends Stmt["kind"]> = Extract<Stmt, { kind: K }>
+export const Stmt = {
+  Expr: (span: Span, expr: Expr): StmtWithKind<"Expr"> => ({
+    kind: "Expr",
+    span,
+    expr: expr,
+  }),
+
+  Block: (span: Span, block: Block): StmtWithKind<"Block"> => ({
+    kind: "Block",
+    span,
+    block: block,
+  }),
+
+  Return: (span: Span, value: Expr | null): StmtWithKind<"Return"> => ({
+    kind: "Return",
+    span,
+    value: value,
+  }),
+
+  VarDecl: (span: Span, decl: VarDecl): StmtWithKind<"VarDecl"> => ({
+    kind: "VarDecl",
+    span,
+    decl: decl,
+  }),
+
+  If: (
+    span: Span,
+    condition: Expr,
+    if_true: Stmt,
+    if_false: Stmt | null,
+  ): StmtWithKind<"If"> => ({
+    kind: "If",
+    span,
+    condition: condition,
+    if_true: if_true,
+    if_false: if_false,
+  }),
+
+  Switch: (
+    span: Span,
+    condition: Expr,
+    cases: readonly SwitchCase[],
+  ): StmtWithKind<"Switch"> => ({
+    kind: "Switch",
+    span,
+    condition: condition,
+    cases: cases,
+  }),
+
+  While: (span: Span, condition: Expr, body: Stmt): StmtWithKind<"While"> => ({
+    kind: "While",
+    span,
+    condition: condition,
+    body: body,
+  }),
+
+  DoWhile: (
+    span: Span,
+    body: Stmt,
+    condition: Expr,
+  ): StmtWithKind<"DoWhile"> => ({
+    kind: "DoWhile",
+    span,
+    body: body,
+    condition: condition,
+  }),
+
+  Try: (
+    span: Span,
+    try_block: Block,
+    catch_pattern: Pattern | null,
+    catch_block: Block | null,
+    finally_block: Block | null,
+  ): StmtWithKind<"Try"> => ({
+    kind: "Try",
+    span,
+    try_block: try_block,
+    catch_pattern: catch_pattern,
+    catch_block: catch_block,
+    finally_block: finally_block,
+  }),
+
+  For: (
+    span: Span,
+    init: ForInit,
+    test: Expr | null,
+    update: Expr | null,
+    body: Stmt,
+  ): StmtWithKind<"For"> => ({
+    kind: "For",
+    span,
+    init: init,
+    test: test,
+    update: update,
+    body: body,
+  }),
+
+  ForInOrOf: (
+    span: Span,
+    decl_type: DeclType | null,
+    lhs: Pattern,
+    in_or_of: InOrOf,
+    rhs: Expr,
+    body: Stmt,
+  ): StmtWithKind<"ForInOrOf"> => ({
+    kind: "ForInOrOf",
+    span,
+    decl_type: decl_type,
+    lhs: lhs,
+    in_or_of: in_or_of,
+    rhs: rhs,
+    body: body,
+  }),
+
+  Break: (span: Span, label: Label | null): StmtWithKind<"Break"> => ({
+    kind: "Break",
+    span,
+    label: label,
+  }),
+
+  Continue: (span: Span, label: Label | null): StmtWithKind<"Continue"> => ({
+    kind: "Continue",
+    span,
+    label: label,
+  }),
+
+  Debugger: { kind: "Debugger" } as const,
+
+  With: (span: Span, expr: Expr, body: Stmt): StmtWithKind<"With"> => ({
+    kind: "With",
+    span,
+    expr: expr,
+    body: body,
+  }),
+
+  Func: (span: Span, func: Func): StmtWithKind<"Func"> => ({
+    kind: "Func",
+    span,
+    func: func,
+  }),
+
+  ClassDecl: (span: Span, klass: Class): StmtWithKind<"ClassDecl"> => ({
+    kind: "ClassDecl",
+    span,
+    class: klass,
+  }),
+
+  Empty: { kind: "Empty" } as const,
+} as const
 
 export interface Class {
   readonly span: Span
@@ -153,6 +303,21 @@ export type ClassMember =
       readonly kind: "FieldDef"
       readonly field: FieldDef
     }
+export type ClassMemberWithKind<K extends ClassMember["kind"]> = Extract<
+  ClassMember,
+  { kind: K }
+>
+export const ClassMember = {
+  MethodDef: (method: MethodDef): ClassMemberWithKind<"MethodDef"> => ({
+    kind: "MethodDef",
+    method: method,
+  }),
+
+  FieldDef: (field: FieldDef): ClassMemberWithKind<"FieldDef"> => ({
+    kind: "FieldDef",
+    field: field,
+  }),
+} as const
 
 export interface FieldDef {
   readonly span: Span
@@ -203,6 +368,60 @@ export type Pattern =
       readonly span: Span
       readonly pattern: Pattern
     }
+export type PatternWithKind<K extends Pattern["kind"]> = Extract<
+  Pattern,
+  { kind: K }
+>
+export const Pattern = {
+  Var: (span: Span, ident: Ident): PatternWithKind<"Var"> => ({
+    kind: "Var",
+    span,
+    ident: ident,
+  }),
+
+  Assignment: (
+    span: Span,
+    pattern: Pattern,
+    initializer: Expr,
+  ): PatternWithKind<"Assignment"> => ({
+    kind: "Assignment",
+    span,
+    pattern: pattern,
+    initializer: initializer,
+  }),
+
+  Array: (span: Span, items: readonly Pattern[]): PatternWithKind<"Array"> => ({
+    kind: "Array",
+    span,
+    items: items,
+  }),
+
+  Object: (
+    span: Span,
+    properties: readonly ObjectPatternProperty[],
+    rest: Pattern | null,
+  ): PatternWithKind<"Object"> => ({
+    kind: "Object",
+    span,
+    properties: properties,
+    rest: rest,
+  }),
+
+  Prop: (span: Span, expr: Expr, key: ObjectKey): PatternWithKind<"Prop"> => ({
+    kind: "Prop",
+    span,
+    expr: expr,
+    key: key,
+  }),
+
+  Elision: { kind: "Elision" } as const,
+
+  Rest: (span: Span, pattern: Pattern): PatternWithKind<"Rest"> => ({
+    kind: "Rest",
+    span,
+    pattern: pattern,
+  }),
+} as const
 
 export interface Label {
   readonly span: Span
@@ -216,6 +435,10 @@ export interface SwitchCase {
 }
 
 export type InOrOf = "In" | "Of"
+const InOrOf = {
+  In: "In",
+  Of: "Of",
+} as const
 
 export interface VarDecl {
   readonly span: Span
@@ -237,6 +460,18 @@ export type ForInit =
       readonly kind: "Expr"
       readonly expr: Expr
     }
+export type ForInitWithKind<K extends ForInit["kind"]> = Extract<
+  ForInit,
+  { kind: K }
+>
+export const ForInit = {
+  VarDecl: (decl: VarDecl): ForInitWithKind<"VarDecl"> => ({
+    kind: "VarDecl",
+    decl: decl,
+  }),
+
+  Expr: (expr: Expr): ForInitWithKind<"Expr"> => ({ kind: "Expr", expr: expr }),
+} as const
 export type Expr =
   | {
       readonly kind: "Var"
@@ -430,6 +665,252 @@ export type Expr =
       readonly span: Span
       readonly fragments: readonly TemplateLiteralFragment[]
     }
+export type ExprWithKind<K extends Expr["kind"]> = Extract<Expr, { kind: K }>
+export const Expr = {
+  Var: (span: Span, ident: Ident): ExprWithKind<"Var"> => ({
+    kind: "Var",
+    span,
+    ident: ident,
+  }),
+
+  BinOp: (
+    span: Span,
+    lhs: Expr,
+    operator: BinOp,
+    rhs: Expr,
+  ): ExprWithKind<"BinOp"> => ({
+    kind: "BinOp",
+    span,
+    lhs: lhs,
+    operator: operator,
+    rhs: rhs,
+  }),
+
+  ArrowFn: (
+    span: Span,
+    params: ParamList,
+    body: ArrowFnBody,
+  ): ExprWithKind<"ArrowFn"> => ({
+    kind: "ArrowFn",
+    span,
+    params: params,
+    body: body,
+  }),
+
+  Func: (span: Span, func: Func): ExprWithKind<"Func"> => ({
+    kind: "Func",
+    span,
+    func: func,
+  }),
+
+  Call: (
+    span: Span,
+    callee: Expr,
+    args: readonly Expr[],
+  ): ExprWithKind<"Call"> => ({
+    kind: "Call",
+    span,
+    callee: callee,
+    args: args,
+  }),
+
+  Index: (span: Span, lhs: Expr, property: Expr): ExprWithKind<"Index"> => ({
+    kind: "Index",
+    span,
+    lhs: lhs,
+    property: property,
+  }),
+
+  Prop: (span: Span, lhs: Expr, property: Ident): ExprWithKind<"Prop"> => ({
+    kind: "Prop",
+    span,
+    lhs: lhs,
+    property: property,
+  }),
+
+  String: (span: Span, text: Text): ExprWithKind<"String"> => ({
+    kind: "String",
+    span,
+    text: text,
+  }),
+
+  Number: (span: Span, text: Text): ExprWithKind<"Number"> => ({
+    kind: "Number",
+    span,
+    text: text,
+  }),
+
+  Boolean: (span: Span, value: boolean): ExprWithKind<"Boolean"> => ({
+    kind: "Boolean",
+    span,
+    value: value,
+  }),
+
+  Null: { kind: "Null" } as const,
+
+  Undefined: { kind: "Undefined" } as const,
+
+  Object: (
+    span: Span,
+    entries: readonly ObjectLiteralEntry[],
+  ): ExprWithKind<"Object"> => ({ kind: "Object", span, entries: entries }),
+
+  Throw: (span: Span, value: Expr): ExprWithKind<"Throw"> => ({
+    kind: "Throw",
+    span,
+    value: value,
+  }),
+
+  PostIncrement: (span: Span, value: Expr): ExprWithKind<"PostIncrement"> => ({
+    kind: "PostIncrement",
+    span,
+    value: value,
+  }),
+
+  PostDecrement: (span: Span, value: Expr): ExprWithKind<"PostDecrement"> => ({
+    kind: "PostDecrement",
+    span,
+    value: value,
+  }),
+
+  PreIncrement: (span: Span, value: Expr): ExprWithKind<"PreIncrement"> => ({
+    kind: "PreIncrement",
+    span,
+    value: value,
+  }),
+
+  PreDecrement: (span: Span, value: Expr): ExprWithKind<"PreDecrement"> => ({
+    kind: "PreDecrement",
+    span,
+    value: value,
+  }),
+
+  Array: (
+    span: Span,
+    items: readonly ArrayLiteralMember[],
+  ): ExprWithKind<"Array"> => ({ kind: "Array", span, items: items }),
+
+  New: (span: Span, expr: Expr): ExprWithKind<"New"> => ({
+    kind: "New",
+    span,
+    expr: expr,
+  }),
+
+  Yield: (span: Span, value: Expr | null): ExprWithKind<"Yield"> => ({
+    kind: "Yield",
+    span,
+    value: value,
+  }),
+
+  YieldFrom: (span: Span, expr: Expr): ExprWithKind<"YieldFrom"> => ({
+    kind: "YieldFrom",
+    span,
+    expr: expr,
+  }),
+
+  Ternary: (
+    span: Span,
+    condition: Expr,
+    if_true: Expr,
+    if_false: Expr,
+  ): ExprWithKind<"Ternary"> => ({
+    kind: "Ternary",
+    span,
+    condition: condition,
+    if_true: if_true,
+    if_false: if_false,
+  }),
+
+  Assign: (
+    span: Span,
+    pattern: Pattern,
+    operator: AssignOp,
+    value: Expr,
+  ): ExprWithKind<"Assign"> => ({
+    kind: "Assign",
+    span,
+    pattern: pattern,
+    operator: operator,
+    value: value,
+  }),
+
+  Regex: (span: Span, text: Text): ExprWithKind<"Regex"> => ({
+    kind: "Regex",
+    span,
+    text: text,
+  }),
+
+  Delete: (span: Span, expr: Expr): ExprWithKind<"Delete"> => ({
+    kind: "Delete",
+    span,
+    expr: expr,
+  }),
+
+  Void: (span: Span, expr: Expr): ExprWithKind<"Void"> => ({
+    kind: "Void",
+    span,
+    expr: expr,
+  }),
+
+  TypeOf: (span: Span, expr: Expr): ExprWithKind<"TypeOf"> => ({
+    kind: "TypeOf",
+    span,
+    expr: expr,
+  }),
+
+  UnaryPlus: (span: Span, expr: Expr): ExprWithKind<"UnaryPlus"> => ({
+    kind: "UnaryPlus",
+    span,
+    expr: expr,
+  }),
+
+  UnaryMinus: (span: Span, expr: Expr): ExprWithKind<"UnaryMinus"> => ({
+    kind: "UnaryMinus",
+    span,
+    expr: expr,
+  }),
+
+  BitNot: (span: Span, expr: Expr): ExprWithKind<"BitNot"> => ({
+    kind: "BitNot",
+    span,
+    expr: expr,
+  }),
+
+  Not: (span: Span, expr: Expr): ExprWithKind<"Not"> => ({
+    kind: "Not",
+    span,
+    expr: expr,
+  }),
+
+  Await: (span: Span, expr: Expr): ExprWithKind<"Await"> => ({
+    kind: "Await",
+    span,
+    expr: expr,
+  }),
+
+  Comma: (span: Span, items: readonly Expr[]): ExprWithKind<"Comma"> => ({
+    kind: "Comma",
+    span,
+    items: items,
+  }),
+
+  Super: { kind: "Super" } as const,
+
+  Class: (span: Span, klass: Class): ExprWithKind<"Class"> => ({
+    kind: "Class",
+    span,
+    class: klass,
+  }),
+
+  TemplateLiteral: (
+    span: Span,
+    fragments: readonly TemplateLiteralFragment[],
+  ): ExprWithKind<"TemplateLiteral"> => ({
+    kind: "TemplateLiteral",
+    span,
+    fragments: fragments,
+  }),
+} as const
 export type ObjectLiteralEntry =
   | {
       readonly kind: "Ident"
@@ -452,6 +933,41 @@ export type ObjectLiteralEntry =
       readonly span: Span
       readonly expr: Expr
     }
+export type ObjectLiteralEntryWithKind<K extends ObjectLiteralEntry["kind"]> =
+  Extract<ObjectLiteralEntry, { kind: K }>
+export const ObjectLiteralEntry = {
+  Ident: (span: Span, ident: Ident): ObjectLiteralEntryWithKind<"Ident"> => ({
+    kind: "Ident",
+    span,
+    ident: ident,
+  }),
+
+  Prop: (
+    span: Span,
+    key: ObjectKey,
+    value: Expr,
+  ): ObjectLiteralEntryWithKind<"Prop"> => ({
+    kind: "Prop",
+    span,
+    key: key,
+    value: value,
+  }),
+
+  Method: (
+    span: Span,
+    method: MethodDef,
+  ): ObjectLiteralEntryWithKind<"Method"> => ({
+    kind: "Method",
+    span,
+    method: method,
+  }),
+
+  Spread: (span: Span, expr: Expr): ObjectLiteralEntryWithKind<"Spread"> => ({
+    kind: "Spread",
+    span,
+    expr: expr,
+  }),
+} as const
 export type ObjectKey =
   | {
       readonly kind: "Ident"
@@ -468,6 +984,29 @@ export type ObjectKey =
       readonly span: Span
       readonly expr: Expr
     }
+export type ObjectKeyWithKind<K extends ObjectKey["kind"]> = Extract<
+  ObjectKey,
+  { kind: K }
+>
+export const ObjectKey = {
+  Ident: (span: Span, ident: Ident): ObjectKeyWithKind<"Ident"> => ({
+    kind: "Ident",
+    span,
+    ident: ident,
+  }),
+
+  String: (span: Span, text: Text): ObjectKeyWithKind<"String"> => ({
+    kind: "String",
+    span,
+    text: text,
+  }),
+
+  Computed: (span: Span, expr: Expr): ObjectKeyWithKind<"Computed"> => ({
+    kind: "Computed",
+    span,
+    expr: expr,
+  }),
+} as const
 
 export interface ParamList {
   readonly span: Span
@@ -503,6 +1042,23 @@ export type ArrayLiteralMember =
       readonly span: Span
       readonly expr: Expr
     }
+export type ArrayLiteralMemberWithKind<K extends ArrayLiteralMember["kind"]> =
+  Extract<ArrayLiteralMember, { kind: K }>
+export const ArrayLiteralMember = {
+  Expr: (span: Span, expr: Expr): ArrayLiteralMemberWithKind<"Expr"> => ({
+    kind: "Expr",
+    span,
+    expr: expr,
+  }),
+
+  Elision: { kind: "Elision" } as const,
+
+  Spread: (span: Span, expr: Expr): ArrayLiteralMemberWithKind<"Spread"> => ({
+    kind: "Spread",
+    span,
+    expr: expr,
+  }),
+} as const
 export type ArrowFnBody =
   | {
       readonly kind: "Expr"
@@ -514,6 +1070,23 @@ export type ArrowFnBody =
       readonly span: Span
       readonly block: Block
     }
+export type ArrowFnBodyWithKind<K extends ArrowFnBody["kind"]> = Extract<
+  ArrowFnBody,
+  { kind: K }
+>
+export const ArrowFnBody = {
+  Expr: (span: Span, expr: Expr): ArrowFnBodyWithKind<"Expr"> => ({
+    kind: "Expr",
+    span,
+    expr: expr,
+  }),
+
+  Block: (span: Span, block: Block): ArrowFnBodyWithKind<"Block"> => ({
+    kind: "Block",
+    span,
+    block: block,
+  }),
+} as const
 export type TemplateLiteralFragment =
   | {
       readonly kind: "Text"
@@ -525,6 +1098,22 @@ export type TemplateLiteralFragment =
       readonly span: Span
       readonly expr: Expr
     }
+export type TemplateLiteralFragmentWithKind<
+  K extends TemplateLiteralFragment["kind"],
+> = Extract<TemplateLiteralFragment, { kind: K }>
+export const TemplateLiteralFragment = {
+  Text: (span: Span, text: Text): TemplateLiteralFragmentWithKind<"Text"> => ({
+    kind: "Text",
+    span,
+    text: text,
+  }),
+
+  Expr: (span: Span, expr: Expr): TemplateLiteralFragmentWithKind<"Expr"> => ({
+    kind: "Expr",
+    span,
+    expr: expr,
+  }),
+} as const
 
 export interface ObjectPatternProperty {
   readonly span: Span
@@ -556,6 +1145,31 @@ export type BinOp =
   | "LeftShift"
   | "RightShift"
   | "UnsignedRightShift"
+const BinOp = {
+  Add: "Add",
+  Sub: "Sub",
+  Mul: "Mul",
+  Div: "Div",
+  Mod: "Mod",
+  BitXor: "BitXor",
+  BitAnd: "BitAnd",
+  BitOr: "BitOr",
+  And: "And",
+  Or: "Or",
+  Gt: "Gt",
+  Lt: "Lt",
+  Gte: "Gte",
+  Lte: "Lte",
+  EqEq: "EqEq",
+  EqEqEq: "EqEqEq",
+  NotEq: "NotEq",
+  NotEqEq: "NotEqEq",
+  In: "In",
+  Instanceof: "Instanceof",
+  LeftShift: "LeftShift",
+  RightShift: "RightShift",
+  UnsignedRightShift: "UnsignedRightShift",
+} as const
 export type AssignOp =
   | "Eq"
   | "MulEq"
@@ -570,5 +1184,29 @@ export type AssignOp =
   | "BitXorEq"
   | "BitOrEq"
   | "ExponentEq"
+const AssignOp = {
+  Eq: "Eq",
+  MulEq: "MulEq",
+  DivEq: "DivEq",
+  ModEq: "ModEq",
+  AddEq: "AddEq",
+  SubEq: "SubEq",
+  LeftShiftEq: "LeftShiftEq",
+  RightShiftEq: "RightShiftEq",
+  UnsignedRightShiftEq: "UnsignedRightShiftEq",
+  BitAndEq: "BitAndEq",
+  BitXorEq: "BitXorEq",
+  BitOrEq: "BitOrEq",
+  ExponentEq: "ExponentEq",
+} as const
 export type DeclType = "Let" | "Const" | "Var"
+const DeclType = {
+  Let: "Let",
+  Const: "Const",
+  Var: "Var",
+} as const
 export type AccessorType = "Get" | "Set"
+const AccessorType = {
+  Get: "Get",
+  Set: "Set",
+} as const
