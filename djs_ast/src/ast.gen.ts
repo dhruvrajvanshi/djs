@@ -4,14 +4,14 @@
 
 import type { Span } from "./Span.js"
 
+/**
+ * Raw source text
+ */
+type Text = string
+
 export interface SourceFile {
   readonly span: Span
   readonly stmts: readonly Stmt[]
-}
-
-export interface Text {
-  readonly span: Span
-  readonly text: string
 }
 
 export type Stmt =
@@ -246,7 +246,10 @@ export const Stmt = {
     label: label,
   }),
 
-  Debugger: { kind: "Debugger" } as const,
+  Debugger: (span: Span): StmtWithKind<"Debugger"> => ({
+    kind: "Debugger",
+    span,
+  }),
 
   With: (span: Span, expr: Expr, body: Stmt): StmtWithKind<"With"> => ({
     kind: "With",
@@ -267,7 +270,7 @@ export const Stmt = {
     class: klass,
   }),
 
-  Empty: { kind: "Empty" } as const,
+  Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
 } as const
 
 export interface Class {
@@ -414,7 +417,10 @@ export const Pattern = {
     key: key,
   }),
 
-  Elision: { kind: "Elision" } as const,
+  Elision: (span: Span): PatternWithKind<"Elision"> => ({
+    kind: "Elision",
+    span,
+  }),
 
   Rest: (span: Span, pattern: Pattern): PatternWithKind<"Rest"> => ({
     kind: "Rest",
@@ -746,9 +752,12 @@ export const Expr = {
     value: value,
   }),
 
-  Null: { kind: "Null" } as const,
+  Null: (span: Span): ExprWithKind<"Null"> => ({ kind: "Null", span }),
 
-  Undefined: { kind: "Undefined" } as const,
+  Undefined: (span: Span): ExprWithKind<"Undefined"> => ({
+    kind: "Undefined",
+    span,
+  }),
 
   Object: (
     span: Span,
@@ -894,7 +903,7 @@ export const Expr = {
     items: items,
   }),
 
-  Super: { kind: "Super" } as const,
+  Super: (span: Span): ExprWithKind<"Super"> => ({ kind: "Super", span }),
 
   Class: (span: Span, klass: Class): ExprWithKind<"Class"> => ({
     kind: "Class",
@@ -1051,7 +1060,10 @@ export const ArrayLiteralMember = {
     expr: expr,
   }),
 
-  Elision: { kind: "Elision" } as const,
+  Elision: (span: Span): ArrayLiteralMemberWithKind<"Elision"> => ({
+    kind: "Elision",
+    span,
+  }),
 
   Spread: (span: Span, expr: Expr): ArrayLiteralMemberWithKind<"Spread"> => ({
     kind: "Spread",

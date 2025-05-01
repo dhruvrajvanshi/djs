@@ -7,6 +7,11 @@ let output = `
 // node djs_ast/gen_ts_ast.js | pnpm prettier > src/ast.gen.ts
 
 import type { Span } from "./Span.js";
+
+/**
+ * Raw source text
+ */
+type Text = string;
 `
 for (const item of ast_items) {
   if (item.kind === "struct") {
@@ -85,7 +90,7 @@ function gen_enum_factories(item) {
    * @returns {string}
    */
   function gen_variant(variant) {
-    if (Object.entries(variant.args).length > 0) {
+    if (Object.entries(variant.args).length > 0 || item.tags.includes("span")) {
       const variantType = `${item.name}WithKind<${JSON.stringify(variant.name)}>`
       const params = Object.entries(variant.args)
         .map(([name, type]) => `${escape_js_name(name)}: ${gen_type(type)}`)

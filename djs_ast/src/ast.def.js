@@ -1,139 +1,139 @@
 /**
  * {@link DStmt}
  */
-const Stmt = "Stmt";
+const Stmt = "Stmt"
 /**
  * {@link DExpr}
  */
-const Expr = "Expr";
+const Expr = "Expr"
 
 /**
  * {@link DIdent}
  */
-const Ident = "Ident";
+const Ident = "Ident"
 
 /**
  * {@link DFunc}
  */
-const Func = "Func";
+const Func = "Func"
 
 /**
  * {@link DObjectKey}
  */
-const ObjectKey = "ObjectKey";
+const ObjectKey = "ObjectKey"
 
 /**
  * {@link DText}
  */
-const Text = "Text";
+const Text = "Text"
 
 /**
  * {@link DLabel}
  */
-const Label = "Label";
+const Label = "Label"
 
 /**
  * {@link DParamList}
  */
-const ParamList = "ParamList";
+const ParamList = "ParamList"
 
 /**
  * {@link DParam}
  */
-const Param = "Param";
+const Param = "Param"
 
 /**
  * {@link DMethodDef}
  */
-const MethodDef = "MethodDef";
+const MethodDef = "MethodDef"
 
 /**
  * {@link DBlock}
  */
-const Block = "Block";
+const Block = "Block"
 
 const DIdent = Struct("Ident", ["span"], {
   text: "str",
-});
+})
 
 /**
  * {@link DPattern}
  */
-const Pattern = "Pattern";
+const Pattern = "Pattern"
 
 /**
  * {@link DArrowFnBody}
  */
-const ArrowFnBody = "ArrowFnBody";
+const ArrowFnBody = "ArrowFnBody"
 /**
  * {@link DTemplateLiteralFragment}
  */
-const TemplateLiteralFragment = "TemplateLiteralFragment";
+const TemplateLiteralFragment = "TemplateLiteralFragment"
 
 /**
  * {@link DBinOp}
  */
-const BinOp = "BinOp";
+const BinOp = "BinOp"
 /**
  * {@link DAssignOp}
  */
-const AssignOp = "AssignOp";
+const AssignOp = "AssignOp"
 /**
  * {@link DDeclType}
  */
-const DeclType = "DeclType";
+const DeclType = "DeclType"
 /**
  * {@link DAccessorType}
  */
-const AccessorType = "AccessorType";
+const AccessorType = "AccessorType"
 /**
  * {@link DVarDecl}
  */
-const VarDecl = "VarDecl";
+const VarDecl = "VarDecl"
 /**
  * {@link DSwitchCase}
  */
-const SwitchCase = "SwitchCase";
+const SwitchCase = "SwitchCase"
 /**
  * {@link DInOrOf}
  */
-const InOrOf = "InOrOf";
+const InOrOf = "InOrOf"
 /**
  * {@link DVarDeclarator}
  */
-const VarDeclarator = "VarDeclarator";
+const VarDeclarator = "VarDeclarator"
 /**
  * {@link DObjectLiteralEntry}
  */
-const ObjectLiteralEntry = "ObjectLiteralEntry";
+const ObjectLiteralEntry = "ObjectLiteralEntry"
 /**
  * {@link DClass}
  */
-const Class = "Class";
+const Class = "Class"
 /**
  * {@link DFieldDef}
  */
-const FieldDef = "FieldDef";
+const FieldDef = "FieldDef"
 /**
  * {@link DClassMember}
  */
-const ClassMember = "ClassMember";
+const ClassMember = "ClassMember"
 /**
  * {@link DClassBody}
  */
-const ClassBody = "ClassBody";
+const ClassBody = "ClassBody"
 /**
  * {@link DForInit}
  */
-const ForInit = "ForInit";
+const ForInit = "ForInit"
 /**
  * {@link DArrayLiteralMember}
  */
-const ArrayLiteralMember = "ArrayLiteralMember";
+const ArrayLiteralMember = "ArrayLiteralMember"
 /**
  * {@link DSourceFile}
  */
-const SourceFile = "SourceFile";
+const SourceFile = "SourceFile"
 
 const DPattern = Enum(Pattern, ["span", "visit"], {
   Var: { ident: Ident },
@@ -143,7 +143,7 @@ const DPattern = Enum(Pattern, ["span", "visit"], {
   Prop: { expr: Expr, key: ObjectKey },
   Elision: {},
   Rest: { pattern: Pattern },
-});
+})
 const DStmt = Enum(Stmt, ["span", "visit"], {
   Expr: { expr: Expr },
   Block: { block: Block },
@@ -174,7 +174,7 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
   Func: { func: Func },
   ClassDecl: { class: Class },
   Empty: {},
-});
+})
 
 const DExpr = Enum(Expr, ["span", "visit"], {
   Var: { ident: Ident },
@@ -214,55 +214,55 @@ const DExpr = Enum(Expr, ["span", "visit"], {
   Super: {},
   Class: { class: "Class" },
   TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
-});
+})
 const DClass = Struct(Class, ["span"], {
   name: Option(Ident),
   superclass: Option(Expr),
   body: ClassBody,
-});
+})
 const DClassBody = Struct(ClassBody, ["span"], {
   members: Array(ClassMember),
-});
+})
 const DClassMember = Enum(ClassMember, [], {
   MethodDef: { method: MethodDef },
   FieldDef: { field: FieldDef },
-});
+})
 const DFieldDef = Struct("FieldDef", ["span"], {
   name: Ident,
   initializer: Option(Expr),
-});
+})
 const DMethodDef = Struct(MethodDef, ["span"], {
   name: ObjectKey,
   body: Func,
   accessor_type: Option(AccessorType),
-});
+})
 
 const DObjectKey = Enum(ObjectKey, ["span"], {
   Ident: { ident: Ident },
   String: { text: Text },
   Computed: { expr: Expr },
-});
+})
 
 const DObjectLiteralEntry = Enum(ObjectLiteralEntry, ["span"], {
   Ident: { ident: Ident },
   Prop: { key: ObjectKey, value: Expr },
   Method: { method: MethodDef },
   Spread: { expr: Expr },
-});
+})
 
 const DParamList = Struct(ParamList, ["span"], {
   params: Array(Param),
-});
+})
 
 const DParam = Struct(Param, ["span"], {
   pattern: Pattern,
-});
+})
 
 const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
   Expr: { expr: Expr },
   Elision: {},
   Spread: { expr: Expr },
-});
+})
 
 const DFunc = Struct("Func", ["span"], {
   name: Option(Ident),
@@ -270,49 +270,47 @@ const DFunc = Struct("Func", ["span"], {
   body: Block,
   is_generator: "boolean",
   is_async: "boolean",
-});
+})
 const DBlock = Struct("Block", ["span"], {
   stmts: Array(Stmt),
-});
-const DText = Struct("Text", ["span"], {
-  text: "str",
-});
+})
+
 const DLabel = Struct("Label", ["span"], {
   name: "str",
-});
+})
 
 const DSourceFile = Struct("SourceFile", ["span", "visit"], {
   stmts: Array(Stmt),
-});
+})
 const DSwitchCase = Struct("SwitchCase", ["span"], {
   test: Option(Expr),
   body: Array(Stmt),
-});
-const DInOrOf = StringUnion(InOrOf, "In", "Of");
+})
+const DInOrOf = StringUnion(InOrOf, "In", "Of")
 const DVarDecl = Struct("VarDecl", ["span"], {
   decl_type: DeclType,
   declarators: Array(VarDeclarator),
-});
+})
 const DVarDeclarator = Struct("VarDeclarator", [], {
   pattern: Pattern,
   init: Option(Expr),
-});
+})
 const DForInit = Enum(ForInit, [], {
   VarDecl: { decl: VarDecl },
   Expr: { expr: Expr },
-});
+})
 const DArrowFnBody = Enum(ArrowFnBody, ["span"], {
   Expr: { expr: Expr },
   Block: { block: Block },
-});
+})
 const DTemplateLiteralFragment = Enum(TemplateLiteralFragment, ["span"], {
   Text: { text: Text },
   Expr: { expr: Expr },
-});
+})
 const DObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
   key: ObjectKey,
   value: Pattern,
-});
+})
 const DBinOp = StringUnion(
   BinOp,
   // Arithmetic
@@ -345,7 +343,7 @@ const DBinOp = StringUnion(
   "LeftShift",
   "RightShift",
   "UnsignedRightShift",
-);
+)
 const DAssignOp = StringUnion(
   AssignOp,
   "Eq",
@@ -361,13 +359,12 @@ const DAssignOp = StringUnion(
   "BitXorEq",
   "BitOrEq",
   "ExponentEq",
-);
-const DDeclType = StringUnion(DeclType, "Let", "Const", "Var");
-const DAccessorType = StringUnion(AccessorType, "Get", "Set");
+)
+const DDeclType = StringUnion(DeclType, "Let", "Const", "Var")
+const DAccessorType = StringUnion(AccessorType, "Get", "Set")
 
 const ast_items = [
   DSourceFile,
-  DText,
   DStmt,
   DClass,
   DBlock,
@@ -397,7 +394,7 @@ const ast_items = [
   DAssignOp,
   DDeclType,
   DAccessorType,
-];
+]
 
 /**
  *
@@ -415,7 +412,7 @@ function StringUnion(name, ...variants) {
       args: {},
       tags: [],
     })),
-  };
+  }
 }
 
 /**
@@ -438,10 +435,10 @@ function Enum(name, tags, variants) {
           name,
           tags: [],
           args,
-        };
+        }
       },
     ),
-  };
+  }
 }
 
 /**
@@ -456,7 +453,7 @@ function Struct(name, tags, fields) {
     name,
     tags,
     fields,
-  };
+  }
 }
 
 /**
@@ -466,7 +463,7 @@ function Struct(name, tags, fields) {
  * @returns {["Option", T]}
  */
 function Option(type) {
-  return ["Option", type];
+  return ["Option", type]
 }
 
 /**
@@ -475,24 +472,24 @@ function Option(type) {
  * @returns {["Vec", T]}
  */
 function Array(type) {
-  return ["Vec", type];
+  return ["Vec", type]
 }
 
 const items_by_name = Object.fromEntries(
   ast_items.map((item) => [item.name, item]),
-);
+)
 
-const needs_lifetime_param = needs_lifetime_param_set();
+const needs_lifetime_param = needs_lifetime_param_set()
 function needs_lifetime_param_set() {
-  const result = new Set();
+  const result = new Set()
 
   for (const item of ast_items) {
     if (item_contains_ident_or_text(item)) {
-      result.add(item.name);
+      result.add(item.name)
     }
   }
 
-  return result;
+  return result
 
   /**
    * @param {Item} item
@@ -500,19 +497,19 @@ function needs_lifetime_param_set() {
    **/
   function item_contains_ident_or_text(item) {
     if (result.has(item.name)) {
-      return true;
+      return true
     }
     switch (item.kind) {
       case "struct":
         return Object.entries(item.fields).some(([_, type]) =>
           type_contains_ident_or_text(type),
-        );
+        )
       case "enum":
         return item.variants.some(
           (variant) =>
             Object.keys(variant.args).length > 0 &&
             Object.values(variant.args).some(type_contains_ident_or_text),
-        );
+        )
     }
   }
 
@@ -522,17 +519,17 @@ function needs_lifetime_param_set() {
    */
   function type_contains_ident_or_text(type) {
     if (typeof type === "string") {
-      if (type === "str") {
-        return true;
+      if (type === "str" || type === "Text") {
+        return true
       }
       if (items_by_name[type] === undefined) {
-        throw new Error(`Unknown type: ${type}`);
+        throw new Error(`Unknown type: ${type}`)
       }
-      return item_contains_ident_or_text(items_by_name[type]);
+      return item_contains_ident_or_text(items_by_name[type])
     } else {
-      return type.slice(1).some(type_contains_ident_or_text);
+      return type.slice(1).some(type_contains_ident_or_text)
     }
   }
 }
 
-export { ast_items, items_by_name, needs_lifetime_param };
+export { ast_items, items_by_name, needs_lifetime_param }

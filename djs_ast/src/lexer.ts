@@ -333,6 +333,12 @@ export function lexer_impl(
       kind,
       span: { start: span_start, stop: current_index },
       line,
+      text:
+        kind === TokenKind.Ident ||
+        kind === TokenKind.String ||
+        kind === TokenKind.Number
+          ? current_text()
+          : "",
     }
   }
   function current_char() {
