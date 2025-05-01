@@ -75,8 +75,9 @@ function gen_enum(item) {
    * @returns {string}
    */
   function gen_variant(variant) {
+    const span = item.tags.includes("span") ? `readonly span: Span;` : ``;
     return `{
-        readonly kind: "${variant.name}",
+        readonly kind: "${variant.name}"; ${span}
         ${Object.entries(variant.args)
           .map(([name, type]) => "readonly " + name + ": " + gen_type(type))
           .join(", ")}
