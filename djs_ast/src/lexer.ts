@@ -307,7 +307,15 @@ export function lexer_impl(
     } else if (is_ascii_digit(current_char())) {
       return lex_number()
     } else {
-      throw new Error("TODO")
+      let limit = 100
+      while (current_char() !== "\0" && !is_whitespace(current_char())) {
+        limit--
+        if (limit <= 0) {
+          break
+        }
+        advance()
+      }
+      return make_token(TokenKind.Error)
     }
   }
   function lex_number(): Token {

@@ -11,7 +11,6 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
-import { emit } from "node:process"
 
 interface Parser {
   parse_source_file(): SourceFile
@@ -48,13 +47,11 @@ function parser_impl(_lexer: Lexer): Parser {
         return Expr.Var(ident.span, ident)
       }
       case t.True:
-        advance()
-        return Expr.Boolean(last_token!.span, true)
+        return Expr.Boolean(advance().span, true)
       case t.False:
         return Expr.Boolean(advance().span, false)
       case t.Null:
-        advance()
-        return Expr.Null(last_token!.span)
+        return Expr.Null(advance().span)
       case t.Undefined:
         return Expr.Undefined(advance().span)
       case t.String: {
@@ -110,6 +107,9 @@ function parser_impl(_lexer: Lexer): Parser {
       // case t.TemplateLiteralFragment:
       //   return parse_template_literal()
       default:
+        do {
+          advance()
+        } while (!at(t.EndOfFile) && current_token.line === last_token?.line)
         emit_error("Expected an expression")
         return Expr.ParseError(current_token.span)
     }
@@ -175,6 +175,7 @@ function parser_impl(_lexer: Lexer): Parser {
     }
   }
   function parse_stmt(): Stmt {
+    console.log("parse_stmt", current_token.kind)
     switch (current_token.kind) {
       // case t.Let:
       // case t.Const:
@@ -311,10 +312,7 @@ function parser_impl(_lexer: Lexer): Parser {
     const stmts: Stmt[] = []
     const span = current_token.span
     while (!at(t.EndOfFile)) {
-      const stmt = parse_stmt()
-      if (stmt) {
-        stmts.push(stmt)
-      }
+      stmts.push(parse_stmt())
     }
     return { span, stmts, errors }
   }
@@ -327,6 +325,7 @@ function parser_impl(_lexer: Lexer): Parser {
   }
 
   function advance(): Token {
+    assert(current_token.kind !== t.EndOfFile, "Tried to advance past the EOF")
     last_token = current_token
     current_token = lexer.next()
     return last_token

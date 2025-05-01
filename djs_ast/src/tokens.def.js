@@ -110,4 +110,5 @@ export const tokens = [
   "Caret",
 
   "EndOfFile",
-];
+  "Error",
+]
