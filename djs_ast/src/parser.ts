@@ -175,7 +175,6 @@ function parser_impl(_lexer: Lexer): Parser {
     }
   }
   function parse_stmt(): Stmt {
-    console.log("parse_stmt", current_token.kind)
     switch (current_token.kind) {
       // case t.Let:
       // case t.Const:
