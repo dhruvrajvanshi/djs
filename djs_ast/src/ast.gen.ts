@@ -450,10 +450,6 @@ export type TemplateLiteralFragment =
       readonly expr: Expr;
     };
 
-export interface ObjectPattern {
-  readonly span: Span;
-}
-
 export interface ObjectPatternProperty {
   readonly span: Span;
   readonly key: ObjectKey;

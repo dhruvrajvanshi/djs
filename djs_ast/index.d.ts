@@ -16,6 +16,6 @@ type StructItem = {
   kind: "struct";
   name: string;
   tags: Tag[];
-  fields: [string, Type][];
+  fields: Record<string, Type>;
 };
 type Item = EnumItem | StructItem;

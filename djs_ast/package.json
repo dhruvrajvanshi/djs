@@ -1,8 +1,10 @@
 {
+  "$schema": "https://json.schemastore.org/package.json",
   "name": "djs_ast",
   "version": "1.0.0",
   "type": "module",
   "license": "UNLICENSED",
+  "main": "src/index.ts",
   "devDependencies": {
     "prettier": "^3.5.3",
     "typescript": "5.8.3",

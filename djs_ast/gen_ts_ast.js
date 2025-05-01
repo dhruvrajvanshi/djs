@@ -25,7 +25,7 @@ function gen_struct(item) {
   return `
     export interface ${item.name} {
       ${span}
-      ${item.fields.map(([name, ty]) => `readonly ${name}: ${gen_type(ty)};`).join("\n")}
+      ${Object.entries(item.fields).map(([name, ty]) => `readonly ${name}: ${gen_type(ty)};`).join("\n")}
     }
   `;
 }
