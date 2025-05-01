@@ -13,9 +13,9 @@ const Expr = "Expr";
 const Ident = "Ident";
 
 /**
- * {@link DFunction}
+ * {@link DFunc}
  */
-const Function = "Function";
+const Func = "Func";
 
 /**
  * {@link DObjectKey}
@@ -171,7 +171,7 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
   Continue: { label: Option(Label) },
   Debugger: {},
   With: { expr: Expr, body: Stmt },
-  FunctionDecl: { func: Function },
+  Func: { func: Func },
   ClassDecl: { class: Class },
   Empty: {},
 });
@@ -180,7 +180,7 @@ const DExpr = Enum(Expr, ["span", "visit"], {
   Var: { ident: Ident },
   BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
   ArrowFn: { params: ParamList, body: ArrowFnBody },
-  Function: { func: Function },
+  Func: { func: Func },
   Call: { callee: Expr, args: Array(Expr) },
   Index: { lhs: Expr, property: Expr },
   Prop: { lhs: Expr, property: Ident },
@@ -233,7 +233,7 @@ const DFieldDef = Struct("FieldDef", ["span"], {
 });
 const DMethodDef = Struct(MethodDef, ["span"], {
   name: ObjectKey,
-  body: Function,
+  body: Func,
   accessor_type: Option(AccessorType),
 });
 
@@ -264,7 +264,7 @@ const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
   Spread: { expr: Expr },
 });
 
-const DFunction = Struct("Function", ["span"], {
+const DFunc = Struct("Func", ["span"], {
   name: Option(Ident),
   params: ParamList,
   body: Block,
@@ -388,7 +388,7 @@ const ast_items = [
   DObjectKey,
   DParamList,
   DParam,
-  DFunction,
+  DFunc,
   DArrayLiteralMember,
   DArrowFnBody,
   DTemplateLiteralFragment,

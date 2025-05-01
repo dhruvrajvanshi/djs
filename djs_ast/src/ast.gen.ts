@@ -91,8 +91,8 @@ export type Stmt =
       readonly body: Stmt;
     }
   | {
-      readonly kind: "FunctionDecl";
-      readonly func: Function;
+      readonly kind: "Func";
+      readonly func: Func;
     }
   | {
       readonly kind: "ClassDecl";
@@ -122,7 +122,7 @@ export interface ClassBody {
 export interface MethodDef {
   readonly span: Span;
   readonly name: ObjectKey;
-  readonly body: Function;
+  readonly body: Func;
   readonly accessor_type: AccessorType | null;
 }
 
@@ -229,8 +229,8 @@ export type Expr =
       readonly body: ArrowFnBody;
     }
   | {
-      readonly kind: "Function";
-      readonly func: Function;
+      readonly kind: "Func";
+      readonly func: Func;
     }
   | {
       readonly kind: "Call";
@@ -410,7 +410,7 @@ export interface Param {
   readonly pattern: Pattern;
 }
 
-export interface Function {
+export interface Func {
   readonly span: Span;
   readonly name: Ident | null;
   readonly params: ParamList;
