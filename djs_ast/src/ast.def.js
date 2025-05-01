@@ -210,6 +210,7 @@ const DExpr = Enum(Expr, ["span", "visit"], {
   Super: {},
   Class: { class: "Class" },
   TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
+  ParseError: {},
 })
 const DClass = Struct(Class, ["span"], {
   name: Option(Ident),

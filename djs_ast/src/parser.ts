@@ -11,6 +11,7 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
+import { emit } from "node:process"
 
 interface Parser {
   parse_source_file(): SourceFile
@@ -109,7 +110,8 @@ function parser_impl(_lexer: Lexer): Parser {
       // case t.TemplateLiteralFragment:
       //   return parse_template_literal()
       default:
-        throw new Error("Couldn't parse primary expression")
+        emit_error("Expected an expression")
+        return Expr.ParseError(current_token.span)
     }
   }
   function parse_paren_expr(): Expr {

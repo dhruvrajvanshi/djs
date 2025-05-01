@@ -677,6 +677,10 @@ export type Expr =
       readonly span: Span
       readonly fragments: readonly TemplateLiteralFragment[]
     }
+  | {
+      readonly kind: "ParseError"
+      readonly span: Span
+    }
 export type ExprWithKind<K extends Expr["kind"]> = Extract<Expr, { kind: K }>
 export const Expr = {
   Var: (span: Span, ident: Ident): ExprWithKind<"Var"> => ({
@@ -924,6 +928,11 @@ export const Expr = {
     kind: "TemplateLiteral",
     span,
     fragments: fragments,
+  }),
+
+  ParseError: (span: Span): ExprWithKind<"ParseError"> => ({
+    kind: "ParseError",
+    span,
   }),
 } as const
 export type ObjectLiteralEntry =
