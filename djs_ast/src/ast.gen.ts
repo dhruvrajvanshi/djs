@@ -447,7 +447,7 @@ export interface SwitchCase {
 }
 
 export type InOrOf = "In" | "Of"
-const InOrOf = {
+export const InOrOf = {
   In: "In",
   Of: "Of",
 } as const
@@ -1172,7 +1172,7 @@ export type BinOp =
   | "LeftShift"
   | "RightShift"
   | "UnsignedRightShift"
-const BinOp = {
+export const BinOp = {
   Add: "Add",
   Sub: "Sub",
   Mul: "Mul",
@@ -1211,7 +1211,7 @@ export type AssignOp =
   | "BitXorEq"
   | "BitOrEq"
   | "ExponentEq"
-const AssignOp = {
+export const AssignOp = {
   Eq: "Eq",
   MulEq: "MulEq",
   DivEq: "DivEq",
@@ -1227,13 +1227,13 @@ const AssignOp = {
   ExponentEq: "ExponentEq",
 } as const
 export type DeclType = "Let" | "Const" | "Var"
-const DeclType = {
+export const DeclType = {
   Let: "Let",
   Const: "Const",
   Var: "Var",
 } as const
 export type AccessorType = "Get" | "Set"
-const AccessorType = {
+export const AccessorType = {
   Get: "Get",
   Set: "Set",
 } as const

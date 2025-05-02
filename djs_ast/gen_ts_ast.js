@@ -79,7 +79,7 @@ function gen_enum_factories(item) {
     const variants = item.variants
       .map((v) => `${v.name}: ${JSON.stringify(v.name)}`)
       .join(",\n")
-    return `const ${item.name} = {
+    return `export const ${item.name} = {
       ${variants}
     } as const`
   }
