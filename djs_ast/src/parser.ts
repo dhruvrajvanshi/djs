@@ -1,5 +1,6 @@
 import assert, { AssertionError } from "node:assert"
 import {
+  AccessorType,
   ArrayLiteralMember,
   ArrowFnBody,
   AssignOp,
@@ -10,6 +11,8 @@ import {
   ObjectKey,
   ObjectLiteralEntry,
   ObjectPatternProperty,
+  Param,
+  ParamList,
   ParseError,
   Pattern,
   SourceFile,
@@ -313,15 +316,15 @@ function parser_impl(_lexer: Lexer): Parser {
         const tok = advance()
         return Expr.Number(tok.span, tok.text)
       }
-      // case t.LBrace: {
-      //   const start = advance()
-      //   const entries = parse_comma_separated_list(
-      //     t.RBrace,
-      //     parse_object_literal_entry,
-      //   )
-      //   const end = expect(t.RBrace)
-      //   return Expr.Object(Span.between(start.span, end.span), entries)
-      // }
+      case t.LBrace: {
+        const start = advance()
+        const entries = parse_comma_separated_list(
+          t.RBrace,
+          parse_object_literal_entry,
+        )
+        const end = expect_or_error(t.RBrace, "Expected a closing }")
+        return Expr.Object(Span.between(start.span, end.span), entries)
+      }
       case t.LParen:
         return parse_paren_expr()
       // case t.Async: {
@@ -365,6 +368,222 @@ function parser_impl(_lexer: Lexer): Parser {
         return Expr.ParseError(current_token.span)
     }
   }
+  function parse_object_literal_entry(): ObjectLiteralEntry {
+    switch (current_token.kind) {
+      case t.DotDotDot: {
+        advance()
+        const expr = parse_assignment_expr()
+        return ObjectLiteralEntry.Spread(expr.span, expr)
+      }
+      case t.Ident:
+        if (next_is(t.Comma) || next_is(t.RBrace)) {
+          const ident = parse_ident()
+          return ObjectLiteralEntry.Ident(ident.span, ident)
+        } else if (
+          current_matches(is_accessor_type) &&
+          next_matches(Token.can_start_object_property_name)
+        ) {
+          return parse_object_literal_entry_method()
+        }
+      // Fall through to default
+      case t.Async:
+        if (next_is(t.Star)) {
+          return parse_object_literal_entry_method()
+        } else if (
+          next_is(t.Ident) ||
+          next_is(t.LSquare) ||
+          next_token_is_keyword()
+        ) {
+          return parse_object_literal_entry_method()
+        }
+      // Fall through to default
+      case t.Star:
+        return parse_object_literal_entry_method()
+      case t.Ident:
+        if (next_is(t.LParen)) {
+          return parse_object_literal_entry_method()
+        }
+      // Fall through to default
+      default: {
+        const start = current_token.span
+        const name = parse_object_key()
+
+        switch (current_token.kind) {
+          case t.LParen: {
+            const params = parse_params_with_parens()
+            const body = parse_block()
+            const span = Span.between(start, body.span)
+            const method = {
+              span,
+              name,
+              accessor_type: null,
+              body: {
+                span,
+                name: null,
+                params,
+                body,
+                is_generator: false,
+                is_async: false,
+              },
+            }
+            return ObjectLiteralEntry.Method(method.span, method)
+          }
+          default: {
+            expect_or_throw(t.Colon)
+            const expr = parse_assignment_expr()
+            return ObjectLiteralEntry.Prop(
+              Span.between(start, expr.span),
+              name,
+              expr,
+            )
+          }
+        }
+      }
+    }
+  }
+  function parse_object_literal_entry_method(): ObjectLiteralEntry {
+    const start = current_token.span
+    const line = current_token.line
+    let accessor_type: AccessorType | null = null
+
+    if (
+      current_matches(is_accessor_type) &&
+      next_matches(Token.can_start_object_property_name)
+    ) {
+      if (current_token.text === "get") {
+        advance()
+        accessor_type = AccessorType.Get
+      } else if (current_token.text === "set") {
+        advance()
+        accessor_type = AccessorType.Set
+      }
+    }
+
+    const is_async = at(t.Async)
+    if (is_async) {
+      advance()
+    }
+
+    const is_generator = at(t.Star)
+    if (is_generator) {
+      advance()
+    }
+
+    const name = parse_object_key()
+    const params = parse_params_with_parens()
+    const body = parse_block()
+    const span = Span.between(start, body.span)
+
+    if (accessor_type === AccessorType.Get && params.params.length > 0) {
+      emit_error(`Getter method should not have any parameters`)
+      // Could return an error node here, but continuing with processing
+    }
+
+    const method = {
+      span,
+      name,
+      accessor_type,
+      body: {
+        span,
+        name: null,
+        params,
+        body,
+        is_generator,
+        is_async,
+      },
+    }
+
+    return ObjectLiteralEntry.Method(span, method)
+  }
+  function next_matches(predicate: (token: Token) => boolean): boolean {
+    return predicate(next_token())
+  }
+  function next_token_is_keyword(): boolean {
+    return TokenKind.is_keyword(next_token().kind)
+  }
+  function current_matches(predicate: (token: Token) => boolean): boolean {
+    return predicate(current_token)
+  }
+
+  function parse_object_key(): ObjectKey {
+    switch (current_token.kind) {
+      case t.String: {
+        const tok = advance()
+        return ObjectKey.String(tok.span, tok.text)
+      }
+      case t.Number: {
+        const tok = advance()
+        return ObjectKey.String(tok.span, tok.text)
+      }
+      case t.LSquare: {
+        advance()
+        const expr = parse_expr()
+        expect_or_throw(t.RSquare)
+        return ObjectKey.Computed(expr.span, expr)
+      }
+      default: {
+        const name = parse_member_ident_name()
+        return ObjectKey.Ident(name.span, name)
+      }
+    }
+  }
+
+  function parse_params_with_parens(): ParamList {
+    const start = expect_or_throw(t.LParen)
+    const params: Param[] = []
+
+    while (!at(t.RParen) && !at(t.EndOfFile)) {
+      if (params.length > 0) {
+        expect_or_throw(t.Comma)
+      }
+
+      const pattern = parse_pattern()
+      params.push({
+        span: pattern.span,
+        pattern,
+      })
+
+      if (at(t.Comma) && next_is(t.RParen)) {
+        advance()
+        break
+      }
+    }
+
+    const stop = expect_or_throw(t.RParen)
+    return {
+      span: Span.between(start.span, stop.span),
+      params,
+    }
+  }
+
+  function parse_comma_separated_list<T>(
+    end_token: TokenKind,
+    parse_item: () => T,
+  ): T[] {
+    const items: T[] = []
+    let first = true
+
+    while (
+      current_token.kind !== t.EndOfFile &&
+      current_token.kind !== end_token
+    ) {
+      if (!first) {
+        expect_or_throw(t.Comma)
+      } else {
+        first = false
+      }
+
+      const entry = parse_item()
+      items.push(entry)
+
+      if (at(t.Comma) && next_is(end_token)) {
+        advance()
+        break
+      }
+    }
+
+    return items
+  }
   function parse_paren_expr(): Expr {
     expect_or_throw(t.LParen)
     const expr = parse_expr()
@@ -374,6 +593,9 @@ function parser_impl(_lexer: Lexer): Parser {
 
   function next_is(token_kind: TokenKind): boolean {
     return lexer.clone().next().kind === token_kind
+  }
+  function next_token(): Token {
+    return lexer.clone().next()
   }
 
   function parse_assignment_expr(): Expr {
@@ -448,6 +670,13 @@ function parser_impl(_lexer: Lexer): Parser {
 
   function parse_pattern(): Pattern {
     assert(false, "TODO")
+  }
+  function is_accessor_type(token: Token): boolean {
+    // In the original Rust implementation, this is defined as a method on Token
+    // The implementation checks if the token is either 'get' or 'set'
+    return (
+      token.kind === t.Ident && (token.text === "get" || token.text === "set")
+    )
   }
 
   function parse_short_circuit_expr(): Expr {
@@ -660,11 +889,12 @@ function parser_impl(_lexer: Lexer): Parser {
     })
   }
 
-  function expect_or_error(kind: TokenKind, message: string): void {
+  function expect_or_error(kind: TokenKind, message: string): Token {
     if (at(kind)) {
-      advance()
+      return advance()
     } else {
       emit_error(message)
+      return { ...current_token, kind: t.Error }
     }
   }
 
