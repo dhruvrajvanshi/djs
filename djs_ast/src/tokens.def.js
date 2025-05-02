@@ -99,6 +99,7 @@ export const tokens = [
   "GreaterThanGreaterThanEq",
   "GreaterThanGreaterThanGreaterThanEq",
   "AmpEq",
+  "VBarEq",
   "CaretEq",
   "BarEq",
   "StarStarEq",

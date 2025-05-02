@@ -1,9 +1,17 @@
 import assert, { AssertionError } from "node:assert"
 import {
   ArrayLiteralMember,
+  ArrowFnBody,
+  AssignOp,
+  BinOp,
+  Block,
   Expr,
   Ident,
+  ObjectKey,
+  ObjectLiteralEntry,
+  ObjectPatternProperty,
   ParseError,
+  Pattern,
   SourceFile,
   Stmt,
 } from "./ast.gen.js"
@@ -26,17 +34,260 @@ function parser_impl(_lexer: Lexer): Parser {
   let last_token: Token | null = null
   let current_token = lexer.next()
   let errors: ParseError[] = []
+
+  const parse_multiplicative_expr = define_binop_parser(
+    parse_exponentiation_expr,
+    t.Star,
+    t.Slash,
+    t.Percent,
+  )
+
+  const parse_additive_expr = define_binop_parser(
+    parse_multiplicative_expr,
+    t.Plus,
+    t.Minus,
+  )
+
+  const parse_shift_expr = define_binop_parser(
+    parse_additive_expr,
+    t.LessThanLessThan,
+    t.GreaterThanGreaterThan,
+    t.GreaterThanGreaterThanGreaterThan,
+  )
+
+  const parse_relational_expr = define_binop_parser(
+    parse_shift_expr,
+    t.LessThan,
+    t.GreaterThan,
+    t.LessThanEq,
+    t.GreaterThanEq,
+    t.In,
+    t.Instanceof,
+  )
+
+  const parse_equality_expr = define_binop_parser(
+    parse_relational_expr,
+    t.EqEq,
+    t.EqEqEq,
+    t.BangEq,
+    t.BangEqEq,
+    t.In,
+    t.Instanceof,
+  )
+
+  const parse_bitwise_and_expr = define_binop_parser(parse_equality_expr, t.Amp)
+
+  const parse_bitwise_xor_expr = define_binop_parser(
+    parse_bitwise_and_expr,
+    t.Caret,
+  )
+
+  const parse_bitwise_or_expr = define_binop_parser(
+    parse_bitwise_xor_expr,
+    t.VBar,
+  )
+
+  const parse_logical_and_expr = define_binop_parser(
+    parse_bitwise_or_expr,
+    t.VBarVBar,
+  )
+
+  const parse_logical_or_expr = define_binop_parser(
+    parse_logical_and_expr,
+    t.AmpAmp,
+  )
+
   return { parse_source_file, parse_expr }
 
-  function parse_expr(): Expr {
-    return parse_primary_expr()
-  }
   function parse_ident(): Ident {
     if (current_token.kind === t.Ident) {
       const tok = advance()
       return { span: tok.span, text: tok.text }
     } else {
       throw new Error(`Expected identifier, got ${current_token.kind}`)
+    }
+  }
+  function parse_expr(): Expr {
+    const comma_exprs: Expr[] = [parse_assignment_expr()]
+
+    while (current_token.kind === t.Comma) {
+      advance()
+      comma_exprs.push(parse_assignment_expr())
+    }
+
+    if (comma_exprs.length === 1) {
+      return comma_exprs[0]
+    } else {
+      const start = comma_exprs[0].span
+      const end = comma_exprs[comma_exprs.length - 1].span
+      return Expr.Comma(Span.between(start, end), comma_exprs)
+    }
+  }
+
+  function parse_exponentiation_expr(): Expr {
+    // TODO: Handle exponentiation operator
+    return parse_unary_expr()
+  }
+  function parse_update_expr(): Expr {
+    switch (current_token.kind) {
+      case t.PlusPlus: {
+        const start = advance()
+        const expr = parse_unary_expr()
+        return Expr.PreIncrement(Span.between(start.span, expr.span), expr)
+      }
+      case t.MinusMinus: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.PreDecrement(Span.between(start, expr.span), expr)
+      }
+      default: {
+        const lhs = parse_left_hand_side_expr()
+        if (at(t.PlusPlus) && !current_is_on_new_line()) {
+          const end = advance()
+          return Expr.PostIncrement(Span.between(lhs.span, end.span), lhs)
+        } else if (at(t.MinusMinus) && !current_is_on_new_line()) {
+          const end = advance()
+          return Expr.PostDecrement(Span.between(lhs.span, end.span), lhs)
+        } else {
+          return lhs
+        }
+      }
+    }
+  }
+  function current_is_on_new_line(): boolean {
+    if (last_token === null) {
+      return false
+    }
+    return current_token.line > last_token.line
+  }
+  function parse_member_or_call_expr(allow_calls: boolean): Expr {
+    let lhs: Expr
+
+    if (current_token.kind === t.New) {
+      const start = advance()
+      // When parsing something like "new Foo()", we don't want to allow calls when parsing Foo
+      // since new Foo() means `new (Foo)()` and not (new (Foo()))
+      const expr = parse_member_or_call_expr(/* allow_calls */ false)
+      lhs = Expr.New(Span.between(start.span, expr.span), expr)
+    } else {
+      lhs = parse_primary_expr()
+    }
+
+    while (true) {
+      switch (current_token.kind) {
+        case t.Dot: {
+          advance()
+          const prop = parse_member_ident_name()
+          const span = Span.between(lhs.span, prop.span)
+          lhs = Expr.Prop(span, lhs, prop)
+          break
+        }
+        case t.LSquare: {
+          const start = advance()
+          const prop = parse_expr()
+          const end = expect_or_throw(t.RSquare)
+          const span = Span.between(start.span, end.span)
+          lhs = Expr.Index(span, lhs, prop)
+          break
+        }
+        case t.LParen: {
+          if (allow_calls) {
+            const args = parse_arguments()
+            const span = Span.between(lhs.span, args.span)
+            lhs = Expr.Call(span, lhs, args.args)
+            break
+          } else {
+            return lhs
+          }
+        }
+        default:
+          return lhs
+      }
+    }
+  }
+
+  function parse_left_hand_side_expr(): Expr {
+    return parse_member_or_call_expr(/* allow_calls */ true)
+  }
+
+  function parse_member_ident_name(): Ident {
+    if (TokenKind.is_keyword(current_token.kind)) {
+      const token = advance()
+      return { span: token.span, text: token.text }
+    } else {
+      return parse_ident()
+    }
+  }
+
+  function parse_arguments(): { args: Expr[]; span: Span } {
+    const first = expect_or_throw(t.LParen)
+    const args = parse_arg_list()
+    const last = expect_or_throw(t.RParen)
+    const span = Span.between(first.span, last.span)
+    return { args, span }
+  }
+
+  function parse_arg_list(): Expr[] {
+    const args: Expr[] = []
+    while (true) {
+      if (
+        current_token.kind === t.RParen ||
+        current_token.kind === t.EndOfFile
+      ) {
+        break
+      }
+
+      // Parse each argument as an assignment expression instead of a comma expression
+      args.push(parse_assignment_expr())
+
+      if (current_token.kind === t.Comma) {
+        advance()
+      } else {
+        break
+      }
+    }
+    return args
+  }
+
+  function parse_unary_expr(): Expr {
+    switch (current_token.kind) {
+      case t.Delete: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.Delete(Span.between(start, expr.span), expr)
+      }
+      case t.Bang: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.Not(Span.between(start, expr.span), expr)
+      }
+      case t.Plus: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.UnaryPlus(Span.between(start, expr.span), expr)
+      }
+      case t.Minus: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.UnaryMinus(Span.between(start, expr.span), expr)
+      }
+      case t.Typeof: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.TypeOf(Span.between(start, expr.span), expr)
+      }
+      case t.Void: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.Void(Span.between(start, expr.span), expr)
+      }
+      case t.Await: {
+        const start = advance().span
+        const expr = parse_unary_expr()
+        return Expr.Await(Span.between(start, expr.span), expr)
+      }
+      default:
+        return parse_update_expr()
     }
   }
 
@@ -126,7 +377,145 @@ function parser_impl(_lexer: Lexer): Parser {
   }
 
   function parse_assignment_expr(): Expr {
-    throw new Error("Not implemented")
+    switch (current_token.kind) {
+      case t.Yield: {
+        const start = advance()
+        if (current_is_on_new_line()) {
+          return Expr.Yield(start.span, null)
+        } else {
+          let is_yield_from = false
+          if (at(t.Star)) {
+            advance()
+            is_yield_from = true
+          }
+          const expr = parse_assignment_expr()
+          const span = Span.between(start.span, expr.span)
+          if (is_yield_from) {
+            return Expr.YieldFrom(span, expr)
+          } else {
+            return Expr.Yield(span, expr)
+          }
+        }
+      }
+      case t.Ident:
+        if (next_is(t.FatArrow) && !current_is_on_new_line()) {
+          const pattern = parse_pattern()
+          const params = {
+            span: pattern.span,
+            params: [{ span: pattern.span, pattern }],
+          }
+          expect_or_throw(t.FatArrow)
+          const body = parse_arrow_fn_body()
+          return Expr.ArrowFn(
+            Span.between(params.span, body.span),
+            params,
+            body,
+          )
+        }
+      // Fall through to default case
+      case t.LParen:
+        if (can_start_arrow_fn()) {
+          return parse_arrow_fn()
+        }
+      // Fall through to default case
+      default: {
+        const lhs = parse_conditional_expr()
+        const assignOp = assign_op(current_token.kind)
+
+        if (assignOp !== null) {
+          const lhsPattern = expr_to_pattern(lhs)
+          if (lhsPattern === null) {
+            emit_error("Invalid left-hand side in assignment")
+            return Expr.ParseError(current_token.span)
+          }
+
+          advance()
+          const rhs = parse_assignment_expr()
+          const span = Span.between(lhsPattern.span, rhs.span)
+          return Expr.Assign(span, lhsPattern, assignOp, rhs)
+        } else {
+          return lhs
+        }
+      }
+    }
+  }
+  function can_start_arrow_fn(): boolean {
+    assert(false, "TODO")
+  }
+  function parse_arrow_fn(): Expr {
+    assert(false, "TODO")
+  }
+
+  function parse_pattern(): Pattern {
+    assert(false, "TODO")
+  }
+
+  function parse_short_circuit_expr(): Expr {
+    // TODO: parse_coalesce_expr
+    return parse_logical_or_expr()
+  }
+  function parse_conditional_expr(): Expr {
+    const lhs = parse_short_circuit_expr()
+
+    switch (current_token.kind) {
+      case t.Question: {
+        advance()
+        const consequent = parse_expr()
+        expect_or_throw(t.Colon)
+        const alternate = parse_assignment_expr()
+        const span = Span.between(lhs.span, alternate.span)
+        return Expr.Ternary(span, lhs, consequent, alternate)
+      }
+      default:
+        return lhs
+    }
+  }
+  function parse_arrow_fn_body(): ArrowFnBody {
+    switch (current_token.kind) {
+      case t.LBrace: {
+        const start = advance()
+        const stmts: Stmt[] = []
+
+        while (!at(t.RBrace) && !at(t.EndOfFile)) {
+          stmts.push(parse_stmt())
+        }
+
+        const stop = expect_or_throw(t.RBrace)
+        const span = Span.between(start.span, stop.span)
+
+        return ArrowFnBody.Block(span, {
+          span,
+          stmts,
+        })
+      }
+      default: {
+        const e = parse_expr()
+        return ArrowFnBody.Expr(e.span, e)
+      }
+    }
+  }
+  function parse_block(): Block {
+    const start = expect_or_throw(t.LBrace)
+    const stmts = parse_stmt_list((token_kind) => token_kind === t.RBrace)
+    const stop = expect_or_throw(t.RBrace)
+    return {
+      span: Span.between(start.span, stop.span),
+      stmts,
+    }
+  }
+
+  function parse_stmt_list(
+    end_token: (token_kind: TokenKind) => boolean,
+  ): Stmt[] {
+    const stmts: Stmt[] = []
+    while (
+      !end_token(current_token.kind) &&
+      current_token.kind !== t.EndOfFile
+    ) {
+      const stmt = parse_stmt()
+      stmts.push(stmt)
+    }
+    return stmts
   }
 
   function parse_array_literal(): Expr {
@@ -337,5 +726,195 @@ function parser_impl(_lexer: Lexer): Parser {
     last_token = current_token
     current_token = lexer.next()
     return last_token
+  }
+
+  function define_binop_parser(
+    next_fn: () => Expr,
+    ...kinds: readonly TokenKind[]
+  ) {
+    return function () {
+      let lhs = next_fn()
+      const op_kinds = new Set(kinds)
+      while (op_kinds.has(current_token.kind)) {
+        const op = parse_bin_op(advance().kind)
+        const rhs = next_fn()
+        const span = Span.between(lhs.span, rhs.span)
+        lhs = Expr.BinOp(span, lhs, op, rhs)
+      }
+
+      return lhs
+    }
+  }
+}
+const TOKEN_TO_BINOP = {
+  [t.EqEq]: BinOp.EqEq,
+  [t.EqEqEq]: BinOp.EqEqEq,
+  [t.BangEq]: BinOp.NotEq,
+  [t.BangEqEq]: BinOp.NotEqEq,
+  [t.LessThan]: BinOp.Lt,
+  [t.LessThanEq]: BinOp.Lte,
+  [t.GreaterThan]: BinOp.Gt,
+  [t.GreaterThanEq]: BinOp.Gte,
+  [t.Plus]: BinOp.Add,
+  [t.Minus]: BinOp.Sub,
+  [t.Star]: BinOp.Mul,
+  [t.Slash]: BinOp.Div,
+  [t.Percent]: BinOp.Mod,
+  [t.In]: BinOp.In,
+  [t.Instanceof]: BinOp.Instanceof,
+  [t.AmpAmp]: BinOp.And,
+  [t.VBarVBar]: BinOp.Or,
+  [t.VBar]: BinOp.BitOr,
+  [t.Caret]: BinOp.BitXor,
+  [t.Amp]: BinOp.BitAnd,
+  [t.LessThanLessThan]: BinOp.LeftShift,
+  [t.GreaterThanGreaterThan]: BinOp.RightShift,
+  [t.GreaterThanGreaterThanGreaterThan]: BinOp.UnsignedRightShift,
+}
+function parse_bin_op(kind: TokenKind): BinOp {
+  const op = TOKEN_TO_BINOP[kind]
+  assert(op !== undefined, `Unknown binop kind: ${kind}`)
+  return op
+}
+
+function expr_to_pattern(expr: Expr): Pattern | null {
+  switch (expr.kind) {
+    case "Var":
+      return Pattern.Var(expr.span, expr.ident)
+    case "Object":
+      return obj_literal_to_pattern(expr.span, expr.entries)
+    case "Array":
+      return array_literal_to_pattern(expr.span, expr.items)
+    case "Prop":
+      return Pattern.Prop(
+        expr.span,
+        expr.lhs,
+        ObjectKey.Ident(expr.property.span, expr.property),
+      )
+    case "Index":
+      return Pattern.Prop(
+        expr.span,
+        expr.lhs,
+        ObjectKey.Computed(expr.property.span, expr.property),
+      )
+    default:
+      return null
+  }
+}
+function obj_literal_to_pattern(
+  span: Span,
+  entries: readonly ObjectLiteralEntry[],
+): Pattern | null {
+  const properties: ObjectPatternProperty[] = []
+  let rest: Pattern | null = null
+
+  for (let index = 0; index < entries.length; index++) {
+    const entry = entries[index]
+
+    switch (entry.kind) {
+      case "Ident": {
+        properties.push({
+          span: entry.ident.span,
+          key: ObjectKey.Ident(entry.ident.span, entry.ident),
+          value: Pattern.Var(entry.ident.span, entry.ident),
+        })
+        break
+      }
+      case "Prop": {
+        const pattern = expr_to_pattern(entry.value)
+        if (pattern === null) {
+          return null
+        }
+        properties.push({
+          span: entry.span,
+          key: entry.key,
+          value: pattern,
+        })
+        break
+      }
+      case "Spread": {
+        if (index !== entries.length - 1) {
+          return null
+        }
+        const pattern = expr_to_pattern(entry.expr)
+        if (pattern === null) {
+          return null
+        }
+        rest = pattern
+        break
+      }
+      case "Method": {
+        return null
+      }
+    }
+  }
+
+  return Pattern.Object(span, properties, rest)
+}
+
+function array_literal_to_pattern(
+  span: Span,
+  items: readonly ArrayLiteralMember[],
+): Pattern | null {
+  const members: Pattern[] = []
+
+  for (const item of items) {
+    switch (item.kind) {
+      case "Elision": {
+        members.push(Pattern.Elision(item.span))
+        break
+      }
+      case "Expr": {
+        const pattern = expr_to_pattern(item.expr)
+        if (pattern === null) {
+          return null
+        }
+        members.push(pattern)
+        break
+      }
+      case "Spread": {
+        const pattern = expr_to_pattern(item.expr)
+        if (pattern === null) {
+          return null
+        }
+        members.push(Pattern.Rest(pattern.span, pattern))
+        break
+      }
+    }
+  }
+
+  return Pattern.Array(span, members)
+}
+
+function assign_op(kind: TokenKind): AssignOp | null {
+  switch (kind) {
+    case t.Eq:
+      return AssignOp.Eq
+    case t.PlusEq:
+      return AssignOp.AddEq
+    case t.MinusEq:
+      return AssignOp.SubEq
+    case t.StarEq:
+      return AssignOp.MulEq
+    case t.SlashEq:
+      return AssignOp.DivEq
+    case t.PercentEq:
+      return AssignOp.ModEq
+    case t.AmpEq:
+      return AssignOp.BitAndEq
+    case t.VBarEq:
+      return AssignOp.BitOrEq
+    case t.CaretEq:
+      return AssignOp.BitXorEq
+    case t.LessThanLessThanEq:
+      return AssignOp.LeftShiftEq
+    case t.GreaterThanGreaterThanEq:
+      return AssignOp.RightShiftEq
+    case t.GreaterThanGreaterThanGreaterThanEq:
+      return AssignOp.UnsignedRightShiftEq
+    case t.StarStarEq:
+      return AssignOp.ExponentEq
+    default:
+      return null
   }
 }
