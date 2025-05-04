@@ -625,7 +625,6 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_assignment_expr(): Expr {
-    console.log("Parse assignment expr")
     if (at(t.Yield)) {
       const start = advance()
       if (current_is_on_new_line()) {
@@ -658,7 +657,6 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       const body = parse_arrow_fn_body()
       return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
     } else if (at(t.LParen) && can_start_arrow_fn()) {
-      console.log("Parsing arrow function")
       return parse_arrow_fn()
     } else {
       const lhs = parse_conditional_expr()
@@ -942,7 +940,6 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     if (current_token.kind === token_kind) {
       return advance()
     } else {
-      console.log(preview_lines(source, current_token.span))
       throw new AssertionError({
         message: `Expected ${token_kind}, got ${current_token.kind} at ${current_token.span.start}`,
         stackStartFn: expect_or_throw,
@@ -1029,7 +1026,6 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       default:
         const expr_stmt = parse_expr_stmt()
-        console.log("Expr stmt")
         if (expr_stmt.expr.kind === "ParseError") {
           while (true) {
             if (at(t.EndOfFile)) break
@@ -1218,7 +1214,6 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     const span = current_token.span
     while (!at(t.EndOfFile)) {
       let start_tok = current_token
-      console.log("Parsing statement", current_token.kind)
       stmts.push(parse_stmt())
       if (current_token === start_tok) {
         advance()
