@@ -576,7 +576,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
   function parse_comma_separated_list<T>(
     end_token: TokenKind,
-    parse_item: () => T,
+    parse_item: () => T | "BREAK",
   ): T[] {
     const items: T[] = []
     let first = true
@@ -596,6 +596,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
 
       const entry = parse_item()
+      if (entry === "BREAK") {
+        return []
+      }
       items.push(entry)
 
       if (at(t.Comma) && next_is(end_token)) {
@@ -622,6 +625,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_assignment_expr(): Expr {
+    console.log("Parse assignment expr")
     if (at(t.Yield)) {
       const start = advance()
       if (current_is_on_new_line()) {
@@ -654,6 +658,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       const body = parse_arrow_fn_body()
       return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
     } else if (at(t.LParen) && can_start_arrow_fn()) {
+      console.log("Parsing arrow function")
       return parse_arrow_fn()
     } else {
       const lhs = parse_conditional_expr()
@@ -1024,6 +1029,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       default:
         const expr_stmt = parse_expr_stmt()
+        console.log("Expr stmt")
         if (expr_stmt.expr.kind === "ParseError") {
           while (true) {
             if (at(t.EndOfFile)) break
@@ -1130,7 +1136,19 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       `Expected can_start_arrow_fn to be called when current token is a (, found ${current_token.kind}`,
     )
     const restore = fork()
-    parse_comma_separated_list(t.RParen, parse_pattern)
+    let error = false
+    parse_comma_separated_list(t.RParen, () => {
+      const p = parse_pattern()
+      if (p.kind === "ParseError") {
+        error = true
+        return "BREAK"
+      } else {
+        return 0
+      }
+    })
+    if (error) {
+      return restore(false)
+    }
     const rparen = advance()
     if (rparen.kind !== t.RParen) {
       return restore(false)
@@ -1199,7 +1217,12 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     const stmts: Stmt[] = []
     const span = current_token.span
     while (!at(t.EndOfFile)) {
+      let start_tok = current_token
+      console.log("Parsing statement", current_token.kind)
       stmts.push(parse_stmt())
+      if (current_token === start_tok) {
+        advance()
+      }
     }
     return { span, stmts, errors }
   }
