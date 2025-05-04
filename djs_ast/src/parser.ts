@@ -6,6 +6,7 @@ import {
   AssignOp,
   BinOp,
   Block,
+  DeclType,
   Expr,
   Ident,
   ObjectKey,
@@ -17,6 +18,8 @@ import {
   Pattern,
   SourceFile,
   Stmt,
+  VarDecl,
+  VarDeclarator,
 } from "./ast.gen.js"
 import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
@@ -941,12 +944,12 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
   function parse_stmt(): Stmt {
     switch (current_token.kind) {
-      // case t.Let:
-      // case t.Const:
-      // case t.Var: {
-      //   const decl = parse_var_decl()
-      //   return Stmt.VarDecl(decl)
-      // }
+      case t.Let:
+      case t.Const:
+      case t.Var: {
+        const decl = parse_var_decl()
+        return Stmt.VarDecl(decl.span, decl)
+      }
       case t.If:
         return parse_if_stmt()
       // case t.Switch:
@@ -1027,6 +1030,69 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         }
         return expr_stmt
     }
+  }
+  function parse_var_decl(): VarDecl {
+    let span = current_token.span
+
+    let decl_type: DeclType
+    switch (current_token.kind) {
+      case t.Let:
+        advance()
+        decl_type = DeclType.Let
+        break
+      case t.Const:
+        advance()
+        decl_type = DeclType.Const
+        break
+      case t.Var:
+        advance()
+        decl_type = DeclType.Var
+        break
+      default:
+        throw new Error(
+          `Expected let, const, or var, got ${current_token.kind}`,
+        )
+    }
+
+    const declarators: VarDeclarator[] = []
+    declarators.push(parse_var_declarator())
+
+    while (at(t.Comma)) {
+      advance()
+      declarators.push(parse_var_declarator())
+    }
+
+    // Update span to include all declarators
+    if (declarators.length > 0) {
+      const lastDeclarator = declarators[declarators.length - 1]
+      span = Span.between(
+        span,
+        lastDeclarator.init?.span || lastDeclarator.pattern.span,
+      )
+    }
+
+    expect_semi()
+
+    return {
+      span,
+      decl_type,
+      declarators,
+    }
+  }
+
+  function parse_var_declarator(): VarDeclarator {
+    // Parse the pattern with restrictions - no assignment or spread allowed
+    const pattern = parse_pattern_with_precedence(
+      ~(PatternFlags.ALLOW_ASSIGNMENT | PatternFlags.ALLOW_SPREAD),
+    )
+
+    let init: Expr | null = null
+    if (current_token.kind === t.Eq) {
+      advance()
+      init = parse_assignment_expr()
+    }
+
+    return { pattern, init }
   }
 
   function can_start_arrow_fn(): boolean {
