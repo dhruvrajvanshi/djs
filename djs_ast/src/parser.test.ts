@@ -1,7 +1,6 @@
-import { test } from "vitest"
+import { test, expect } from "vitest"
 import { Parser } from "./parser"
 import { Expr } from "./ast.gen"
-import { expect } from "vitest"
 import { pretty_print } from "./pretty_print"
 import fs from "fs/promises"
 
@@ -38,19 +37,18 @@ test("parse error for missing parenthesis in if condition", () => {
 const test262Paths: string[] = []
 
 for await (const path of fs.glob("../test262/test/**/*.js")) {
-  test262Paths.push(path)
-}
-test.each(test262Paths)("test262: %s", async (filePath) => {
-  // Skip staging files
-  if (filePath.includes("staging")) {
-    return
+  if (path.includes("staging")) {
+    continue
   }
 
   // Skip known problematic files that cause stack overflow
-  if (filePath.includes("test/language/statements/function/S13.2.1_A1_T1.js")) {
-    return
+  if (path.includes("test/language/statements/function/S13.2.1_A1_T1.js")) {
+    continue
   }
-
+  test262Paths.push(path)
+}
+test.each(test262Paths)("test262: %s", async (filePath) => {
+  console.log(`Testing ${filePath}`)
   const source = await fs.readFile(filePath, "utf-8")
 
   const expectedParseError = syntax_error_expected(source)
