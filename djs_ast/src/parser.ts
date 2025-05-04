@@ -23,6 +23,7 @@ import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
 import { error } from "node:console"
+import { preview_lines } from "./diagnostic.js"
 
 interface Parser {
   parse_source_file(): SourceFile
@@ -245,7 +246,8 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_arguments(): { args: Expr[]; span: Span } {
-    const first = expect_or_throw(t.LParen)
+    const first = advance()
+    assert(first.kind === t.LParen)
     const args = parse_arg_list()
     const last = expect_or_throw(t.RParen)
     const span = Span.between(first.span, last.span)
@@ -802,6 +804,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     if (current_token.kind === token_kind) {
       return advance()
     } else {
+      console.log(preview_lines(source, current_token.span))
       throw new AssertionError({
         message: `Expected ${token_kind}, got ${current_token.kind} at ${current_token.span.start}`,
         stackStartFn: expect_or_throw,
