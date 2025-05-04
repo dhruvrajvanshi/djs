@@ -4,14 +4,7 @@
         "checkJs": true,
         "outDir": "../target",
         "strict": true,
-        "lib": ["ES2022", "WebWorker"],
-        "target": "ES2022"
-    },
-    "files": [
-        "index.d.ts",
-        "src/ast.def.js",
-        "src/tokens.def.js",
-        "gen_ts_ast.js",
-        "gen_ts_tokens.js"
-    ]
+        "target": "ES2022",
+        "module": "ESNext",
+    }
 }
