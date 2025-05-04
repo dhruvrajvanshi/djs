@@ -356,19 +356,19 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       case t.LParen:
         return parse_paren_expr()
-      // case t.Async: {
-      //   advance()
-      //   if (at(t.Function)) {
-      //     const f = parse_function()
-      //     return Expr.Func(f.span, f)
-      //   } else {
-      //     return parse_arrow_fn()
-      //   }
-      // }
-      // case t.Function: {
-      //   const f = parse_function()
-      //   return Expr.Func(f.span, f)
-      // }
+      case t.Async: {
+        advance()
+        if (at(t.Function)) {
+          const f = parse_function()
+          return Expr.Func(f.span, f)
+        } else {
+          return parse_arrow_fn()
+        }
+      }
+      case t.Function: {
+        const f = parse_function()
+        return Expr.Func(f.span, f)
+      }
       case t.Throw: {
         const start = advance().span
         const expr = parse_expr()
