@@ -680,13 +680,141 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_pattern(): Pattern {
-    if (at(t.Ident)) {
-      const ident = parse_ident()
-      return Pattern.Var(ident.span, ident)
-    } else {
-      emit_error("Expected a pattern")
+    return parse_pattern_with_precedence(PatternFlags.all())
+  }
+
+  function parse_pattern_with_precedence(flags: number): Pattern {
+    let head: Pattern
+
+    switch (current_token.kind) {
+      case t.Ident: {
+        const ident = parse_binding_ident()
+        head = Pattern.Var(ident.span, ident)
+        break
+      }
+      case t.DotDotDot: {
+        if ((flags & PatternFlags.ALLOW_SPREAD) !== 0) {
+          advance()
+          const pattern = parse_pattern_with_precedence(
+            ~(PatternFlags.ALLOW_ASSIGNMENT | PatternFlags.ALLOW_SPREAD),
+          )
+          head = Pattern.Rest(pattern.span, pattern)
+          break
+        }
+        emit_error("Unexpected rest pattern")
+        head = Pattern.ParseError(current_token.span)
+        break
+      }
+      case t.LSquare: {
+        const start = advance()
+        const elements: Pattern[] = []
+
+        while (true) {
+          if (
+            (at(t.Comma) && next_is(t.RSquare) && elements.length > 0) ||
+            at(t.RSquare) ||
+            at(t.EndOfFile)
+          ) {
+            if (at(t.Comma)) {
+              advance()
+            }
+            break
+          } else if (at(t.Comma)) {
+            const span = advance().span
+            elements.push(Pattern.Elision(span))
+          } else {
+            elements.push(parse_pattern())
+            if (at(t.RSquare)) {
+              break
+            }
+            expect_or_throw(t.Comma)
+          }
+        }
+
+        const end = expect_or_throw(t.RSquare)
+        head = Pattern.Array(Span.between(start.span, end.span), elements)
+        break
+      }
+      case t.LBrace: {
+        const start = advance()
+        const properties: ObjectPatternProperty[] = []
+        let rest: Pattern | null = null
+
+        while (true) {
+          if (at(t.RBrace) || at(t.EndOfFile)) {
+            break
+          } else if (at(t.DotDotDot)) {
+            advance()
+            const restPattern = parse_pattern()
+            rest = restPattern
+
+            if (at(t.Comma)) {
+              advance()
+            }
+            break
+          } else {
+            const property = parse_object_pattern_property()
+            properties.push(property)
+
+            if (at(t.RBrace)) {
+              break
+            }
+            expect_or_throw(t.Comma)
+          }
+        }
+
+        const stop = expect_or_throw(t.RBrace)
+        head = Pattern.Object(
+          Span.between(start.span, stop.span),
+          properties,
+          rest,
+        )
+        break
+      }
+      default:
+        emit_error(`Expected a pattern, got ${current_token.kind}`)
+        head = Pattern.ParseError(current_token.span)
+        break
+    }
+
+    if (
+      current_token.kind === t.Eq &&
+      (flags & PatternFlags.ALLOW_ASSIGNMENT) !== 0
+    ) {
       advance()
-      return Pattern.ParseError(current_token.span)
+      const init = parse_assignment_expr()
+      return Pattern.Assignment(Span.between(head.span, init.span), head, init)
+    }
+
+    return head
+  }
+
+  function parse_binding_ident(): Ident {
+    // TODO: Handle [Yield, Await] as identifier names
+    return parse_ident()
+  }
+
+  function parse_object_pattern_property(): ObjectPatternProperty {
+    const key = parse_object_key()
+    let value: Pattern
+
+    if (current_token.kind === t.Colon) {
+      advance()
+      value = parse_pattern()
+    } else if (key.kind === "Ident") {
+      value = Pattern.Var(key.span, {
+        span: key.span,
+        text: key.ident.text,
+      })
+    } else {
+      expect_or_throw(t.Colon)
+      value = parse_pattern()
+    }
+
+    return {
+      span: Span.between(key.span, value.span),
+      key,
+      value,
     }
   }
   function is_accessor_type(token: Token): boolean {
@@ -1184,4 +1312,15 @@ function assign_op(kind: TokenKind): AssignOp | null {
     default:
       return null
   }
+}
+
+// Pattern flags bitmask values
+const PatternFlags = {
+  NONE: 0,
+  ALLOW_ASSIGNMENT: 1 << 0,
+  ALLOW_SPREAD: 1 << 1,
+
+  all(): number {
+    return this.ALLOW_ASSIGNMENT | this.ALLOW_SPREAD
+  },
 }

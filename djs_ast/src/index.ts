@@ -19,12 +19,6 @@ async function main(path: string) {
   const source_text = await fs.readFile(path, "utf-8")
   const parser = Parser(source_text)
   const source_file = parser.parse_source_file()
-  console.log(
-    pretty_print(source_file)
-      .split("\n")
-      .map((line, idx) => `${idx + 1}: ${line}`)
-      .join("\n"),
-  )
 
   console.log(
     source_file.errors
@@ -34,6 +28,14 @@ async function main(path: string) {
       )
       .join("\n\n"),
   )
+
+  console.log(
+    pretty_print(source_file)
+      .split("\n")
+      .map((line, idx) => `${idx + 1}: ${line}`)
+      .join("\n"),
+  )
+
   console.log(`Found ${source_file.errors.length} error(s)`)
 }
 function preview_lines(source: string, span: Span) {

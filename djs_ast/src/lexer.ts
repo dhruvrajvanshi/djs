@@ -74,7 +74,7 @@ export function lexer_impl(
   }
 
   function next(): Token {
-    consume_whitespace()
+    skip_whitespace_and_comments()
     span_start = current_index
     if (current_char() === "\0") {
       return make_token(TokenKind.EndOfFile)
@@ -337,6 +337,55 @@ export function lexer_impl(
       return make_token(TokenKind.Error)
     }
   }
+  function skip_whitespace_and_comments(): void {
+    while (is_whitespace(current_char()) || at_comment()) {
+      if (is_whitespace(current_char())) {
+        skip_whitespace()
+      } else {
+        skip_comment()
+      }
+    }
+  }
+
+  function skip_whitespace(): void {
+    while (is_whitespace(current_char())) {
+      advance()
+    }
+  }
+
+  function at_comment(): boolean {
+    return (
+      (current_char() === "/" && next_char() === "/") ||
+      (current_char() === "/" && next_char() === "*")
+    )
+  }
+
+  function skip_comment(): void {
+    const first = advance()
+    assert(first === "/", "Expected '/' at the start of a comment")
+
+    const second = advance()
+    assert(second === "/" || second === "*", "Expected '/' or '*' after '/'")
+
+    if (second === "/") {
+      // Line comment
+      while (current_char() !== "\n" && current_char() !== "\0") {
+        advance()
+      }
+    } else {
+      // Block comment
+      while (true) {
+        const c = advance()
+        if (c === "\0") {
+          throw new Error(`Unclosed block comment at line ${line}`)
+        }
+        if (c === "*" && current_char() === "/") {
+          advance() // Consume the closing '/'
+          break
+        }
+      }
+    }
+  }
   function lex_number(): Token {
     while (is_ascii_digit(current_char())) {
       advance()
@@ -553,12 +602,6 @@ export function lexer_impl(
   }
   function next_char(): string {
     return input[current_index + 1] ?? "\0"
-  }
-
-  function consume_whitespace() {
-    while (is_whitespace(current_char())) {
-      advance()
-    }
   }
 
   function advance(): string {
