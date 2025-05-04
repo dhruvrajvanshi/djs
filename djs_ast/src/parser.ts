@@ -670,7 +670,11 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_arrow_fn(): Expr {
-    assert(false, "TODO")
+    const params = parse_params_with_parens()
+    expect_or_throw(t.FatArrow)
+    const body = parse_arrow_fn_body()
+
+    return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
   }
 
   function parse_pattern(): Pattern {
