@@ -22,21 +22,50 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
+import { error } from "node:console"
 
 interface Parser {
   parse_source_file(): SourceFile
   parse_expr(): Expr
 }
 export function Parser(source: string): Parser {
-  return parser_impl(Lexer(source))
+  return parser_impl(source, Lexer(source))
 }
 
 const t = TokenKind
-function parser_impl(_lexer: Lexer): Parser {
+function parser_impl(source: string, _lexer: Lexer): Parser {
   let lexer = _lexer
   let last_token: Token | null = null
   let current_token = lexer.next()
   let errors: ParseError[] = []
+  let is_forked = false
+
+  function fork(): <T>(value: T) => T {
+    assert(!is_forked)
+    const snapshot = {
+      lexer: _lexer.clone(),
+      last_token: last_token,
+      current_token: current_token,
+      errors: [...errors],
+    }
+    is_forked = true
+    preview_lines(source, snapshot.current_token.span)
+    console.trace(
+      "Forking parser state",
+      current_token.kind,
+      offset_to_line_and_col(source, snapshot.current_token.span.start),
+    )
+
+    return function restore(value) {
+      is_forked = false
+      console.log("Restoring parser state")
+      lexer = snapshot.lexer
+      last_token = snapshot.last_token
+      current_token = snapshot.current_token
+      errors = snapshot.errors
+      return value
+    }
+  }
 
   const parse_multiplicative_expr = define_binop_parser(
     parse_exponentiation_expr,
@@ -567,6 +596,10 @@ function parser_impl(_lexer: Lexer): Parser {
       current_token.kind !== t.EndOfFile &&
       current_token.kind !== end_token
     ) {
+      console.log(
+        "parse_comma_sep_list loop: current_token",
+        current_token.kind,
+      )
       if (!first) {
         expect_or_throw(t.Comma)
       } else {
@@ -585,9 +618,10 @@ function parser_impl(_lexer: Lexer): Parser {
     return items
   }
   function parse_paren_expr(): Expr {
-    expect_or_throw(t.LParen)
+    const start = advance()
+    assert(start.kind === t.LParen)
     const expr = parse_expr()
-    expect_or_throw(t.RParen)
+    expect_or_error(t.RParen, "Expected a closing )")
     return expr
   }
 
@@ -599,71 +633,60 @@ function parser_impl(_lexer: Lexer): Parser {
   }
 
   function parse_assignment_expr(): Expr {
-    switch (current_token.kind) {
-      case t.Yield: {
-        const start = advance()
-        if (current_is_on_new_line()) {
-          return Expr.Yield(start.span, null)
+    if (at(t.Yield)) {
+      const start = advance()
+      if (current_is_on_new_line()) {
+        return Expr.Yield(start.span, null)
+      } else {
+        let is_yield_from = false
+        if (at(t.Star)) {
+          advance()
+          is_yield_from = true
+        }
+        const expr = parse_assignment_expr()
+        const span = Span.between(start.span, expr.span)
+        if (is_yield_from) {
+          return Expr.YieldFrom(span, expr)
         } else {
-          let is_yield_from = false
-          if (at(t.Star)) {
-            advance()
-            is_yield_from = true
-          }
-          const expr = parse_assignment_expr()
-          const span = Span.between(start.span, expr.span)
-          if (is_yield_from) {
-            return Expr.YieldFrom(span, expr)
-          } else {
-            return Expr.Yield(span, expr)
-          }
+          return Expr.Yield(span, expr)
         }
       }
-      case t.Ident:
-        if (next_is(t.FatArrow) && !current_is_on_new_line()) {
-          const pattern = parse_pattern()
-          const params = {
-            span: pattern.span,
-            params: [{ span: pattern.span, pattern }],
-          }
-          expect_or_throw(t.FatArrow)
-          const body = parse_arrow_fn_body()
-          return Expr.ArrowFn(
-            Span.between(params.span, body.span),
-            params,
-            body,
-          )
-        }
-      // Fall through to default case
-      case t.LParen:
-        if (can_start_arrow_fn()) {
-          return parse_arrow_fn()
-        }
-      // Fall through to default case
-      default: {
-        const lhs = parse_conditional_expr()
-        const assignOp = assign_op(current_token.kind)
+    } else if (
+      at(t.Ident) &&
+      next_is(t.FatArrow) &&
+      !current_is_on_new_line()
+    ) {
+      const pattern = parse_pattern()
+      const params = {
+        span: pattern.span,
+        params: [{ span: pattern.span, pattern }],
+      }
+      expect_or_throw(t.FatArrow)
+      const body = parse_arrow_fn_body()
+      return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
+    } else if (at(t.LParen) && can_start_arrow_fn()) {
+      return parse_arrow_fn()
+    } else {
+      const lhs = parse_conditional_expr()
+      const assignOp = assign_op(current_token.kind)
 
-        if (assignOp !== null) {
-          const lhsPattern = expr_to_pattern(lhs)
-          if (lhsPattern === null) {
-            emit_error("Invalid left-hand side in assignment")
-            return Expr.ParseError(current_token.span)
-          }
-
-          advance()
-          const rhs = parse_assignment_expr()
-          const span = Span.between(lhsPattern.span, rhs.span)
-          return Expr.Assign(span, lhsPattern, assignOp, rhs)
-        } else {
-          return lhs
+      if (assignOp !== null) {
+        const lhsPattern = expr_to_pattern(lhs)
+        if (lhsPattern === null) {
+          emit_error("Invalid left-hand side in assignment")
+          return Expr.ParseError(current_token.span)
         }
+
+        advance()
+        const rhs = parse_assignment_expr()
+        const span = Span.between(lhsPattern.span, rhs.span)
+        return Expr.Assign(span, lhsPattern, assignOp, rhs)
+      } else {
+        return lhs
       }
     }
   }
-  function can_start_arrow_fn(): boolean {
-    assert(false, "TODO")
-  }
+
   function parse_arrow_fn(): Expr {
     assert(false, "TODO")
   }
@@ -880,6 +903,24 @@ function parser_impl(_lexer: Lexer): Parser {
         }
         return expr_stmt
     }
+  }
+
+  function can_start_arrow_fn(): boolean {
+    assert(
+      current_token.kind === t.LParen,
+      `Expected can_start_arrow_fn to be called when current token is a (, found ${current_token.kind}`,
+    )
+    const restore = fork()
+    parse_comma_separated_list(t.RParen, parse_pattern)
+    const rparen = advance()
+    if (rparen.kind !== t.RParen) {
+      return restore(false)
+    }
+    const fatarrow = advance()
+    if (fatarrow.kind !== t.FatArrow) {
+      return restore(false)
+    }
+    return restore(fatarrow.line === rparen.line)
   }
 
   function emit_error(message: string): void {
@@ -1147,4 +1188,47 @@ function assign_op(kind: TokenKind): AssignOp | null {
     default:
       return null
   }
+}
+
+const COLOR_ERROR = "\x1b[31;1m"
+const COLOR_RESET = "\x1b[0m"
+const COLOR_DIMMED = "\x1b[2m"
+function preview_lines(source: string, span: Span) {
+  const [start_line, col] = offset_to_line_and_col(source, span.start)
+  const lines = source.split("\n").slice(start_line - 1, start_line + 2)
+  return lines
+    .map((line, idx) => {
+      const line_number = start_line + idx
+      const prefix = `${line_number}|  `
+      const first = `${COLOR_DIMMED}${prefix}${COLOR_RESET}${line}`
+      if (idx === 0) {
+        return (
+          first +
+          "\n" +
+          " ".repeat(prefix.length + col - 1) +
+          `${COLOR_ERROR}^~~${COLOR_RESET}`
+        )
+      } else return first
+    })
+    .join("\n")
+}
+function offset_to_line(source: string, offset: number): number {
+  return offset_to_line_and_col(source, offset)[0]
+}
+function offset_to_line_and_col(
+  source: string,
+  offset: number,
+): [number, number] {
+  const lines = source.split("\n")
+  let line_number = 1
+  let col_number = offset + 1
+  for (const line of lines) {
+    if (offset < line.length) {
+      return [line_number, col_number]
+    }
+    offset -= line.length + 1
+    line_number++
+    col_number = offset + 1
+  }
+  return [line_number, col_number]
 }
