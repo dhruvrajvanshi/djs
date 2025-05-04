@@ -968,8 +968,10 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         const tok = advance()
         return Stmt.Empty(tok.span)
       }
-      // case t.LBrace:
-      //   return Stmt.Block(parse_block())
+      case t.LBrace: {
+        const block = parse_block()
+        return Stmt.Block(block.span, block)
+      }
       // case t.For: {
       //   let for_stmt_snapshot = clone()
       //   try {
