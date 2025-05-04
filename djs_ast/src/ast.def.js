@@ -139,6 +139,7 @@ const DPattern = Enum(Pattern, ["span", "visit"], {
   Prop: { expr: Expr, key: ObjectKey },
   Elision: {},
   Rest: { pattern: Pattern },
+  ParseError: {},
 })
 const DStmt = Enum(Stmt, ["span", "visit"], {
   Expr: { expr: Expr },

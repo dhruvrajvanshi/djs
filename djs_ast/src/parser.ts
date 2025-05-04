@@ -398,74 +398,63 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
   function parse_object_literal_entry(): ObjectLiteralEntry {
-    switch (current_token.kind) {
-      case t.DotDotDot: {
-        advance()
-        const expr = parse_assignment_expr()
-        return ObjectLiteralEntry.Spread(expr.span, expr)
-      }
-      case t.Ident:
-        if (next_is(t.Comma) || next_is(t.RBrace)) {
-          const ident = parse_ident()
-          return ObjectLiteralEntry.Ident(ident.span, ident)
-        } else if (
-          current_matches(is_accessor_type) &&
-          next_matches(Token.can_start_object_property_name)
-        ) {
-          return parse_object_literal_entry_method()
-        }
-      // Fall through to default
-      case t.Async:
-        if (next_is(t.Star)) {
-          return parse_object_literal_entry_method()
-        } else if (
-          next_is(t.Ident) ||
-          next_is(t.LSquare) ||
-          next_token_is_keyword()
-        ) {
-          return parse_object_literal_entry_method()
-        }
-      // Fall through to default
-      case t.Star:
-        return parse_object_literal_entry_method()
-      case t.Ident:
-        if (next_is(t.LParen)) {
-          return parse_object_literal_entry_method()
-        }
-      // Fall through to default
-      default: {
-        const start = current_token.span
-        const name = parse_object_key()
+    if (at(t.DotDotDot)) {
+      advance()
+      const expr = parse_assignment_expr()
+      return ObjectLiteralEntry.Spread(expr.span, expr)
+    } else if (at(t.Ident) && (next_is(t.Comma) || next_is(t.RBrace))) {
+      const ident = parse_ident()
+      return ObjectLiteralEntry.Ident(ident.span, ident)
+    } else if (
+      at(t.Ident) &&
+      current_matches(is_accessor_type) &&
+      next_matches(Token.can_start_object_property_name)
+    ) {
+      return parse_object_literal_entry_method()
+    } else if (at(t.Async) && next_is(t.Star)) {
+      return parse_object_literal_entry_method()
+    } else if (at(t.Async) && next_is(t.Ident)) {
+      return parse_object_literal_entry_method()
+    } else if (at(t.Async) && next_is(t.LSquare)) {
+      return parse_object_literal_entry_method()
+    } else if (at(t.Async) && next_token_is_keyword()) {
+      return parse_object_literal_entry_method()
+    } else if (at(t.Star)) {
+      return parse_object_literal_entry_method()
+    } else if (at(t.Ident) && next_is(t.LParen)) {
+      return parse_object_literal_entry_method()
+    } else {
+      const start = current_token.span
+      const name = parse_object_key()
 
-        switch (current_token.kind) {
-          case t.LParen: {
-            const params = parse_params_with_parens()
-            const body = parse_block()
-            const span = Span.between(start, body.span)
-            const method = {
+      switch (current_token.kind) {
+        case t.LParen: {
+          const params = parse_params_with_parens()
+          const body = parse_block()
+          const span = Span.between(start, body.span)
+          const method = {
+            span,
+            name,
+            accessor_type: null,
+            body: {
               span,
-              name,
-              accessor_type: null,
-              body: {
-                span,
-                name: null,
-                params,
-                body,
-                is_generator: false,
-                is_async: false,
-              },
-            }
-            return ObjectLiteralEntry.Method(method.span, method)
+              name: null,
+              params,
+              body,
+              is_generator: false,
+              is_async: false,
+            },
           }
-          default: {
-            expect_or_throw(t.Colon)
-            const expr = parse_assignment_expr()
-            return ObjectLiteralEntry.Prop(
-              Span.between(start, expr.span),
-              name,
-              expr,
-            )
-          }
+          return ObjectLiteralEntry.Method(method.span, method)
+        }
+        default: {
+          expect_or_throw(t.Colon)
+          const expr = parse_assignment_expr()
+          return ObjectLiteralEntry.Prop(
+            Span.between(start, expr.span),
+            name,
+            expr,
+          )
         }
       }
     }
@@ -596,12 +585,12 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       current_token.kind !== t.EndOfFile &&
       current_token.kind !== end_token
     ) {
-      console.log(
-        "parse_comma_sep_list loop: current_token",
-        current_token.kind,
-      )
       if (!first) {
-        expect_or_throw(t.Comma)
+        if (at(t.Comma)) {
+          advance()
+        } else {
+          emit_error(`Expected a comma or ${end_token}`)
+        }
       } else {
         first = false
       }
@@ -692,7 +681,13 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_pattern(): Pattern {
-    assert(false, "TODO")
+    if (at(t.Ident)) {
+      const ident = parse_ident()
+      return Pattern.Var(ident.span, ident)
+    } else {
+      emit_error("Expected a pattern")
+      return Pattern.ParseError(current_token.span)
+    }
   }
   function is_accessor_type(token: Token): boolean {
     // In the original Rust implementation, this is defined as a method on Token

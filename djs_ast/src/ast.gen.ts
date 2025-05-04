@@ -377,6 +377,10 @@ export type Pattern =
       readonly span: Span
       readonly pattern: Pattern
     }
+  | {
+      readonly kind: "ParseError"
+      readonly span: Span
+    }
 export type PatternWithKind<K extends Pattern["kind"]> = Extract<
   Pattern,
   { kind: K }
@@ -432,6 +436,11 @@ export const Pattern = {
     kind: "Rest",
     span,
     pattern: pattern,
+  }),
+
+  ParseError: (span: Span): PatternWithKind<"ParseError"> => ({
+    kind: "ParseError",
+    span,
   }),
 } as const
 
