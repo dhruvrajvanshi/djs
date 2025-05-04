@@ -679,6 +679,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       return Pattern.Var(ident.span, ident)
     } else {
       emit_error("Expected a pattern")
+      advance()
       return Pattern.ParseError(current_token.span)
     }
   }
