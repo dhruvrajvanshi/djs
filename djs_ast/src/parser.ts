@@ -1,4 +1,4 @@
-import assert, { AssertionError } from "node:assert"
+import assert, { AssertionError } from "node:assert/strict"
 import {
   AccessorType,
   ArrayLiteralMember,
@@ -20,6 +20,7 @@ import {
   Stmt,
   VarDecl,
   VarDeclarator,
+  type Func,
 } from "./ast.gen.js"
 import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
@@ -27,6 +28,7 @@ import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
 import { error } from "node:console"
 import { preview_lines } from "./diagnostic.js"
+import { todo } from "./assert.js"
 
 interface Parser {
   parse_source_file(): SourceFile
@@ -1001,23 +1003,23 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         const body = parse_stmt()
         return Stmt.With(Span.between(start.span, body.span), obj, body)
       }
-      // case t.Function: {
-      //   const f = parse_function()
-      //   return Stmt.FunctionDecl(f)
-      // }
+      case t.Function: {
+        const f = parse_function()
+        return Stmt.Func(f.span, f)
+      }
       // case t.Class: {
       //   const c = parse_class()
       //   return Stmt.ClassDecl(c)
       // }
-      // case t.Async: {
-      //   if (next_is(t.Function)) {
-      //     advance()
-      //     const f = parse_function()
-      //     return Stmt.FunctionDecl(f)
-      //   } else {
-      //     return unexpected_token()
-      //   }
-      // }
+      case t.Async: {
+        if (next_is(t.Function)) {
+          advance()
+          const f = parse_function()
+          return Stmt.Func(f.span, f)
+        } else {
+          todo()
+        }
+      }
       default:
         const expr_stmt = parse_expr_stmt()
         if (expr_stmt.expr.kind === "ParseError") {
@@ -1029,6 +1031,31 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           }
         }
         return expr_stmt
+    }
+  }
+
+  function parse_function(): Func {
+    const start = advance()
+
+    const is_generator = at(t.Star)
+    if (is_generator) {
+      advance()
+    }
+
+    const name = at(t.Ident) ? parse_ident() : null
+
+    const params = parse_params_with_parens()
+    const body = parse_block()
+
+    const span = Span.between(start.span, body.span)
+
+    return {
+      span,
+      name,
+      params,
+      body,
+      is_generator,
+      is_async: false,
     }
   }
   function parse_var_decl(): VarDecl {
@@ -1207,7 +1234,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 }
-const TOKEN_TO_BINOP = {
+const TOKEN_TO_BINOP: Partial<Record<TokenKind, BinOp>> = {
   [t.EqEq]: BinOp.EqEq,
   [t.EqEqEq]: BinOp.EqEqEq,
   [t.BangEq]: BinOp.NotEq,
