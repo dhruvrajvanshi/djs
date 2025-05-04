@@ -1,5 +1,6 @@
 import { TokenKind } from "./TokenKind.js"
 import { Token } from "./Token.js"
+import assert from "node:assert"
 
 export interface Lexer {
   clone(): Lexer
@@ -11,6 +12,7 @@ export function Lexer(input: string) {
     /* line */ 1,
     /* start_index */ 0,
     /* regex_enabled */ false,
+    /* template_literal_interpolation */ false,
   )
 }
 
@@ -19,14 +21,22 @@ export function lexer_impl(
   _line: number,
   _index: number,
   _regex_enabled: boolean,
+  _template_literal_interpolation: boolean,
 ): Lexer {
   let line = _line
   let span_start = _index
   let current_index = _index
   let regex_enabled = _regex_enabled
+  let template_literal_interpolation = false
   return {
     clone(): Lexer {
-      return lexer_impl(input, line, current_index, regex_enabled)
+      return lexer_impl(
+        input,
+        line,
+        current_index,
+        regex_enabled,
+        template_literal_interpolation,
+      )
     },
     next,
   }
@@ -80,6 +90,10 @@ export function lexer_impl(
     //     self.end_template_literal_interpolation();
     //     self.lex_template_literal_post_interpolation()
     // }
+    else if (at("}") && template_literal_interpolation) {
+      template_literal_interpolation = false
+      return lex_template_literal_post_interpolation()
+    }
     // '}' => self.lex_single_char_token(TokenKind::RBrace),
     else if (at("}")) {
       return lex_single_char_token(TokenKind.RBrace)
@@ -214,8 +228,13 @@ export function lexer_impl(
       return lex_single_char_token(TokenKind.Question)
     }
     // '"' | '\'' => self.lex_simple_string(),
-
+    else if (at('"') || at("'")) {
+      return lex_simple_string()
+    }
     // '`' => self.lex_template_literal_start(),
+    else if (at("`")) {
+      return lex_template_literal_start()
+    }
 
     // _ if at!("<=") => self.lex_2_char_token(TokenKind::LessThanEq),
     else if (at("<=")) {
@@ -325,6 +344,186 @@ export function lexer_impl(
     return make_token(TokenKind.Number)
   }
 
+  function lex_simple_string(): Token {
+    // Verify we're starting with a quote character
+    assert(
+      current_char() === '"' || current_char() === "'",
+      "Expected a quote character",
+    )
+
+    const quote = advance()
+
+    while (current_char() !== "\0" && current_char() !== quote) {
+      const c = advance()
+
+      if (c === "\\") {
+        if (current_char() === "u" || current_char() === "x") {
+          consume_unicode_or_hex_escape()
+        } else if (
+          current_char() !== "\\" &&
+          current_char() !== "b" &&
+          current_char() !== "f" &&
+          current_char() !== "n" &&
+          current_char() !== "r" &&
+          current_char() !== "t" &&
+          current_char() !== "v" &&
+          current_char() !== "'" &&
+          current_char() !== '"' &&
+          current_char() !== "\n"
+        ) {
+          throw new Error(
+            `Invalid escape sequence: ${current_char()} at line ${line}`,
+          )
+        } else {
+          advance()
+        }
+      }
+    }
+
+    const end_quote = advance()
+
+    if (end_quote !== quote) {
+      throw new Error(
+        `Unclosed string literal, expected ${quote} at line ${line}`,
+      )
+    }
+
+    return make_token(TokenKind.String)
+  }
+  function lex_template_literal_start(): Token {
+    assert(current_char() === "`", "Expected backtick character")
+    advance()
+
+    while (true) {
+      const current = current_char()
+
+      if (current === "\\") {
+        advance()
+        if (current_char() === "u" || current_char() === "x") {
+          consume_unicode_or_hex_escape()
+        } else {
+          advance()
+        }
+      } else if (current === "`") {
+        advance()
+        return make_token(TokenKind.TemplateLiteralFragment)
+      } else if (current === "$") {
+        if (next_char() === "{") {
+          advance() // Consume $
+          advance() // Consume {
+          template_literal_interpolation = true
+          return make_token(TokenKind.TemplateLiteralFragment)
+        } else {
+          advance()
+        }
+      } else if (current === "\0") {
+        throw new Error(
+          `Unclosed template literal at line ${line}, expected \``,
+        )
+      } else {
+        advance()
+      }
+    }
+  }
+  function lex_template_literal_post_interpolation(): Token {
+    assert(current_char() === "}", "Expected closing brace")
+    advance()
+
+    while (true) {
+      const current = current_char()
+
+      if (current === "\\") {
+        advance()
+        if (current_char() === "u" || current_char() === "x") {
+          consume_unicode_or_hex_escape()
+        } else {
+          advance()
+        }
+      } else if (current === "`") {
+        advance()
+        return make_token(TokenKind.TemplateLiteralFragment)
+      } else if (current === "$") {
+        if (next_char() === "{") {
+          advance() // Consume $
+          advance() // Consume {
+          template_literal_interpolation = true
+          return make_token(TokenKind.TemplateLiteralFragment)
+        } else {
+          advance()
+        }
+      } else if (current === "\0") {
+        throw new Error(
+          `Unclosed template literal at line ${line}, expected \``,
+        )
+      } else {
+        advance()
+      }
+    }
+  }
+
+  function consume_unicode_or_hex_escape(): void {
+    // Verify we're starting with 'u' or 'x'
+    assert(
+      current_char() === "u" || current_char() === "x",
+      "Expected 'u' or 'x'",
+    )
+
+    const first = advance()
+
+    if (first === "u" && current_char() === "{") {
+      // Unicode code point escape: \u{XXXXXX}
+      advance() // consume the '{'
+      const start_offset = current_index
+      let end_offset = start_offset
+
+      while (current_char() !== "}" && current_char() !== "\0") {
+        const c = advance()
+        if (!is_hex_digit(c)) {
+          throw new Error(
+            `Expected a hex character but got '${c}' at line ${line}`,
+          )
+        } else {
+          end_offset = current_index
+        }
+      }
+
+      const hex_string = input.slice(start_offset, end_offset)
+      // Validate code point is between 0x0 and 0x10FFFF inclusive
+      const code_point = parseInt(hex_string, 16)
+
+      if (isNaN(code_point) || code_point > 0x10ffff) {
+        throw new Error(
+          `Code point must be between 0x0 and 0x10FFFF inclusive, at line ${line}`,
+        )
+      }
+
+      const last = advance()
+      if (last !== "}") {
+        throw new Error(`Expected '}' but reached end of input at line ${line}`)
+      }
+    } else if (first === "u") {
+      // Fixed-length Unicode escape: \uXXXX (exactly 4 hex digits)
+      for (let i = 0; i < 4; i++) {
+        const c = advance()
+        if (!is_hex_digit(c)) {
+          throw new Error(
+            `Expected a hex character but got '${c}' at line ${line}`,
+          )
+        }
+      }
+    } else if (first === "x") {
+      // Hexadecimal escape: \xXX (exactly 2 hex digits)
+      for (let i = 0; i < 2; i++) {
+        const c = advance()
+        if (!is_hex_digit(c)) {
+          throw new Error(
+            `Expected a hex character but got '${c}' at line ${line}`,
+          )
+        }
+      }
+    }
+  }
+
   function lex_ident_or_keyword(): Token {
     while (is_identifier_char(current_char())) {
       advance()
@@ -349,8 +548,11 @@ export function lexer_impl(
           : "",
     }
   }
-  function current_char() {
+  function current_char(): string {
     return input[current_index] ?? "\0"
+  }
+  function next_char(): string {
+    return input[current_index + 1] ?? "\0"
   }
 
   function consume_whitespace() {
@@ -359,7 +561,7 @@ export function lexer_impl(
     }
   }
 
-  function advance() {
+  function advance(): string {
     if (current_index >= input.length) {
       throw new Error("End of input")
     }
@@ -368,6 +570,7 @@ export function lexer_impl(
     if (last_char === "\n") {
       line++
     }
+    return last_char
   }
 }
 
@@ -386,4 +589,10 @@ function is_identifier_start(c: string): boolean {
 
 function is_identifier_char(c: string): boolean {
   return is_identifier_start(c) || is_ascii_digit(c)
+}
+
+function is_hex_digit(c: string): boolean {
+  return (
+    (c >= "0" && c <= "9") || (c >= "a" && c <= "f") || (c >= "A" && c <= "F")
+  )
 }
