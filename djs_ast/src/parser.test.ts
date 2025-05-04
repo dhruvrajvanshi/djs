@@ -48,7 +48,6 @@ for await (const path of fs.glob("../test262/test/**/*.js")) {
   test262Paths.push(path)
 }
 test.each(test262Paths)("test262: %s", async (filePath) => {
-  console.log(`Testing ${filePath}`)
   const source = await fs.readFile(filePath, "utf-8")
 
   const expectedParseError = syntax_error_expected(source)
