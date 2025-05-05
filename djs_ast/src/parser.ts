@@ -216,7 +216,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         case t.LSquare: {
           const start = advance()
           const prop = parse_expr()
-          const end = expect_or_throw(t.RSquare)
+          const end = expect(t.RSquare)
           const span = Span.between(start.span, end.span)
           lhs = Expr.Index(span, lhs, prop)
           break
@@ -254,7 +254,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     const first = advance()
     assert(first.kind === t.LParen)
     const args = parse_arg_list()
-    const last = expect_or_throw(t.RParen)
+    const last = expect(t.RParen)
     const span = Span.between(first.span, last.span)
     return { args, span }
   }
@@ -448,7 +448,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           return ObjectLiteralEntry.Method(method.span, method)
         }
         default: {
-          expect_or_throw(t.Colon)
+          expect(t.Colon)
           const expr = parse_assignment_expr()
           return ObjectLiteralEntry.Prop(
             Span.between(start, expr.span),
@@ -536,7 +536,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       case t.LSquare: {
         advance()
         const expr = parse_expr()
-        expect_or_throw(t.RSquare)
+        expect(t.RSquare)
         return ObjectKey.Computed(expr.span, expr)
       }
       default: {
@@ -547,12 +547,12 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_params_with_parens(): ParamList {
-    const start = expect_or_throw(t.LParen)
+    const start = expect(t.LParen)
     const params: Param[] = []
 
     while (!at(t.RParen) && !at(t.EndOfFile)) {
       if (params.length > 0) {
-        expect_or_throw(t.Comma)
+        expect(t.Comma)
       }
 
       const pattern = parse_pattern()
@@ -567,7 +567,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
     }
 
-    const stop = expect_or_throw(t.RParen)
+    const stop = expect(t.RParen)
     return {
       span: Span.between(start.span, stop.span),
       params,
@@ -653,7 +653,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         span: pattern.span,
         params: [{ span: pattern.span, pattern }],
       }
-      expect_or_throw(t.FatArrow)
+      expect(t.FatArrow)
       const body = parse_arrow_fn_body()
       return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
     } else if (at(t.LParen) && can_start_arrow_fn()) {
@@ -681,7 +681,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
   function parse_arrow_fn(): Expr {
     const params = parse_params_with_parens()
-    expect_or_throw(t.FatArrow)
+    expect(t.FatArrow)
     const body = parse_arrow_fn_body()
 
     return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
@@ -735,11 +735,11 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
             if (at(t.RSquare)) {
               break
             }
-            expect_or_throw(t.Comma)
+            expect(t.Comma)
           }
         }
 
-        const end = expect_or_throw(t.RSquare)
+        const end = expect(t.RSquare)
         head = Pattern.Array(Span.between(start.span, end.span), elements)
         break
       }
@@ -767,11 +767,11 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
             if (at(t.RBrace)) {
               break
             }
-            expect_or_throw(t.Comma)
+            expect(t.Comma)
           }
         }
 
-        const stop = expect_or_throw(t.RBrace)
+        const stop = expect(t.RBrace)
         head = Pattern.Object(
           Span.between(start.span, stop.span),
           properties,
@@ -815,7 +815,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         text: key.ident.text,
       })
     } else {
-      expect_or_throw(t.Colon)
+      expect(t.Colon)
       value = parse_pattern()
     }
 
@@ -844,7 +844,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       case t.Question: {
         advance()
         const consequent = parse_expr()
-        expect_or_throw(t.Colon)
+        expect(t.Colon)
         const alternate = parse_assignment_expr()
         const span = Span.between(lhs.span, alternate.span)
         return Expr.Ternary(span, lhs, consequent, alternate)
@@ -863,7 +863,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           stmts.push(parse_stmt())
         }
 
-        const stop = expect_or_throw(t.RBrace)
+        const stop = expect(t.RBrace)
         const span = Span.between(start.span, stop.span)
 
         return ArrowFnBody.Block(span, {
@@ -878,9 +878,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
   function parse_block(): Block {
-    const start = expect_or_throw(t.LBrace)
+    const start = expect(t.LBrace)
     const stmts = parse_stmt_list((token_kind) => token_kind === t.RBrace)
-    const stop = expect_or_throw(t.RBrace)
+    const stop = expect(t.RBrace)
     return {
       span: Span.between(start.span, stop.span),
       stmts,
@@ -921,7 +921,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           ArrayLiteralMember.Spread(Span.between(start, expr), expr),
         )
         if (at(t.RSquare)) break
-        expect_or_throw(t.Comma)
+        expect(t.Comma)
       } else if (current_token.kind === t.Comma) {
         const span = advance().span
         elements.push(ArrayLiteralMember.Elision(span))
@@ -929,20 +929,20 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         const e = parse_assignment_expr()
         elements.push(ArrayLiteralMember.Expr(e.span, e))
         if (at(t.RSquare)) break
-        expect_or_throw(t.Comma)
+        expect(t.Comma)
       }
     }
-    const end = expect_or_throw(t.RSquare)
+    const end = expect(t.RSquare)
     return Expr.Array(Span.between(start.span, end.span), elements)
   }
 
-  function expect_or_throw(token_kind: TokenKind): Token {
+  function expect(token_kind: TokenKind): Token {
     if (current_token.kind === token_kind) {
       return advance()
     } else {
       throw new AssertionError({
         message: `Expected ${token_kind}, got ${current_token.kind} at ${current_token.span.start}`,
-        stackStartFn: expect_or_throw,
+        stackStartFn: expect,
       })
     }
   }
@@ -1173,7 +1173,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function parse_if_stmt(): Stmt {
-    const start = expect_or_throw(t.If).span
+    const start = expect(t.If).span
     expect_or_error(t.LParen, `Expected a '('`)
 
     const cond = parse_expr()
