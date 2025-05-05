@@ -1,6 +1,6 @@
 import { TokenKind } from "./TokenKind.js"
 import { Token } from "./Token.js"
-import assert from "node:assert"
+import assert, { AssertionError } from "node:assert"
 
 export interface Lexer {
   clone(): Lexer
@@ -577,7 +577,7 @@ export function lexer_impl(
     while (is_identifier_char(current_char())) {
       advance()
     }
-    const token_kind = TokenKind.from_str(current_text()) ?? TokenKind.Ident
+    const token_kind = TokenKind.keyword_kind(current_text()) ?? TokenKind.Ident
     return make_token(token_kind)
   }
   function current_text() {
@@ -585,6 +585,7 @@ export function lexer_impl(
   }
 
   function make_token(kind: TokenKind): Token {
+    assert(typeof kind === "string", "Expected kind to be a string")
     return {
       kind,
       span: { start: span_start, stop: current_index },

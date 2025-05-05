@@ -22,18 +22,22 @@ output += `
   const TokenKinds = Object.freeze({
     ${symbols.join("\n")}
   })
-  const keywords: Record<string, TokenKind> = Object.freeze({
+  const text_to_keyword_kind: Map<string, TokenKind> = new Map([
     ${keywords
-      .map(({ text, variant }) => `\"${text}\": ${JSON.stringify(variant)},`)
+      .map(
+        ({ text, variant }) =>
+          `[${JSON.stringify(text)}, TokenKinds.${variant}],`,
+      )
       .join("\n    ")}
-  })
+  ])
 
   export type TokenKind = typeof TokenKinds[keyof typeof TokenKinds];
-  const keyword_token_kinds = new Set<TokenKind>(Object.values(keywords));
+  const keyword_token_kinds = new Set<TokenKind>(text_to_keyword_kind.values());
+
   export const TokenKind = Object.freeze({
     ...TokenKinds,
-    from_str(s: string): TokenKind | null {
-      return keywords[s] ?? null
+    keyword_kind(s: string): TokenKind | null {
+      return text_to_keyword_kind.get(s) ?? null;
     },
 
     is_keyword(self: TokenKind): boolean {
