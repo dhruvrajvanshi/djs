@@ -130,12 +130,13 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
   return { parse_source_file }
 
-  function parse_ident(): Ident {
+  function parse_ident(): Ident | Err {
     if (current_token.kind === t.Ident) {
       const tok = advance()
       return { span: tok.span, text: tok.text }
     } else {
-      throw new Error(`Expected identifier, got ${current_token.kind}`)
+      emit_error("Expected an identifier")
+      return ERR
     }
   }
   function parse_expr(): Expr | Err {
@@ -219,6 +220,8 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         case t.Dot: {
           advance()
           const prop = parse_member_ident_name()
+          if (prop === ERR) return prop
+
           const span = Span.between(lhs.span, prop.span)
           lhs = Expr.Prop(span, lhs, prop)
           break
@@ -254,7 +257,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     return parse_member_or_call_expr(/* allow_calls */ true)
   }
 
-  function parse_member_ident_name(): Ident {
+  function parse_member_ident_name(): Ident | Err {
     if (TokenKind.is_keyword(current_token.kind)) {
       const token = advance()
       return { span: token.span, text: token.text }
@@ -351,6 +354,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     switch (current_token.kind) {
       case t.Ident: {
         const ident = parse_ident()
+        if (ident === ERR) return ERR
         return Expr.Var(ident.span, ident)
       }
       case t.True:
@@ -431,6 +435,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       return ObjectLiteralEntry.Spread(expr.span, expr)
     } else if (at(t.Ident) && (next_is(t.Comma) || next_is(t.RBrace))) {
       const ident = parse_ident()
+      if (ident === ERR) return ERR
       return ObjectLiteralEntry.Ident(ident.span, ident)
     } else if (
       at(t.Ident) &&
@@ -578,6 +583,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       default: {
         const name = parse_member_ident_name()
+        if (name === ERR) return ERR
         return ObjectKey.Ident(name.span, name)
       }
     }
@@ -743,6 +749,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     switch (current_token.kind) {
       case t.Ident: {
         const ident = parse_binding_ident()
+        if (ident === ERR) return ERR
         head = Pattern.Var(ident.span, ident)
         break
       }
@@ -847,7 +854,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     return head
   }
 
-  function parse_binding_ident(): Ident {
+  function parse_binding_ident(): Ident | Err {
     // TODO: Handle [Yield, Await] as identifier names
     return parse_ident()
   }
@@ -1098,6 +1105,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
 
     const name = at(t.Ident) ? parse_ident() : null
+    if (name === ERR) return ERR
 
     const params = parse_params_with_parens()
     if (params === ERR) return ERR

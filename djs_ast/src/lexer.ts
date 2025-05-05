@@ -409,24 +409,27 @@ export function lexer_impl(
         if (current_char() === "u" || current_char() === "x") {
           consume_unicode_or_hex_escape()
         } else if (
-          current_char() !== "\\" &&
-          current_char() !== "b" &&
-          current_char() !== "f" &&
-          current_char() !== "n" &&
-          current_char() !== "r" &&
-          current_char() !== "t" &&
-          current_char() !== "v" &&
-          current_char() !== "'" &&
-          current_char() !== '"' &&
-          current_char() !== "\n"
+          c !== "\\" &&
+          c !== "b" &&
+          c !== "f" &&
+          c !== "n" &&
+          c !== "r" &&
+          c !== "t" &&
+          c !== "v" &&
+          c !== "'" &&
+          c !== '"' &&
+          c !== "\n"
         ) {
-          throw new Error(
+          return error_token(
             `Invalid escape sequence: ${current_char()} at line ${line}`,
           )
         } else {
           advance()
         }
       }
+    }
+    if (current_char() === "\0") {
+      return error_token(`Unclosed string literal`)
     }
 
     const end_quote = advance()
@@ -438,6 +441,14 @@ export function lexer_impl(
     }
 
     return make_token(TokenKind.String)
+  }
+  function error_token(message: string): Token {
+    return {
+      kind: TokenKind.Error,
+      span: { start: span_start, stop: current_index },
+      line,
+      text: message,
+    }
   }
   function lex_template_literal_start(): Token {
     assert(current_char() === "`", "Expected backtick character")
@@ -607,7 +618,10 @@ export function lexer_impl(
 
   function advance(): string {
     if (current_index >= input.length) {
-      throw new Error("End of input")
+      throw new AssertionError({
+        message: "End of input",
+        stackStartFn: advance,
+      })
     }
     let last_char = input[current_index]
     current_index++
