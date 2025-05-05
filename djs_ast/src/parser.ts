@@ -1087,7 +1087,8 @@ function parser_impl(source: string): Parser {
           if (f === ERR) return ERR
           return Stmt.Func(f.span, f)
         } else {
-          todo()
+          emit_error(`Expected 'function'`)
+          return ERR
         }
       }
       default:
