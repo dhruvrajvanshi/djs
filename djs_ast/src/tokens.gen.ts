@@ -149,6 +149,7 @@ const keywords: Record<string, TokenKind> = Object.freeze({
 })
 
 export type TokenKind = (typeof TokenKinds)[keyof typeof TokenKinds]
+const keyword_token_kinds = new Set<TokenKind>(Object.values(keywords))
 export const TokenKind = Object.freeze({
   ...TokenKinds,
   from_str(s: string): TokenKind | null {
@@ -156,6 +157,6 @@ export const TokenKind = Object.freeze({
   },
 
   is_keyword(self: TokenKind): boolean {
-    return keywords[self] !== undefined
+    return keyword_token_kinds.has(self)
   },
 })
