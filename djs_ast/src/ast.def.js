@@ -171,6 +171,7 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
   Func: { func: Func },
   ClassDecl: { class: Class },
   Empty: {},
+  ParseError: {},
 })
 
 const DExpr = Enum(Expr, ["span", "visit"], {

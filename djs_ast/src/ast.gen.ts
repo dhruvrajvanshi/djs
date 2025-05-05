@@ -125,6 +125,10 @@ export type Stmt =
       readonly kind: "Empty"
       readonly span: Span
     }
+  | {
+      readonly kind: "ParseError"
+      readonly span: Span
+    }
 export type StmtWithKind<K extends Stmt["kind"]> = Extract<Stmt, { kind: K }>
 export const Stmt = {
   Expr: (span: Span, expr: Expr): StmtWithKind<"Expr"> => ({
@@ -277,6 +281,11 @@ export const Stmt = {
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
+
+  ParseError: (span: Span): StmtWithKind<"ParseError"> => ({
+    kind: "ParseError",
+    span,
+  }),
 } as const
 
 export interface Class {
