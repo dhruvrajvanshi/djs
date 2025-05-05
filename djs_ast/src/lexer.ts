@@ -10,7 +10,8 @@ export function Lexer(input: string) {
   return lexer_impl(
     input,
     /* line */ 1,
-    /* start_index */ 0,
+    /* span_start */ 0,
+    /* index */ 0,
     /* regex_enabled */ false,
     /* template_literal_interpolation */ false,
   )
@@ -19,20 +20,22 @@ export function Lexer(input: string) {
 export function lexer_impl(
   input: string,
   _line: number,
+  _span_start: number,
   _index: number,
   _regex_enabled: boolean,
   _template_literal_interpolation: boolean,
 ): Lexer {
   let line = _line
-  let span_start = _index
+  let span_start = _span_start
   let current_index = _index
   let regex_enabled = _regex_enabled
-  let template_literal_interpolation = false
+  let template_literal_interpolation = _template_literal_interpolation
   return {
     clone(): Lexer {
       return lexer_impl(
         input,
         line,
+        span_start,
         current_index,
         regex_enabled,
         template_literal_interpolation,

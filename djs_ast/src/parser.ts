@@ -28,36 +28,33 @@ import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
 import { todo } from "./assert.js"
+import { preview_lines } from "./diagnostic.js"
 
 interface Parser {
   parse_source_file(): SourceFile
 }
 export function Parser(source: string): Parser {
-  return parser_impl(source, Lexer(source))
+  return parser_impl(source)
 }
 const ERR = Symbol("ParseError")
 type Err = typeof ERR
 
 const t = TokenKind
-function parser_impl(source: string, _lexer: Lexer): Parser {
-  let lexer = _lexer
+function parser_impl(source: string): Parser {
+  let lexer = Lexer(source)
   let last_token: Token | null = null
   let current_token = lexer.next()
   let errors: ParseError[] = []
-  let is_forked = false
 
   function fork(): <T>(value: T) => T {
-    assert(!is_forked)
     const snapshot = {
-      lexer: _lexer.clone(),
+      lexer: lexer.clone(),
       last_token: last_token,
       current_token: current_token,
       errors: [...errors],
     }
-    is_forked = true
 
     return function restore(value) {
-      is_forked = false
       lexer = snapshot.lexer
       last_token = snapshot.last_token
       current_token = snapshot.current_token
@@ -937,7 +934,6 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     const start = expect(t.LBrace)
     if (start === ERR) return ERR
     const stmts = parse_stmt_list((token_kind) => token_kind === t.RBrace)
-    if (stmts === ERR) return ERR
     const stop = expect(t.RBrace)
     if (stop === ERR) return ERR
     return {
@@ -948,14 +944,17 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
   function parse_stmt_list(
     end_token: (token_kind: TokenKind) => boolean,
-  ): Stmt[] | Err {
+  ): Stmt[] {
     const stmts: Stmt[] = []
     while (
       !end_token(current_token.kind) &&
       current_token.kind !== t.EndOfFile
     ) {
       const stmt = parse_stmt()
-      if (stmt === ERR) return ERR
+      if (stmt === ERR) {
+        recover_till_next_stmt()
+        continue
+      }
       stmts.push(stmt)
     }
     return stmts
@@ -1199,27 +1198,14 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       `Expected can_start_arrow_fn to be called when current token is a (, found ${current_token.kind}`,
     )
     const restore = fork()
-    let error = false
-    parse_comma_separated_list(t.RParen, () => {
-      const p = parse_pattern()
-      if (!p) {
-        error = true
-        return "BREAK"
-      } else {
-        return 0
-      }
-    })
-    if (error) {
-      return restore(false)
-    }
-    const rparen = advance()
-    if (rparen.kind !== t.RParen) {
-      return restore(false)
-    }
-    const fatarrow = advance()
-    if (fatarrow.kind !== t.FatArrow) {
-      return restore(false)
-    }
+    if (!expect(t.LParen)) return restore(false)
+    const params = parse_comma_separated_list(t.RParen, parse_pattern)
+    if (params === ERR) return restore(false)
+    const rparen = expect(t.RParen)
+    if (rparen === ERR) return restore(false)
+    const fatarrow = expect(t.FatArrow)
+    if (fatarrow === ERR) return restore(false)
+
     return restore(fatarrow.line === rparen.line)
   }
 
@@ -1241,8 +1227,8 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
     const then_branch = parse_stmt()
     if (then_branch === ERR) return ERR
-    const else_branch =
-      current_token.kind === t.Else ? (advance(), parse_stmt()) : null
+
+    const else_branch = at(t.Else) ? (advance(), parse_stmt()) : null
     if (else_branch === ERR) return ERR
 
     return Stmt.If(
@@ -1279,19 +1265,18 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     while (!at(t.EndOfFile)) {
       const stmt = parse_stmt()
       if (stmt === ERR) {
-        do {
-          advance()
-        } while (
-          !at(t.EndOfFile) &&
-          !at(t.Semi) &&
-          !at(t.RBrace) &&
-          !at(t.LBrace)
-        )
+        recover_till_next_stmt()
         continue
       }
       stmts.push(stmt)
     }
     return { span, stmts, errors }
+  }
+  function recover_till_next_stmt(): void {
+    if (at(t.EndOfFile)) return
+    do {
+      advance()
+    } while (!at(t.EndOfFile) && !at(t.Semi) && !at(t.RBrace) && !at(t.LBrace))
   }
 
   function at(token_kind: TokenKind): boolean {
@@ -1305,6 +1290,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     assert(current_token.kind !== t.EndOfFile, "Tried to advance past the EOF")
     last_token = current_token
     current_token = lexer.next()
+    assert(current_token.span.start >= last_token.span.start)
     return last_token
   }
 
