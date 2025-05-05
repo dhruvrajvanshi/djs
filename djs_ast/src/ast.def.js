@@ -139,7 +139,6 @@ const DPattern = Enum(Pattern, ["span", "visit"], {
   Prop: { expr: Expr, key: ObjectKey },
   Elision: {},
   Rest: { pattern: Pattern },
-  ParseError: {},
 })
 const DStmt = Enum(Stmt, ["span", "visit"], {
   Expr: { expr: Expr },
@@ -171,7 +170,6 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
   Func: { func: Func },
   ClassDecl: { class: Class },
   Empty: {},
-  ParseError: {},
 })
 
 const DExpr = Enum(Expr, ["span", "visit"], {
@@ -212,7 +210,6 @@ const DExpr = Enum(Expr, ["span", "visit"], {
   Super: {},
   Class: { class: "Class" },
   TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
-  ParseError: {},
 })
 const DClass = Struct(Class, ["span"], {
   name: Option(Ident),

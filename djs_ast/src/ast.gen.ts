@@ -125,10 +125,6 @@ export type Stmt =
       readonly kind: "Empty"
       readonly span: Span
     }
-  | {
-      readonly kind: "ParseError"
-      readonly span: Span
-    }
 export type StmtWithKind<K extends Stmt["kind"]> = Extract<Stmt, { kind: K }>
 export const Stmt = {
   Expr: (span: Span, expr: Expr): StmtWithKind<"Expr"> => ({
@@ -281,11 +277,6 @@ export const Stmt = {
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
-
-  ParseError: (span: Span): StmtWithKind<"ParseError"> => ({
-    kind: "ParseError",
-    span,
-  }),
 } as const
 
 export interface Class {
@@ -386,10 +377,6 @@ export type Pattern =
       readonly span: Span
       readonly pattern: Pattern
     }
-  | {
-      readonly kind: "ParseError"
-      readonly span: Span
-    }
 export type PatternWithKind<K extends Pattern["kind"]> = Extract<
   Pattern,
   { kind: K }
@@ -445,11 +432,6 @@ export const Pattern = {
     kind: "Rest",
     span,
     pattern: pattern,
-  }),
-
-  ParseError: (span: Span): PatternWithKind<"ParseError"> => ({
-    kind: "ParseError",
-    span,
   }),
 } as const
 
@@ -694,10 +676,6 @@ export type Expr =
       readonly kind: "TemplateLiteral"
       readonly span: Span
       readonly fragments: readonly TemplateLiteralFragment[]
-    }
-  | {
-      readonly kind: "ParseError"
-      readonly span: Span
     }
 export type ExprWithKind<K extends Expr["kind"]> = Extract<Expr, { kind: K }>
 export const Expr = {
@@ -946,11 +924,6 @@ export const Expr = {
     kind: "TemplateLiteral",
     span,
     fragments: fragments,
-  }),
-
-  ParseError: (span: Span): ExprWithKind<"ParseError"> => ({
-    kind: "ParseError",
-    span,
   }),
 } as const
 export type ObjectLiteralEntry =

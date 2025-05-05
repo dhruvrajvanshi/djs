@@ -1,4 +1,4 @@
-import assert, { AssertionError } from "node:assert/strict"
+import assert from "node:assert/strict"
 import {
   AccessorType,
   ArrayLiteralMember,
@@ -9,6 +9,7 @@ import {
   DeclType,
   Expr,
   Ident,
+  MethodDef,
   ObjectKey,
   ObjectLiteralEntry,
   ObjectPatternProperty,
@@ -26,17 +27,16 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
-import { error } from "node:console"
-import { preview_lines } from "./diagnostic.js"
 import { todo } from "./assert.js"
 
 interface Parser {
   parse_source_file(): SourceFile
-  parse_expr(): Expr
 }
 export function Parser(source: string): Parser {
   return parser_impl(source, Lexer(source))
 }
+const ERR = Symbol("ParseError")
+type Err = typeof ERR
 
 const t = TokenKind
 function parser_impl(source: string, _lexer: Lexer): Parser {
@@ -128,7 +128,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     t.AmpAmp,
   )
 
-  return { parse_source_file, parse_expr }
+  return { parse_source_file }
 
   function parse_ident(): Ident {
     if (current_token.kind === t.Ident) {
@@ -138,12 +138,16 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       throw new Error(`Expected identifier, got ${current_token.kind}`)
     }
   }
-  function parse_expr(): Expr {
-    const comma_exprs: Expr[] = [parse_assignment_expr()]
+  function parse_expr(): Expr | Err {
+    const first = parse_assignment_expr()
+    if (first === ERR) return first
+    const comma_exprs: Expr[] = [first]
 
     while (current_token.kind === t.Comma) {
       advance()
-      comma_exprs.push(parse_assignment_expr())
+      const expr = parse_assignment_expr()
+      if (expr === ERR) return ERR
+      comma_exprs.push(expr)
     }
 
     if (comma_exprs.length === 1) {
@@ -155,24 +159,27 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 
-  function parse_exponentiation_expr(): Expr {
+  function parse_exponentiation_expr(): Expr | Err {
     // TODO: Handle exponentiation operator
     return parse_unary_expr()
   }
-  function parse_update_expr(): Expr {
+  function parse_update_expr(): Expr | Err {
     switch (current_token.kind) {
       case t.PlusPlus: {
         const start = advance()
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.PreIncrement(Span.between(start.span, expr.span), expr)
       }
       case t.MinusMinus: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.PreDecrement(Span.between(start, expr.span), expr)
       }
       default: {
         const lhs = parse_left_hand_side_expr()
+        if (lhs === ERR) return ERR
         if (at(t.PlusPlus) && !current_is_on_new_line()) {
           const end = advance()
           return Expr.PostIncrement(Span.between(lhs.span, end.span), lhs)
@@ -191,7 +198,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
     return current_token.line > last_token.line
   }
-  function parse_member_or_call_expr(allow_calls: boolean): Expr {
+  function parse_member_or_call_expr(allow_calls: boolean): Expr | Err {
     let lhs: Expr
 
     if (current_token.kind === t.New) {
@@ -199,9 +206,12 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       // When parsing something like "new Foo()", we don't want to allow calls when parsing Foo
       // since new Foo() means `new (Foo)()` and not (new (Foo()))
       const expr = parse_member_or_call_expr(/* allow_calls */ false)
+      if (expr === ERR) return expr
       lhs = Expr.New(Span.between(start.span, expr.span), expr)
     } else {
-      lhs = parse_primary_expr()
+      const expr = parse_primary_expr()
+      if (expr === ERR) return expr
+      lhs = expr
     }
 
     while (true) {
@@ -216,7 +226,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         case t.LSquare: {
           const start = advance()
           const prop = parse_expr()
+          if (prop === ERR) return prop
           const end = expect(t.RSquare)
+          if (end === ERR) return end
           const span = Span.between(start.span, end.span)
           lhs = Expr.Index(span, lhs, prop)
           break
@@ -224,6 +236,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         case t.LParen: {
           if (allow_calls) {
             const args = parse_arguments()
+            if (args === ERR) return ERR
             const span = Span.between(lhs.span, args.span)
             lhs = Expr.Call(span, lhs, args.args)
             break
@@ -237,7 +250,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 
-  function parse_left_hand_side_expr(): Expr {
+  function parse_left_hand_side_expr(): Expr | Err {
     return parse_member_or_call_expr(/* allow_calls */ true)
   }
 
@@ -250,16 +263,18 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 
-  function parse_arguments(): { args: Expr[]; span: Span } {
+  function parse_arguments(): Err | { args: Expr[]; span: Span } {
     const first = advance()
     assert(first.kind === t.LParen)
     const args = parse_arg_list()
+    if (args === ERR) return ERR
     const last = expect(t.RParen)
+    if (last === ERR) return ERR
     const span = Span.between(first.span, last.span)
     return { args, span }
   }
 
-  function parse_arg_list(): Expr[] {
+  function parse_arg_list(): Expr[] | Err {
     const args: Expr[] = []
     while (true) {
       if (
@@ -270,7 +285,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
 
       // Parse each argument as an assignment expression instead of a comma expression
-      args.push(parse_assignment_expr())
+      const arg = parse_assignment_expr()
+      if (arg === ERR) return ERR
+      args.push(arg)
 
       if (current_token.kind === t.Comma) {
         advance()
@@ -281,41 +298,48 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     return args
   }
 
-  function parse_unary_expr(): Expr {
+  function parse_unary_expr(): Expr | Err {
     switch (current_token.kind) {
       case t.Delete: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.Delete(Span.between(start, expr.span), expr)
       }
       case t.Bang: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.Not(Span.between(start, expr.span), expr)
       }
       case t.Plus: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.UnaryPlus(Span.between(start, expr.span), expr)
       }
       case t.Minus: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.UnaryMinus(Span.between(start, expr.span), expr)
       }
       case t.Typeof: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.TypeOf(Span.between(start, expr.span), expr)
       }
       case t.Void: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.Void(Span.between(start, expr.span), expr)
       }
       case t.Await: {
         const start = advance().span
         const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
         return Expr.Await(Span.between(start, expr.span), expr)
       }
       default:
@@ -323,7 +347,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 
-  function parse_primary_expr(): Expr {
+  function parse_primary_expr(): Expr | Err {
     switch (current_token.kind) {
       case t.Ident: {
         const ident = parse_ident()
@@ -351,7 +375,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           t.RBrace,
           parse_object_literal_entry,
         )
-        const end = expect_or_error(t.RBrace, "Expected a closing }")
+        if (entries === ERR) return ERR
+        const end = expect(t.RBrace)
+        if (end === ERR) return ERR
         return Expr.Object(Span.between(start.span, end.span), entries)
       }
       case t.LParen:
@@ -360,6 +386,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         advance()
         if (at(t.Function)) {
           const f = parse_function()
+          if (f === ERR) return ERR
           return Expr.Func(f.span, f)
         } else {
           return parse_arrow_fn()
@@ -367,11 +394,13 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       case t.Function: {
         const f = parse_function()
+        if (f === ERR) return ERR
         return Expr.Func(f.span, f)
       }
       case t.Throw: {
         const start = advance().span
         const expr = parse_expr()
+        if (expr === ERR) return ERR
         return Expr.Throw(Span.between(start, expr.span), expr)
       }
       case t.LSquare:
@@ -390,17 +419,15 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       // case t.TemplateLiteralFragment:
       //   return parse_template_literal()
       default:
-        do {
-          advance()
-        } while (!at(t.EndOfFile) && current_token.line === last_token?.line)
         emit_error("Expected an expression")
-        return Expr.ParseError(current_token.span)
+        return ERR
     }
   }
-  function parse_object_literal_entry(): ObjectLiteralEntry {
+  function parse_object_literal_entry(): ObjectLiteralEntry | Err {
     if (at(t.DotDotDot)) {
       advance()
       const expr = parse_assignment_expr()
+      if (expr === ERR) return ERR
       return ObjectLiteralEntry.Spread(expr.span, expr)
     } else if (at(t.Ident) && (next_is(t.Comma) || next_is(t.RBrace))) {
       const ident = parse_ident()
@@ -426,13 +453,17 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     } else {
       const start = current_token.span
       const name = parse_object_key()
+      if (name === ERR) return ERR
 
       switch (current_token.kind) {
         case t.LParen: {
           const params = parse_params_with_parens()
+          if (params === ERR) return ERR
+
           const body = parse_block()
+          if (body === ERR) return ERR
           const span = Span.between(start, body.span)
-          const method = {
+          const method: MethodDef = {
             span,
             name,
             accessor_type: null,
@@ -448,8 +479,10 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           return ObjectLiteralEntry.Method(method.span, method)
         }
         default: {
-          expect(t.Colon)
+          if (expect(t.Colon) === ERR) return ERR
           const expr = parse_assignment_expr()
+          if (expr === ERR) return ERR
+
           return ObjectLiteralEntry.Prop(
             Span.between(start, expr.span),
             name,
@@ -459,7 +492,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
     }
   }
-  function parse_object_literal_entry_method(): ObjectLiteralEntry {
+  function parse_object_literal_entry_method(): ObjectLiteralEntry | Err {
     const start = current_token.span
     const line = current_token.line
     let accessor_type: AccessorType | null = null
@@ -488,8 +521,11 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
 
     const name = parse_object_key()
+    if (name === ERR) return ERR
     const params = parse_params_with_parens()
+    if (params === ERR) return ERR
     const body = parse_block()
+    if (body === ERR) return ERR
     const span = Span.between(start, body.span)
 
     if (accessor_type === AccessorType.Get && params.params.length > 0) {
@@ -523,7 +559,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     return predicate(current_token)
   }
 
-  function parse_object_key(): ObjectKey {
+  function parse_object_key(): ObjectKey | Err {
     switch (current_token.kind) {
       case t.String: {
         const tok = advance()
@@ -536,7 +572,8 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       case t.LSquare: {
         advance()
         const expr = parse_expr()
-        expect(t.RSquare)
+        if (expr === ERR) return ERR
+        if (expect(t.RSquare) === ERR) return ERR
         return ObjectKey.Computed(expr.span, expr)
       }
       default: {
@@ -546,16 +583,18 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 
-  function parse_params_with_parens(): ParamList {
+  function parse_params_with_parens(): ParamList | Err {
     const start = expect(t.LParen)
+    if (start === ERR) return ERR
     const params: Param[] = []
 
     while (!at(t.RParen) && !at(t.EndOfFile)) {
       if (params.length > 0) {
-        expect(t.Comma)
+        if (expect(t.Comma) === ERR) return ERR
       }
 
       const pattern = parse_pattern()
+      if (pattern === ERR) return ERR
       params.push({
         span: pattern.span,
         pattern,
@@ -568,6 +607,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
 
     const stop = expect(t.RParen)
+    if (stop === ERR) return ERR
     return {
       span: Span.between(start.span, stop.span),
       params,
@@ -576,8 +616,8 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
   function parse_comma_separated_list<T>(
     end_token: TokenKind,
-    parse_item: () => T | "BREAK",
-  ): T[] {
+    parse_item: () => T | Err,
+  ): T[] | Err {
     const items: T[] = []
     let first = true
 
@@ -590,15 +630,14 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           advance()
         } else {
           emit_error(`Expected a comma or ${end_token}`)
+          return ERR
         }
       } else {
         first = false
       }
 
       const entry = parse_item()
-      if (entry === "BREAK") {
-        return []
-      }
+      if (entry === ERR) return ERR
       items.push(entry)
 
       if (at(t.Comma) && next_is(end_token)) {
@@ -609,11 +648,11 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
     return items
   }
-  function parse_paren_expr(): Expr {
+  function parse_paren_expr(): Expr | Err {
     const start = advance()
     assert(start.kind === t.LParen)
     const expr = parse_expr()
-    expect_or_error(t.RParen, "Expected a closing )")
+    if (expect(t.RParen) === ERR) return ERR
     return expr
   }
 
@@ -624,7 +663,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     return lexer.clone().next()
   }
 
-  function parse_assignment_expr(): Expr {
+  function parse_assignment_expr(): Expr | Err {
     if (at(t.Yield)) {
       const start = advance()
       if (current_is_on_new_line()) {
@@ -636,6 +675,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           is_yield_from = true
         }
         const expr = parse_assignment_expr()
+        if (expr === ERR) return ERR
         const span = Span.between(start.span, expr.span)
         if (is_yield_from) {
           return Expr.YieldFrom(span, expr)
@@ -649,28 +689,32 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       !current_is_on_new_line()
     ) {
       const pattern = parse_pattern()
+      if (pattern === ERR) return ERR
       const params = {
         span: pattern.span,
         params: [{ span: pattern.span, pattern }],
       }
-      expect(t.FatArrow)
+      if (expect(t.FatArrow) === ERR) return ERR
       const body = parse_arrow_fn_body()
+      if (body === ERR) return ERR
       return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
     } else if (at(t.LParen) && can_start_arrow_fn()) {
       return parse_arrow_fn()
     } else {
       const lhs = parse_conditional_expr()
+      if (lhs === ERR) return ERR
       const assignOp = assign_op(current_token.kind)
 
       if (assignOp !== null) {
         const lhsPattern = expr_to_pattern(lhs)
         if (lhsPattern === null) {
           emit_error("Invalid left-hand side in assignment")
-          return Expr.ParseError(current_token.span)
+          return ERR
         }
 
         advance()
         const rhs = parse_assignment_expr()
+        if (rhs === ERR) return ERR
         const span = Span.between(lhsPattern.span, rhs.span)
         return Expr.Assign(span, lhsPattern, assignOp, rhs)
       } else {
@@ -679,19 +723,21 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 
-  function parse_arrow_fn(): Expr {
+  function parse_arrow_fn(): Expr | Err {
     const params = parse_params_with_parens()
-    expect(t.FatArrow)
+    if (params === ERR) return ERR
+    if (expect(t.FatArrow) === ERR) return ERR
     const body = parse_arrow_fn_body()
+    if (body === ERR) return ERR
 
     return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
   }
 
-  function parse_pattern(): Pattern {
+  function parse_pattern(): Pattern | Err {
     return parse_pattern_with_precedence(PatternFlags.all())
   }
 
-  function parse_pattern_with_precedence(flags: number): Pattern {
+  function parse_pattern_with_precedence(flags: number): Pattern | Err {
     let head: Pattern
 
     switch (current_token.kind) {
@@ -706,12 +752,13 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           const pattern = parse_pattern_with_precedence(
             ~(PatternFlags.ALLOW_ASSIGNMENT | PatternFlags.ALLOW_SPREAD),
           )
+          if (pattern === ERR) return ERR
           head = Pattern.Rest(pattern.span, pattern)
           break
+        } else {
+          emit_error("Unexpected rest pattern")
+          return ERR
         }
-        emit_error("Unexpected rest pattern")
-        head = Pattern.ParseError(current_token.span)
-        break
       }
       case t.LSquare: {
         const start = advance()
@@ -731,7 +778,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
             const span = advance().span
             elements.push(Pattern.Elision(span))
           } else {
-            elements.push(parse_pattern())
+            const p = parse_pattern()
+            if (p === ERR) return ERR
+            elements.push(p)
             if (at(t.RSquare)) {
               break
             }
@@ -740,6 +789,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         }
 
         const end = expect(t.RSquare)
+        if (end === ERR) return ERR
         head = Pattern.Array(Span.between(start.span, end.span), elements)
         break
       }
@@ -753,8 +803,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
             break
           } else if (at(t.DotDotDot)) {
             advance()
-            const restPattern = parse_pattern()
-            rest = restPattern
+            const rest_pattern = parse_pattern()
+            if (rest_pattern === ERR) return ERR
+            rest = rest_pattern
 
             if (at(t.Comma)) {
               advance()
@@ -762,16 +813,18 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
             break
           } else {
             const property = parse_object_pattern_property()
+            if (property === ERR) return ERR
             properties.push(property)
 
             if (at(t.RBrace)) {
               break
             }
-            expect(t.Comma)
+            if (expect(t.Comma) === ERR) return ERR
           }
         }
 
         const stop = expect(t.RBrace)
+        if (stop === ERR) return ERR
         head = Pattern.Object(
           Span.between(start.span, stop.span),
           properties,
@@ -781,16 +834,13 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       default:
         emit_error(`Expected a pattern, got ${current_token.kind}`)
-        head = Pattern.ParseError(current_token.span)
-        break
+        return ERR
     }
 
-    if (
-      current_token.kind === t.Eq &&
-      (flags & PatternFlags.ALLOW_ASSIGNMENT) !== 0
-    ) {
+    if (at(t.Eq) && (flags & PatternFlags.ALLOW_ASSIGNMENT) !== 0) {
       advance()
       const init = parse_assignment_expr()
+      if (init === ERR) return ERR
       return Pattern.Assignment(Span.between(head.span, init.span), head, init)
     }
 
@@ -802,21 +852,26 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     return parse_ident()
   }
 
-  function parse_object_pattern_property(): ObjectPatternProperty {
+  function parse_object_pattern_property(): ObjectPatternProperty | Err {
     const key = parse_object_key()
+    if (key === ERR) return ERR
     let value: Pattern
 
     if (current_token.kind === t.Colon) {
       advance()
-      value = parse_pattern()
+      const pattern = parse_pattern()
+      if (pattern === ERR) return ERR
+      value = pattern
     } else if (key.kind === "Ident") {
       value = Pattern.Var(key.span, {
         span: key.span,
         text: key.ident.text,
       })
     } else {
-      expect(t.Colon)
-      value = parse_pattern()
+      if (expect(t.Colon) === ERR) return ERR
+      const p = parse_pattern()
+      if (p === ERR) return ERR
+      value = p
     }
 
     return {
@@ -833,19 +888,22 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     )
   }
 
-  function parse_short_circuit_expr(): Expr {
+  function parse_short_circuit_expr(): Expr | Err {
     // TODO: parse_coalesce_expr
     return parse_logical_or_expr()
   }
-  function parse_conditional_expr(): Expr {
+  function parse_conditional_expr(): Expr | Err {
     const lhs = parse_short_circuit_expr()
+    if (lhs === ERR) return ERR
 
     switch (current_token.kind) {
       case t.Question: {
         advance()
         const consequent = parse_expr()
-        expect(t.Colon)
+        if (consequent === ERR) return ERR
+        if (expect(t.Colon) === ERR) return ERR
         const alternate = parse_assignment_expr()
+        if (alternate === ERR) return ERR
         const span = Span.between(lhs.span, alternate.span)
         return Expr.Ternary(span, lhs, consequent, alternate)
       }
@@ -853,34 +911,28 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         return lhs
     }
   }
-  function parse_arrow_fn_body(): ArrowFnBody {
+  function parse_arrow_fn_body(): ArrowFnBody | Err {
     switch (current_token.kind) {
       case t.LBrace: {
-        const start = advance()
-        const stmts: Stmt[] = []
+        const block = parse_block()
+        if (block === ERR) return ERR
 
-        while (!at(t.RBrace) && !at(t.EndOfFile)) {
-          stmts.push(parse_stmt())
-        }
-
-        const stop = expect(t.RBrace)
-        const span = Span.between(start.span, stop.span)
-
-        return ArrowFnBody.Block(span, {
-          span,
-          stmts,
-        })
+        return ArrowFnBody.Block(block.span, block)
       }
       default: {
         const e = parse_expr()
+        if (e === ERR) return ERR
         return ArrowFnBody.Expr(e.span, e)
       }
     }
   }
-  function parse_block(): Block {
+  function parse_block(): Block | Err {
     const start = expect(t.LBrace)
+    if (start === ERR) return ERR
     const stmts = parse_stmt_list((token_kind) => token_kind === t.RBrace)
+    if (stmts === ERR) return ERR
     const stop = expect(t.RBrace)
+    if (stop === ERR) return ERR
     return {
       span: Span.between(start.span, stop.span),
       stmts,
@@ -889,19 +941,20 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
 
   function parse_stmt_list(
     end_token: (token_kind: TokenKind) => boolean,
-  ): Stmt[] {
+  ): Stmt[] | Err {
     const stmts: Stmt[] = []
     while (
       !end_token(current_token.kind) &&
       current_token.kind !== t.EndOfFile
     ) {
       const stmt = parse_stmt()
+      if (stmt === ERR) return ERR
       stmts.push(stmt)
     }
     return stmts
   }
 
-  function parse_array_literal(): Expr {
+  function parse_array_literal(): Expr | Err {
     const start = advance()
     const elements: Array<ArrayLiteralMember> = []
     while (true) {
@@ -917,6 +970,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       } else if (current_token.kind === t.DotDotDot) {
         const start = advance()
         const expr = parse_assignment_expr()
+        if (expr === ERR) return ERR
         elements.push(
           ArrayLiteralMember.Spread(Span.between(start, expr), expr),
         )
@@ -927,31 +981,32 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         elements.push(ArrayLiteralMember.Elision(span))
       } else {
         const e = parse_assignment_expr()
+        if (e === ERR) return ERR
         elements.push(ArrayLiteralMember.Expr(e.span, e))
         if (at(t.RSquare)) break
         expect(t.Comma)
       }
     }
     const end = expect(t.RSquare)
+    if (end === ERR) return ERR
     return Expr.Array(Span.between(start.span, end.span), elements)
   }
 
-  function expect(token_kind: TokenKind): Token {
+  function expect(token_kind: TokenKind): Token | Err {
     if (current_token.kind === token_kind) {
       return advance()
     } else {
-      throw new AssertionError({
-        message: `Expected ${token_kind}, got ${current_token.kind} at ${current_token.span.start}`,
-        stackStartFn: expect,
-      })
+      emit_error(`Expected ${token_kind}, got ${current_token.kind}`)
+      return ERR
     }
   }
-  function parse_stmt(): Stmt {
+  function parse_stmt(): Stmt | Err {
     switch (current_token.kind) {
       case t.Let:
       case t.Const:
       case t.Var: {
         const decl = parse_var_decl()
+        if (decl === ERR) return ERR
         return Stmt.VarDecl(decl.span, decl)
       }
       case t.If:
@@ -972,6 +1027,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       case t.LBrace: {
         const block = parse_block()
+        if (block === ERR) return ERR
         return Stmt.Block(block.span, block)
       }
       // case t.For: {
@@ -1001,14 +1057,17 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       }
       case t.With: {
         const start = advance()
-        expect_or_error(t.LParen, "Expected a (")
+        if (expect(t.LParen) === ERR) return ERR
         const obj = parse_expr()
-        expect_or_error(t.RParen, "Expected a )")
+        if (obj === ERR) return ERR
+        if (expect(t.RParen) === ERR) return ERR
         const body = parse_stmt()
+        if (body === ERR) return ERR
         return Stmt.With(Span.between(start.span, body.span), obj, body)
       }
       case t.Function: {
         const f = parse_function()
+        if (f === ERR) return ERR
         return Stmt.Func(f.span, f)
       }
       // case t.Class: {
@@ -1019,26 +1078,18 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         if (next_is(t.Function)) {
           advance()
           const f = parse_function()
+          if (f === ERR) return ERR
           return Stmt.Func(f.span, f)
         } else {
           todo()
         }
       }
       default:
-        const expr_stmt = parse_expr_stmt()
-        if (expr_stmt.expr.kind === "ParseError") {
-          while (true) {
-            if (at(t.EndOfFile)) break
-            if (at(t.Semi)) break
-            if (at(t.RBrace)) break
-            advance()
-          }
-        }
-        return expr_stmt
+        return parse_expr_stmt()
     }
   }
 
-  function parse_function(): Func {
+  function parse_function(): Func | Err {
     const start = advance()
 
     const is_generator = at(t.Star)
@@ -1049,7 +1100,9 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     const name = at(t.Ident) ? parse_ident() : null
 
     const params = parse_params_with_parens()
+    if (params === ERR) return ERR
     const body = parse_block()
+    if (body === ERR) return ERR
 
     const span = Span.between(start.span, body.span)
 
@@ -1062,7 +1115,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       is_async: false,
     }
   }
-  function parse_var_decl(): VarDecl {
+  function parse_var_decl(): VarDecl | Err {
     let span = current_token.span
 
     let decl_type: DeclType
@@ -1085,12 +1138,15 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         )
     }
 
-    const declarators: VarDeclarator[] = []
-    declarators.push(parse_var_declarator())
+    const first = parse_var_declarator()
+    if (first === ERR) return ERR
+    const declarators: VarDeclarator[] = [first]
 
     while (at(t.Comma)) {
       advance()
-      declarators.push(parse_var_declarator())
+      const item = parse_var_declarator()
+      if (item === ERR) return ERR
+      declarators.push(item)
     }
 
     // Update span to include all declarators
@@ -1111,16 +1167,19 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     }
   }
 
-  function parse_var_declarator(): VarDeclarator {
+  function parse_var_declarator(): VarDeclarator | Err {
     // Parse the pattern with restrictions - no assignment or spread allowed
     const pattern = parse_pattern_with_precedence(
       ~(PatternFlags.ALLOW_ASSIGNMENT | PatternFlags.ALLOW_SPREAD),
     )
+    if (pattern === ERR) return ERR
 
     let init: Expr | null = null
     if (current_token.kind === t.Eq) {
       advance()
-      init = parse_assignment_expr()
+      const expr = parse_assignment_expr()
+      if (expr === ERR) return ERR
+      init = expr
     }
 
     return { pattern, init }
@@ -1135,7 +1194,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     let error = false
     parse_comma_separated_list(t.RParen, () => {
       const p = parse_pattern()
-      if (p.kind === "ParseError") {
+      if (!p) {
         error = true
         return "BREAK"
       } else {
@@ -1163,25 +1222,20 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
     })
   }
 
-  function expect_or_error(kind: TokenKind, message: string): Token {
-    if (at(kind)) {
-      return advance()
-    } else {
-      emit_error(message)
-      return { ...current_token, kind: t.Error }
-    }
-  }
-
-  function parse_if_stmt(): Stmt {
-    const start = expect(t.If).span
-    expect_or_error(t.LParen, `Expected a '('`)
+  function parse_if_stmt(): Stmt | Err {
+    assert(at(t.If))
+    const start = advance().span
+    if (expect(t.LParen) === ERR) return ERR
 
     const cond = parse_expr()
-    expect_or_error(t.RParen, `Expected a ')'`)
+    if (cond === ERR) return ERR
+    if (expect(t.RParen) === ERR) return ERR
 
     const then_branch = parse_stmt()
+    if (then_branch === ERR) return ERR
     const else_branch =
       current_token.kind === t.Else ? (advance(), parse_stmt()) : null
+    if (else_branch === ERR) return ERR
 
     return Stmt.If(
       Span.between(start, else_branch ? else_branch.span : then_branch.span),
@@ -1190,12 +1244,13 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       else_branch,
     )
   }
-  function parse_expr_stmt(): Extract<Stmt, { kind: "Expr" }> {
+  function parse_expr_stmt(): Extract<Stmt, { kind: "Expr" }> | Err {
     const expr = parse_expr()
-    expect_semi()
+    if (expr === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
     return Stmt.Expr(expr.span, expr)
   }
-  function expect_semi(): void {
+  function expect_semi(): Err | void {
     if (current_kind() === t.Semi) {
       advance()
       return
@@ -1207,17 +1262,26 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
       return
     }
     emit_error("Missing semicolon")
+    return ERR
   }
 
   function parse_source_file(): SourceFile {
     const stmts: Stmt[] = []
     const span = current_token.span
     while (!at(t.EndOfFile)) {
-      let start_tok = current_token
-      stmts.push(parse_stmt())
-      if (current_token === start_tok) {
-        advance()
+      const stmt = parse_stmt()
+      if (stmt === ERR) {
+        do {
+          advance()
+        } while (
+          !at(t.EndOfFile) &&
+          !at(t.Semi) &&
+          !at(t.RBrace) &&
+          !at(t.LBrace)
+        )
+        continue
       }
+      stmts.push(stmt)
     }
     return { span, stmts, errors }
   }
@@ -1237,15 +1301,17 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
   }
 
   function define_binop_parser(
-    next_fn: () => Expr,
+    next_fn: () => Expr | Err,
     ...kinds: readonly TokenKind[]
   ) {
     return function () {
       let lhs = next_fn()
+      if (lhs === ERR) return ERR
       const op_kinds = new Set(kinds)
       while (op_kinds.has(current_token.kind)) {
         const op = parse_bin_op(advance().kind)
         const rhs = next_fn()
+        if (rhs === ERR) return ERR
         const span = Span.between(lhs.span, rhs.span)
         lhs = Expr.BinOp(span, lhs, op, rhs)
       }
