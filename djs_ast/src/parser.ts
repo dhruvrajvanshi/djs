@@ -791,7 +791,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
             if (at(t.RSquare)) {
               break
             }
-            expect(t.Comma)
+            if (expect(t.Comma) === ERR) return ERR
           }
         }
 
@@ -982,7 +982,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
           ArrayLiteralMember.Spread(Span.between(start, expr), expr),
         )
         if (at(t.RSquare)) break
-        expect(t.Comma)
+        if (expect(t.Comma) === ERR) return ERR
       } else if (current_token.kind === t.Comma) {
         const span = advance().span
         elements.push(ArrayLiteralMember.Elision(span))
@@ -991,7 +991,7 @@ function parser_impl(source: string, _lexer: Lexer): Parser {
         if (e === ERR) return ERR
         elements.push(ArrayLiteralMember.Expr(e.span, e))
         if (at(t.RSquare)) break
-        expect(t.Comma)
+        if (expect(t.Comma) === ERR) return ERR
       }
     }
     const end = expect(t.RSquare)
