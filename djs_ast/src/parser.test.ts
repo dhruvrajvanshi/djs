@@ -60,7 +60,7 @@ test.each(test262Paths)("test262: %s", async (filePath) => {
     expect(errors.length).toBeGreaterThan(0)
   } else {
     // If the test262 file is not expected to throw a syntax error, check if it does not
-    expect(source_file.errors).toEqual([])
+    expect(source_file.errors.length).toEqual(0)
   }
 })
 
