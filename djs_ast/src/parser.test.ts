@@ -3,6 +3,7 @@ import { Parser } from "./parser"
 import { Expr } from "./ast.gen"
 import { pretty_print } from "./pretty_print"
 import fs from "fs/promises"
+import assert from "assert"
 
 test("test_parse_var_expr", () => {
   const expr = parse_expr("x")
@@ -84,5 +85,9 @@ function extract_frontmatter(source: string): string {
 
 function parse_expr(input: string): Expr {
   const parser = Parser(input)
-  return parser.parse_expr()
+  const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+  const stmt = source_file.stmts[0]
+  assert(stmt.kind === "Expr")
+  return stmt.expr
 }
