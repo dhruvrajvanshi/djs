@@ -46,8 +46,20 @@ const expected_parse_successes = (
 console.log(`Successes: ${successes.length}`)
 console.log(`Failures: ${successes.length}`)
 
-assert.equal(successes.length, expected_parse_successes.length)
-assert.equal(failures.length, expected_parse_failures.length)
+if (process.env.UPDATE_BASELINE) {
+  console.log("Updating baseline files...")
+  await fs.writeFile(
+    "../djs_parser/test_262_baseline.success.txt",
+    successes.join("\n"),
+  )
+  await fs.writeFile(
+    "../djs_parser/test_262_baseline.failed.txt",
+    failures.join("\n"),
+  )
+} else {
+  assert.equal(successes.length, expected_parse_successes.length)
+  assert.equal(failures.length, expected_parse_failures.length)
+}
 
 function syntax_error_expected(source: string): boolean {
   const frontmatter = extract_frontmatter(source)
