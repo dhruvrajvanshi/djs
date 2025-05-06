@@ -21,6 +21,7 @@ import {
   Pattern,
   SourceFile,
   Stmt,
+  TemplateLiteralFragment,
   VarDecl,
   VarDeclarator,
   type Func,
@@ -415,12 +416,39 @@ function parser_impl(source: string): Parser {
         if (cls === ERR) return ERR
         return Expr.Class(cls.span, cls)
       }
-      // case t.TemplateLiteralFragment:
-      //   return parse_template_literal()
+      case t.TemplateLiteralFragment:
+        return parse_template_literal()
       default:
         emit_error("Expected an expression")
         return ERR
     }
+  }
+  function parse_template_literal(): Expr | Err {
+    let span = current_token.span
+    const fragments: TemplateLiteralFragment[] = []
+
+    while (true) {
+      if (at(t.TemplateLiteralFragment)) {
+        const tok = advance()
+        fragments.push(TemplateLiteralFragment.Text(tok.span, tok.text))
+
+        if (tok.text.endsWith("${")) {
+          lexer.start_template_literal_interpolation()
+          const expr = parse_expr()
+          if (expr === ERR) return ERR
+          fragments.push(TemplateLiteralFragment.Expr(expr.span, expr))
+          lexer.end_template_literal_interpolation()
+        } else if (tok.text.endsWith("`")) {
+          span = Span.between(span, tok.span)
+          break
+        }
+      } else {
+        emit_error("Unexpected end of template literal")
+        return ERR
+      }
+    }
+
+    return Expr.TemplateLiteral(span, fragments)
   }
   function parse_class(): Class | Err {
     const first = expect(t.Class)

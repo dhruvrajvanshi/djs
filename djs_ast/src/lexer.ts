@@ -5,6 +5,8 @@ import assert, { AssertionError } from "node:assert"
 export interface Lexer {
   clone(): Lexer
   next(): Token
+  start_template_literal_interpolation(): void
+  end_template_literal_interpolation(): void
 }
 export function Lexer(input: string) {
   return lexer_impl(
@@ -42,6 +44,14 @@ export function lexer_impl(
       )
     },
     next,
+    start_template_literal_interpolation,
+    end_template_literal_interpolation,
+  }
+  function start_template_literal_interpolation(): void {
+    template_literal_interpolation = true
+  }
+  function end_template_literal_interpolation(): void {
+    template_literal_interpolation = false
   }
   function at(text: string): boolean {
     for (let i = 0; i < text.length; i++) {
@@ -606,7 +616,8 @@ export function lexer_impl(
       text:
         kind === TokenKind.Ident ||
         kind === TokenKind.String ||
-        kind === TokenKind.Number
+        kind === TokenKind.Number ||
+        kind === TokenKind.TemplateLiteralFragment
           ? current_text()
           : "",
     }
