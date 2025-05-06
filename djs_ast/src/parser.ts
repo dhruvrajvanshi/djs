@@ -6,6 +6,8 @@ import {
   AssignOp,
   BinOp,
   Block,
+  Class,
+  ClassMember,
   DeclType,
   Expr,
   Ident,
@@ -27,8 +29,6 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
-import { todo } from "./assert.js"
-import { preview_lines } from "./diagnostic.js"
 
 interface Parser {
   parse_source_file(): SourceFile
@@ -413,15 +413,128 @@ function parser_impl(source: string): Parser {
       // }
       case t.Super:
         return Expr.Super(advance().span)
-      // case t.Class: {
-      //   const cls = parse_class()
-      //   return Expr.Class(cls)
-      // }
+      case t.Class: {
+        const cls = parse_class()
+        if (cls === ERR) return ERR
+        return Expr.Class(cls.span, cls)
+      }
       // case t.TemplateLiteralFragment:
       //   return parse_template_literal()
       default:
         emit_error("Expected an expression")
         return ERR
+    }
+  }
+  function parse_class(): Class | Err {
+    const first = expect(t.Class)
+    if (first === ERR) return ERR
+
+    const name = parse_optional_binding_ident()
+    if (name === ERR) return ERR
+
+    let superclass: Expr | null = null
+    if (current_token.kind === t.Extends) {
+      advance()
+      const expr = parse_left_hand_side_expr()
+      if (expr === ERR) return ERR
+      superclass = expr
+    }
+
+    const body_start = expect(t.LBrace)
+    if (body_start === ERR) return ERR
+
+    const members: ClassMember[] = []
+    while (!at(t.RBrace) && !at(t.EndOfFile)) {
+      const member = parse_class_member()
+      if (member === ERR) return ERR
+      members.push(member)
+    }
+
+    const body_end = expect(t.RBrace)
+    if (body_end === ERR) return ERR
+
+    const span = Span.between(first.span, body_end.span)
+
+    return {
+      span,
+      name,
+      superclass,
+      body: {
+        span: Span.between(body_start.span, body_end.span),
+        members,
+      },
+    }
+  }
+
+  function parse_optional_binding_ident(): Ident | null | Err {
+    if (current_token.kind === t.Ident) {
+      return parse_binding_ident()
+    } else {
+      return null
+    }
+  }
+
+  function parse_class_member(): ClassMember | Err {
+    const method = parse_method_def()
+    if (method === ERR) return ERR
+    return ClassMember.MethodDef(method)
+  }
+
+  function parse_method_def(): MethodDef | Err {
+    let static_token: Token | null = null
+    if (current_token.kind === t.Static) {
+      static_token = advance()
+    }
+
+    let accessor_type: AccessorType | null = null
+    if (
+      current_matches(is_accessor_type) &&
+      next_matches(Token.can_start_object_property_name)
+    ) {
+      if (current_token.text === "get") {
+        advance()
+        accessor_type = AccessorType.Get
+      } else if (current_token.text === "set") {
+        advance()
+        accessor_type = AccessorType.Set
+      }
+    }
+
+    const is_async = at(t.Async)
+    if (is_async) {
+      advance()
+    }
+
+    const is_generator = at(t.Star)
+    if (is_generator) {
+      advance()
+    }
+
+    const name = parse_object_key()
+    if (name === ERR) return ERR
+
+    const start = static_token ? static_token.span : name.span
+
+    const params = parse_params_with_parens()
+    if (params === ERR) return ERR
+
+    const body = parse_block()
+    if (body === ERR) return ERR
+
+    const span = Span.between(start, body.span)
+
+    return {
+      span,
+      name,
+      accessor_type,
+      body: {
+        span,
+        name: null,
+        params,
+        body,
+        is_generator,
+        is_async,
+      },
     }
   }
   function parse_object_literal_entry(): ObjectLiteralEntry | Err {
