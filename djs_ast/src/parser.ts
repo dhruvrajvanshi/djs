@@ -128,7 +128,7 @@ function parser_impl(source: string): Parser {
   return { parse_source_file }
 
   function parse_ident(): Ident | Err {
-    if (current_token.kind === t.Ident) {
+    if (at(t.Ident)) {
       const tok = advance()
       return { span: tok.span, text: tok.text }
     } else {
@@ -141,7 +141,7 @@ function parser_impl(source: string): Parser {
     if (first === ERR) return first
     const comma_exprs: Expr[] = [first]
 
-    while (current_token.kind === t.Comma) {
+    while (at(t.Comma)) {
       advance()
       const expr = parse_assignment_expr()
       if (expr === ERR) return ERR
@@ -199,7 +199,7 @@ function parser_impl(source: string): Parser {
   function parse_member_or_call_expr(allow_calls: boolean): Expr | Err {
     let lhs: Expr
 
-    if (current_token.kind === t.New) {
+    if (at(t.New)) {
       const start = advance()
       // When parsing something like "new Foo()", we don't want to allow calls when parsing Foo
       // since new Foo() means `new (Foo)()` and not (new (Foo()))
@@ -277,10 +277,7 @@ function parser_impl(source: string): Parser {
   function parse_arg_list(): Expr[] | Err {
     const args: Expr[] = []
     while (true) {
-      if (
-        current_token.kind === t.RParen ||
-        current_token.kind === t.EndOfFile
-      ) {
+      if (at(t.RParen) || at(t.EndOfFile)) {
         break
       }
 
@@ -289,7 +286,7 @@ function parser_impl(source: string): Parser {
       if (arg === ERR) return ERR
       args.push(arg)
 
-      if (current_token.kind === t.Comma) {
+      if (at(t.Comma)) {
         advance()
       } else {
         break
@@ -433,7 +430,7 @@ function parser_impl(source: string): Parser {
     if (name === ERR) return ERR
 
     let superclass: Expr | null = null
-    if (current_token.kind === t.Extends) {
+    if (at(t.Extends)) {
       advance()
       const expr = parse_left_hand_side_expr()
       if (expr === ERR) return ERR
@@ -467,7 +464,7 @@ function parser_impl(source: string): Parser {
   }
 
   function parse_optional_binding_ident(): Ident | null | Err {
-    if (current_token.kind === t.Ident) {
+    if (at(t.Ident)) {
       return parse_binding_ident()
     } else {
       return null
@@ -482,7 +479,7 @@ function parser_impl(source: string): Parser {
 
   function parse_method_def(): MethodDef | Err {
     let static_token: Token | null = null
-    if (current_token.kind === t.Static) {
+    if (at(t.Static)) {
       static_token = advance()
     }
 
@@ -974,7 +971,7 @@ function parser_impl(source: string): Parser {
     if (key === ERR) return ERR
     let value: Pattern
 
-    if (current_token.kind === t.Colon) {
+    if (at(t.Colon)) {
       advance()
       const pattern = parse_pattern()
       if (pattern === ERR) return ERR
@@ -1078,11 +1075,9 @@ function parser_impl(source: string): Parser {
     const elements: Array<ArrayLiteralMember> = []
     while (true) {
       if (
-        (current_token.kind === t.Comma &&
-          next_is(t.RSquare) &&
-          elements.length > 0) ||
-        current_token.kind === t.RSquare ||
-        current_token.kind === t.EndOfFile
+        (at(t.Comma) && next_is(t.RSquare) && elements.length > 0) ||
+        at(t.RSquare) ||
+        at(t.EndOfFile)
       ) {
         if (current_token.kind === t.Comma) advance()
         break
@@ -1136,8 +1131,8 @@ function parser_impl(source: string): Parser {
         return parse_while_stmt()
       // case t.Do:
       //   return parse_do_while_stmt()
-      // case t.Try:
-      //   return parse_try_stmt()
+      case t.Try:
+        return parse_try_stmt()
       case t.Return:
         return parse_return_stmt()
       case t.Semi: {
@@ -1208,6 +1203,60 @@ function parser_impl(source: string): Parser {
       default:
         return parse_expr_stmt()
     }
+  }
+  function parse_try_stmt(): Stmt | Err {
+    const start = expect(t.Try)
+    if (start === ERR) return ERR
+
+    const try_block = parse_block()
+    if (try_block === ERR) return ERR
+
+    let catch_pattern: Pattern | null = null
+    let catch_block: Block | null = null
+
+    if (at(t.Catch)) {
+      advance() // consume 'catch'
+
+      if (at(t.LParen)) {
+        advance() // consume '('
+        const pattern = parse_pattern()
+        if (pattern === ERR) return ERR
+        catch_pattern = pattern
+
+        if (expect(t.RParen) === ERR) return ERR
+
+        const block = parse_block()
+        if (block === ERR) return ERR
+        catch_block = block
+      } else {
+        // Catch with no binding parameter
+        const block = parse_block()
+        if (block === ERR) return ERR
+        catch_block = block
+      }
+    }
+
+    let finally_block: Block | null = null
+    if (at(t.Finally)) {
+      advance() // consume 'finally'
+      const block = parse_block()
+      if (block === ERR) return ERR
+      finally_block = block
+    }
+
+    // Determine the end span based on available blocks
+    let end_span: Span
+    if (finally_block !== null) {
+      end_span = finally_block.span
+    } else if (catch_block !== null) {
+      end_span = catch_block.span
+    } else {
+      end_span = try_block.span
+    }
+
+    const span = Span.between(start.span, end_span)
+
+    return Stmt.Try(span, try_block, catch_pattern, catch_block, finally_block)
   }
   function parse_switch_stmt(): Stmt | Err {
     const start_token = expect(t.Switch)
@@ -1410,7 +1459,7 @@ function parser_impl(source: string): Parser {
     if (pattern === ERR) return ERR
 
     let init: Expr | null = null
-    if (current_token.kind === t.Eq) {
+    if (at(t.Eq)) {
       advance()
       const expr = parse_assignment_expr()
       if (expr === ERR) return ERR
