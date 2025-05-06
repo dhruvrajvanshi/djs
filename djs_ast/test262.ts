@@ -16,26 +16,39 @@ for await (const path of fs.glob("../test262/test/**/*.js")) {
   test262Paths.push(path)
 }
 
+const COLOR_ERROR = "\x1b[31;1m"
+const COLOR_SUCCESS = "\x1b[32;1m"
+const COLOR_RESET = "\x1b[0m"
+
 const successes: string[] = []
 const failures: string[] = []
+const total = test262Paths.length
 for (const path of test262Paths) {
   const source = await fs.readFile(path, "utf-8")
-  console.log(`Parsing ${path}...`)
   const errors = Parser(source).parse_source_file().errors
   if (syntax_error_expected(source)) {
     if (errors.length === 0) {
+      console.log(
+        `${COLOR_ERROR}FAIL${COLOR_RESET}: ${path}; ${COLOR_ERROR}MISSING_SYNTAX_ERROR${COLOR_RESET}`,
+      )
       failures.push(path)
     } else {
+      console.log(`${COLOR_SUCCESS}PASS${COLOR_RESET}: ${path}`)
       successes.push(path)
     }
   } else {
     if (errors.length > 0) {
+      console.log(
+        `${COLOR_ERROR}FAIL${COLOR_RESET}: ${path}; ${COLOR_ERROR}UNEXPECTED_SYNTAX_ERROR${COLOR_RESET}`,
+      )
       failures.push(path)
     } else {
+      console.log(`${COLOR_SUCCESS}PASS${COLOR_RESET}: ${path}`)
       successes.push(path)
     }
   }
 }
+assert.equal(successes.length + failures.length, total)
 
 const expected_parse_failures = (
   await fs.readFile("../djs_parser/test_262_baseline.failed.txt", "utf-8")
@@ -43,8 +56,8 @@ const expected_parse_failures = (
 const expected_parse_successes = (
   await fs.readFile("../djs_parser/test_262_baseline.success.txt", "utf-8")
 ).split("\n")
-console.log(`Successes: ${successes.length}`)
-console.log(`Failures: ${successes.length}`)
+console.log(`${COLOR_SUCCESS}Successes: ${successes.length}${COLOR_RESET}`)
+console.log(`${COLOR_ERROR}Failures: ${failures.length}${COLOR_RESET}`)
 
 if (process.env.UPDATE_BASELINE) {
   console.log("Updating baseline files...")
