@@ -1138,8 +1138,8 @@ function parser_impl(source: string): Parser {
       //   return parse_do_while_stmt()
       // case t.Try:
       //   return parse_try_stmt()
-      // case t.Return:
-      //   return parse_return_stmt()
+      case t.Return:
+        return parse_return_stmt()
       case t.Semi: {
         const tok = advance()
         return Stmt.Empty(tok.span)
@@ -1207,6 +1207,32 @@ function parser_impl(source: string): Parser {
       default:
         return parse_expr_stmt()
     }
+  }
+  function parse_return_stmt(): Stmt | Err {
+    const start = expect(t.Return)
+    if (start === ERR) return ERR
+
+    let expr: Expr | null = null
+
+    // Check if there's an expression after the return
+    // We don't parse an expression if:
+    // 1. The next token is a semicolon, right brace, or EOF
+    // 2. The next token is on a new line (automatic semicolon insertion)
+    if (
+      !at(t.Semi) &&
+      !at(t.RBrace) &&
+      !at(t.EndOfFile) &&
+      !current_is_on_new_line()
+    ) {
+      const parsedExpr = parse_expr()
+      if (parsedExpr === ERR) return ERR
+      expr = parsedExpr
+    }
+
+    const end_span = expr ? expr.span : start.span
+    expect_semi()
+
+    return Stmt.Return(Span.between(start.span, end_span), expr)
   }
 
   function parse_function(): Func | Err {
