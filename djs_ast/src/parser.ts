@@ -1291,6 +1291,9 @@ function parser_impl(source: string): Parser {
     assert(current_token.kind !== t.EndOfFile, "Tried to advance past the EOF")
     last_token = current_token
     current_token = lexer.next()
+    if (current_token.kind === t.Error) {
+      emit_error(current_token.text)
+    }
     assert(current_token.span.start >= last_token.span.start)
     return last_token
   }

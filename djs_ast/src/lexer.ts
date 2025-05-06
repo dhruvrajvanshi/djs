@@ -410,7 +410,8 @@ export function lexer_impl(
 
       if (c === "\\") {
         if (current_char() === "u" || current_char() === "x") {
-          consume_unicode_or_hex_escape()
+          const err = consume_unicode_or_hex_escape()
+          if (err) return error_token(err)
         } else if (
           c !== "\\" &&
           c !== "b" &&
@@ -463,7 +464,8 @@ export function lexer_impl(
       if (current === "\\") {
         advance()
         if (current_char() === "u" || current_char() === "x") {
-          consume_unicode_or_hex_escape()
+          const err = consume_unicode_or_hex_escape()
+          if (err) return error_token(err)
         } else {
           advance()
         }
@@ -498,7 +500,8 @@ export function lexer_impl(
       if (current === "\\") {
         advance()
         if (current_char() === "u" || current_char() === "x") {
-          consume_unicode_or_hex_escape()
+          const err = consume_unicode_or_hex_escape()
+          if (err) return error_token(err)
         } else {
           advance()
         }
@@ -524,7 +527,10 @@ export function lexer_impl(
     }
   }
 
-  function consume_unicode_or_hex_escape(): void {
+  /**
+   * Returns an error message string if the escape sequence is invalid.
+   */
+  function consume_unicode_or_hex_escape(): string | void {
     // Verify we're starting with 'u' or 'x'
     assert(
       current_char() === "u" || current_char() === "x",
@@ -535,16 +541,14 @@ export function lexer_impl(
 
     if (first === "u" && current_char() === "{") {
       // Unicode code point escape: \u{XXXXXX}
-      advance() // consume the '{'
+      advance()
       const start_offset = current_index
       let end_offset = start_offset
 
       while (current_char() !== "}" && current_char() !== "\0") {
         const c = advance()
         if (!is_hex_digit(c)) {
-          throw new Error(
-            `Expected a hex character but got '${c}' at line ${line}`,
-          )
+          return `Expected a hex character but got '${c}'`
         } else {
           end_offset = current_index
         }
@@ -555,23 +559,19 @@ export function lexer_impl(
       const code_point = parseInt(hex_string, 16)
 
       if (isNaN(code_point) || code_point > 0x10ffff) {
-        throw new Error(
-          `Code point must be between 0x0 and 0x10FFFF inclusive, at line ${line}`,
-        )
+        return `Code point must be between 0x0 and 0x10FFFF inclusive`
       }
 
       const last = advance()
       if (last !== "}") {
-        throw new Error(`Expected '}' but reached end of input at line ${line}`)
+        return `Expected '}' but reached end of input`
       }
     } else if (first === "u") {
       // Fixed-length Unicode escape: \uXXXX (exactly 4 hex digits)
       for (let i = 0; i < 4; i++) {
         const c = advance()
         if (!is_hex_digit(c)) {
-          throw new Error(
-            `Expected a hex character but got '${c}' at line ${line}`,
-          )
+          return `Expected a hex character but got '${c}'`
         }
       }
     } else if (first === "x") {
@@ -579,9 +579,7 @@ export function lexer_impl(
       for (let i = 0; i < 2; i++) {
         const c = advance()
         if (!is_hex_digit(c)) {
-          throw new Error(
-            `Expected a hex character but got '${c}' at line ${line}`,
-          )
+          return `Expected a hex character but got '${c}'`
         }
       }
     }
