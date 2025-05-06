@@ -77,7 +77,8 @@ export function lexer_impl(
   }
 
   function next(): Token {
-    skip_whitespace_and_comments()
+    const comment_err = skip_whitespace_and_comments()
+    if (comment_err) return error_token(comment_err)
     span_start = current_index
     if (current_char() === "\0") {
       return make_token(TokenKind.EndOfFile)
@@ -340,12 +341,13 @@ export function lexer_impl(
       return make_token(TokenKind.Error)
     }
   }
-  function skip_whitespace_and_comments(): void {
+  function skip_whitespace_and_comments(): string | void {
     while (is_whitespace(current_char()) || at_comment()) {
       if (is_whitespace(current_char())) {
         skip_whitespace()
       } else {
-        skip_comment()
+        const err = skip_comment()
+        if (err) return err
       }
     }
   }
@@ -363,7 +365,7 @@ export function lexer_impl(
     )
   }
 
-  function skip_comment(): void {
+  function skip_comment(): string | void {
     const first = advance()
     assert(first === "/", "Expected '/' at the start of a comment")
 
@@ -378,10 +380,11 @@ export function lexer_impl(
     } else {
       // Block comment
       while (true) {
-        const c = advance()
-        if (c === "\0") {
-          throw new Error(`Unclosed block comment at line ${line}`)
+        if (current_char() === "\0") {
+          return "Unclosed block comment"
         }
+        const c = advance()
+
         if (c === "*" && current_char() === "/") {
           advance() // Consume the closing '/'
           break
@@ -482,9 +485,7 @@ export function lexer_impl(
           advance()
         }
       } else if (current === "\0") {
-        throw new Error(
-          `Unclosed template literal at line ${line}, expected \``,
-        )
+        return error_token("Unclosed template literal")
       } else {
         advance()
       }
