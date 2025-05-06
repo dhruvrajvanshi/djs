@@ -1130,8 +1130,8 @@ function parser_impl(source: string): Parser {
       }
       case t.If:
         return parse_if_stmt()
-      // case t.Switch:
-      //   return parse_switch_stmt()
+      case t.Switch:
+        return parse_switch_stmt()
       case t.While:
         return parse_while_stmt()
       // case t.Do:
@@ -1207,6 +1207,77 @@ function parser_impl(source: string): Parser {
       }
       default:
         return parse_expr_stmt()
+    }
+  }
+  function parse_switch_stmt(): Stmt | Err {
+    const start_token = expect(t.Switch)
+    if (start_token === ERR) return ERR
+
+    const start = start_token.span
+    if (expect(t.LParen) === ERR) return ERR
+    const expr = parse_expr()
+    if (expr === ERR) return ERR
+    if (expect(t.RParen) === ERR) return ERR
+    if (expect(t.LBrace) === ERR) return ERR
+
+    const cases: Array<{
+      span: Span
+      test: Expr | null
+      body: Stmt[]
+    }> = []
+
+    while (!at(t.RBrace) && !at(t.EndOfFile)) {
+      const case_stmt = parse_switch_case()
+      if (case_stmt === ERR) return ERR
+      cases.push(case_stmt)
+    }
+
+    const end = expect(t.RBrace)
+    if (end === ERR) return ERR
+    const span = Span.between(start, end.span)
+
+    return Stmt.Switch(span, expr, cases)
+  }
+
+  function parse_switch_case():
+    | { span: Span; test: Expr | null; body: Stmt[] }
+    | Err {
+    if (current_token.kind === t.Case) {
+      const start = expect(t.Case)
+      if (start === ERR) return ERR
+      const expr = parse_expr()
+      if (expr === ERR) return ERR
+      const colon = expect(t.Colon)
+      if (colon === ERR) return ERR
+
+      const stmts = parse_stmt_list(
+        (tok) => tok === t.Case || tok === t.Default || tok === t.RBrace,
+      )
+
+      const end = stmts.length > 0 ? stmts[stmts.length - 1].span : colon.span
+
+      return {
+        span: Span.between(start.span, end),
+        test: expr,
+        body: stmts,
+      }
+    } else {
+      const start = expect(t.Default)
+      if (start === ERR) return ERR
+      const colon = expect(t.Colon)
+      if (colon === ERR) return ERR
+
+      const stmts = parse_stmt_list(
+        (tok) => tok === t.Case || tok === t.Default || tok === t.RBrace,
+      )
+
+      const end = stmts.length > 0 ? stmts[stmts.length - 1].span : colon.span
+
+      return {
+        span: Span.between(start.span, end),
+        test: null,
+        body: stmts,
+      }
     }
   }
   function parse_while_stmt(): Stmt | Err {
