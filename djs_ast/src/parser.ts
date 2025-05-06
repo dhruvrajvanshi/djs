@@ -10,7 +10,9 @@ import {
   ClassMember,
   DeclType,
   Expr,
+  ForInit,
   Ident,
+  InOrOf,
   MethodDef,
   ObjectKey,
   ObjectLiteralEntry,
@@ -47,19 +49,32 @@ function parser_impl(source: string): Parser {
   let current_token = lexer.next()
   let errors: ParseError[] = []
 
-  function fork(): <T>(value: T) => T {
-    const snapshot = {
+  type ParserState = {
+    lexer: Lexer
+    last_token: Token | null
+    current_token: Token
+    errors: ParseError[]
+  }
+  function create_snapshot(): ParserState {
+    return {
       lexer: lexer.clone(),
       last_token: last_token,
       current_token: current_token,
       errors: [...errors],
     }
+  }
+  function restore_snapshot(snapshot: ParserState) {
+    lexer = snapshot.lexer
+    last_token = snapshot.last_token
+    current_token = snapshot.current_token
+    errors = snapshot.errors
+  }
+
+  function fork(): <T>(value: T) => T {
+    const snapshot = create_snapshot()
 
     return function restore(value) {
-      lexer = snapshot.lexer
-      last_token = snapshot.last_token
-      current_token = snapshot.current_token
-      errors = snapshot.errors
+      restore_snapshot(snapshot)
       return value
     }
   }
@@ -1172,16 +1187,16 @@ function parser_impl(source: string): Parser {
         if (block === ERR) return ERR
         return Stmt.Block(block.span, block)
       }
-      // case t.For: {
-      //   let for_stmt_snapshot = clone()
-      //   try {
-      //     const stmt = for_stmt_snapshot.parse_for_stmt()
-      //     commit(for_stmt_snapshot)
-      //     return stmt
-      //   } catch {
-      //     return parse_for_in_of_stmt()
-      //   }
-      // }
+      case t.For: {
+        const snapshot = create_snapshot()
+        const for_stmt = parse_for_stmt()
+        if (for_stmt === ERR) {
+          restore_snapshot(snapshot)
+          return parse_for_in_of_stmt()
+        } else {
+          return for_stmt
+        }
+      }
       case t.Break: {
         const span = advance().span
         expect_semi()
@@ -1232,6 +1247,120 @@ function parser_impl(source: string): Parser {
         return parse_expr_stmt()
     }
   }
+  function parse_for_stmt(): Stmt | Err {
+    assert(at(t.For))
+    const first = advance()
+
+    if (expect(t.LParen) === ERR) return ERR
+
+    // Parse the initialization part
+    let init: ForInit
+    if (at(t.Let) || at(t.Const) || at(t.Var)) {
+      const decl = parse_var_decl()
+      if (decl === ERR) return ERR
+      init = ForInit.VarDecl(decl)
+    } else if (at(t.Semi)) {
+      advance()
+      // TODO: I have no idea why I defaulted to a 0 literal in the original rust code
+      //       Figure out if this is correct. My guess is that ForStmt.init must be nullable
+      //       and the correct thing to do here is `init = null`.
+      init = ForInit.Expr(Expr.Number(first.span, "0")) // Default to 0
+    } else {
+      const expr = parse_expr()
+      if (expr === ERR) return ERR
+
+      // No ASI allowed here
+      if (expect(t.Semi) === ERR) return ERR
+      init = ForInit.Expr(expr)
+    }
+
+    // Parse the condition part
+    let test: Expr | null = null
+    if (at(t.Semi)) {
+      advance()
+    } else {
+      const expr = parse_expr()
+      if (expr === ERR) return ERR
+
+      // No ASI allowed here
+      if (expect(t.Semi) === ERR) return ERR
+      test = expr
+    }
+
+    // Parse the update part
+    let update: Expr | null = null
+    if (!at(t.RParen)) {
+      const expr = parse_expr()
+      if (expr === ERR) return ERR
+      update = expr
+    }
+
+    if (expect(t.RParen) === ERR) return ERR
+
+    const body = parse_stmt()
+    if (body === ERR) return ERR
+
+    const span = Span.between(first.span, body.span)
+
+    return Stmt.For(span, init, test, update, body)
+  }
+  function parse_for_in_of_stmt(): Stmt | Err {
+    assert(at(t.For))
+    const start = advance().span
+    if (expect(t.LParen) === ERR) return ERR
+
+    let decl_type: DeclType | null = null
+    switch (current_token.kind) {
+      case t.Let:
+        advance()
+        decl_type = DeclType.Let
+        break
+      case t.Const:
+        advance()
+        decl_type = DeclType.Const
+        break
+      case t.Var:
+        advance()
+        decl_type = DeclType.Var
+        break
+    }
+
+    const lhs = parse_pattern()
+    if (lhs === ERR) return ERR
+
+    let in_or_of: InOrOf
+    switch (current_token.kind) {
+      case t.In:
+        advance()
+        in_or_of = InOrOf.In
+        break
+      case t.Of:
+        advance()
+        in_or_of = InOrOf.Of
+        break
+      default:
+        emit_error(`Expected 'in' or 'of', got ${current_token.kind}`)
+        return ERR
+    }
+
+    const rhs = parse_assignment_expr()
+    if (rhs === ERR) return ERR
+
+    if (expect(t.RParen) === ERR) return ERR
+
+    const body = parse_stmt()
+    if (body === ERR) return ERR
+
+    return Stmt.ForInOrOf(
+      Span.between(start, body.span),
+      decl_type,
+      lhs,
+      in_or_of,
+      rhs,
+      body,
+    )
+  }
+
   function parse_try_stmt(): Stmt | Err {
     const start = expect(t.Try)
     if (start === ERR) return ERR
