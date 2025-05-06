@@ -1132,8 +1132,8 @@ function parser_impl(source: string): Parser {
         return parse_if_stmt()
       // case t.Switch:
       //   return parse_switch_stmt()
-      // case t.While:
-      //   return parse_while_stmt()
+      case t.While:
+        return parse_while_stmt()
       // case t.Do:
       //   return parse_do_while_stmt()
       // case t.Try:
@@ -1189,10 +1189,11 @@ function parser_impl(source: string): Parser {
         if (f === ERR) return ERR
         return Stmt.Func(f.span, f)
       }
-      // case t.Class: {
-      //   const c = parse_class()
-      //   return Stmt.ClassDecl(c)
-      // }
+      case t.Class: {
+        const c = parse_class()
+        if (c === ERR) return ERR
+        return Stmt.ClassDecl(c.span, c)
+      }
       case t.Async: {
         if (next_is(t.Function)) {
           advance()
@@ -1207,6 +1208,22 @@ function parser_impl(source: string): Parser {
       default:
         return parse_expr_stmt()
     }
+  }
+  function parse_while_stmt(): Stmt | Err {
+    const start = advance().span // Consume the 'while' keyword
+
+    if (expect(t.LParen) === ERR) return ERR
+
+    const cond = parse_expr()
+    if (cond === ERR) return ERR
+
+    if (expect(t.RParen) === ERR) return ERR
+
+    const body = parse_stmt()
+    if (body === ERR) return ERR
+
+    const span = Span.between(start, body.span)
+    return Stmt.While(span, cond, body)
   }
   function parse_return_stmt(): Stmt | Err {
     const start = expect(t.Return)
