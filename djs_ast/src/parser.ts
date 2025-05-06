@@ -1079,9 +1079,9 @@ function parser_impl(source: string): Parser {
         at(t.RSquare) ||
         at(t.EndOfFile)
       ) {
-        if (current_token.kind === t.Comma) advance()
+        if (at(t.Comma)) advance()
         break
-      } else if (current_token.kind === t.DotDotDot) {
+      } else if (at(t.DotDotDot)) {
         const start = advance()
         const expr = parse_assignment_expr()
         if (expr === ERR) return ERR
@@ -1090,7 +1090,7 @@ function parser_impl(source: string): Parser {
         )
         if (at(t.RSquare)) break
         if (expect(t.Comma) === ERR) return ERR
-      } else if (current_token.kind === t.Comma) {
+      } else if (at(t.Comma)) {
         const span = advance().span
         elements.push(ArrayLiteralMember.Elision(span))
       } else {
@@ -1291,7 +1291,7 @@ function parser_impl(source: string): Parser {
   function parse_switch_case():
     | { span: Span; test: Expr | null; body: Stmt[] }
     | Err {
-    if (current_token.kind === t.Case) {
+    if (at(t.Case)) {
       const start = expect(t.Case)
       if (start === ERR) return ERR
       const expr = parse_expr()
@@ -1471,7 +1471,7 @@ function parser_impl(source: string): Parser {
 
   function can_start_arrow_fn(): boolean {
     assert(
-      current_token.kind === t.LParen,
+      at(t.LParen),
       `Expected can_start_arrow_fn to be called when current token is a (, found ${current_token.kind}`,
     )
     const restore = fork()
@@ -1567,7 +1567,7 @@ function parser_impl(source: string): Parser {
     assert(current_token.kind !== t.EndOfFile, "Tried to advance past the EOF")
     last_token = current_token
     current_token = lexer.next()
-    if (current_token.kind === t.Error) {
+    if (at(t.Error)) {
       emit_error(current_token.text)
     }
     assert(current_token.span.start >= last_token.span.start)
