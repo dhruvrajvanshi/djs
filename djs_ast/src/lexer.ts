@@ -7,6 +7,8 @@ export interface Lexer {
   next(): Token
   start_template_literal_interpolation(): void
   end_template_literal_interpolation(): void
+  enable_regex(): void
+  disable_regex(): void
 }
 export function Lexer(input: string) {
   return lexer_impl(
@@ -46,6 +48,14 @@ export function lexer_impl(
     next,
     start_template_literal_interpolation,
     end_template_literal_interpolation,
+    enable_regex,
+    disable_regex,
+  }
+  function enable_regex(): void {
+    regex_enabled = true
+  }
+  function disable_regex(): void {
+    regex_enabled = false
   }
   function start_template_literal_interpolation(): void {
     template_literal_interpolation = true
@@ -232,11 +242,9 @@ export function lexer_impl(
       return lex_single_char_token(TokenKind.Tilde)
     }
     // '/' if self.regex_enabled => self.lex_regex(),
-
+    else if (regex_enabled && at("/")) return lex_regex()
     // '/' => self.lex_single_char_token(TokenKind::Slash),
-    else if (at("/")) {
-      return lex_single_char_token(TokenKind.Slash)
-    }
+    else if (at("/")) return lex_single_char_token(TokenKind.Slash)
     // '?' => self.lex_single_char_token(TokenKind::Question),
     else if (at("?")) {
       return lex_single_char_token(TokenKind.Question)
@@ -595,6 +603,43 @@ export function lexer_impl(
       }
     }
   }
+  function lex_regex(): Token {
+    assert(current_char() === "/", "Expected '/' at the start of a regex")
+    advance()
+
+    while (current_char() !== "/" && current_char() !== "\0") {
+      if (is_line_terminator(current_char())) {
+        return error_token("Unexpected newline in regex")
+      }
+
+      const c = advance()
+
+      if (c === "\\") {
+        const c = current_char()
+        // Any character except for a linebreak is a valid escape character
+        // in a regex literal
+        // https://tc39.es/ecma262/#prod-RegularExpressionBackslashSequence
+        if (is_line_terminator(c) || c === "\0") {
+          return error_token("Unexpected newline in regex")
+        } else {
+          advance()
+        }
+      }
+    }
+
+    if (current_char() === "/") {
+      advance()
+
+      // Parse regex flags
+      while (is_valid_regex_flag(current_char())) {
+        advance()
+      }
+
+      return make_token(TokenKind.Regex)
+    } else {
+      return error_token(`Unclosed regular expression: expected /`)
+    }
+  }
 
   function lex_ident_or_keyword(): Token {
     while (is_identifier_char(current_char())) {
@@ -666,4 +711,15 @@ function is_hex_digit(c: string): boolean {
   return (
     (c >= "0" && c <= "9") || (c >= "a" && c <= "f") || (c >= "A" && c <= "F")
   )
+}
+
+// Helper function for regex parsing
+function is_line_terminator(c: string): boolean {
+  return c === "\n" || c === "\r"
+}
+
+// Helper function for regex flags
+function is_valid_regex_flag(c: string): boolean {
+  // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions#advanced_searching_with_flags
+  return ["d", "g", "i", "m", "s", "u", "v", "y"].includes(c)
 }

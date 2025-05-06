@@ -44,12 +44,14 @@ type Err = typeof ERR
 
 const t = TokenKind
 function parser_impl(source: string): Parser {
+  let previous_lexer: Lexer | null = null
   let lexer = Lexer(source)
   let last_token: Token | null = null
   let current_token = lexer.next()
   let errors: ParseError[] = []
 
   type ParserState = {
+    previous_lexer: Lexer | null
     lexer: Lexer
     last_token: Token | null
     current_token: Token
@@ -57,9 +59,10 @@ function parser_impl(source: string): Parser {
   }
   function create_snapshot(): ParserState {
     return {
+      previous_lexer,
       lexer: lexer.clone(),
-      last_token: last_token,
-      current_token: current_token,
+      last_token,
+      current_token,
       errors: [...errors],
     }
   }
@@ -419,11 +422,12 @@ function parser_impl(source: string): Parser {
       }
       case t.LSquare:
         return parse_array_literal()
-      // case t.Slash: {
-      //   re_lex_regex()
-      //   const tok = expect(t.Regex)
-      //   return Expr.Regex(tok.span, tok.text)
-      // }
+      case t.Slash: {
+        re_lex_regex()
+        const tok = expect(t.Regex)
+        if (tok === ERR) return ERR
+        return Expr.Regex(tok.span, tok.text)
+      }
       case t.Super:
         return Expr.Super(advance().span)
       case t.Class: {
@@ -437,6 +441,16 @@ function parser_impl(source: string): Parser {
         emit_error("Expected an expression")
         return ERR
     }
+  }
+
+  function re_lex_regex() {
+    if (previous_lexer === null) return ERR
+    const last_lexer = previous_lexer.clone()
+    last_lexer.enable_regex()
+    current_token = last_lexer.next()
+    last_lexer.disable_regex()
+    assert(current_token.kind === t.Regex || current_token.kind === t.Error)
+    lexer = last_lexer
   }
   function parse_template_literal(): Expr | Err {
     let span = current_token.span
@@ -1722,6 +1736,7 @@ function parser_impl(source: string): Parser {
 
   function advance(): Token {
     assert(current_token.kind !== t.EndOfFile, "Tried to advance past the EOF")
+    previous_lexer = lexer.clone()
     last_token = current_token
     current_token = lexer.next()
     if (at(t.Error)) {
