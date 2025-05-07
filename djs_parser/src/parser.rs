@@ -1906,6 +1906,8 @@ mod tests {
         }
         if env::var("UPDATE_BASELINE").is_ok() {
             println!("Updating baseline...");
+            successful_results.sort();
+            unsuccessful_results.sort();
             let mut file = File::create("test_262_baseline.success.txt").unwrap();
             for entry in successful_results {
                 writeln!(file, "{}", entry.to_str().unwrap()).unwrap();
