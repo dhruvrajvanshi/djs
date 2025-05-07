@@ -378,6 +378,9 @@ impl<'src> Lexer<'src> {
     fn lex_number(&mut self) -> Result<Token<'src>> {
         let start = self.advance();
         assert!(start.is_ascii_digit());
+        while (self.current_char().is_ascii_digit() || self.current_char() == '_') && !self.eof() {
+            self.advance();
+        }
         while (self.current_char().is_ascii_digit() || self.current_char() == '.') && !self.eof() {
             self.advance();
         }
