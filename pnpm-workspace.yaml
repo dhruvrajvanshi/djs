@@ -1,6 +1,5 @@
 packages:
   - djs_il
-  - djs_ast
   - djs_frontend
 
 onlyBuiltDependencies:
