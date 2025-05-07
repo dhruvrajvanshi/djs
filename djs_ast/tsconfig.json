@@ -1,11 +1,15 @@
 {
     "compilerOptions": {
-        "moduleResolution": "node",
-        "esModuleInterop": true,
         "checkJs": true,
         "outDir": "../target",
         "strict": true,
-        "target": "ES2022",
-        "module": "ESNext",
-    }
+        "lib": ["ES2022", "WebWorker"],
+        "target": "ES2022"
+    },
+    "files": [
+        "index.d.ts",
+        "src/ast.js",
+        "gen_ast.js",
+	"gen_visitor.js",
+    ]
 }

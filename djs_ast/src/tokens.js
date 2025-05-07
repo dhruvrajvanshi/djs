@@ -1,5 +1,5 @@
-/** @type {(string | [string, string])[]} */
-export const tokens = [
+/** @type {string | [string, string][]} */
+const tokens = [
   "Ident",
 
   ["True", "true"],
@@ -99,7 +99,6 @@ export const tokens = [
   "GreaterThanGreaterThanEq",
   "GreaterThanGreaterThanGreaterThanEq",
   "AmpEq",
-  "VBarEq",
   "CaretEq",
   "BarEq",
   "StarStarEq",
@@ -111,5 +110,5 @@ export const tokens = [
   "Caret",
 
   "EndOfFile",
-  "Error",
-]
+];
+module.exports = { tokens };
