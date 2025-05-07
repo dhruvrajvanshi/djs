@@ -308,6 +308,9 @@ export function lexer_impl(
     assert(is_ascii_digit(start), "Expected a digit at the start of a number")
 
     // Parse integer part (and potentially decimal point + fraction part)
+    while (is_ascii_digit(current_char()) || at("_")) {
+      advance()
+    }
     while (
       (is_ascii_digit(current_char()) || current_char() === ".") &&
       current_char() !== "\0"
