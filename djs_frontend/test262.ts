@@ -61,8 +61,14 @@ console.log(`${COLOR_ERROR}Failures: ${failures.length}${COLOR_RESET}`)
 
 if (process.env.UPDATE_BASELINE) {
   console.log("Updating baseline files...")
-  await fs.writeFile("./test_262_baseline.success.txt", successes.join("\n"))
-  await fs.writeFile("./test_262_baseline.failed.txt", failures.join("\n"))
+  await fs.writeFile(
+    "./test_262_baseline.success.txt",
+    successes.sort().join("\n"),
+  )
+  await fs.writeFile(
+    "./test_262_baseline.failed.txt",
+    failures.sort().join("\n"),
+  )
 } else {
   assert.equal(successes.length, expected_parse_successes.length)
   assert.equal(failures.length, expected_parse_failures.length)
