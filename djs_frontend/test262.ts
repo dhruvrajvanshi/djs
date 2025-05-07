@@ -51,24 +51,18 @@ for (const path of test262Paths) {
 assert.equal(successes.length + failures.length, total)
 
 const expected_parse_failures = (
-  await fs.readFile("../djs_parser/test_262_baseline.failed.txt", "utf-8")
+  await fs.readFile("./test_262_baseline.failed.txt", "utf-8")
 ).split("\n")
 const expected_parse_successes = (
-  await fs.readFile("../djs_parser/test_262_baseline.success.txt", "utf-8")
+  await fs.readFile("./test_262_baseline.success.txt", "utf-8")
 ).split("\n")
 console.log(`${COLOR_SUCCESS}Successes: ${successes.length}${COLOR_RESET}`)
 console.log(`${COLOR_ERROR}Failures: ${failures.length}${COLOR_RESET}`)
 
 if (process.env.UPDATE_BASELINE) {
   console.log("Updating baseline files...")
-  await fs.writeFile(
-    "../djs_parser/test_262_baseline.success.txt",
-    successes.join("\n"),
-  )
-  await fs.writeFile(
-    "../djs_parser/test_262_baseline.failed.txt",
-    failures.join("\n"),
-  )
+  await fs.writeFile("./test_262_baseline.success.txt", successes.join("\n"))
+  await fs.writeFile("./test_262_baseline.failed.txt", failures.join("\n"))
 } else {
   assert.equal(successes.length, expected_parse_successes.length)
   assert.equal(failures.length, expected_parse_failures.length)
