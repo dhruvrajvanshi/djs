@@ -1667,11 +1667,19 @@ function parser_impl(source: string): Parser {
   function parse_if_stmt(): Stmt | Err {
     assert(at(t.If))
     const start = advance().span
-    if (expect(t.LParen) === ERR) return ERR
+    let parenthesized = false
+    if (!at(t.LParen)) {
+      emit_error("Expected '(' after 'if'")
+    } else {
+      parenthesized = true
+      advance()
+    }
 
     const cond = parse_expr()
     if (cond === ERR) return ERR
-    if (expect(t.RParen) === ERR) return ERR
+    if (parenthesized) {
+      if (expect(t.RParen) === ERR) return ERR
+    }
 
     const then_branch = parse_stmt()
     if (then_branch === ERR) return ERR
