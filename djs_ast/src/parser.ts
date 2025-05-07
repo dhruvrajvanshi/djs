@@ -32,6 +32,8 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
+import { AssertionError } from "node:assert"
+import { todo } from "./assert.js"
 
 interface Parser {
   parse_source_file(): SourceFile
@@ -44,14 +46,14 @@ type Err = typeof ERR
 
 const t = TokenKind
 function parser_impl(source: string): Parser {
-  let previous_lexer: Lexer | null = null
   let lexer = Lexer(source)
+  let previous_lexer: Lexer = lexer.clone()
   let last_token: Token | null = null
   let current_token = lexer.next()
   let errors: ParseError[] = []
 
   type ParserState = {
-    previous_lexer: Lexer | null
+    previous_lexer: Lexer
     lexer: Lexer
     last_token: Token | null
     current_token: Token
@@ -424,6 +426,14 @@ function parser_impl(source: string): Parser {
         return parse_array_literal()
       case t.Slash: {
         re_lex_regex()
+        if (!at(t.Regex) && !at(t.Error)) {
+          throw new AssertionError({
+            message:
+              "Expected the current token to be a regex immediately after calling `re_lex_regex`",
+            actual: current_token.kind,
+            expected: [t.Regex, t.Error],
+          })
+        }
         const tok = expect(t.Regex)
         if (tok === ERR) return ERR
         return Expr.Regex(tok.span, tok.text)
@@ -444,13 +454,11 @@ function parser_impl(source: string): Parser {
   }
 
   function re_lex_regex() {
-    if (previous_lexer === null) return ERR
-    const last_lexer = previous_lexer.clone()
-    last_lexer.enable_regex()
-    current_token = last_lexer.next()
-    last_lexer.disable_regex()
-    assert(current_token.kind === t.Regex || current_token.kind === t.Error)
-    lexer = last_lexer
+    const l = previous_lexer.clone()
+    l.enable_regex()
+    current_token = l.next()
+    l.disable_regex()
+    lexer = l
   }
   function parse_template_literal(): Expr | Err {
     let span = current_token.span

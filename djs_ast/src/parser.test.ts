@@ -36,6 +36,17 @@ test("parse error for missing parenthesis in if condition", () => {
   expect(pretty_print(source_file)).toMatchInlineSnapshot(`"if (x) y; else z;"`)
 })
 
+test("simple regex", () => {
+  const pareser = Parser(`/x/`)
+  const source_file = pareser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+})
+test("division and regex mixed", () => {
+  const parser = Parser("1 / 2 / /a/")
+  const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+})
+
 function parse_expr(input: string): Expr {
   const parser = Parser(input)
   const source_file = parser.parse_source_file()
