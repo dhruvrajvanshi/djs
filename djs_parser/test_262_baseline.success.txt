@@ -6859,6 +6859,7 @@
 ../test262/test/built-ins/Iterator/from/get-return-method-when-call-return.js
 ../test262/test/built-ins/Iterator/from/is-function.js
 ../test262/test/built-ins/Iterator/from/iterable-primitives.js
+../test262/test/built-ins/Iterator/from/iterable-to-iterator-fallback.js
 ../test262/test/built-ins/Iterator/from/length.js
 ../test262/test/built-ins/Iterator/from/name.js
 ../test262/test/built-ins/Iterator/from/non-constructible.js
@@ -7032,6 +7033,7 @@
 ../test262/test/built-ins/Iterator/prototype/flatMap/get-return-method-throws.js
 ../test262/test/built-ins/Iterator/prototype/flatMap/is-function.js
 ../test262/test/built-ins/Iterator/prototype/flatMap/iterable-primitives-are-not-flattened.js
+../test262/test/built-ins/Iterator/prototype/flatMap/iterable-to-iterator-fallback.js
 ../test262/test/built-ins/Iterator/prototype/flatMap/iterator-already-exhausted.js
 ../test262/test/built-ins/Iterator/prototype/flatMap/iterator-return-method-throws.js
 ../test262/test/built-ins/Iterator/prototype/flatMap/length.js
@@ -16331,6 +16333,7 @@
 ../test262/test/built-ins/Temporal/Duration/from/order-of-operations.js
 ../test262/test/built-ins/Temporal/Duration/from/prop-desc.js
 ../test262/test/built-ins/Temporal/Duration/from/string-with-skipped-units.js
+../test262/test/built-ins/Temporal/Duration/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Duration/get-prototype-from-constructor-throws.js
 ../test262/test/built-ins/Temporal/Duration/invalid-type.js
 ../test262/test/built-ins/Temporal/Duration/large-number.js
@@ -16349,6 +16352,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/abs/new-object.js
 ../test262/test/built-ins/Temporal/Duration/prototype/abs/not-a-constructor.js
 ../test262/test/built-ins/Temporal/Duration/prototype/abs/prop-desc.js
+../test262/test/built-ins/Temporal/Duration/prototype/abs/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Duration/prototype/add/argument-duration-max.js
 ../test262/test/built-ins/Temporal/Duration/prototype/add/argument-duration-out-of-range.js
 ../test262/test/built-ins/Temporal/Duration/prototype/add/argument-duration-precision-exact-numerical-values.js
@@ -16379,6 +16383,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/add/result-out-of-range-1.js
 ../test262/test/built-ins/Temporal/Duration/prototype/add/result-out-of-range-2.js
 ../test262/test/built-ins/Temporal/Duration/prototype/add/result-out-of-range-3.js
+../test262/test/built-ins/Temporal/Duration/prototype/add/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Duration/prototype/blank/basic.js
 ../test262/test/built-ins/Temporal/Duration/prototype/blank/branding.js
 ../test262/test/built-ins/Temporal/Duration/prototype/blank/prop-desc.js
@@ -16404,6 +16409,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/negated/name.js
 ../test262/test/built-ins/Temporal/Duration/prototype/negated/not-a-constructor.js
 ../test262/test/built-ins/Temporal/Duration/prototype/negated/prop-desc.js
+../test262/test/built-ins/Temporal/Duration/prototype/negated/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Duration/prototype/prop-desc.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/accepts-datetime-strings-for-relative-to.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/balance-negative-result.js
@@ -16436,6 +16442,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/round/largestunit-smallestunit-default.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/largestunit-undefined.js
+../test262/test/built-ins/Temporal/Duration/prototype/round/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/length.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/name.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/next-day-out-of-range.js
@@ -16484,6 +16491,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/Duration/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-floor.js
@@ -16494,11 +16502,14 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/Duration/prototype/round/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/singular-units.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/smallestunit-plurals-accepted-string.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/smallestunit-string-shorthand-string.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/Duration/prototype/round/smallestunit-wrong-type.js
+../test262/test/built-ins/Temporal/Duration/prototype/round/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/succeeds-with-largest-unit-auto.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/throws-if-neither-largestUnit-nor-smallestUnit-is-given.js
 ../test262/test/built-ins/Temporal/Duration/prototype/round/throws-on-wrong-offset-for-zoned-date-time-relative-to.js
@@ -16539,6 +16550,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/subtract/result-out-of-range-1.js
 ../test262/test/built-ins/Temporal/Duration/prototype/subtract/result-out-of-range-2.js
 ../test262/test/built-ins/Temporal/Duration/prototype/subtract/result-out-of-range-3.js
+../test262/test/built-ins/Temporal/Duration/prototype/subtract/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toJSON/balance-subseconds.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toJSON/basic.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toJSON/branding.js
@@ -16588,10 +16600,12 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/roundingmode-halfExpand.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/Duration/prototype/toString/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/smallestunit-fractionalseconddigits.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/smallestunit-valid-units.js
+../test262/test/built-ins/Temporal/Duration/prototype/toString/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toString/throws-when-rounded-duration-is-invalid.js
 ../test262/test/built-ins/Temporal/Duration/prototype/toStringTag/prop-desc.js
 ../test262/test/built-ins/Temporal/Duration/prototype/total/balance-negative-result.js
@@ -16653,6 +16667,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/total/unit-plurals-accepted-string.js
 ../test262/test/built-ins/Temporal/Duration/prototype/total/unit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Duration/prototype/total/unit-string-shorthand-string.js
+../test262/test/built-ins/Temporal/Duration/prototype/total/unit-wrong-type.js
 ../test262/test/built-ins/Temporal/Duration/prototype/total/year-zero.js
 ../test262/test/built-ins/Temporal/Duration/prototype/valueOf/basic.js
 ../test262/test/built-ins/Temporal/Duration/prototype/valueOf/branding.js
@@ -16683,6 +16698,7 @@
 ../test262/test/built-ins/Temporal/Duration/prototype/with/prop-desc.js
 ../test262/test/built-ins/Temporal/Duration/prototype/with/sign-conflict-throws-rangeerror.js
 ../test262/test/built-ins/Temporal/Duration/prototype/with/sign-replace.js
+../test262/test/built-ins/Temporal/Duration/prototype/with/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Duration/prototype/years/branding.js
 ../test262/test/built-ins/Temporal/Duration/prototype/years/prop-desc.js
 ../test262/test/built-ins/Temporal/Duration/subclass.js
@@ -16745,6 +16761,7 @@
 ../test262/test/built-ins/Temporal/Instant/from/name.js
 ../test262/test/built-ins/Temporal/Instant/from/not-a-constructor.js
 ../test262/test/built-ins/Temporal/Instant/from/prop-desc.js
+../test262/test/built-ins/Temporal/Instant/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Instant/from/timezone-custom.js
 ../test262/test/built-ins/Temporal/Instant/from/year-zero.js
 ../test262/test/built-ins/Temporal/Instant/fromEpochMilliseconds/argument.js
@@ -16849,6 +16866,7 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-floor.js
@@ -16859,8 +16877,10 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/round/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/smallestunit-string-shorthand.js
+../test262/test/built-ins/Temporal/Instant/prototype/round/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/throws-on-increments-that-do-not-divide-evenly.js
 ../test262/test/built-ins/Temporal/Instant/prototype/round/throws-without-smallest-unit.js
@@ -16890,6 +16910,7 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/since/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/largestunit-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/largestunit.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/leap-second.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/length.js
@@ -16908,6 +16929,7 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-floor.js
@@ -16918,8 +16940,10 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/since/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/subseconds.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/valid-increments.js
 ../test262/test/built-ins/Temporal/Instant/prototype/since/year-zero.js
@@ -16996,10 +17020,12 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/toString/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/smallestunit-fractionalseconddigits.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/smallestunit-valid-units.js
+../test262/test/built-ins/Temporal/Instant/prototype/toString/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/timezone-offset.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/timezone-string-datetime.js
 ../test262/test/built-ins/Temporal/Instant/prototype/toString/timezone-string-leap-second.js
@@ -17053,6 +17079,7 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/until/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/largestunit-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/leap-second.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/length.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/minutes-and-hours.js
@@ -17070,6 +17097,7 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-floor.js
@@ -17080,8 +17108,10 @@
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/until/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/Instant/prototype/until/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/subseconds.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/valid-increments.js
 ../test262/test/built-ins/Temporal/Instant/prototype/until/year-zero.js
@@ -17254,7 +17284,9 @@
 ../test262/test/built-ins/Temporal/PlainDate/from/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainDate/from/out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDate/from/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/from/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/from/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDate/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDate/from/with-year-month-day-need-constrain.js
 ../test262/test/built-ins/Temporal/PlainDate/from/with-year-month-day.js
 ../test262/test/built-ins/Temporal/PlainDate/from/with-year-monthCode-day-need-constrain.js
@@ -17302,7 +17334,9 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/add/overflow-constrain.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/add/overflow-reject.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/add/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/add/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/add/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/add/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/calendarId/branding.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/calendarId/prop-desc.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/constructor.js
@@ -17409,6 +17443,7 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/largestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/largestunit.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/length.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/name.js
@@ -17422,6 +17457,7 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingincrement.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-expand.js
@@ -17433,9 +17469,11 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/smallestunit-higher-units.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/weeks-months.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/wrapping-at-end-of-month.js
@@ -17467,7 +17505,9 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/subtract/overflow-constrain.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/subtract/overflow-reject.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/subtract/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/subtract/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/subtract/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/subtract/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toJSON/basic.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toJSON/branding.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toJSON/builtin.js
@@ -17538,6 +17578,7 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toString/calendarname-critical.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toString/calendarname-never.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toString/calendarname-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/toString/calendarname-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toString/length.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toString/name.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/toString/not-a-constructor.js
@@ -17631,6 +17672,7 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/largestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/largestunit-week.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/largestunit-year.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/length.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/name.js
@@ -17645,6 +17687,7 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingincrement.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-expand.js
@@ -17656,9 +17699,11 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/smallestunit-higher-units.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/until/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/weeks-months.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/wrapping-at-end-of-month.js
@@ -17687,8 +17732,10 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/with/options-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/with/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/with/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/with/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/with/plaindatelike-invalid.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/with/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/with/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/withCalendar/basic.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/withCalendar/branding.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/withCalendar/builtin.js
@@ -17808,8 +17855,10 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/from/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainDateTime/from/overflow-reject.js
 ../test262/test/built-ins/Temporal/PlainDateTime/from/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/from/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/from/parser.js
 ../test262/test/built-ins/Temporal/PlainDateTime/from/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDateTime/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDateTime/from/year-zero.js
 ../test262/test/built-ins/Temporal/PlainDateTime/get-prototype-from-constructor-throws.js
 ../test262/test/built-ins/Temporal/PlainDateTime/length.js
@@ -17845,7 +17894,9 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/options-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/add/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/calendarId/branding.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/calendarId/prop-desc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/constructor.js
@@ -17941,6 +17992,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingincrement-one-day.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-basic.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-expand.js
@@ -17952,8 +18004,11 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/smallestunit-string-shorthand.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/smallestunit-wrong-type.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/throws-argument-object-insufficient-data.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/throws-argument-object.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/round/throws-no-argument.js
@@ -17995,6 +18050,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/largestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/largestunit.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/leap-second.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/length.js
@@ -18017,6 +18073,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-floor.js
@@ -18029,8 +18086,10 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-trunc-is-default.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/subseconds.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/weeks-months-mutually-exclusive.js
@@ -18065,7 +18124,9 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/subtract/options-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/subtract/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/subtract/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/subtract/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/subtract/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/subtract/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toJSON/basic.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toJSON/branding.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toJSON/builtin.js
@@ -18103,6 +18164,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/calendarname-critical.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/calendarname-never.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/calendarname-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/calendarname-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/fractionalseconddigits-auto.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/fractionalseconddigits-nan.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/fractionalseconddigits-non-integer.js
@@ -18130,16 +18192,19 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/smallestunit-fractionalseconddigits.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/smallestunit-valid-units.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toString/year-format.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toStringTag/prop-desc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/basic.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/branding.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/builtin.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/constant-offset.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/disambiguation-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/disambiguation.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/invalid-instant.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/toZonedDateTime/length.js
@@ -18198,6 +18263,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/largestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/leap-second.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/length.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/name.js
@@ -18219,6 +18285,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-floor.js
@@ -18231,8 +18298,10 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-trunc-is-default.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/subseconds.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/units-changed.js
@@ -18272,6 +18341,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/with/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/with/prop-desc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/with/string-throws.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/with/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/with/throws-if-combined-date-time-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/with/timezone-throws.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/withCalendar/basic.js
@@ -18320,6 +18390,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/withPlainTime/not-a-constructor.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/withPlainTime/plaintime-propertybag-no-time-units.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/withPlainTime/prop-desc.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/withPlainTime/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/withPlainTime/throws-if-combined-date-time-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/withPlainTime/time-undefined.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/withPlainTime/year-zero.js
@@ -18383,8 +18454,10 @@
 ../test262/test/built-ins/Temporal/PlainMonthDay/from/options-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/from/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/from/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainMonthDay/from/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/from/overflow.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/from/prop-desc.js
+../test262/test/built-ins/Temporal/PlainMonthDay/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/from/year-zero.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/get-prototype-from-constructor-throws.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/length.js
@@ -18466,6 +18539,7 @@
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/toString/calendarname-critical.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/toString/calendarname-never.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/toString/calendarname-undefined.js
+../test262/test/built-ins/Temporal/PlainMonthDay/prototype/toString/calendarname-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/toString/length.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/toString/name.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/toString/not-a-constructor.js
@@ -18496,7 +18570,9 @@
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/with/options-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/with/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/with/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainMonthDay/prototype/with/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/prototype/with/prop-desc.js
+../test262/test/built-ins/Temporal/PlainMonthDay/prototype/with/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/refisoyear-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/subclass.js
 ../test262/test/built-ins/Temporal/PlainTime/builtin.js
@@ -18569,8 +18645,10 @@
 ../test262/test/built-ins/Temporal/PlainTime/from/overflow-constrain.js
 ../test262/test/built-ins/Temporal/PlainTime/from/overflow-reject.js
 ../test262/test/built-ins/Temporal/PlainTime/from/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/from/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/from/plaintime-propertybag-no-time-units.js
 ../test262/test/built-ins/Temporal/PlainTime/from/prop-desc.js
+../test262/test/built-ins/Temporal/PlainTime/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainTime/from/year-zero.js
 ../test262/test/built-ins/Temporal/PlainTime/get-prototype-from-constructor-throws.js
 ../test262/test/built-ins/Temporal/PlainTime/hour-undefined.js
@@ -18607,6 +18685,7 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/add/precision-exact-mathematical-values-1.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/add/precision-exact-mathematical-values-2.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/add/prop-desc.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/add/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/constructor.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/equals/argument-cast.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/equals/argument-number.js
@@ -18667,6 +18746,7 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingincrement-seconds.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-floor.js
@@ -18677,9 +18757,12 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/round/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/smallestunit-missing.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/round/smallestunit-string-shorthand.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/round/smallestunit-wrong-type.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/round/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/second/branding.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/second/prop-desc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/argument-cast.js
@@ -18708,6 +18791,7 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/largestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/largestunit.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/leap-second.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/length.js
@@ -18733,6 +18817,7 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingincrement-seconds.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-floor.js
@@ -18743,8 +18828,10 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/since/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/since/year-zero.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/subtract/argument-duration-max.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/subtract/argument-duration-out-of-range.js
@@ -18774,6 +18861,7 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/subtract/precision-exact-mathematical-values-1.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/subtract/precision-exact-mathematical-values-2.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/subtract/prop-desc.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/subtract/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toJSON/basic.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toJSON/branding.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toJSON/builtin.js
@@ -18818,10 +18906,12 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/toString/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/smallestunit-fractionalseconddigits.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toString/smallestunit-valid-units.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/toString/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/toStringTag/prop-desc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/argument-cast.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/argument-number.js
@@ -18849,6 +18939,7 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/largestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/largestunit.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/leap-second.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/length.js
@@ -18874,6 +18965,7 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingincrement-seconds.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-floor.js
@@ -18884,8 +18976,10 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/until/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/until/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/until/year-zero.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/valueOf/basic.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/valueOf/branding.js
@@ -18909,8 +19003,10 @@
 ../test262/test/built-ins/Temporal/PlainTime/prototype/with/options-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/with/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/with/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/with/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/with/plaintimelike-invalid.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/with/prop-desc.js
+../test262/test/built-ins/Temporal/PlainTime/prototype/with/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainTime/prototype/with/throws-if-time-is-invalid-when-overflow-is-reject.js
 ../test262/test/built-ins/Temporal/PlainTime/subclass.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/argument-invalid.js
@@ -19009,8 +19105,10 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/from/overflow-constrain.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/from/overflow-reject.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/from/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/from/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/from/prop-desc.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/from/reference-day.js
+../test262/test/built-ins/Temporal/PlainYearMonth/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/from/year-zero.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/get-prototype-from-constructor-throws.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/length.js
@@ -19044,6 +19142,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/add/overflow-undefined.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/add/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/add/prop-desc.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/add/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/add/subtract-from-last-representable-month.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/add/throws-if-year-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/calendarId/branding.js
@@ -19139,6 +19238,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/largestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/largestunit-years.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/leap-second.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/length.js
@@ -19155,6 +19255,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-floor.js
@@ -19165,8 +19266,10 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/symmetry.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/throws-if-year-outside-valid-iso-range.js
@@ -19199,6 +19302,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/overflow-undefined.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/prop-desc.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/subtract-from-last-representable-month.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/throws-if-year-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toJSON/basic.js
@@ -19234,6 +19338,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toString/calendarname-critical.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toString/calendarname-never.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toString/calendarname-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toString/calendarname-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toString/length.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toString/name.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/toString/not-a-constructor.js
@@ -19278,6 +19383,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/largestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/largestunit-years.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/leap-second.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/length.js
@@ -19294,6 +19400,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-floor.js
@@ -19304,8 +19411,10 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/throws-if-year-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/year-zero.js
@@ -19332,7 +19441,9 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/with/options-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/with/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/with/overflow-undefined.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/with/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/with/prop-desc.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/with/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/with/yearmonthlike-invalid.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/year/branding.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/year/prop-desc.js
@@ -19439,6 +19550,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/calendar-temporal-object.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/constrain-has-no-effect-on-invalid-iso-string.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/disambiguation-invalid-string.js
+../test262/test/built-ins/Temporal/ZonedDateTime/from/disambiguation-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/infinity-throws-rangeerror.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/leap-second.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/length.js
@@ -19452,10 +19564,12 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/offset-overrides-critical-flag.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/offset-string-invalid.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/offset-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/from/offset-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/options-object.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/options-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/overflow-options.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/overflow-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/from/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/prop-desc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/timezone-case-insensitive.js
@@ -19494,6 +19608,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/add/options-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/add/order-of-operations.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/add/overflow-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/add/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/add/overflow.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/add/prop-desc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/add/subclassing-ignored.js
@@ -19638,6 +19753,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-floor.js
@@ -19648,8 +19764,10 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/smallestunit-string-shorthand.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/smallestunit.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/subclassing-ignored.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/round/throws-on-invalid-increments.js
@@ -19702,6 +19820,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/largestunit.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/leap-second.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/length.js
@@ -19720,6 +19839,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-floor.js
@@ -19730,11 +19850,13 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/rounds-relative-to-receiver.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/same-epoch-nanoseconds.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/since-until.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/subseconds.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/valid-rounding-increments.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/since/weeks-and-months-are-mutually-exclusive.js
@@ -19774,6 +19896,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/subtract/options-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/subtract/order-of-operations.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/subtract/overflow-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/subtract/overflow-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/subtract/overflow.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/subtract/prop-desc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/subtract/subclassing-ignored.js
@@ -19844,6 +19967,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/calendarname-critical.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/calendarname-never.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/calendarname-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/calendarname-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/fractionalseconddigits-auto.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/fractionalseconddigits-nan.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/fractionalseconddigits-non-integer.js
@@ -19859,6 +19983,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/offset-invalid-string.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/offset-never.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/offset-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/offset-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/offset.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/options-object.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/options-wrong-type.js
@@ -19876,14 +20001,17 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/smallestunit-fractionalseconddigits.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/smallestunit-valid-units.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/timezonename-auto.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/timezonename-critical.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/timezonename-never.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/timezonename-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/timezonename-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toString/year-format.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/toStringTag/prop-desc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/argument-propertybag-calendar-case-insensitive.js
@@ -19929,6 +20057,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-smallestunit-mismatch.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/largestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/leap-second.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/length.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/name.js
@@ -19945,6 +20074,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingincrement-non-integer.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingincrement-out-of-range.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingincrement-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingincrement-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-expand.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-floor.js
@@ -19955,10 +20085,12 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/rounds-relative-to-receiver.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/same-epoch-nanoseconds.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/smallestunit-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/subseconds.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/until-since.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/valid-rounding-increments.js
@@ -19981,6 +20113,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/builtin.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/copy-properties-not-undefined.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-invalid-string.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/disambiguation-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/incorrectly-spelled-properties-ignored.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/infinity-throws-rangeerror.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/invalid-disambiguation.js
@@ -19992,7 +20125,9 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/not-a-constructor.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/object-must-contain-at-least-one-property.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/offset-invalid-string.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/offset-property-invalid-string.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/offset-undefined.js
+../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/offset-wrong-type.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/options-object.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/options-undefined.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/with/options-wrong-type.js
@@ -21460,6 +21595,7 @@
 ../test262/test/built-ins/TypedArray/prototype/toLocaleString/user-provided-tolocalestring-shrink.js
 ../test262/test/built-ins/TypedArray/prototype/toReversed/ignores-species.js
 ../test262/test/built-ins/TypedArray/prototype/toReversed/immutable.js
+../test262/test/built-ins/TypedArray/prototype/toReversed/length-property-ignored.js
 ../test262/test/built-ins/TypedArray/prototype/toReversed/length.js
 ../test262/test/built-ins/TypedArray/prototype/toReversed/name.js
 ../test262/test/built-ins/TypedArray/prototype/toReversed/not-a-constructor.js
@@ -21469,6 +21605,7 @@
 ../test262/test/built-ins/TypedArray/prototype/toSorted/comparefn-stop-after-error.js
 ../test262/test/built-ins/TypedArray/prototype/toSorted/ignores-species.js
 ../test262/test/built-ins/TypedArray/prototype/toSorted/immutable.js
+../test262/test/built-ins/TypedArray/prototype/toSorted/length-property-ignored.js
 ../test262/test/built-ins/TypedArray/prototype/toSorted/length.js
 ../test262/test/built-ins/TypedArray/prototype/toSorted/name.js
 ../test262/test/built-ins/TypedArray/prototype/toSorted/not-a-constructor.js
@@ -21506,6 +21643,7 @@
 ../test262/test/built-ins/TypedArray/prototype/with/index-casted-to-number.js
 ../test262/test/built-ins/TypedArray/prototype/with/index-negative.js
 ../test262/test/built-ins/TypedArray/prototype/with/index-validated-against-current-length.js
+../test262/test/built-ins/TypedArray/prototype/with/length-property-ignored.js
 ../test262/test/built-ins/TypedArray/prototype/with/length.js
 ../test262/test/built-ins/TypedArray/prototype/with/name.js
 ../test262/test/built-ins/TypedArray/prototype/with/not-a-constructor.js
@@ -23513,6 +23651,14 @@
 ../test262/test/intl402/ListFormat/instance/prototype.js
 ../test262/test/intl402/ListFormat/prototype/constructor/prop-desc.js
 ../test262/test/intl402/ListFormat/prototype/format/branding.js
+../test262/test/intl402/ListFormat/prototype/format/en-us-default.js
+../test262/test/intl402/ListFormat/prototype/format/en-us-disjunction.js
+../test262/test/intl402/ListFormat/prototype/format/en-us-narrow.js
+../test262/test/intl402/ListFormat/prototype/format/en-us-short.js
+../test262/test/intl402/ListFormat/prototype/format/en-us-unit.js
+../test262/test/intl402/ListFormat/prototype/format/es-es-long.js
+../test262/test/intl402/ListFormat/prototype/format/es-es-narrow.js
+../test262/test/intl402/ListFormat/prototype/format/es-es-short.js
 ../test262/test/intl402/ListFormat/prototype/format/iterable-getiterator-throw.js
 ../test262/test/intl402/ListFormat/prototype/format/iterable-invalid.js
 ../test262/test/intl402/ListFormat/prototype/format/iterable-iteratorclose.js
@@ -23524,6 +23670,14 @@
 ../test262/test/intl402/ListFormat/prototype/format/name.js
 ../test262/test/intl402/ListFormat/prototype/format/prop-desc.js
 ../test262/test/intl402/ListFormat/prototype/formatToParts/branding.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/en-us-default.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/en-us-disjunction.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/en-us-narrow.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/en-us-short.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/en-us-unit.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/es-es-long.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/es-es-narrow.js
+../test262/test/intl402/ListFormat/prototype/formatToParts/es-es-short.js
 ../test262/test/intl402/ListFormat/prototype/formatToParts/iterable-getiterator-throw.js
 ../test262/test/intl402/ListFormat/prototype/formatToParts/iterable-invalid.js
 ../test262/test/intl402/ListFormat/prototype/formatToParts/iterable-iteratorclose.js
@@ -24213,6 +24367,7 @@
 ../test262/test/intl402/Temporal/PlainDate/prototype/toLocaleString/options-conflict.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/toLocaleString/options-undefined.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/toLocaleString/resolved-time-zone.js
+../test262/test/intl402/Temporal/PlainDate/prototype/toString/calendarname-wrong-type.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/toString/options-undefined.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/toZonedDateTime/dst-skipped-cross-midnight.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/toZonedDateTime/timezone-string-datetime.js
@@ -24224,6 +24379,7 @@
 ../test262/test/intl402/Temporal/PlainDate/prototype/weekOfYear/non-iso-week-of-year.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/with/cross-era-boundary.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/with/gregorian-mutually-exclusive-fields.js
+../test262/test/intl402/Temporal/PlainDate/prototype/with/japanese-mutually-exclusive-fields.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/with/non-iso-calendar-fields.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/withCalendar/canonicalize-calendar.js
 ../test262/test/intl402/Temporal/PlainDate/prototype/yearOfWeek/gregory-iso-weekofyear.js
@@ -24253,6 +24409,7 @@
 ../test262/test/intl402/Temporal/PlainDateTime/prototype/toLocaleString/options-conflict.js
 ../test262/test/intl402/Temporal/PlainDateTime/prototype/toLocaleString/options-undefined.js
 ../test262/test/intl402/Temporal/PlainDateTime/prototype/toLocaleString/resolved-time-zone.js
+../test262/test/intl402/Temporal/PlainDateTime/prototype/toString/calendarname-wrong-type.js
 ../test262/test/intl402/Temporal/PlainDateTime/prototype/toString/options-undefined.js
 ../test262/test/intl402/Temporal/PlainDateTime/prototype/toZonedDateTime/disambiguation-undefined.js
 ../test262/test/intl402/Temporal/PlainDateTime/prototype/toZonedDateTime/dst-disambiguation.js
@@ -24290,6 +24447,7 @@
 ../test262/test/intl402/Temporal/PlainMonthDay/prototype/toLocaleString/options-undefined.js
 ../test262/test/intl402/Temporal/PlainMonthDay/prototype/toLocaleString/resolved-time-zone.js
 ../test262/test/intl402/Temporal/PlainMonthDay/prototype/toPlainDate/infinity-throws-rangeerror.js
+../test262/test/intl402/Temporal/PlainMonthDay/prototype/toString/calendarname-wrong-type.js
 ../test262/test/intl402/Temporal/PlainMonthDay/prototype/toString/year-format.js
 ../test262/test/intl402/Temporal/PlainMonthDay/prototype/with/fields-missing-properties.js
 ../test262/test/intl402/Temporal/PlainMonthDay/prototype/with/non-iso-calendar-fields.js
@@ -24311,6 +24469,7 @@
 ../test262/test/intl402/Temporal/PlainYearMonth/from/one-of-era-erayear-undefined.js
 ../test262/test/intl402/Temporal/PlainYearMonth/from/reference-day-chinese.js
 ../test262/test/intl402/Temporal/PlainYearMonth/from/reference-day-gregory.js
+../test262/test/intl402/Temporal/PlainYearMonth/from/reference-day-hebrew.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/add/options-undefined.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/equals/canonicalize-calendar.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/equals/compare-calendar.js
@@ -24330,6 +24489,7 @@
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/toLocaleString/lone-options-accepted.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/toLocaleString/options-undefined.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/toLocaleString/resolved-time-zone.js
+../test262/test/intl402/Temporal/PlainYearMonth/prototype/toString/calendarname-wrong-type.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/toString/options-undefined.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/until/canonicalize-calendar.js
 ../test262/test/intl402/Temporal/PlainYearMonth/prototype/until/infinity-throws-rangeerror.js
@@ -24416,6 +24576,7 @@
 ../test262/test/intl402/Temporal/ZonedDateTime/prototype/toLocaleString/options-undefined.js
 ../test262/test/intl402/Temporal/ZonedDateTime/prototype/toLocaleString/time-zone-canonicalized.js
 ../test262/test/intl402/Temporal/ZonedDateTime/prototype/toPlainDate/preserves-calendar.js
+../test262/test/intl402/Temporal/ZonedDateTime/prototype/toString/calendarname-wrong-type.js
 ../test262/test/intl402/Temporal/ZonedDateTime/prototype/toString/options-undefined.js
 ../test262/test/intl402/Temporal/ZonedDateTime/prototype/until/argument-propertybag-timezone-string-datetime.js
 ../test262/test/intl402/Temporal/ZonedDateTime/prototype/until/calendar-mismatch.js
@@ -24594,6 +24755,7 @@
 ../test262/test/language/arguments-object/gen-meth-args-trailing-comma-single-args.js
 ../test262/test/language/arguments-object/gen-meth-args-trailing-comma-undefined.js
 ../test262/test/language/arguments-object/mapped/Symbol.iterator.js
+../test262/test/language/arguments-object/mapped/enumerable-configurable-accessor-descriptor.js
 ../test262/test/language/arguments-object/mapped/mapped-arguments-nonconfigurable-1.js
 ../test262/test/language/arguments-object/mapped/mapped-arguments-nonconfigurable-2.js
 ../test262/test/language/arguments-object/mapped/mapped-arguments-nonconfigurable-3.js
@@ -24616,6 +24778,7 @@
 ../test262/test/language/arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-3.js
 ../test262/test/language/arguments-object/mapped/mapped-arguments-nonwritable-nonconfigurable-4.js
 ../test262/test/language/arguments-object/mapped/nonconfigurable-descriptors-basic.js
+../test262/test/language/arguments-object/mapped/nonconfigurable-descriptors-define-failure.js
 ../test262/test/language/arguments-object/mapped/nonconfigurable-descriptors-set-value-by-arguments.js
 ../test262/test/language/arguments-object/mapped/nonconfigurable-descriptors-set-value-with-define-property.js
 ../test262/test/language/arguments-object/mapped/nonconfigurable-descriptors-with-param-assign.js
