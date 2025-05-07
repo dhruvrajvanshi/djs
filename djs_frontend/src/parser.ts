@@ -1099,7 +1099,7 @@ function parser_impl(source: string): Parser {
         return ArrowFnBody.Block(block.span, block)
       }
       default: {
-        const e = parse_expr()
+        const e = parse_assignment_expr()
         if (e === ERR) return ERR
         return ArrowFnBody.Expr(e.span, e)
       }

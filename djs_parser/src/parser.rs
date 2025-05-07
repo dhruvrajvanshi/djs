@@ -1508,7 +1508,7 @@ impl<'src> Parser<'src> {
                 let span = Span::between(start.span, stop.span);
                 Ok(ArrowFnBody::Block(Block { span, stmts }))
             }
-            _ => Ok(ArrowFnBody::Expr(Box::new(self.parse_expr()?))),
+            _ => Ok(ArrowFnBody::Expr(Box::new(self.parse_assignment_expr()?))),
         }
     }
 
