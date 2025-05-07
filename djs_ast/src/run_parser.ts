@@ -11,6 +11,10 @@ export {
   type AssignOp,
 } from "./ast.gen.js"
 
+if (process.argv[1] === import.meta.filename) {
+  await main(process.argv[2])
+}
+
 async function main(path: string) {
   const fs = await import("node:fs/promises")
   const { Parser } = await import("./parser.js")
@@ -28,8 +32,4 @@ async function main(path: string) {
   )
 
   console.log(`Found ${source_file.errors.length} error(s)`)
-}
-
-if (process.argv[1] === import.meta.filename) {
-  await main(process.argv[2])
 }

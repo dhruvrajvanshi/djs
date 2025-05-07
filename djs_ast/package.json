@@ -9,7 +9,8 @@
     "test": "vitest",
     "gen": "pnpm gen:ast && pnpm gen:tokens",
     "gen:ast": "node gen_ts_ast.js | prettier > src/ast.gen.ts",
-    "gen:tokens": "node gen_ts_tokens.js | prettier > src/tokens.gen.ts"
+    "gen:tokens": "node gen_ts_tokens.js | prettier > src/tokens.gen.ts",
+    "run_parser": "tsx src/run_parser.ts"
   },
   "devDependencies": {
     "@types/node": "^22.14.1",
