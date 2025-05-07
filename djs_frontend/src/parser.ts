@@ -1756,10 +1756,13 @@ function parser_impl(source: string): Parser {
     return { span, stmts, errors }
   }
   function recover_till_next_stmt(): void {
+    const start_line = current_token.line
     if (at(t.EndOfFile)) return
     do {
       advance()
-    } while (!at(t.EndOfFile) && !at(t.Semi) && !at(t.RBrace) && !at(t.LBrace))
+      if (at(t.EndOfFile) || at(t.Semi)) break
+      if (at(t.RBrace) && current_token.line !== start_line) break
+    } while (true)
   }
 
   function at(token_kind: TokenKind): boolean {
