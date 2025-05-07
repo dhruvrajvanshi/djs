@@ -1194,8 +1194,8 @@ function parser_impl(source: string): Parser {
         return parse_switch_stmt()
       case t.While:
         return parse_while_stmt()
-      // case t.Do:
-      //   return parse_do_while_stmt()
+      case t.Do:
+        return parse_do_while_stmt()
       case t.Try:
         return parse_try_stmt()
       case t.Return:
@@ -1523,6 +1523,25 @@ function parser_impl(source: string): Parser {
 
     const span = Span.between(start, body.span)
     return Stmt.While(span, cond, body)
+  }
+  function parse_do_while_stmt(): Stmt | Err {
+    const start = expect(t.Do)
+    if (start === ERR) return ERR
+
+    const body = parse_stmt()
+    if (body === ERR) return ERR
+
+    if (expect(t.While) === ERR) return ERR
+    if (expect(t.LParen) === ERR) return ERR
+
+    const cond = parse_expr()
+    if (cond === ERR) return ERR
+
+    if (expect(t.RParen) === ERR) return ERR
+
+    expect_semi()
+
+    return Stmt.DoWhile(Span.between(start.span, cond.span), body, cond)
   }
   function parse_return_stmt(): Stmt | Err {
     const start = expect(t.Return)
