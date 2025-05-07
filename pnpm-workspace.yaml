@@ -1,5 +1,6 @@
 packages:
   - djs_il
+  - djs_frontend
 
 onlyBuiltDependencies:
   - '@biomejs/biome'
