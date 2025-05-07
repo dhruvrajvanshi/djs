@@ -1,5 +1,4 @@
 import { show_diagnostics } from "./diagnostic.js"
-import { pretty_print } from "./pretty_print.js"
 
 export { TokenKind } from "./TokenKind.js"
 export type { Token } from "./Token.js"
@@ -12,24 +11,21 @@ export {
 } from "./ast.gen.js"
 
 if (process.argv[1] === import.meta.filename) {
-  await main(process.argv[2])
+  await main(process.argv.slice(2))
 }
 
-async function main(path: string) {
+async function main(paths: string[]) {
   const fs = await import("node:fs/promises")
   const { Parser } = await import("./parser.js")
-  const source_text = await fs.readFile(path, "utf-8")
-  const parser = Parser(source_text)
-  const source_file = parser.parse_source_file()
+  let total_errors = 0
+  for (const path of paths) {
+    const source_text = await fs.readFile(path, "utf-8")
+    const parser = Parser(source_text)
+    const source_file = parser.parse_source_file()
 
-  show_diagnostics(path, source_text, source_file.errors)
+    show_diagnostics(path, source_text, source_file.errors)
+    total_errors += source_file.errors.length
+  }
 
-  console.log(
-    pretty_print(source_file)
-      .split("\n")
-      .map((line, idx) => `${idx + 1}: ${line}`)
-      .join("\n"),
-  )
-
-  console.log(`Found ${source_file.errors.length} error(s)`)
+  console.log(`Found ${total_errors} error(s)`)
 }
