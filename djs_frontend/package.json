@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/package.json",
-  "name": "djs_ast",
+  "name": "djs_frontend",
   "version": "1.0.0",
   "type": "module",
   "license": "UNLICENSED",
