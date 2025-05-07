@@ -1254,7 +1254,6 @@ impl<'src> Parser<'src> {
     }
 
     fn parse_conditional_expr(&mut self) -> Result<Expr<'src>> {
-        // TODO
         let lhs = self.parse_short_circuit_expr()?;
         match self.current()?.kind {
             T::Question => {
