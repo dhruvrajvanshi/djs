@@ -24,6 +24,7 @@ import {
   SourceFile,
   Stmt,
   TemplateLiteralFragment,
+  TypeAnnotation,
   VarDecl,
   VarDeclarator,
   type Func,
@@ -33,19 +34,27 @@ import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
 import { AssertionError } from "node:assert"
-import { todo } from "./assert.js"
 
 interface Parser {
   parse_source_file(): SourceFile
 }
-export function Parser(source: string): Parser {
-  return parser_impl(source)
+export function Parser(path: string, source: string): Parser {
+  let flags = 0
+  if (path.endsWith(".ts") || path.endsWith(".tsx")) {
+    flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
+  }
+  return parser_impl(path, source, flags)
 }
 const ERR = Symbol("ParseError")
 type Err = typeof ERR
 
 const t = TokenKind
-function parser_impl(source: string): Parser {
+
+const PARSER_FLAGS = {
+  ALLOW_TYPE_ANNOTATIONS: 1,
+}
+
+function parser_impl(path: string, source: string, flags: number): Parser {
   let lexer = Lexer(source)
   let previous_lexer: Lexer = lexer.clone()
   let last_token: Token | null = null
@@ -579,6 +588,8 @@ function parser_impl(source: string): Parser {
 
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
+    const return_type = parse_optional_type_annotation()
+    if (return_type === ERR) return ERR
 
     const body = parse_block()
     if (body === ERR) return ERR
@@ -589,7 +600,11 @@ function parser_impl(source: string): Parser {
       span,
       name,
       accessor_type,
+      return_type,
       body: {
+        // TODO: Passing return_type to both the method and the body,
+        // cleanup types so that one would do
+        return_type,
         span,
         name: null,
         params,
@@ -636,6 +651,8 @@ function parser_impl(source: string): Parser {
         case t.LParen: {
           const params = parse_params_with_parens()
           if (params === ERR) return ERR
+          const return_type = parse_optional_type_annotation()
+          if (return_type === ERR) return ERR
 
           const body = parse_block()
           if (body === ERR) return ERR
@@ -644,7 +661,11 @@ function parser_impl(source: string): Parser {
             span,
             name,
             accessor_type: null,
+            return_type,
             body: {
+              // TODO: Passing return_type to both the method and the body,
+              // cleanup types so that one would do
+              return_type,
               span,
               name: null,
               params,
@@ -701,6 +722,8 @@ function parser_impl(source: string): Parser {
     if (name === ERR) return ERR
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
+    const return_type = parse_optional_type_annotation()
+    if (return_type === ERR) return ERR
     const body = parse_block()
     if (body === ERR) return ERR
     const span = Span.between(start, body.span)
@@ -710,12 +733,16 @@ function parser_impl(source: string): Parser {
       // Could return an error node here, but continuing with processing
     }
 
-    const method = {
+    const method: MethodDef = {
       span,
       name,
       accessor_type,
+      return_type,
       body: {
         span,
+        // TODO: Passing return_type to both the method and the body,
+        // cleanup types so that one would do
+        return_type,
         name: null,
         params,
         body,
@@ -771,12 +798,9 @@ function parser_impl(source: string): Parser {
         if (expect(t.Comma) === ERR) return ERR
       }
 
-      const pattern = parse_pattern()
-      if (pattern === ERR) return ERR
-      params.push({
-        span: pattern.span,
-        pattern,
-      })
+      const param = parse_param()
+      if (param === ERR) return ERR
+      params.push(param)
 
       if (at(t.Comma) && next_is(t.RParen)) {
         advance()
@@ -789,6 +813,36 @@ function parser_impl(source: string): Parser {
     return {
       span: Span.between(start.span, stop.span),
       params,
+    }
+  }
+  function parse_param(): Param | Err {
+    const pattern = parse_pattern()
+    if (pattern === ERR) return ERR
+    const type_annotation = parse_optional_type_annotation()
+    if (type_annotation === ERR) return ERR
+    return {
+      span: pattern.span,
+      pattern,
+      type_annotation,
+    }
+  }
+  function parse_optional_type_annotation(): TypeAnnotation | null | Err {
+    if (flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS && at(t.Colon)) {
+      advance()
+      return parse_type_annotation()
+    } else {
+      return null
+    }
+  }
+  function parse_type_annotation(): TypeAnnotation | Err {
+    switch (current_token.kind) {
+      case t.Ident: {
+        const ident = parse_ident()
+        if (ident === ERR) return ERR
+        return TypeAnnotation.Ident(ident)
+      }
+      default:
+        return ERR
     }
   }
 
@@ -868,14 +922,19 @@ function parser_impl(source: string): Parser {
     ) {
       const pattern = parse_pattern()
       if (pattern === ERR) return ERR
-      const params = {
+      const params: ParamList = {
         span: pattern.span,
-        params: [{ span: pattern.span, pattern }],
+        params: [{ span: pattern.span, pattern, type_annotation: null }],
       }
       if (expect(t.FatArrow) === ERR) return ERR
       const body = parse_arrow_fn_body()
       if (body === ERR) return ERR
-      return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
+      return Expr.ArrowFn(
+        Span.between(params.span, body.span),
+        params,
+        /* type_annotation */ null,
+        body,
+      )
     } else if (at(t.LParen) && can_start_arrow_fn()) {
       return parse_arrow_fn()
     } else {
@@ -905,10 +964,17 @@ function parser_impl(source: string): Parser {
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
     if (expect(t.FatArrow) === ERR) return ERR
+    const return_type = parse_optional_type_annotation()
+    if (return_type === ERR) return ERR
     const body = parse_arrow_fn_body()
     if (body === ERR) return ERR
 
-    return Expr.ArrowFn(Span.between(params.span, body.span), params, body)
+    return Expr.ArrowFn(
+      Span.between(params.span, body.span),
+      params,
+      return_type,
+      body,
+    )
   }
 
   function parse_pattern(): Pattern | Err {
@@ -1179,7 +1245,17 @@ function parser_impl(source: string): Parser {
       return ERR
     }
   }
-  function parse_stmt(): Stmt | Err {
+  function parse_stmt(export_token: Token | null = null): Stmt | Err {
+    if (
+      (at(t.Export) && next_is(t.Function)) ||
+      next_is(t.Class) ||
+      next_is(t.Var) ||
+      next_is(t.Let) ||
+      next_is(t.Const)
+    ) {
+      advance()
+      return parse_stmt(export_token)
+    }
     switch (current_token.kind) {
       case t.Let:
       case t.Const:
@@ -1583,6 +1659,8 @@ function parser_impl(source: string): Parser {
 
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
+    const return_type = parse_optional_type_annotation()
+    if (return_type === ERR) return ERR
     const body = parse_block()
     if (body === ERR) return ERR
 
@@ -1592,6 +1670,7 @@ function parser_impl(source: string): Parser {
       span,
       name,
       params,
+      return_type,
       body,
       is_generator,
       is_async: false,
@@ -1746,7 +1825,7 @@ function parser_impl(source: string): Parser {
     const stmts: Stmt[] = []
     const span = current_token.span
     while (!at(t.EndOfFile)) {
-      const stmt = parse_stmt()
+      const stmt = parse_stmt(/* top_level */)
       if (stmt === ERR) {
         recover_till_next_stmt()
         continue
@@ -1762,6 +1841,8 @@ function parser_impl(source: string): Parser {
       advance()
       if (at(t.EndOfFile) || at(t.Semi)) break
       if (at(t.RBrace) && current_token.line !== start_line) break
+      if (at(t.Function) || at(t.Let) || at(t.Const) || at(t.For) || at(t.Var))
+        break
     } while (true)
   }
 
