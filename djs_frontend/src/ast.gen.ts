@@ -461,6 +461,7 @@ export interface VarDecl {
 
 export interface VarDeclarator {
   readonly pattern: Pattern
+  readonly type_annotation: TypeAnnotation | null
   readonly init: Expr | null
 }
 

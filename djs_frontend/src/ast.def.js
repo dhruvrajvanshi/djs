@@ -308,6 +308,7 @@ const DVarDecl = Struct("VarDecl", ["span"], {
 })
 const DVarDeclarator = Struct("VarDeclarator", [], {
   pattern: Pattern,
+  type_annotation: Option(TypeAnnotation),
   init: Option(Expr),
 })
 const DForInit = Enum(ForInit, [], {

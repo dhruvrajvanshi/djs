@@ -1736,6 +1736,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (pattern === ERR) return ERR
 
     let init: Expr | null = null
+    const type_annotation = parse_optional_type_annotation()
+    if (type_annotation === ERR) return ERR
     if (at(t.Eq)) {
       advance()
       const expr = parse_assignment_expr()
@@ -1743,7 +1745,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       init = expr
     }
 
-    return { pattern, init }
+    return { pattern, type_annotation, init }
   }
 
   function can_start_arrow_fn(): boolean {
