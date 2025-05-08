@@ -1834,15 +1834,35 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
     return { span, stmts, errors }
   }
+  function at_any(...kinds: readonly TokenKind[]): boolean {
+    return kinds.some((kind) => current_token.kind === kind)
+  }
   function recover_till_next_stmt(): void {
     const start_line = current_token.line
     if (at(t.EndOfFile)) return
     do {
       advance()
-      if (at(t.EndOfFile) || at(t.Semi)) break
-      if (at(t.RBrace) && current_token.line !== start_line) break
-      if (at(t.Function) || at(t.Let) || at(t.Const) || at(t.For) || at(t.Var))
+      if (
+        at_any(
+          t.Function,
+          t.Class,
+          t.Let,
+          t.Const,
+          t.Var,
+          t.If,
+          t.For,
+          t.While,
+          t.Do,
+          t.Switch,
+          t.EndOfFile,
+          t.Break,
+          t.Return,
+          t.Semi,
+          t.Continue,
+        )
+      ) {
         break
+      }
     } while (true)
   }
 
