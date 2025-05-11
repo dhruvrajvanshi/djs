@@ -1430,13 +1430,20 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     )
   }
   function parse_import_specifier(): ImportSpecifier | Err {
+    const start = current_token.span
+    let type_only = false
+    if (at(t.Ident) && current_token.text === "type") {
+      advance()
+      type_only = true
+    }
     if (at(t.String)) {
       const tok = advance()
       if (expect(t.As) === ERR) return ERR
       const alias = parse_ident()
       if (alias === ERR) return ERR
       return {
-        span: Span.between(tok.span, alias.span),
+        type_only: false,
+        span: Span.between(start, alias),
         as_name: alias,
         imported_name: ModuleExportName.Ident({
           span: tok.span,
@@ -1451,13 +1458,15 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       const alias = parse_ident()
       if (alias === ERR) return ERR
       return {
+        type_only,
         span: Span.between(name.span, alias.span),
         as_name: alias,
         imported_name: ModuleExportName.Ident(name),
       }
     } else {
       return {
-        span: name.span,
+        type_only,
+        span: Span.between(start, name),
         as_name: null,
         imported_name: ModuleExportName.Ident(name),
       }
