@@ -25,7 +25,7 @@ const failures: string[] = []
 const total = test262Paths.length
 for (const path of test262Paths) {
   const source = await fs.readFile(path, "utf-8")
-  const errors = Parser(source).parse_source_file().errors
+  const errors = Parser(path, source).parse_source_file().errors
   if (syntax_error_expected(source)) {
     if (errors.length === 0) {
       console.log(

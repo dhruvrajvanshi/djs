@@ -41,6 +41,10 @@ export const tokens = [
   ["Switch", "switch"],
   ["Case", "case"],
   ["Default", "default"],
+  ["Export", "export"],
+  ["Import", "import"],
+  ["From", "from"],
+  ["As", "as"],
 
   "String",
   "Number",

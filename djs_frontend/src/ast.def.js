@@ -6,6 +6,10 @@ const Stmt = "Stmt"
  * {@link DExpr}
  */
 const Expr = "Expr"
+/**
+ * {@link DTypeAnnotation}
+ */
+const TypeAnnotation = "TypeAnnotation"
 
 /**
  * {@link DIdent}
@@ -175,7 +179,11 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
 const DExpr = Enum(Expr, ["span", "visit"], {
   Var: { ident: Ident },
   BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
-  ArrowFn: { params: ParamList, body: ArrowFnBody },
+  ArrowFn: {
+    params: ParamList,
+    return_type: Option(TypeAnnotation),
+    body: ArrowFnBody,
+  },
   Func: { func: Func },
   Call: { callee: Expr, args: Array(Expr) },
   Index: { lhs: Expr, property: Expr },
@@ -211,6 +219,11 @@ const DExpr = Enum(Expr, ["span", "visit"], {
   Class: { class: "Class" },
   TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
 })
+const DTypeAnnotation = Enum("TypeAnnotation", [], {
+  Ident: { ident: Ident },
+  Union: { left: TypeAnnotation, right: TypeAnnotation },
+  Array: { item: TypeAnnotation },
+})
 const DClass = Struct(Class, ["span"], {
   name: Option(Ident),
   superclass: Option(Expr),
@@ -230,6 +243,7 @@ const DFieldDef = Struct("FieldDef", ["span"], {
 const DMethodDef = Struct(MethodDef, ["span"], {
   name: ObjectKey,
   body: Func,
+  return_type: Option(TypeAnnotation),
   accessor_type: Option(AccessorType),
 })
 
@@ -252,6 +266,7 @@ const DParamList = Struct(ParamList, ["span"], {
 
 const DParam = Struct(Param, ["span"], {
   pattern: Pattern,
+  type_annotation: Option(TypeAnnotation),
 })
 
 const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
@@ -264,6 +279,7 @@ const DFunc = Struct("Func", ["span"], {
   name: Option(Ident),
   params: ParamList,
   body: Block,
+  return_type: Option(TypeAnnotation),
   is_generator: "boolean",
   is_async: "boolean",
 })
@@ -294,6 +310,7 @@ const DVarDecl = Struct("VarDecl", ["span"], {
 })
 const DVarDeclarator = Struct("VarDeclarator", [], {
   pattern: Pattern,
+  type_annotation: Option(TypeAnnotation),
   init: Option(Expr),
 })
 const DForInit = Enum(ForInit, [], {
@@ -383,6 +400,7 @@ const ast_items = [
   DVarDeclarator,
   DForInit,
   DExpr,
+  DTypeAnnotation,
   DObjectLiteralEntry,
   DObjectKey,
   DParamList,

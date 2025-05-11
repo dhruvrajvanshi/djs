@@ -20,7 +20,7 @@ async function main(paths: string[]) {
   let total_errors = 0
   for (const path of paths) {
     const source_text = await fs.readFile(path, "utf-8")
-    const parser = Parser(source_text)
+    const parser = Parser(path, source_text)
     const source_file = parser.parse_source_file()
 
     show_diagnostics(path, source_text, source_file.errors)
