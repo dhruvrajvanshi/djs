@@ -1897,7 +1897,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           t.Return,
           t.Semi,
           t.Continue,
-        )
+        ) ||
+        (at(t.Ident) && next_is(t.LParen))
       ) {
         break
       }
