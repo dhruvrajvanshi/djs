@@ -122,6 +122,12 @@ export type Stmt =
       readonly class: Class
     }
   | {
+      readonly kind: "Import"
+      readonly span: Span
+      readonly named_imports: readonly ImportSpecifier[]
+      readonly module_specifier: Text
+    }
+  | {
       readonly kind: "Empty"
       readonly span: Span
     }
@@ -274,6 +280,17 @@ export const Stmt = {
     kind: "ClassDecl",
     span,
     class: klass,
+  }),
+
+  Import: (
+    span: Span,
+    named_imports: readonly ImportSpecifier[],
+    module_specifier: Text,
+  ): StmtWithKind<"Import"> => ({
+    kind: "Import",
+    span,
+    named_imports: named_imports,
+    module_specifier: module_specifier,
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
@@ -1182,6 +1199,35 @@ export interface ObjectPatternProperty {
   readonly span: Span
   readonly key: ObjectKey
   readonly value: Pattern
+}
+
+export type ModuleExportName =
+  | {
+      readonly kind: "Ident"
+      readonly ident: Ident
+    }
+  | {
+      readonly kind: "String"
+      readonly text: Text
+    }
+export type ModuleExportNameWithKind<K extends ModuleExportName["kind"]> =
+  Extract<ModuleExportName, { kind: K }>
+export const ModuleExportName = {
+  Ident: (ident: Ident): ModuleExportNameWithKind<"Ident"> => ({
+    kind: "Ident",
+    ident: ident,
+  }),
+
+  String: (text: Text): ModuleExportNameWithKind<"String"> => ({
+    kind: "String",
+    text: text,
+  }),
+} as const
+
+export interface ImportSpecifier {
+  readonly span: Span
+  readonly as_name: Ident | null
+  readonly imported_name: ModuleExportName
 }
 
 export type BinOp =
