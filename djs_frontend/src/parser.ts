@@ -1321,6 +1321,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       }
       case t.Break: {
         const span = advance().span
+        if (at(t.Ident)) {
+          const label_token = advance()
+          const label = label_token.text
+          return Stmt.Break(span, { span: label_token.span, name: label })
+        }
         expect_semi()
         return Stmt.Break(span, null)
       }
