@@ -864,6 +864,13 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         if (ident === ERR) return ERR
         return TypeAnnotation.Ident(ident)
       }
+      case t.Void: {
+        const tok = advance()
+        return TypeAnnotation.Ident({
+          span: tok.span,
+          text: "void",
+        })
+      }
       default:
         return ERR
     }
