@@ -221,6 +221,8 @@ const DExpr = Enum(Expr, ["span", "visit"], {
 })
 const DTypeAnnotation = Enum("TypeAnnotation", [], {
   Ident: { ident: Ident },
+  Union: { left: TypeAnnotation, right: TypeAnnotation },
+  Array: { item: TypeAnnotation },
 })
 const DClass = Struct(Class, ["span"], {
   name: Option(Ident),

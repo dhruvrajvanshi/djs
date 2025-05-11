@@ -931,10 +931,20 @@ export const Expr = {
     fragments: fragments,
   }),
 } as const
-export type TypeAnnotation = {
-  readonly kind: "Ident"
-  readonly ident: Ident
-}
+export type TypeAnnotation =
+  | {
+      readonly kind: "Ident"
+      readonly ident: Ident
+    }
+  | {
+      readonly kind: "Union"
+      readonly left: TypeAnnotation
+      readonly right: TypeAnnotation
+    }
+  | {
+      readonly kind: "Array"
+      readonly item: TypeAnnotation
+    }
 export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
   TypeAnnotation,
   { kind: K }
@@ -943,6 +953,20 @@ export const TypeAnnotation = {
   Ident: (ident: Ident): TypeAnnotationWithKind<"Ident"> => ({
     kind: "Ident",
     ident: ident,
+  }),
+
+  Union: (
+    left: TypeAnnotation,
+    right: TypeAnnotation,
+  ): TypeAnnotationWithKind<"Union"> => ({
+    kind: "Union",
+    left: left,
+    right: right,
+  }),
+
+  Array: (item: TypeAnnotation): TypeAnnotationWithKind<"Array"> => ({
+    kind: "Array",
+    item: item,
   }),
 } as const
 export type ObjectLiteralEntry =

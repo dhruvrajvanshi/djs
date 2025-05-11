@@ -835,6 +835,29 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
   function parse_type_annotation(): TypeAnnotation | Err {
+    let lhs = parse_primary_type_annotation()
+    if (lhs === ERR) return ERR
+    loop: while (true) {
+      switch (current_token.kind) {
+        case t.VBar: {
+          advance()
+          const rhs = parse_type_annotation()
+          if (rhs === ERR) return ERR
+          lhs = TypeAnnotation.Union(lhs, rhs)
+          break
+        }
+        case t.LSquare: {
+          advance()
+          if (expect(t.RSquare) === ERR) return ERR
+          lhs = TypeAnnotation.Array(lhs)
+        }
+        default:
+          break loop
+      }
+    }
+    return lhs
+  }
+  function parse_primary_type_annotation(): TypeAnnotation | Err {
     switch (current_token.kind) {
       case t.Ident: {
         const ident = parse_ident()
