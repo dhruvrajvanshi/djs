@@ -1940,7 +1940,6 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return kinds.some((kind) => current_token.kind === kind)
   }
   function recover_till_next_stmt(): void {
-    const start_line = current_token.line
     if (at(t.EndOfFile)) return
     do {
       advance()
@@ -1961,6 +1960,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           t.Return,
           t.Semi,
           t.Continue,
+          t.Export,
+          t.Import,
         ) ||
         (at(t.Ident) && next_is(t.LParen))
       ) {
