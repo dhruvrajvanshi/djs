@@ -177,6 +177,10 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
     named_imports: Array("ImportSpecifier"),
     module_specifier: Text,
   },
+  Labeled: {
+    label: Label,
+    stmt: Stmt,
+  },
   Empty: {},
 })
 
