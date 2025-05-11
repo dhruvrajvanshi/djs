@@ -10,7 +10,8 @@ export function show_diagnostics(
   errors: readonly ParseError[],
 ) {
   console.log(
-    errors
+    [...errors]
+      .sort((a, b) => b.span.start - a.span.start)
       .map(
         (e) =>
           `${COLOR_ERROR}ERROR:${COLOR_RESET} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}`,

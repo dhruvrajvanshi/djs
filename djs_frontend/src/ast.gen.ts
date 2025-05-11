@@ -300,6 +300,7 @@ export interface MethodDef {
   readonly span: Span
   readonly name: ObjectKey
   readonly body: Func
+  readonly return_type: TypeAnnotation | null
   readonly accessor_type: AccessorType | null
 }
 
@@ -460,6 +461,7 @@ export interface VarDecl {
 
 export interface VarDeclarator {
   readonly pattern: Pattern
+  readonly type_annotation: TypeAnnotation | null
   readonly init: Expr | null
 }
 
@@ -501,6 +503,7 @@ export type Expr =
       readonly kind: "ArrowFn"
       readonly span: Span
       readonly params: ParamList
+      readonly return_type: TypeAnnotation | null
       readonly body: ArrowFnBody
     }
   | {
@@ -701,11 +704,13 @@ export const Expr = {
   ArrowFn: (
     span: Span,
     params: ParamList,
+    return_type: TypeAnnotation | null,
     body: ArrowFnBody,
   ): ExprWithKind<"ArrowFn"> => ({
     kind: "ArrowFn",
     span,
     params: params,
+    return_type: return_type,
     body: body,
   }),
 
@@ -926,6 +931,44 @@ export const Expr = {
     fragments: fragments,
   }),
 } as const
+export type TypeAnnotation =
+  | {
+      readonly kind: "Ident"
+      readonly ident: Ident
+    }
+  | {
+      readonly kind: "Union"
+      readonly left: TypeAnnotation
+      readonly right: TypeAnnotation
+    }
+  | {
+      readonly kind: "Array"
+      readonly item: TypeAnnotation
+    }
+export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
+  TypeAnnotation,
+  { kind: K }
+>
+export const TypeAnnotation = {
+  Ident: (ident: Ident): TypeAnnotationWithKind<"Ident"> => ({
+    kind: "Ident",
+    ident: ident,
+  }),
+
+  Union: (
+    left: TypeAnnotation,
+    right: TypeAnnotation,
+  ): TypeAnnotationWithKind<"Union"> => ({
+    kind: "Union",
+    left: left,
+    right: right,
+  }),
+
+  Array: (item: TypeAnnotation): TypeAnnotationWithKind<"Array"> => ({
+    kind: "Array",
+    item: item,
+  }),
+} as const
 export type ObjectLiteralEntry =
   | {
       readonly kind: "Ident"
@@ -1031,6 +1074,7 @@ export interface ParamList {
 export interface Param {
   readonly span: Span
   readonly pattern: Pattern
+  readonly type_annotation: TypeAnnotation | null
 }
 
 export interface Func {
@@ -1038,6 +1082,7 @@ export interface Func {
   readonly name: Ident | null
   readonly params: ParamList
   readonly body: Block
+  readonly return_type: TypeAnnotation | null
   readonly is_generator: boolean
   readonly is_async: boolean
 }

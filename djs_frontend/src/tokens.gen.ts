@@ -44,6 +44,10 @@ const TokenKinds = Object.freeze({
   Switch: "Switch",
   Case: "Case",
   Default: "Default",
+  Export: "Export",
+  Import: "Import",
+  From: "From",
+  As: "As",
   String: "String",
   Number: "Number",
   Regex: "Regex",
@@ -146,6 +150,10 @@ const text_to_keyword_kind: Map<string, TokenKind> = new Map([
   ["switch", TokenKinds.Switch],
   ["case", TokenKinds.Case],
   ["default", TokenKinds.Default],
+  ["export", TokenKinds.Export],
+  ["import", TokenKinds.Import],
+  ["from", TokenKinds.From],
+  ["as", TokenKinds.As],
 ])
 
 export type TokenKind = (typeof TokenKinds)[keyof typeof TokenKinds]
