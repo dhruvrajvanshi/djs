@@ -993,9 +993,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   function parse_arrow_fn(): Expr | Err {
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
-    if (expect(t.FatArrow) === ERR) return ERR
     const return_type = parse_optional_type_annotation()
     if (return_type === ERR) return ERR
+    if (expect(t.FatArrow) === ERR) return ERR
+
     const body = parse_arrow_fn_body()
     if (body === ERR) return ERR
 
@@ -1791,14 +1792,18 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     )
     const restore = fork()
     if (!expect(t.LParen)) return restore(false)
-    const params = parse_comma_separated_list(t.RParen, parse_pattern)
+    const params = parse_comma_separated_list(t.RParen, parse_param)
     if (params === ERR) return restore(false)
     const rparen = expect(t.RParen)
     if (rparen === ERR) return restore(false)
-    const fatarrow = expect(t.FatArrow)
-    if (fatarrow === ERR) return restore(false)
-
-    return restore(fatarrow.line === rparen.line)
+    const last = advance()
+    if (
+      (last.kind === t.FatArrow || last.kind === t.Colon) &&
+      last.line === rparen.line
+    ) {
+      return restore(true)
+    }
+    return restore(false)
   }
 
   function emit_error(message: string): void {
