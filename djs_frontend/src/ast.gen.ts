@@ -128,6 +128,12 @@ export type Stmt =
       readonly module_specifier: Text
     }
   | {
+      readonly kind: "Labeled"
+      readonly span: Span
+      readonly label: Label
+      readonly stmt: Stmt
+    }
+  | {
       readonly kind: "Empty"
       readonly span: Span
     }
@@ -291,6 +297,13 @@ export const Stmt = {
     span,
     named_imports: named_imports,
     module_specifier: module_specifier,
+  }),
+
+  Labeled: (span: Span, label: Label, stmt: Stmt): StmtWithKind<"Labeled"> => ({
+    kind: "Labeled",
+    span,
+    label: label,
+    stmt: stmt,
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),

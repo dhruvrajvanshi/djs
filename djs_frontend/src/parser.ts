@@ -1305,6 +1305,22 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         if (decl === ERR) return ERR
         return Stmt.VarDecl(decl.span, decl)
       }
+      case t.Ident: {
+        if (next_is(t.Colon)) {
+          const label = parse_ident()
+          assert(label !== ERR) // because of the lookahead above
+          assert(advance().kind === t.Colon) // because of the lookahead above
+          const stmt = parse_stmt()
+          if (stmt === ERR) return ERR
+          return Stmt.Labeled(
+            Span.between(label.span, stmt.span),
+            { span: label.span, name: label.text },
+            stmt,
+          )
+        } else {
+          return parse_expr_stmt()
+        }
+      }
       case t.If:
         return parse_if_stmt()
       case t.Switch:
