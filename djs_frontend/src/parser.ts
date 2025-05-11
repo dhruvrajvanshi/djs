@@ -1270,11 +1270,12 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
   function parse_stmt(export_token: Token | null = null): Stmt | Err {
     if (
-      (at(t.Export) && next_is(t.Function)) ||
-      next_is(t.Class) ||
-      next_is(t.Var) ||
-      next_is(t.Let) ||
-      next_is(t.Const)
+      at(t.Export) &&
+      (next_is(t.Function) ||
+        next_is(t.Class) ||
+        next_is(t.Var) ||
+        next_is(t.Let) ||
+        next_is(t.Const))
     ) {
       advance()
       return parse_stmt(export_token)
