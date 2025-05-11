@@ -173,6 +173,10 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
   With: { expr: Expr, body: Stmt },
   Func: { func: Func },
   ClassDecl: { class: Class },
+  Import: {
+    named_imports: Array("ImportSpecifier"),
+    module_specifier: Text,
+  },
   Empty: {},
 })
 
@@ -329,6 +333,14 @@ const DObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
   key: ObjectKey,
   value: Pattern,
 })
+const DModuleExportName = Enum("ModuleExportName", [], {
+  Ident: { ident: Ident },
+  String: { text: Text },
+})
+const DImportSpecifier = Struct("ImportSpecifier", ["span"], {
+  as_name: Option(Ident),
+  imported_name: "ModuleExportName",
+})
 const DBinOp = StringUnion(
   BinOp,
   // Arithmetic
@@ -410,6 +422,8 @@ const ast_items = [
   DArrowFnBody,
   DTemplateLiteralFragment,
   DObjectPatternProperty,
+  DModuleExportName,
+  DImportSpecifier,
   DBinOp,
   DAssignOp,
   DDeclType,

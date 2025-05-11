@@ -12,8 +12,10 @@ import {
   Expr,
   ForInit,
   Ident,
+  ImportSpecifier,
   InOrOf,
   MethodDef,
+  ModuleExportName,
   ObjectKey,
   ObjectLiteralEntry,
   ObjectPatternProperty,
@@ -1378,10 +1380,67 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           return ERR
         }
       }
+      case t.Import:
+        return parse_import_stmt()
       default:
         return parse_expr_stmt()
     }
   }
+  function parse_import_stmt(): Stmt | Err {
+    const start = advance()
+    assert(start.kind === t.Import)
+    if (expect(t.LBrace) === ERR) return ERR
+    const import_specifiers = parse_comma_separated_list(
+      t.RBrace,
+      parse_import_specifier,
+    )
+    if (import_specifiers === ERR) return ERR
+    if (expect(t.RBrace) === ERR) return ERR
+    if (expect(t.From) === ERR) return ERR
+    const from_clause = expect(t.String)
+    if (from_clause === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+    return Stmt.Import(
+      Span.between(start.span, from_clause.span),
+      import_specifiers,
+      from_clause.text,
+    )
+  }
+  function parse_import_specifier(): ImportSpecifier | Err {
+    if (at(t.String)) {
+      const tok = advance()
+      if (expect(t.As) === ERR) return ERR
+      const alias = parse_ident()
+      if (alias === ERR) return ERR
+      return {
+        span: Span.between(tok.span, alias.span),
+        as_name: alias,
+        imported_name: ModuleExportName.Ident({
+          span: tok.span,
+          text: tok.text,
+        }),
+      }
+    }
+    const name = parse_ident()
+    if (name === ERR) return ERR
+    if (at(t.As)) {
+      advance()
+      const alias = parse_ident()
+      if (alias === ERR) return ERR
+      return {
+        span: Span.between(name.span, alias.span),
+        as_name: alias,
+        imported_name: ModuleExportName.Ident(name),
+      }
+    } else {
+      return {
+        span: name.span,
+        as_name: null,
+        imported_name: ModuleExportName.Ident(name),
+      }
+    }
+  }
+
   function parse_for_stmt(): Stmt | Err {
     assert(at(t.For))
     const first = advance()
