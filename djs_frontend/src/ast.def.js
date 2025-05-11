@@ -342,6 +342,7 @@ const DModuleExportName = Enum("ModuleExportName", [], {
   String: { text: Text },
 })
 const DImportSpecifier = Struct("ImportSpecifier", ["span"], {
+  type_only: "boolean",
   as_name: Option(Ident),
   imported_name: "ModuleExportName",
 })
@@ -559,6 +560,9 @@ function needs_lifetime_param_set() {
     if (typeof type === "string") {
       if (type === "str" || type === "Text") {
         return true
+      }
+      if (type === "boolean") {
+        return false
       }
       if (items_by_name[type] === undefined) {
         throw new Error(`Unknown type: ${type}`)

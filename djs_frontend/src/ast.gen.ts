@@ -1239,6 +1239,7 @@ export const ModuleExportName = {
 
 export interface ImportSpecifier {
   readonly span: Span
+  readonly type_only: boolean
   readonly as_name: Ident | null
   readonly imported_name: ModuleExportName
 }
