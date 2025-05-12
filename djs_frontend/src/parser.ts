@@ -28,6 +28,7 @@ import {
   SwitchCase,
   TemplateLiteralFragment,
   TypeAnnotation,
+  TypeParam,
   VarDecl,
   VarDeclarator,
   type Func,
@@ -590,6 +591,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
 
     const start = static_token ? static_token.span : name.span
 
+    const type_params = parse_optional_type_params()
+    if (type_params === ERR) return ERR
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
     const return_type = parse_optional_type_annotation()
@@ -611,6 +614,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         return_type,
         span,
         name: null,
+        type_params,
         params,
         body,
         is_generator,
@@ -650,6 +654,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       const start = current_token.span
       const name = parse_object_key()
       if (name === ERR) return ERR
+      const type_params = parse_optional_type_params()
+      if (type_params === ERR) return ERR
 
       switch (current_token.kind) {
         case t.LParen: {
@@ -670,6 +676,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
               // TODO: Passing return_type to both the method and the body,
               // cleanup types so that one would do
               return_type,
+              type_params,
               span,
               name: null,
               params,
@@ -723,6 +730,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
 
     const name = parse_object_key()
     if (name === ERR) return ERR
+    const type_params = parse_optional_type_params()
+    if (type_params === ERR) return ERR
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
     const return_type = parse_optional_type_annotation()
@@ -745,6 +754,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         span,
         // TODO: Passing return_type to both the method and the body,
         // cleanup types so that one would do
+        type_params,
         return_type,
         name: null,
         params,
@@ -1900,6 +1910,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
 
     const name = at(t.Ident) ? parse_ident() : null
     if (name === ERR) return ERR
+    const type_params = parse_optional_type_params()
+    if (type_params === ERR) return ERR
 
     const params = parse_params_with_parens()
     if (params === ERR) return ERR
@@ -1913,12 +1925,24 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return {
       span,
       name,
+      type_params,
       params,
       return_type,
       body,
       is_generator,
       is_async: false,
     }
+  }
+  function parse_optional_type_params(): readonly TypeParam[] | Err {
+    if (!at(t.LessThan)) return []
+    advance()
+    const params = parse_comma_separated_list(
+      t.GreaterThan,
+      parse_binding_ident,
+    )
+    if (params === ERR) return ERR
+    if (expect(t.GreaterThan) === ERR) return ERR
+    return params.map((ident) => ({ ident }))
   }
   function parse_var_decl(): VarDecl | Err {
     let span = current_token.span
