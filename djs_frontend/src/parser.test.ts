@@ -53,6 +53,18 @@ test("assignment bitwise or equal |=", () => {
   assert("Assign" === expr.kind)
   assert.equal(expr.operator, AssignOp.BitOrEq)
 })
+test("struct type decl", () => {
+  const source = `type ParserState = {
+    previous_lexer: Lexer
+    lexer: Lexer
+    last_token: Token | null
+    current_token: Token
+    errors: ParseError[]
+  }`
+  const parser = Parser("test.ts", source)
+  const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+})
 
 function parse_expr(input: string): Expr {
   const parser = Parser("test.js", input)

@@ -959,14 +959,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       current_token.kind !== end_token
     ) {
       if (!first) {
-        if (
-          at(t.Comma) ||
-          at(t.Semi) ||
-          (last_token && last_token.line > current_token.line)
-        ) {
+        if (at(t.Comma) || at(t.Semi)) {
           advance()
+        } else if (last_token && last_token.line < current_token.line) {
         } else {
-          emit_error(`Expected a comma or ${end_token}`)
+          emit_error(`Expected a comma, ; a newline or ${end_token}`)
           return ERR
         }
       } else {
