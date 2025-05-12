@@ -860,6 +860,17 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           head = TypeAnnotation.Array(head)
           break
         }
+        case t.LessThan: {
+          advance()
+          const args = parse_comma_separated_list(
+            t.GreaterThan,
+            parse_type_annotation,
+          )
+          if (args === ERR) return ERR
+          if (expect(t.GreaterThan) === ERR) return ERR
+          head = TypeAnnotation.Application(head, args)
+          break
+        }
         default:
           break loop
       }
@@ -2020,7 +2031,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           t.Export,
           t.Import,
         ) ||
-        (at(t.Ident) && next_is(t.LParen))
+        (at(t.Ident) && next_is(t.LParen)) ||
+        (at(t.Ident) && current_token.text === "type")
       ) {
         break
       }
