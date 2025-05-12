@@ -1023,6 +1023,11 @@ export type TypeAnnotation =
       readonly item: TypeAnnotation
     }
   | {
+      readonly kind: "ReadonlyArray"
+      readonly span: Span
+      readonly item: TypeAnnotation
+    }
+  | {
       readonly kind: "Application"
       readonly span: Span
       readonly callee: TypeAnnotation
@@ -1065,6 +1070,15 @@ export const TypeAnnotation = {
     span: Span,
     item: TypeAnnotation,
   ): TypeAnnotationWithKind<"Array"> => ({ kind: "Array", span, item: item }),
+
+  ReadonlyArray: (
+    span: Span,
+    item: TypeAnnotation,
+  ): TypeAnnotationWithKind<"ReadonlyArray"> => ({
+    kind: "ReadonlyArray",
+    span,
+    item: item,
+  }),
 
   Application: (
     span: Span,

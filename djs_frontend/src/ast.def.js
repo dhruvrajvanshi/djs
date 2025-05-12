@@ -245,6 +245,7 @@ const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { ident: Ident },
   Union: { left: TypeAnnotation, right: TypeAnnotation },
   Array: { item: TypeAnnotation },
+  ReadonlyArray: { item: TypeAnnotation },
   Application: { callee: TypeAnnotation, args: Array(TypeAnnotation) },
   String: { text: Text },
   Func: { params: Array("FuncTypeParam"), returns: TypeAnnotation },
