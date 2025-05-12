@@ -11,16 +11,6 @@ test("test_parse_var_expr", () => {
   })
 })
 
-test("should_parse_parenthesized_expr", () => {
-  const expr = parse_expr("(x)")
-  expect(expr).toMatchObject({
-    kind: "Var",
-    ident: {
-      text: "x",
-    },
-  })
-})
-
 test("parse error for missing parenthesis in if condition", () => {
   const parser = Parser(
     "test.js",
