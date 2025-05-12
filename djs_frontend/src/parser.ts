@@ -696,7 +696,6 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
   function parse_object_literal_entry_method(): ObjectLiteralEntry | Err {
     const start = current_token.span
-    const line = current_token.line
     let accessor_type: AccessorType | null = null
 
     if (
