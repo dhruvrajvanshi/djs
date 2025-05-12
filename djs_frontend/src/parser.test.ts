@@ -65,6 +65,16 @@ test("struct type decl", () => {
   const source_file = parser.parse_source_file()
   expect(source_file.errors).toEqual([])
 })
+test.only("function with if stmt", () => {
+  const source = `
+  function parse_optional_binding_ident(): Ident | null | Err {
+    if (true) {} else {}
+  }
+  `
+  const parser = Parser("test.ts", source)
+  const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+})
 
 function parse_expr(input: string): Expr {
   const parser = Parser("test.js", input)
