@@ -98,7 +98,6 @@ const TokenKinds = Object.freeze({
   GreaterThanGreaterThanEq: "GreaterThanGreaterThanEq",
   GreaterThanGreaterThanGreaterThanEq: "GreaterThanGreaterThanGreaterThanEq",
   AmpEq: "AmpEq",
-  VBarEq: "VBarEq",
   CaretEq: "CaretEq",
   BarEq: "BarEq",
   StarStarEq: "StarStarEq",
