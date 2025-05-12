@@ -65,7 +65,7 @@ test("struct type decl", () => {
   const source_file = parser.parse_source_file()
   expect(source_file.errors).toEqual([])
 })
-test.only("function with if stmt", () => {
+test("function with if stmt", () => {
   const source = `
   function parse_optional_binding_ident(): Ident | null | Err {
     if (true) {} else {}
@@ -73,6 +73,17 @@ test.only("function with if stmt", () => {
   `
   const parser = Parser("test.ts", source)
   const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+})
+
+test("break statement with an identifier on the next line", () => {
+  // A break followed by an identifier should only be treated as a labeled break
+  // if the label is on the same line as the break
+  const source = `
+    break
+    advance()
+  `
+  const source_file = Parser("test.ts", source).parse_source_file()
   expect(source_file.errors).toEqual([])
 })
 
