@@ -2,13 +2,13 @@ import { TokenKind } from "./TokenKind.js"
 import { Token } from "./Token.js"
 import assert, { AssertionError } from "node:assert"
 
-export interface Lexer {
-  clone(): Lexer
-  next(): Token
-  start_template_literal_interpolation(): void
-  end_template_literal_interpolation(): void
-  enable_regex(): void
-  disable_regex(): void
+export type Lexer = {
+  clone: () => Lexer
+  next: () => Token
+  start_template_literal_interpolation: () => void
+  end_template_literal_interpolation: () => void
+  enable_regex: () => void
+  disable_regex: () => void
 }
 export function Lexer(input: string) {
   return lexer_impl(
