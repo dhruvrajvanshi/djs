@@ -1160,11 +1160,16 @@ export interface Param {
 export interface Func {
   readonly span: Span
   readonly name: Ident | null
+  readonly type_params: readonly TypeParam[]
   readonly params: ParamList
   readonly body: Block
   readonly return_type: TypeAnnotation | null
   readonly is_generator: boolean
   readonly is_async: boolean
+}
+
+export interface TypeParam {
+  readonly ident: Ident
 }
 
 export type ArrayLiteralMember =
