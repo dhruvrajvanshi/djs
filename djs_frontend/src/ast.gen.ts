@@ -135,6 +135,12 @@ export type Stmt =
       readonly stmt: Stmt
     }
   | {
+      readonly kind: "StructTypeDecl"
+      readonly span: Span
+      readonly name: Ident
+      readonly fields: readonly StructTypeDeclField[]
+    }
+  | {
       readonly kind: "Empty"
       readonly span: Span
     }
@@ -307,6 +313,17 @@ export const Stmt = {
     span,
     label: label,
     stmt: stmt,
+  }),
+
+  StructTypeDecl: (
+    span: Span,
+    name: Ident,
+    fields: readonly StructTypeDeclField[],
+  ): StmtWithKind<"StructTypeDecl"> => ({
+    kind: "StructTypeDecl",
+    span,
+    name: name,
+    fields: fields,
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
@@ -964,6 +981,13 @@ export const Expr = {
     fragments: fragments,
   }),
 } as const
+
+export interface StructTypeDeclField {
+  readonly is_readonly: boolean
+  readonly label: Ident
+  readonly type_annotation: TypeAnnotation
+}
+
 export type TypeAnnotation =
   | {
       readonly kind: "Ident"
