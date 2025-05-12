@@ -24,6 +24,7 @@ import {
   Pattern,
   SourceFile,
   Stmt,
+  SwitchCase,
   TemplateLiteralFragment,
   TypeAnnotation,
   VarDecl,
@@ -1688,11 +1689,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (expect(t.RParen) === ERR) return ERR
     if (expect(t.LBrace) === ERR) return ERR
 
-    const cases: Array<{
-      span: Span
-      test: Expr | null
-      body: Stmt[]
-    }> = []
+    const cases: Array<SwitchCase> = []
 
     while (!at(t.RBrace) && !at(t.EndOfFile)) {
       const case_stmt = parse_switch_case()
@@ -1707,9 +1704,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return Stmt.Switch(span, expr, cases)
   }
 
-  function parse_switch_case():
-    | { span: Span; test: Expr | null; body: Stmt[] }
-    | Err {
+  function parse_switch_case(): SwitchCase | Err {
     if (at(t.Case)) {
       const start = expect(t.Case)
       if (start === ERR) return ERR
