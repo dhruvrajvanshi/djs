@@ -10,6 +10,7 @@ import {
   DeclType,
   Expr,
   ForInit,
+  FuncTypeParam,
   Ident,
   ImportSpecifier,
   InOrOf,
@@ -916,9 +917,39 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         const tok = advance()
         return TypeAnnotation.String(tok.span, tok.text)
       }
+      case t.LParen:
+        return parse_parenthesized_or_func_type_annotation()
       default:
         return ERR
     }
+  }
+
+  function parse_parenthesized_or_func_type_annotation(): TypeAnnotation | Err {
+    const start = advance()
+    assert(start.kind === t.LParen)
+    if (at(t.RParen) || (at(t.Ident) && next_is(t.Colon))) {
+      const params = parse_comma_separated_list(t.RParen, parse_func_type_param)
+      if (params === ERR) return ERR
+      if (expect(t.RParen) === ERR) return ERR
+      if (expect(t.FatArrow) === ERR) return ERR
+      const returns = parse_type_annotation()
+      if (returns === ERR) return ERR
+
+      return TypeAnnotation.Func(Span.between(start, returns), params, returns)
+    } else {
+      const annotation = parse_type_annotation()
+      if (annotation === ERR) return ERR
+      if (expect(t.RParen) === ERR) return ERR
+      return annotation
+    }
+  }
+  function parse_func_type_param(): FuncTypeParam | Err {
+    const label = parse_binding_ident()
+    if (label === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return ERR
+    return { label, type_annotation }
   }
 
   function parse_comma_separated_list<T>(
