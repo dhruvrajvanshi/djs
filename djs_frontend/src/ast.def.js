@@ -186,6 +186,10 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
     name: Ident,
     fields: Array("StructTypeDeclField"),
   },
+  TypeAlias: {
+    name: Ident,
+    type_annotation: TypeAnnotation,
+  },
   Empty: {},
 })
 const DStructTypeDeclField = Struct("StructTypeDeclField", [], {
@@ -237,7 +241,7 @@ const DExpr = Enum(Expr, ["span", "visit"], {
   Class: { class: "Class" },
   TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
 })
-const DTypeAnnotation = Enum("TypeAnnotation", [], {
+const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { ident: Ident },
   Union: { left: TypeAnnotation, right: TypeAnnotation },
   Array: { item: TypeAnnotation },

@@ -141,6 +141,12 @@ export type Stmt =
       readonly fields: readonly StructTypeDeclField[]
     }
   | {
+      readonly kind: "TypeAlias"
+      readonly span: Span
+      readonly name: Ident
+      readonly type_annotation: TypeAnnotation
+    }
+  | {
       readonly kind: "Empty"
       readonly span: Span
     }
@@ -324,6 +330,17 @@ export const Stmt = {
     span,
     name: name,
     fields: fields,
+  }),
+
+  TypeAlias: (
+    span: Span,
+    name: Ident,
+    type_annotation: TypeAnnotation,
+  ): StmtWithKind<"TypeAlias"> => ({
+    kind: "TypeAlias",
+    span,
+    name: name,
+    type_annotation: type_annotation,
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
@@ -991,24 +1008,29 @@ export interface StructTypeDeclField {
 export type TypeAnnotation =
   | {
       readonly kind: "Ident"
+      readonly span: Span
       readonly ident: Ident
     }
   | {
       readonly kind: "Union"
+      readonly span: Span
       readonly left: TypeAnnotation
       readonly right: TypeAnnotation
     }
   | {
       readonly kind: "Array"
+      readonly span: Span
       readonly item: TypeAnnotation
     }
   | {
       readonly kind: "Application"
+      readonly span: Span
       readonly callee: TypeAnnotation
       readonly args: readonly TypeAnnotation[]
     }
   | {
       readonly kind: "String"
+      readonly span: Span
       readonly text: Text
     }
 export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
@@ -1016,36 +1038,42 @@ export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
   { kind: K }
 >
 export const TypeAnnotation = {
-  Ident: (ident: Ident): TypeAnnotationWithKind<"Ident"> => ({
+  Ident: (span: Span, ident: Ident): TypeAnnotationWithKind<"Ident"> => ({
     kind: "Ident",
+    span,
     ident: ident,
   }),
 
   Union: (
+    span: Span,
     left: TypeAnnotation,
     right: TypeAnnotation,
   ): TypeAnnotationWithKind<"Union"> => ({
     kind: "Union",
+    span,
     left: left,
     right: right,
   }),
 
-  Array: (item: TypeAnnotation): TypeAnnotationWithKind<"Array"> => ({
-    kind: "Array",
-    item: item,
-  }),
+  Array: (
+    span: Span,
+    item: TypeAnnotation,
+  ): TypeAnnotationWithKind<"Array"> => ({ kind: "Array", span, item: item }),
 
   Application: (
+    span: Span,
     callee: TypeAnnotation,
     args: readonly TypeAnnotation[],
   ): TypeAnnotationWithKind<"Application"> => ({
     kind: "Application",
+    span,
     callee: callee,
     args: args,
   }),
 
-  String: (text: Text): TypeAnnotationWithKind<"String"> => ({
+  String: (span: Span, text: Text): TypeAnnotationWithKind<"String"> => ({
     kind: "String",
+    span,
     text: text,
   }),
 } as const

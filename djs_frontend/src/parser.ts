@@ -37,7 +37,7 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
-import assert, { AssertionError } from "node:assert"
+import assert, { AssertionError, throws } from "node:assert"
 
 type Parser = {
   parse_source_file: () => SourceFile
@@ -856,7 +856,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       advance()
       const rhs = parse_array_type_annotation_or_below()
       if (rhs === ERR) return ERR
-      lhs = TypeAnnotation.Union(lhs, rhs)
+      lhs = TypeAnnotation.Union(Span.between(lhs, rhs), lhs, rhs)
     }
     return lhs
   }
@@ -868,8 +868,9 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       switch (current_token.kind) {
         case t.LSquare: {
           advance()
-          if (expect(t.RSquare) === ERR) return ERR
-          head = TypeAnnotation.Array(head)
+          const end = expect(t.RSquare)
+          if (end === ERR) return ERR
+          head = TypeAnnotation.Array(Span.between(head, end), head)
           break
         }
         case t.LessThan: {
@@ -879,8 +880,9 @@ function parser_impl(path: string, source: string, flags: number): Parser {
             parse_type_annotation,
           )
           if (args === ERR) return ERR
-          if (expect(t.GreaterThan) === ERR) return ERR
-          head = TypeAnnotation.Application(head, args)
+          const end = expect(t.GreaterThan)
+          if (end === ERR) return ERR
+          head = TypeAnnotation.Application(Span.between(head, end), head, args)
           break
         }
         default:
@@ -894,25 +896,25 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       case t.Ident: {
         const ident = parse_ident()
         if (ident === ERR) return ERR
-        return TypeAnnotation.Ident(ident)
+        return TypeAnnotation.Ident(ident.span, ident)
       }
       case t.Void: {
         const tok = advance()
-        return TypeAnnotation.Ident({
+        return TypeAnnotation.Ident(tok.span, {
           span: tok.span,
           text: "void",
         })
       }
       case t.Null: {
-        const tok = advance();
-        return TypeAnnotation.Ident({
+        const tok = advance()
+        return TypeAnnotation.Ident(tok.span, {
           span: tok.span,
-          text: "null"
+          text: "null",
         })
       }
       case t.String: {
         const tok = advance()
-        return TypeAnnotation.String(tok.text)
+        return TypeAnnotation.String(tok.span, tok.text)
       }
       default:
         return ERR
@@ -1539,15 +1541,26 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     const ident = parse_ident()
     if (ident === ERR) return ERR
     if (expect(t.Eq) === ERR) return ERR
-    if (expect(t.LBrace) === ERR) return ERR
-    const fields = parse_comma_semi_or_newline_separated_list(
-      t.RBrace,
-      parse_struct_type_decl_field,
-    )
-    if (fields === ERR) return ERR
-    const last = expect(t.RBrace)
-    if (last === ERR) return ERR
-    return Stmt.StructTypeDecl(Span.between(start, last), ident, fields)
+    if (at(t.LBrace)) {
+      advance()
+      const fields = parse_comma_semi_or_newline_separated_list(
+        t.RBrace,
+        parse_struct_type_decl_field,
+      )
+      if (fields === ERR) return ERR
+      const last = expect(t.RBrace)
+      if (last === ERR) return ERR
+      return Stmt.StructTypeDecl(Span.between(start, last), ident, fields)
+    } else {
+      const type_annotation = parse_type_annotation()
+      if (type_annotation === ERR) return ERR
+      if (expect_semi() === ERR) return ERR
+      return Stmt.TypeAlias(
+        Span.between(ident, type_annotation),
+        ident,
+        type_annotation,
+      )
+    }
   }
   function parse_struct_type_decl_field(): StructTypeDeclField | Err {
     let is_readonly = false
