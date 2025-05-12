@@ -31,9 +31,7 @@ jobs:
     - name: Run tests
       run: pnpm vitest --coverage
       working-directory: djs_frontend
-    - name: Run test262 parsing tests
-      run: node --import tsx test262.ts
-      working-directory: djs_frontend
+
     - name: Codecov
       uses: codecov/codecov-action@v5
       env:

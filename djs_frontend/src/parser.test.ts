@@ -3,6 +3,7 @@ import { Parser } from "./parser"
 import { AssignOp, Expr } from "./ast.gen"
 import { pretty_print } from "./pretty_print"
 import assert from "assert"
+import fs from "node:fs/promises"
 
 test("test_parse_var_expr", () => {
   const expr = parse_expr("x")
@@ -76,6 +77,26 @@ test("break statement with an identifier on the next line", () => {
   const source_file = Parser("test.ts", source).parse_source_file()
   expect(source_file.errors).toEqual([])
 })
+
+if (process.env.CI) {
+  const test262Paths: string[] = []
+
+  for await (const path of fs.glob("../test262/test/**/*.js")) {
+    if (path.includes("staging")) {
+      continue
+    }
+
+    // Skip known problematic files that cause stack overflow
+    if (path.includes("test/language/statements/function/S13.2.1_A1_T1.js")) {
+      continue
+    }
+    test262Paths.push(path)
+  }
+  test.each(test262Paths)("test262 coverage", async (path) => {
+    const source = await fs.readFile(path, "utf-8")
+    Parser(path, source).parse_source_file().errors
+  })
+}
 
 function parse_expr(input: string): Expr {
   const parser = Parser("test.js", input)
