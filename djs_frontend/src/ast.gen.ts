@@ -1033,6 +1033,12 @@ export type TypeAnnotation =
       readonly span: Span
       readonly text: Text
     }
+  | {
+      readonly kind: "Func"
+      readonly span: Span
+      readonly params: readonly FuncTypeParam[]
+      readonly returns: TypeAnnotation
+    }
 export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
   TypeAnnotation,
   { kind: K }
@@ -1076,7 +1082,24 @@ export const TypeAnnotation = {
     span,
     text: text,
   }),
+
+  Func: (
+    span: Span,
+    params: readonly FuncTypeParam[],
+    returns: TypeAnnotation,
+  ): TypeAnnotationWithKind<"Func"> => ({
+    kind: "Func",
+    span,
+    params: params,
+    returns: returns,
+  }),
 } as const
+
+export interface FuncTypeParam {
+  readonly label: Ident
+  readonly type_annotation: TypeAnnotation
+}
+
 export type ObjectLiteralEntry =
   | {
       readonly kind: "Ident"

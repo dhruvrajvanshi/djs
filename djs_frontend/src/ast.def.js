@@ -247,6 +247,11 @@ const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Array: { item: TypeAnnotation },
   Application: { callee: TypeAnnotation, args: Array(TypeAnnotation) },
   String: { text: Text },
+  Func: { params: Array("FuncTypeParam"), returns: TypeAnnotation },
+})
+const DFuncTypeParam = Struct("FuncTypeParam", [], {
+  label: Ident,
+  type_annotation: TypeAnnotation,
 })
 const DClass = Struct(Class, ["span"], {
   name: Option(Ident),
@@ -439,6 +444,7 @@ const ast_items = [
   DExpr,
   DStructTypeDeclField,
   DTypeAnnotation,
+  DFuncTypeParam,
   DObjectLiteralEntry,
   DObjectKey,
   DParamList,
