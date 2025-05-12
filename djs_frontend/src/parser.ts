@@ -298,7 +298,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
 
-  function parse_arguments(): Err | { args: Expr[]; span: Span } {
+  type ArgsWithSpan = { args: Expr[]; span: Span }
+  function parse_arguments(): Err | ArgsWithSpan {
     const first = advance()
     assert(first.kind === t.LParen)
     const args = parse_arg_list()
@@ -946,7 +947,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return items
   }
 
-  function parse_comma_or_newline_separated_list<T>(
+  function parse_comma_semi_or_newline_separated_list<T>(
     end_token: TokenKind,
     parse_item: () => T | Err,
   ): T[] | Err {
@@ -960,6 +961,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       if (!first) {
         if (
           at(t.Comma) ||
+          at(t.Semi) ||
           (last_token && last_token.line > current_token.line)
         ) {
           advance()
@@ -1534,7 +1536,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (ident === ERR) return ERR
     if (expect(t.Eq) === ERR) return ERR
     if (expect(t.LBrace) === ERR) return ERR
-    const fields = parse_comma_or_newline_separated_list(
+    const fields = parse_comma_semi_or_newline_separated_list(
       t.RBrace,
       parse_struct_type_decl_field,
     )
