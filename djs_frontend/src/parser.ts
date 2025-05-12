@@ -1,4 +1,3 @@
-import assert from "node:assert/strict"
 import {
   AccessorType,
   ArrayLiteralMember,
@@ -35,7 +34,7 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
-import { AssertionError } from "node:assert"
+import assert, { AssertionError } from "node:assert"
 
 type Parser = {
   parse_source_file(): SourceFile
@@ -1413,6 +1412,30 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   function parse_import_stmt(): Stmt | Err {
     const start = advance()
     assert(start.kind === t.Import)
+    let default_import: Ident | null = null
+    if (at(t.Ident)) {
+      const token = advance()
+      default_import = { span: token.span, text: token.text }
+    }
+    if (default_import) {
+      if (at(t.Comma)) {
+        advance()
+      } else if (at(t.From)) {
+        advance()
+        const from_clause = expect(t.String)
+        if (from_clause === ERR) return ERR
+        if (expect_semi() === ERR) return ERR
+        return Stmt.Import(
+          Span.between(start, from_clause),
+          default_import,
+          [],
+          from_clause.text,
+        )
+      } else {
+        emit_error("Expected a comma or 'from'")
+        return ERR
+      }
+    }
     if (expect(t.LBrace) === ERR) return ERR
     const import_specifiers = parse_comma_separated_list(
       t.RBrace,
@@ -1426,6 +1449,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (expect_semi() === ERR) return ERR
     return Stmt.Import(
       Span.between(start.span, from_clause.span),
+      default_import,
       import_specifiers,
       from_clause.text,
     )
