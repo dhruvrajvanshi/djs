@@ -892,6 +892,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           text: "void",
         })
       }
+      case t.String: {
+        const tok = advance()
+        return TypeAnnotation.String(tok.text)
+      }
       default:
         return ERR
     }
