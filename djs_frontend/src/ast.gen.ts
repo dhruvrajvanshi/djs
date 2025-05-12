@@ -1220,6 +1220,7 @@ export interface Param {
   readonly span: Span
   readonly pattern: Pattern
   readonly type_annotation: TypeAnnotation | null
+  readonly initializer: Expr | null
 }
 
 export interface Func {

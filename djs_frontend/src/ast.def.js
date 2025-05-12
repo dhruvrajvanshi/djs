@@ -297,6 +297,7 @@ const DParamList = Struct(ParamList, ["span"], {
 const DParam = Struct(Param, ["span"], {
   pattern: Pattern,
   type_annotation: Option(TypeAnnotation),
+  initializer: Option(Expr),
 })
 
 const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {

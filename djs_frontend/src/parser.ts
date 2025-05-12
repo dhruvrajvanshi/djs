@@ -835,10 +835,18 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (pattern === ERR) return ERR
     const type_annotation = parse_optional_type_annotation()
     if (type_annotation === ERR) return ERR
+    let initializer: Expr | null = null
+    if (at(t.Eq)) {
+      advance()
+      const init = parse_assignment_expr()
+      if (init === ERR) return ERR
+      initializer = init
+    }
     return {
       span: pattern.span,
       pattern,
       type_annotation,
+      initializer,
     }
   }
   function parse_optional_type_annotation(): TypeAnnotation | null | Err {
@@ -1081,7 +1089,14 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       if (pattern === ERR) return ERR
       const params: ParamList = {
         span: pattern.span,
-        params: [{ span: pattern.span, pattern, type_annotation: null }],
+        params: [
+          {
+            span: pattern.span,
+            pattern,
+            type_annotation: null,
+            initializer: null,
+          },
+        ],
       }
       if (expect(t.FatArrow) === ERR) return ERR
       const body = parse_arrow_fn_body()
