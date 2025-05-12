@@ -37,7 +37,7 @@ import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
 import { AssertionError } from "node:assert"
 
-interface Parser {
+type Parser = {
   parse_source_file(): SourceFile
 }
 export function Parser(path: string, source: string): Parser {
@@ -47,8 +47,9 @@ export function Parser(path: string, source: string): Parser {
   }
   return parser_impl(path, source, flags)
 }
-const ERR = Symbol("ParseError")
-type Err = typeof ERR
+
+type Err = "ParseError"
+const ERR: Err = "ParseError"
 
 const t = TokenKind
 
