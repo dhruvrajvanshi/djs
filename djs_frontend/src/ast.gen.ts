@@ -124,6 +124,7 @@ export type Stmt =
   | {
       readonly kind: "Import"
       readonly span: Span
+      readonly default_import: Ident | null
       readonly named_imports: readonly ImportSpecifier[]
       readonly module_specifier: Text
     }
@@ -290,11 +291,13 @@ export const Stmt = {
 
   Import: (
     span: Span,
+    default_import: Ident | null,
     named_imports: readonly ImportSpecifier[],
     module_specifier: Text,
   ): StmtWithKind<"Import"> => ({
     kind: "Import",
     span,
+    default_import: default_import,
     named_imports: named_imports,
     module_specifier: module_specifier,
   }),

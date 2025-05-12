@@ -174,6 +174,7 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
   Func: { func: Func },
   ClassDecl: { class: Class },
   Import: {
+    default_import: Option(Ident),
     named_imports: Array("ImportSpecifier"),
     module_specifier: Text,
   },
