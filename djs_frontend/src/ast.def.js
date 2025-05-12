@@ -297,11 +297,15 @@ const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
 
 const DFunc = Struct("Func", ["span"], {
   name: Option(Ident),
+  type_params: Array("TypeParam"),
   params: ParamList,
   body: Block,
   return_type: Option(TypeAnnotation),
   is_generator: "boolean",
   is_async: "boolean",
+})
+const DTypeParam = Struct("TypeParam", [], {
+  ident: Ident,
 })
 const DBlock = Struct("Block", ["span"], {
   stmts: Array(Stmt),
@@ -436,6 +440,7 @@ const ast_items = [
   DParamList,
   DParam,
   DFunc,
+  DTypeParam,
   DArrayLiteralMember,
   DArrowFnBody,
   DTemplateLiteralFragment,
