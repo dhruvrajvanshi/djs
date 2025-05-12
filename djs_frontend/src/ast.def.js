@@ -242,6 +242,7 @@ const DTypeAnnotation = Enum("TypeAnnotation", [], {
   Union: { left: TypeAnnotation, right: TypeAnnotation },
   Array: { item: TypeAnnotation },
   Application: { callee: TypeAnnotation, args: Array(TypeAnnotation) },
+  String: { text: Text },
 })
 const DClass = Struct(Class, ["span"], {
   name: Option(Ident),

@@ -1007,6 +1007,10 @@ export type TypeAnnotation =
       readonly callee: TypeAnnotation
       readonly args: readonly TypeAnnotation[]
     }
+  | {
+      readonly kind: "String"
+      readonly text: Text
+    }
 export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
   TypeAnnotation,
   { kind: K }
@@ -1038,6 +1042,11 @@ export const TypeAnnotation = {
     kind: "Application",
     callee: callee,
     args: args,
+  }),
+
+  String: (text: Text): TypeAnnotationWithKind<"String"> => ({
+    kind: "String",
+    text: text,
   }),
 } as const
 export type ObjectLiteralEntry =
