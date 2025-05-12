@@ -182,7 +182,16 @@ const DStmt = Enum(Stmt, ["span", "visit"], {
     label: Label,
     stmt: Stmt,
   },
+  StructTypeDecl: {
+    name: Ident,
+    fields: Array("StructTypeDeclField"),
+  },
   Empty: {},
+})
+const DStructTypeDeclField = Struct("StructTypeDeclField", [], {
+  is_readonly: "boolean",
+  label: Ident,
+  type_annotation: TypeAnnotation,
 })
 
 const DExpr = Enum(Expr, ["span", "visit"], {
@@ -419,6 +428,7 @@ const ast_items = [
   DVarDeclarator,
   DForInit,
   DExpr,
+  DStructTypeDeclField,
   DTypeAnnotation,
   DObjectLiteralEntry,
   DObjectKey,

@@ -24,6 +24,7 @@ import {
   Pattern,
   SourceFile,
   Stmt,
+  StructTypeDeclField,
   SwitchCase,
   TemplateLiteralFragment,
   TypeAnnotation,
@@ -38,7 +39,7 @@ import { TokenKind } from "./TokenKind.js"
 import assert, { AssertionError } from "node:assert"
 
 type Parser = {
-  parse_source_file(): SourceFile
+  parse_source_file: () => SourceFile
 }
 export function Parser(path: string, source: string): Parser {
   let flags = 0
@@ -931,6 +932,45 @@ function parser_impl(path: string, source: string, flags: number): Parser {
 
     return items
   }
+
+  function parse_comma_or_newline_separated_list<T>(
+    end_token: TokenKind,
+    parse_item: () => T | Err,
+  ): T[] | Err {
+    const items: T[] = []
+    let first = true
+
+    while (
+      current_token.kind !== t.EndOfFile &&
+      current_token.kind !== end_token
+    ) {
+      if (!first) {
+        if (
+          at(t.Comma) ||
+          (last_token && last_token.line > current_token.line)
+        ) {
+          advance()
+        } else {
+          emit_error(`Expected a comma or ${end_token}`)
+          return ERR
+        }
+      } else {
+        first = false
+      }
+
+      const entry = parse_item()
+      if (entry === ERR) return ERR
+      items.push(entry)
+
+      if (at(t.Comma) && next_is(end_token)) {
+        advance()
+        break
+      }
+    }
+
+    return items
+  }
+
   function parse_paren_expr(): Expr | Err {
     const start = advance()
     assert(start.kind === t.LParen)
@@ -1297,6 +1337,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       return ERR
     }
   }
+  function next_is_soft_keyword(text: string): boolean {
+    const token = next_token()
+    return token.kind === t.Ident && token.text === text
+  }
   function parse_stmt(export_token: Token | null = null): Stmt | Err {
     if (
       at(t.Export) &&
@@ -1304,7 +1348,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         next_is(t.Class) ||
         next_is(t.Var) ||
         next_is(t.Let) ||
-        next_is(t.Const))
+        next_is(t.Const) ||
+        next_is_soft_keyword("type"))
     ) {
       advance()
       return parse_stmt(export_token)
@@ -1329,6 +1374,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
             { span: label.span, name: label.text },
             stmt,
           )
+        } else if (current_token.text === "type") {
+          return parse_type_decl()
         } else {
           return parse_expr_stmt()
         }
@@ -1466,6 +1513,41 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       from_clause.text,
     )
   }
+  function parse_type_decl(): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "type")
+    const ident = parse_ident()
+    if (ident === ERR) return ERR
+    if (expect(t.Eq) === ERR) return ERR
+    if (expect(t.LBrace) === ERR) return ERR
+    const fields = parse_comma_or_newline_separated_list(
+      t.RBrace,
+      parse_struct_type_decl_field,
+    )
+    if (fields === ERR) return ERR
+    const last = expect(t.RBrace)
+    if (last === ERR) return ERR
+    return Stmt.StructTypeDecl(Span.between(start, last), ident, fields)
+  }
+  function parse_struct_type_decl_field(): StructTypeDeclField | Err {
+    let is_readonly = false
+    if (at(t.Ident) && next_is(t.Ident) && current_token.text === "readonly") {
+      advance()
+      is_readonly = true
+    }
+    const label = parse_binding_ident()
+    if (label === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return type_annotation
+    return {
+      is_readonly,
+      label,
+      type_annotation,
+    }
+  }
+
   function parse_import_specifier(): ImportSpecifier | Err {
     const start = current_token.span
     let type_only = false
