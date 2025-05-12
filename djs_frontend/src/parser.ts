@@ -895,6 +895,20 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   function parse_primary_type_annotation(): TypeAnnotation | Err {
     switch (current_token.kind) {
       case t.Ident: {
+        if (current_token.text === "readonly") {
+          const start = advance()
+          const annot = parse_array_type_annotation_or_below()
+          if (annot === ERR) return ERR
+          if (annot.kind !== "Array") {
+            emit_error("The readonly can only be applied to array types")
+            return annot
+          }
+
+          return TypeAnnotation.ReadonlyArray(
+            Span.between(start, annot),
+            annot.item,
+          )
+        }
         const ident = parse_ident()
         if (ident === ERR) return ERR
         return TypeAnnotation.Ident(ident.span, ident)
