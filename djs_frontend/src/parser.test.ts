@@ -1,6 +1,6 @@
 import { test, expect } from "vitest"
 import { Parser } from "./parser"
-import { Expr } from "./ast.gen"
+import { AssignOp, Expr } from "./ast.gen"
 import { pretty_print } from "./pretty_print"
 import assert from "assert"
 
@@ -47,6 +47,11 @@ test("division and regex mixed", () => {
   const parser = Parser("test.js", "1 / 2 / /a/")
   const source_file = parser.parse_source_file()
   expect(source_file.errors).toEqual([])
+})
+test("assignment bitwise or equal |=", () => {
+  const expr = parse_expr("x |= 1")
+  assert("Assign" === expr.kind)
+  assert.equal(expr.operator, AssignOp.BitOrEq)
 })
 
 function parse_expr(input: string): Expr {

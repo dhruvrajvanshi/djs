@@ -27521,6 +27521,7 @@
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-additive-expression-subtract.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-arrow-function-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-assignment.js
+../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-bitwise-or.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-async-arrow-function-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-await-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-condition-expression-false.js
@@ -27545,6 +27546,7 @@
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-additive-expression-subtract.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-arrow-function-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-assignment.js
+../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-bitwise-or.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-async-arrow-function-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-await-expression.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-condition-expression-false.js
@@ -29073,6 +29075,7 @@
 ../test262/test/language/expressions/compound-assignment/11.13.2-2-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-20-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-21-s.js
+../test262/test/language/expressions/compound-assignment/11.13.2-22-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-23-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-24-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-25-s.js
@@ -29083,6 +29086,7 @@
 ../test262/test/language/expressions/compound-assignment/11.13.2-30-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-31-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-32-s.js
+../test262/test/language/expressions/compound-assignment/11.13.2-33-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-34-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-35-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-36-s.js
@@ -29094,6 +29098,7 @@
 ../test262/test/language/expressions/compound-assignment/11.13.2-41-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-42-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-43-s.js
+../test262/test/language/expressions/compound-assignment/11.13.2-44-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-45-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-46-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-47-s.js
@@ -29105,11 +29110,13 @@
 ../test262/test/language/expressions/compound-assignment/11.13.2-52-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-53-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-54-s.js
+../test262/test/language/expressions/compound-assignment/11.13.2-55-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-6-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-8-s.js
 ../test262/test/language/expressions/compound-assignment/11.13.2-9-s.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T1.1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T1.10.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T1.11.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T1.2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T1.3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T1.4.js
@@ -29120,6 +29127,7 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T1.9.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T2.1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T2.10.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T2.11.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T2.2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T2.3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T2.4.js
@@ -29130,6 +29138,7 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T2.9.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T3.1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T3.10.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T3.11.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T3.2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T3.3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T3.4.js
@@ -29140,6 +29149,7 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A2.1_T3.9.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.1_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.1_T10.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A3.1_T11.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.1_T2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.1_T3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.1_T4.js
@@ -29150,6 +29160,7 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.1_T9.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.2_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.2_T10.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A3.2_T11.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.2_T2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.2_T3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A3.2_T4.js
@@ -29171,6 +29182,19 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A4.10_T2.7.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A4.10_T2.8.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A4.10_T2.9.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T1.1.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T1.2.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T1.3.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T1.4.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.1.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.2.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.3.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.4.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.5.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.6.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.7.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.8.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A4.11_T2.9.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A4.1_T1.1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A4.1_T1.2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A4.1_T1.3.js
@@ -29291,6 +29315,9 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.10_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.10_T2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.10_T3.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A5.11_T1.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A5.11_T2.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A5.11_T3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.1_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.1_T2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.1_T3.js
@@ -29319,6 +29346,7 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.9_T2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A5.9_T3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A6.10_T1.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A6.11_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A6.1_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A6.2_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A6.3_T1.js
@@ -29332,6 +29360,10 @@
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A7.10_T2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A7.10_T3.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A7.10_T4.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A7.11_T1.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A7.11_T2.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A7.11_T3.js
+../test262/test/language/expressions/compound-assignment/S11.13.2_A7.11_T4.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A7.1_T1.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A7.1_T2.js
 ../test262/test/language/expressions/compound-assignment/S11.13.2_A7.1_T3.js
@@ -29383,8 +29415,10 @@
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--17.js
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--18.js
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--19.js
+../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--2.js
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--20.js
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--21.js
+../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--3.js
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--4.js
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--5.js
 ../test262/test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--6.js
@@ -29396,8 +29430,6 @@
 ../test262/test/language/expressions/compound-assignment/left-shift-non-simple.js
 ../test262/test/language/expressions/compound-assignment/mod-div-non-simple.js
 ../test262/test/language/expressions/compound-assignment/mult-non-simple.js
-../test262/test/language/expressions/compound-assignment/or-arguments-strict.js
-../test262/test/language/expressions/compound-assignment/or-eval-strict.js
 ../test262/test/language/expressions/compound-assignment/right-shift-non-simple.js
 ../test262/test/language/expressions/compound-assignment/subtract-non-simple.js
 ../test262/test/language/expressions/compound-assignment/u-right-shift-non-simple.js
@@ -30899,6 +30931,7 @@
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-additive-expression-subtract.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-arrow-function-expression.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-assignment.js
+../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-bitwise-or.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-async-arrow-function-expression.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-await-expression.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-condition-expression-false.js
@@ -34081,6 +34114,7 @@
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-additive-expression-subtract.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-arrow-function-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-assignment.js
+../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-bitwise-or.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-async-arrow-function-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-await-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-condition-expression-false.js
@@ -34105,6 +34139,7 @@
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-additive-expression-subtract.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-arrow-function-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-assignment.js
+../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-bitwise-or.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-async-arrow-function-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-await-expression.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-condition-expression-false.js

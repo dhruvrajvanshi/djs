@@ -2338,7 +2338,7 @@ function assign_op(kind: TokenKind): AssignOp | null {
       return AssignOp.ModEq
     case t.AmpEq:
       return AssignOp.BitAndEq
-    case t.VBarEq:
+    case t.BarEq:
       return AssignOp.BitOrEq
     case t.CaretEq:
       return AssignOp.BitXorEq
