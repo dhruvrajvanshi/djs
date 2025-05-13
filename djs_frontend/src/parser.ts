@@ -1014,6 +1014,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       case t.LParen:
         return parse_parenthesized_or_func_type_annotation()
       default:
+        emit_error("Expected a type annotation")
         return ERR
     }
   }
