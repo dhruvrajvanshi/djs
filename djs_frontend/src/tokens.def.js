@@ -64,6 +64,7 @@ export const tokens = [
   "Semi",
   "Question",
   "QuestionQuestion",
+  "QuestionDot",
   "Bang",
   "Tilde",
   "Percent",

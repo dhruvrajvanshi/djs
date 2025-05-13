@@ -583,18 +583,21 @@ export type Expr =
       readonly span: Span
       readonly callee: Expr
       readonly args: readonly Expr[]
+      readonly is_optional: boolean
     }
   | {
       readonly kind: "Index"
       readonly span: Span
       readonly lhs: Expr
       readonly property: Expr
+      readonly is_optional: boolean
     }
   | {
       readonly kind: "Prop"
       readonly span: Span
       readonly lhs: Expr
       readonly property: Ident
+      readonly is_optional: boolean
     }
   | {
       readonly kind: "String"
@@ -791,25 +794,39 @@ export const Expr = {
     span: Span,
     callee: Expr,
     args: readonly Expr[],
+    is_optional: boolean,
   ): ExprWithKind<"Call"> => ({
     kind: "Call",
     span,
     callee: callee,
     args: args,
+    is_optional: is_optional,
   }),
 
-  Index: (span: Span, lhs: Expr, property: Expr): ExprWithKind<"Index"> => ({
+  Index: (
+    span: Span,
+    lhs: Expr,
+    property: Expr,
+    is_optional: boolean,
+  ): ExprWithKind<"Index"> => ({
     kind: "Index",
     span,
     lhs: lhs,
     property: property,
+    is_optional: is_optional,
   }),
 
-  Prop: (span: Span, lhs: Expr, property: Ident): ExprWithKind<"Prop"> => ({
+  Prop: (
+    span: Span,
+    lhs: Expr,
+    property: Ident,
+    is_optional: boolean,
+  ): ExprWithKind<"Prop"> => ({
     kind: "Prop",
     span,
     lhs: lhs,
     property: property,
+    is_optional: is_optional,
   }),
 
   String: (span: Span, text: Text): ExprWithKind<"String"> => ({
