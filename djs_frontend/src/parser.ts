@@ -424,6 +424,12 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         if (expr === ERR) return ERR
         return Expr.UnaryMinus(Span.between(start, expr.span), expr)
       }
+      case t.Tilde: {
+        const start = advance()
+        const expr = parse_unary_expr()
+        if (expr === ERR) return ERR
+        return Expr.BitNot(Span.between(start, expr), expr)
+      }
       case t.Typeof: {
         const start = advance().span
         const expr = parse_unary_expr()
