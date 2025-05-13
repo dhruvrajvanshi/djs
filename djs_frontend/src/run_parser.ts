@@ -23,7 +23,7 @@ async function main(paths: string[]) {
     const parser = Parser(path, source_text)
     const source_file = parser.parse_source_file()
 
-    show_diagnostics(path, source_text, source_file.errors.slice(0, 1))
+    show_diagnostics(path, source_text, source_file.errors)
     total_errors += source_file.errors.length
   }
 
