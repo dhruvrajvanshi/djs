@@ -588,6 +588,7 @@ export type Expr =
       readonly span: Span
       readonly callee: Expr
       readonly args: readonly Expr[]
+      readonly spread: Expr | null
       readonly is_optional: boolean
     }
   | {
@@ -805,12 +806,14 @@ export const Expr = {
     span: Span,
     callee: Expr,
     args: readonly Expr[],
+    spread: Expr | null,
     is_optional: boolean,
   ): ExprWithKind<"Call"> => ({
     kind: "Call",
     span,
     callee: callee,
     args: args,
+    spread: spread,
     is_optional: is_optional,
   }),
 

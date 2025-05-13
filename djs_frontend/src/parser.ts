@@ -304,10 +304,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         }
         case t.LParen: {
           if (allow_calls) {
-            const args = parse_arguments()
-            if (args === ERR) return ERR
-            const span = Span.between(lhs.span, args.span)
-            lhs = Expr.Call(span, lhs, args.args, /* is_optional */ false)
+            const args_or_err = parse_arguments()
+            if (args_or_err === ERR) return ERR
+            const { args, spread, span: args_span } = args_or_err
+            const span = Span.between(lhs.span, args_span)
+            lhs = Expr.Call(span, lhs, args, spread, /* is_optional */ false)
             break
           } else {
             return lhs
@@ -334,10 +335,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
               break
             }
             case t.LParen: {
-              const args = parse_arguments()
-              if (args === ERR) return ERR
-              const span = Span.between(lhs.span, args.span)
-              lhs = Expr.Call(span, lhs, args.args, /* is_optional */ true)
+              const args_or_err = parse_arguments()
+              if (args_or_err === ERR) return ERR
+              const { args, spread, span: args_span } = args_or_err
+              const span = Span.between(lhs.span, args_span)
+              lhs = Expr.Call(span, lhs, args, spread, /* is_optional */ true)
               break
             }
             default:
@@ -364,16 +366,36 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
 
-  type ArgsWithSpan = { args: Expr[]; span: Span }
+  type ArgsWithSpan = { args: Expr[]; spread: Expr | null; span: Span }
   function parse_arguments(): Err | ArgsWithSpan {
     const first = advance()
     assert(first.kind === t.LParen)
-    const args = parse_comma_separated_list(t.RParen, parse_assignment_expr)
-    if (args === ERR) return ERR
+    let spread: Expr | null = null
+    const args_or_null = parse_comma_separated_list(t.RParen, () => {
+      if (at(t.DotDotDot)) {
+        advance()
+        const expr = parse_assignment_expr()
+        if (expr === ERR) return ERR
+        spread = expr
+        if (
+          !(current_token.kind === t.RParen) &&
+          !(current_token.kind === t.Comma && next_is(t.RParen))
+        ) {
+          emit_error("Spread operator must be the last argument")
+          return ERR
+        }
+        return null
+      }
+      const e = parse_assignment_expr()
+      if (e === ERR) return ERR
+      return e
+    })
+    if (args_or_null === ERR) return ERR
     const last = expect(t.RParen)
     if (last === ERR) return ERR
     const span = Span.between(first.span, last.span)
-    return { args, span }
+    const args = args_or_null.filter((arg) => arg !== null)
+    return { args, spread, span }
   }
 
   function parse_unary_expr(): Expr | Err {
