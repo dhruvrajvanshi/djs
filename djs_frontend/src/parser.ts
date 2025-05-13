@@ -2273,7 +2273,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       else_branch,
     )
   }
-  function parse_expr_stmt(): Extract<Stmt, { kind: "Expr" }> | Err {
+  function parse_expr_stmt(): Stmt | Err {
     const expr = parse_expr()
     if (expr === ERR) return ERR
     if (expect_semi() === ERR) return ERR
