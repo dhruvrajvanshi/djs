@@ -247,16 +247,15 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       if (expr === ERR) return expr
       lhs = expr
     }
-
     while (true) {
-      switch (current_token.kind) {
+      switch (current_kind()) {
         case t.Dot: {
           advance()
           const prop = parse_member_ident_name()
           if (prop === ERR) return prop
 
           const span = Span.between(lhs.span, prop.span)
-          lhs = Expr.Prop(span, lhs, prop)
+          lhs = Expr.Prop(span, lhs, prop, /* is_optional */ false)
           break
         }
         case t.LSquare: {
@@ -266,7 +265,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           const end = expect(t.RSquare)
           if (end === ERR) return end
           const span = Span.between(start.span, end.span)
-          lhs = Expr.Index(span, lhs, prop)
+          lhs = Expr.Index(span, lhs, prop, /* is_optional */ false)
           break
         }
         case t.LParen: {
@@ -274,11 +273,43 @@ function parser_impl(path: string, source: string, flags: number): Parser {
             const args = parse_arguments()
             if (args === ERR) return ERR
             const span = Span.between(lhs.span, args.span)
-            lhs = Expr.Call(span, lhs, args.args)
+            lhs = Expr.Call(span, lhs, args.args, /* is_optional */ false)
             break
           } else {
             return lhs
           }
+        }
+        case t.QuestionDot: {
+          advance()
+          switch (current_kind()) {
+            case t.Ident: {
+              const prop = parse_member_ident_name()
+              if (prop === ERR) return prop
+              const span = Span.between(lhs.span, prop.span)
+              lhs = Expr.Prop(span, lhs, prop, /* is_optional */ true)
+              break
+            }
+            case t.LSquare: {
+              const start = advance()
+              const prop = parse_expr()
+              if (prop === ERR) return prop
+              const end = expect(t.RSquare)
+              if (end === ERR) return end
+              const span = Span.between(start.span, end.span)
+              lhs = Expr.Index(span, lhs, prop, /* is_optional */ true)
+              break
+            }
+            case t.LParen: {
+              const args = parse_arguments()
+              if (args === ERR) return ERR
+              const span = Span.between(lhs.span, args.span)
+              lhs = Expr.Call(span, lhs, args.args, /* is_optional */ true)
+              break
+            }
+            default:
+              break
+          }
+          break
         }
         default:
           return lhs

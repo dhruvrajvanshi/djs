@@ -65,6 +65,7 @@ const TokenKinds = Object.freeze({
   Semi: "Semi",
   Question: "Question",
   QuestionQuestion: "QuestionQuestion",
+  QuestionDot: "QuestionDot",
   Bang: "Bang",
   Tilde: "Tilde",
   Percent: "Percent",
