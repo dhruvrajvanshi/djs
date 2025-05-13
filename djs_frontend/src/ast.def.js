@@ -389,6 +389,7 @@ const DBinOp = StringUnion(
   // Logical
   "And",
   "Or",
+  "Coalesce",
   // Relational
   "Gt",
   "Lt",
