@@ -1,1 +1,1 @@
-export { TokenKind } from "./tokens.gen"
+export { TokenKind } from "./tokens.gen.ts"

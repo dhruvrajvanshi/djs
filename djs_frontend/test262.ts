@@ -1,5 +1,5 @@
 import fs from "node:fs/promises"
-import { Parser } from "./src/parser"
+import { Parser } from "./src/parser.ts"
 import assert from "node:assert"
 
 const test262Paths: string[] = []

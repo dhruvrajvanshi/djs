@@ -1,4 +1,4 @@
-import { ParseError } from "./ast.gen"
+import { type ParseError } from "./ast.gen.ts"
 import { Span } from "./Span"
 
 const COLOR_ERROR = "\x1b[31;1m"
