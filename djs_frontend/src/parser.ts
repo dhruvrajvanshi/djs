@@ -1081,8 +1081,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     const start = advance()
     assert(start.kind === t.LParen)
     const expr = parse_expr()
-    if (expect(t.RParen) === ERR) return ERR
-    return expr
+    if (expr === ERR) return ERR
+    const end = expect(t.RParen)
+    if (end === ERR) return ERR
+    return Expr.Paren(Span.between(start, end), expr)
   }
 
   function next_is(token_kind: TokenKind): boolean {

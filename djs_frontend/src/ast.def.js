@@ -200,6 +200,7 @@ const DStructTypeDeclField = Struct("StructTypeDeclField", [], {
 
 const DExpr = Enum(Expr, ["span", "visit"], {
   Var: { ident: Ident },
+  Paren: { expr: Expr },
   BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
   ArrowFn: {
     params: ParamList,
