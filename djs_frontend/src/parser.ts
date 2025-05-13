@@ -1013,10 +1013,31 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       }
       case t.LParen:
         return parse_parenthesized_or_func_type_annotation()
+      case t.LessThan:
+        return parse_generic_func_type_annotation()
       default:
         emit_error("Expected a type annotation")
         return ERR
     }
+  }
+  function parse_generic_func_type_annotation(): TypeAnnotation | Err {
+    const start = current_token
+    const type_params = parse_type_params()
+    if (type_params === ERR) return ERR
+    if (expect(t.LParen) === ERR) return ERR
+    const params = parse_comma_separated_list(t.RParen, parse_func_type_param)
+    if (params === ERR) return ERR
+    if (expect(t.RParen) === ERR) return ERR
+    if (expect(t.FatArrow) === ERR) return ERR
+    const returns = parse_type_annotation()
+    if (returns === ERR) return ERR
+
+    return TypeAnnotation.Func(
+      Span.between(start, returns),
+      /* type_params */ [],
+      params,
+      returns,
+    )
   }
 
   function parse_parenthesized_or_func_type_annotation(): TypeAnnotation | Err {
@@ -1030,7 +1051,12 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       const returns = parse_type_annotation()
       if (returns === ERR) return ERR
 
-      return TypeAnnotation.Func(Span.between(start, returns), params, returns)
+      return TypeAnnotation.Func(
+        Span.between(start, returns),
+        /* type_params */ [],
+        params,
+        returns,
+      )
     } else {
       const annotation = parse_type_annotation()
       if (annotation === ERR) return ERR
@@ -2134,7 +2160,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
   function parse_optional_type_params(): readonly TypeParam[] | Err {
     if (!at(t.LessThan)) return []
-    advance()
+    return parse_type_params()
+  }
+  function parse_type_params(): readonly TypeParam[] | Err {
+    const start = advance()
+    assert(start.kind === t.LessThan)
     const params = parse_comma_separated_list(
       t.GreaterThan,
       parse_binding_ident,

@@ -249,7 +249,11 @@ const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   ReadonlyArray: { item: TypeAnnotation },
   Application: { callee: TypeAnnotation, args: Array(TypeAnnotation) },
   String: { text: Text },
-  Func: { params: Array("FuncTypeParam"), returns: TypeAnnotation },
+  Func: {
+    type_params: Array("TypeParam"),
+    params: Array("FuncTypeParam"),
+    returns: TypeAnnotation,
+  },
 })
 const DFuncTypeParam = Struct("FuncTypeParam", [], {
   label: Ident,
