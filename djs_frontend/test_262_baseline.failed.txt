@@ -1154,21 +1154,6 @@
 ../test262/test/language/expressions/await/await-in-nested-function.js
 ../test262/test/language/expressions/await/await-in-nested-generator.js
 ../test262/test/language/expressions/await/for-await-of-interleaved.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A2.1_T1.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A2.1_T2.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A2.2_T1.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T1.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T2.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T3.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T4.js
-../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T5.js
-../test262/test/language/expressions/bitwise-not/S9.5_A2.1_T2.js
-../test262/test/language/expressions/bitwise-not/S9.5_A2.2_T2.js
-../test262/test/language/expressions/bitwise-not/S9.5_A2.3_T2.js
-../test262/test/language/expressions/bitwise-not/S9.5_A3.1_T4.js
-../test262/test/language/expressions/bitwise-not/S9.5_A3.2_T2.js
-../test262/test/language/expressions/bitwise-not/bigint-non-primitive.js
-../test262/test/language/expressions/bitwise-not/bigint.js
 ../test262/test/language/expressions/call/eval-spread-empty-leading.js
 ../test262/test/language/expressions/call/eval-spread-empty-trailing.js
 ../test262/test/language/expressions/call/eval-spread-empty.js
@@ -2801,7 +2786,6 @@
 ../test262/test/language/expressions/conditional/in-condition.js
 ../test262/test/language/expressions/delete/identifier-strict-recursive.js
 ../test262/test/language/expressions/delete/identifier-strict.js
-../test262/test/language/expressions/delete/non-reference-return-true.js
 ../test262/test/language/expressions/delete/white-space-line-terminator-between-delete-unaryexpression-allowed.js
 ../test262/test/language/expressions/division/no-magic-asi-from-block-eval.js
 ../test262/test/language/expressions/division/no-magic-asi.js
@@ -3368,7 +3352,6 @@
 ../test262/test/language/expressions/dynamic-import/usage/top-level-import-then-is-call-expression-square-brackets.js
 ../test262/test/language/expressions/dynamic-import/usage/top-level-import-then-returns-thenable.js
 ../test262/test/language/expressions/dynamic-import/usage/top-level-import-then-specifier-tostring.js
-../test262/test/language/expressions/exponentiation/exp-operator-precedence-unary-expression-semantics.js
 ../test262/test/language/expressions/function/array-destructuring-param-strict-body.js
 ../test262/test/language/expressions/function/dflt-params-duplicates.js
 ../test262/test/language/expressions/function/dflt-params-rest.js
