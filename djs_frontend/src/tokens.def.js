@@ -87,6 +87,7 @@ export const tokens = [
   "MinusMinus",
   "PlusPlus",
   "Star",
+  "StarStar",
   "Slash",
 
   "LessThanLessThan",

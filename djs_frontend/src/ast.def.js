@@ -383,6 +383,8 @@ const DBinOp = StringUnion(
   "Mul",
   "Div",
   "Mod",
+  // Exponent
+  "Exponent",
   // Bitwise
   "BitXor",
   "BitAnd",
