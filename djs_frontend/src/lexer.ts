@@ -1,5 +1,5 @@
-import { TokenKind } from "./TokenKind.js"
-import { Token } from "./Token.js"
+import { TokenKind } from "./TokenKind.ts"
+import { Token } from "./Token.ts"
 import assert, { AssertionError } from "node:assert"
 
 export type Lexer = {

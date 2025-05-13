@@ -1,5 +1,5 @@
-import { Span } from "./Span.js"
-import { TokenKind } from "./TokenKind.js"
+import { Span } from "./Span.ts"
+import { TokenKind } from "./TokenKind.ts"
 
 export interface Token {
   readonly kind: TokenKind

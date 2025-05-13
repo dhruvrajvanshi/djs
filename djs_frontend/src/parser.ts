@@ -4,40 +4,40 @@ import {
   ArrowFnBody,
   AssignOp,
   BinOp,
-  Block,
-  Class,
+  type Block,
+  type Class,
   ClassMember,
   DeclType,
   Expr,
   ForInit,
-  FuncTypeParam,
-  Ident,
-  ImportSpecifier,
+  type FuncTypeParam,
+  type Ident,
+  type ImportSpecifier,
   InOrOf,
-  MethodDef,
+  type MethodDef,
   ModuleExportName,
   ObjectKey,
   ObjectLiteralEntry,
-  ObjectPatternProperty,
-  Param,
-  ParamList,
-  ParseError,
+  type ObjectPatternProperty,
+  type Param,
+  type ParamList,
+  type ParseError,
   Pattern,
-  SourceFile,
+  type SourceFile,
   Stmt,
-  StructTypeDeclField,
-  SwitchCase,
+  type StructTypeDeclField,
+  type SwitchCase,
   TemplateLiteralFragment,
   TypeAnnotation,
-  TypeParam,
-  VarDecl,
-  VarDeclarator,
+  type TypeParam,
+  type VarDecl,
+  type VarDeclarator,
   type Func,
-} from "./ast.gen.js"
-import { Lexer } from "./lexer.js"
-import { Span } from "./Span.js"
-import { Token } from "./Token.js"
-import { TokenKind } from "./TokenKind.js"
+} from "./ast.gen.ts"
+import { Lexer } from "./lexer.ts"
+import { Span } from "./Span.ts"
+import { Token } from "./Token.ts"
+import { TokenKind } from "./TokenKind.ts"
 import assert, { AssertionError } from "node:assert"
 
 type Parser = {
