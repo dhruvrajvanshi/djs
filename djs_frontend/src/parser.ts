@@ -195,8 +195,42 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function parse_exponentiation_expr(): Expr | Err {
-    // TODO: Handle exponentiation operator
-    return parse_unary_expr()
+    let head = parse_unary_expr()
+    if (head === ERR) return ERR
+    if (at(t.StarStar)) {
+      if (!is_valid_exponent_lhs(head)) {
+        emit_error(
+          "Exponentiation operator cannot be used with unary expressions",
+        )
+      }
+      advance()
+      const rhs = parse_exponentiation_expr()
+      if (rhs === ERR) return ERR
+      return Expr.BinOp(
+        Span.between(head.span, rhs.span),
+        head,
+        BinOp.Exponent,
+        rhs,
+      )
+    } else {
+      return head
+    }
+  }
+  function is_valid_exponent_lhs(expr: Expr): boolean {
+    switch (expr.kind) {
+      case "Delete":
+      case "TypeOf":
+      case "Void":
+      case "UnaryPlus":
+      case "UnaryMinus":
+      case "Not":
+      case "Await":
+      case "BitNot":
+        return false
+
+      default:
+        return true
+    }
   }
   function parse_update_expr(): Expr | Err {
     switch (current_token.kind) {

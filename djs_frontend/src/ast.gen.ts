@@ -1399,6 +1399,7 @@ export type BinOp =
   | "Mul"
   | "Div"
   | "Mod"
+  | "Exponent"
   | "BitXor"
   | "BitAnd"
   | "BitOr"
@@ -1424,6 +1425,7 @@ export const BinOp = {
   Mul: "Mul",
   Div: "Div",
   Mod: "Mod",
+  Exponent: "Exponent",
   BitXor: "BitXor",
   BitAnd: "BitAnd",
   BitOr: "BitOr",
