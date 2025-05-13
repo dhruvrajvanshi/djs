@@ -1,3 +1,4 @@
+import { todo } from "./assert.ts"
 import {
   AccessorType,
   ArrayLiteralMember,
@@ -1164,7 +1165,28 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function parse_arrow_fn(): Expr | Err {
-    const params = parse_params_with_parens()
+    let params: ParamList | Err
+    if (
+      at(t.Ident) &&
+      next_is(t.FatArrow) &&
+      next_token().line === current_token.line
+    ) {
+      const pattern = parse_pattern()
+      if (pattern === ERR) return ERR
+      params = {
+        span: pattern.span,
+        params: [
+          {
+            span: pattern.span,
+            pattern,
+            type_annotation: null,
+            initializer: null,
+          },
+        ],
+      }
+    } else {
+      params = parse_params_with_parens()
+    }
     if (params === ERR) return ERR
     const return_type = parse_optional_type_annotation()
     if (return_type === ERR) return ERR
