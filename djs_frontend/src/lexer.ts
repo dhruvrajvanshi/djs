@@ -142,6 +142,7 @@ export function lexer_impl(
     else if (at("||=")) return lex_3_char_token(TokenKind.BarBarEq)
     // _ if at!("??=") => self.lex_3_char_token(TokenKind::QuestionQuestionEq),
     else if (at("??=")) return lex_3_char_token(TokenKind.QuestionQuestionEq)
+    else if (at("??")) return lex_2_char_token(TokenKind.QuestionQuestion)
     // _ if at!("*=") => self.lex_2_char_token(TokenKind::StarEq),
     else if (at("*=")) return lex_2_char_token(TokenKind.StarEq)
     // _ if at!("/=") => self.lex_2_char_token(TokenKind::SlashEq),

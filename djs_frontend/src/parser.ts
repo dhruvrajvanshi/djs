@@ -38,7 +38,7 @@ import { Lexer } from "./lexer.js"
 import { Span } from "./Span.js"
 import { Token } from "./Token.js"
 import { TokenKind } from "./TokenKind.js"
-import assert, { AssertionError, throws } from "node:assert"
+import assert, { AssertionError } from "node:assert"
 
 type Parser = {
   parse_source_file: () => SourceFile
@@ -1307,8 +1307,32 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function parse_short_circuit_expr(): Expr | Err {
-    // TODO: parse_coalesce_expr
-    return parse_logical_or_expr()
+    let head = parse_logical_or_expr()
+    if (head === ERR) return ERR
+    while (true) {
+      if (at(t.QuestionQuestion)) {
+        advance()
+        const rhs = parse_bitwise_or_expr()
+        if (rhs === ERR) return ERR
+        if (
+          head.kind === "BinOp" &&
+          (head.operator === BinOp.Or || head.operator === BinOp.And)
+        ) {
+          emit_error(
+            "Logical expressions and coalesce expressions cannot be mixed. Wrap either by parentheses",
+          )
+        }
+        head = Expr.BinOp(
+          Span.between(head.span, rhs.span),
+          head,
+          BinOp.Coalesce,
+          rhs,
+        )
+      } else {
+        break
+      }
+    }
+    return head
   }
   function parse_conditional_expr(): Expr | Err {
     const lhs = parse_short_circuit_expr()

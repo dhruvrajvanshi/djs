@@ -1376,6 +1376,7 @@ export type BinOp =
   | "BitOr"
   | "And"
   | "Or"
+  | "Coalesce"
   | "Gt"
   | "Lt"
   | "Gte"
@@ -1400,6 +1401,7 @@ export const BinOp = {
   BitOr: "BitOr",
   And: "And",
   Or: "Or",
+  Coalesce: "Coalesce",
   Gt: "Gt",
   Lt: "Lt",
   Gte: "Gte",

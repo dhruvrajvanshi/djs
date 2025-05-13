@@ -708,6 +708,7 @@
 ../test262/test/annexB/language/eval-code/indirect/global-switch-dflt-eval-global-skip-early-err-try.js
 ../test262/test/annexB/language/eval-code/indirect/global-switch-dflt-eval-global-skip-early-err.js
 ../test262/test/annexB/language/eval-code/indirect/global-switch-dflt-eval-global-update.js
+../test262/test/annexB/language/expressions/coalesce/emulates-undefined.js
 ../test262/test/annexB/language/expressions/conditional/emulates-undefined.js
 ../test262/test/annexB/language/expressions/does-not-equals/emulates-undefined.js
 ../test262/test/annexB/language/expressions/equals/emulates-undefined.js
@@ -27528,6 +27529,7 @@
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-condition-expression-true.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-decimal-literal.js
+../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-expression-logical-and.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-expression-logical-or.js
 ../test262/test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-function-declaration.js
@@ -27553,6 +27555,7 @@
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-condition-expression-true.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-decimal-literal.js
+../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-expression-logical-and.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-expression-logical-or.js
 ../test262/test/language/expressions/class/cpn-class-expr-computed-property-name-from-function-declaration.js
@@ -29051,10 +29054,28 @@
 ../test262/test/language/expressions/class/subclass-builtins/subclass-WeakMap.js
 ../test262/test/language/expressions/class/subclass-builtins/subclass-WeakRef.js
 ../test262/test/language/expressions/class/subclass-builtins/subclass-WeakSet.js
+../test262/test/language/expressions/coalesce/abrupt-is-a-short-circuit.js
 ../test262/test/language/expressions/coalesce/cannot-chain-head-with-logical-and.js
 ../test262/test/language/expressions/coalesce/cannot-chain-head-with-logical-or.js
 ../test262/test/language/expressions/coalesce/cannot-chain-tail-with-logical-and.js
 ../test262/test/language/expressions/coalesce/cannot-chain-tail-with-logical-or.js
+../test262/test/language/expressions/coalesce/chainable-with-bitwise-and.js
+../test262/test/language/expressions/coalesce/chainable-with-bitwise-or.js
+../test262/test/language/expressions/coalesce/chainable-with-bitwise-xor.js
+../test262/test/language/expressions/coalesce/chainable.js
+../test262/test/language/expressions/coalesce/follows-null.js
+../test262/test/language/expressions/coalesce/follows-undefined.js
+../test262/test/language/expressions/coalesce/short-circuit-number-0.js
+../test262/test/language/expressions/coalesce/short-circuit-number-42.js
+../test262/test/language/expressions/coalesce/short-circuit-number-empty-string.js
+../test262/test/language/expressions/coalesce/short-circuit-number-false.js
+../test262/test/language/expressions/coalesce/short-circuit-number-object.js
+../test262/test/language/expressions/coalesce/short-circuit-number-string.js
+../test262/test/language/expressions/coalesce/short-circuit-number-symbol.js
+../test262/test/language/expressions/coalesce/short-circuit-number-true.js
+../test262/test/language/expressions/coalesce/short-circuit-prevents-evaluation.js
+../test262/test/language/expressions/coalesce/tco-pos-null.js
+../test262/test/language/expressions/coalesce/tco-pos-undefined.js
 ../test262/test/language/expressions/comma/S11.14_A1.js
 ../test262/test/language/expressions/comma/S11.14_A2.1_T1.js
 ../test262/test/language/expressions/comma/S11.14_A2.1_T2.js
@@ -29453,6 +29474,7 @@
 ../test262/test/language/expressions/conditional/S11.12_A4_T2.js
 ../test262/test/language/expressions/conditional/S11.12_A4_T3.js
 ../test262/test/language/expressions/conditional/S11.12_A4_T4.js
+../test262/test/language/expressions/conditional/coalesce-expr-ternary.js
 ../test262/test/language/expressions/conditional/in-branch-1.js
 ../test262/test/language/expressions/conditional/symbol-conditional-evaluation.js
 ../test262/test/language/expressions/conditional/tco-cond.js
@@ -30938,6 +30960,7 @@
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-condition-expression-true.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-decimal-literal.js
+../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-expression-logical-and.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-expression-logical-or.js
 ../test262/test/language/expressions/object/cpn-obj-lit-computed-property-name-from-function-declaration.js
@@ -34121,6 +34144,7 @@
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-condition-expression-true.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-decimal-literal.js
+../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-expression-logical-and.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-expression-logical-or.js
 ../test262/test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-function-declaration.js
@@ -34146,6 +34170,7 @@
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-condition-expression-true.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-decimal-e-notational-literal.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-decimal-literal.js
+../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-expression-coalesce.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-expression-logical-and.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-expression-logical-or.js
 ../test262/test/language/statements/class/cpn-class-decl-computed-property-name-from-function-declaration.js
