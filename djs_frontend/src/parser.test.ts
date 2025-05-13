@@ -78,6 +78,17 @@ test("break statement with an identifier on the next line", () => {
   expect(source_file.errors).toEqual([])
 })
 
+test("conditional operator", () => {
+  const source = `
+    a ? b : c
+  `
+  const parser = Parser("test.js", source)
+  const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+  assert(source_file.stmts[0].kind === "Expr")
+  expect(source_file.stmts[0].expr.kind).toEqual("Ternary")
+})
+
 if (process.env.CI) {
   const test262Paths: string[] = []
 
