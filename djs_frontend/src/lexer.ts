@@ -690,6 +690,7 @@ export function lexer_impl(
   }
 
   function lex_ident_or_keyword(): Token {
+    advance()
     while (is_identifier_char(current_char())) {
       advance()
     }
@@ -748,11 +749,11 @@ function is_alphabet(c: string): boolean {
   return (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
 }
 function is_identifier_start(c: string): boolean {
-  return is_alphabet(c) || c == "_" || c == "$"
+  return is_alphabet(c) || c === "_" || c === "$" || c === "#"
 }
 
 function is_identifier_char(c: string): boolean {
-  return is_identifier_start(c) || is_ascii_digit(c)
+  return is_alphabet(c) || c === "_" || c === "$" || is_ascii_digit(c)
 }
 
 function is_hex_digit(c: string): boolean {
