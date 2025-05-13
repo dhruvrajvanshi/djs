@@ -84,6 +84,7 @@ const TokenKinds = Object.freeze({
   MinusMinus: "MinusMinus",
   PlusPlus: "PlusPlus",
   Star: "Star",
+  StarStar: "StarStar",
   Slash: "Slash",
   LessThanLessThan: "LessThanLessThan",
   GreaterThanGreaterThan: "GreaterThanGreaterThan",

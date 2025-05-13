@@ -177,6 +177,7 @@ export function lexer_impl(
     else if (at("|=")) return lex_2_char_token(TokenKind.BarEq)
     // _ if at!("**=") => self.lex_3_char_token(TokenKind::StarStarEq),
     else if (at("**=")) return lex_3_char_token(TokenKind.StarStarEq)
+    else if (at("**")) return lex_2_char_token(TokenKind.StarStar)
     // '%' => self.lex_single_char_token(TokenKind::Percent),
     else if (at("%")) return lex_single_char_token(TokenKind.Percent)
     // '*' => self.lex_single_char_token(TokenKind::Star),
