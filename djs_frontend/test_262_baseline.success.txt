@@ -10935,6 +10935,7 @@
 ../test262/test/built-ins/Promise/all/resolve-from-same-thenable.js
 ../test262/test/built-ins/Promise/all/resolve-ignores-late-rejection-deferred.js
 ../test262/test/built-ins/Promise/all/resolve-ignores-late-rejection.js
+../test262/test/built-ins/Promise/all/resolve-non-callable.js
 ../test262/test/built-ins/Promise/all/resolve-non-thenable.js
 ../test262/test/built-ins/Promise/all/resolve-poisoned-then.js
 ../test262/test/built-ins/Promise/all/resolve-thenable.js
@@ -11021,6 +11022,7 @@
 ../test262/test/built-ins/Promise/allSettled/resolve-from-same-thenable.js
 ../test262/test/built-ins/Promise/allSettled/resolve-ignores-late-rejection-deferred.js
 ../test262/test/built-ins/Promise/allSettled/resolve-ignores-late-rejection.js
+../test262/test/built-ins/Promise/allSettled/resolve-non-callable.js
 ../test262/test/built-ins/Promise/allSettled/resolve-non-thenable.js
 ../test262/test/built-ins/Promise/allSettled/resolve-poisoned-then.js
 ../test262/test/built-ins/Promise/allSettled/resolve-thenable.js
@@ -11107,6 +11109,7 @@
 ../test262/test/built-ins/Promise/any/resolve-from-same-thenable.js
 ../test262/test/built-ins/Promise/any/resolve-ignores-late-rejection-deferred.js
 ../test262/test/built-ins/Promise/any/resolve-ignores-late-rejection.js
+../test262/test/built-ins/Promise/any/resolve-non-callable.js
 ../test262/test/built-ins/Promise/any/resolve-non-thenable.js
 ../test262/test/built-ins/Promise/any/resolved-sequence-extra-ticks.js
 ../test262/test/built-ins/Promise/any/resolved-sequence-mixed.js
@@ -11331,6 +11334,7 @@
 ../test262/test/built-ins/Promise/race/resolve-from-same-thenable.js
 ../test262/test/built-ins/Promise/race/resolve-ignores-late-rejection-deferred.js
 ../test262/test/built-ins/Promise/race/resolve-ignores-late-rejection.js
+../test262/test/built-ins/Promise/race/resolve-non-callable.js
 ../test262/test/built-ins/Promise/race/resolve-non-obj.js
 ../test262/test/built-ins/Promise/race/resolve-non-thenable.js
 ../test262/test/built-ins/Promise/race/resolve-poisoned-then.js
@@ -37831,9 +37835,11 @@
 ../test262/test/language/white-space/S7.2_A5_T5.js
 ../test262/test/language/white-space/after-regular-expression-literal-carriage-return.js
 ../test262/test/language/white-space/after-regular-expression-literal-line-feed.js
+../test262/test/language/white-space/after-regular-expression-literal-nbsp.js
 ../test262/test/language/white-space/after-regular-expression-literal-space.js
 ../test262/test/language/white-space/after-regular-expression-literal-tab.js
 ../test262/test/language/white-space/between-horizontal-tab.js
+../test262/test/language/white-space/between-nbsp.js
 ../test262/test/language/white-space/between-space.js
 ../test262/test/language/white-space/comment-multi-form-feed.js
 ../test262/test/language/white-space/comment-multi-horizontal-tab.js
