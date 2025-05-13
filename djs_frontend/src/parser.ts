@@ -1,4 +1,3 @@
-import { todo } from "./assert.ts"
 import {
   AccessorType,
   ArrayLiteralMember,
