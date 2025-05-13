@@ -25846,6 +25846,21 @@
 ../test262/test/language/expressions/bitwise-and/bigint.js
 ../test262/test/language/expressions/bitwise-and/order-of-evaluation.js
 ../test262/test/language/expressions/bitwise-not/S11.4.8_A1.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A2.1_T1.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A2.1_T2.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A2.2_T1.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T1.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T2.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T3.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T4.js
+../test262/test/language/expressions/bitwise-not/S11.4.8_A3_T5.js
+../test262/test/language/expressions/bitwise-not/S9.5_A2.1_T2.js
+../test262/test/language/expressions/bitwise-not/S9.5_A2.2_T2.js
+../test262/test/language/expressions/bitwise-not/S9.5_A2.3_T2.js
+../test262/test/language/expressions/bitwise-not/S9.5_A3.1_T4.js
+../test262/test/language/expressions/bitwise-not/S9.5_A3.2_T2.js
+../test262/test/language/expressions/bitwise-not/bigint-non-primitive.js
+../test262/test/language/expressions/bitwise-not/bigint.js
 ../test262/test/language/expressions/bitwise-or/S11.10.3_A1.js
 ../test262/test/language/expressions/bitwise-or/S11.10.3_A2.1_T1.js
 ../test262/test/language/expressions/bitwise-or/S11.10.3_A2.1_T2.js
@@ -28827,6 +28842,7 @@
 ../test262/test/language/expressions/delete/member-computed-reference-undefined.js
 ../test262/test/language/expressions/delete/member-identifier-reference-null.js
 ../test262/test/language/expressions/delete/member-identifier-reference-undefined.js
+../test262/test/language/expressions/delete/non-reference-return-true.js
 ../test262/test/language/expressions/delete/super-property-method.js
 ../test262/test/language/expressions/delete/super-property-null-base.js
 ../test262/test/language/expressions/delete/super-property-topropertykey.js
@@ -29235,6 +29251,7 @@
 ../test262/test/language/expressions/exponentiation/bigint-zero-base-zero-exponent.js
 ../test262/test/language/expressions/exponentiation/exp-assignment-operator.js
 ../test262/test/language/expressions/exponentiation/exp-operator-evaluation-order.js
+../test262/test/language/expressions/exponentiation/exp-operator-precedence-unary-expression-semantics.js
 ../test262/test/language/expressions/exponentiation/exp-operator-precedence-update-expression-semantics.js
 ../test262/test/language/expressions/exponentiation/exp-operator-syntax-error-bitnot-unary-expression-base.js
 ../test262/test/language/expressions/exponentiation/exp-operator-syntax-error-delete-unary-expression-base.js
