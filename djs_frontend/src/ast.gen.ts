@@ -560,6 +560,11 @@ export type Expr =
       readonly ident: Ident
     }
   | {
+      readonly kind: "Paren"
+      readonly span: Span
+      readonly expr: Expr
+    }
+  | {
       readonly kind: "BinOp"
       readonly span: Span
       readonly lhs: Expr
@@ -756,6 +761,12 @@ export const Expr = {
     kind: "Var",
     span,
     ident: ident,
+  }),
+
+  Paren: (span: Span, expr: Expr): ExprWithKind<"Paren"> => ({
+    kind: "Paren",
+    span,
+    expr: expr,
   }),
 
   BinOp: (
