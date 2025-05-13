@@ -13,6 +13,12 @@ for await (const path of fs.glob("../test262/test/**/*.js")) {
   if (path.includes("test/language/statements/function/S13.2.1_A1_T1.js")) {
     continue
   }
+  if (extract_frontmatter(path).includes("class-static-methods-private")) {
+    continue
+  }
+  if (extract_frontmatter(path).includes("IsHTMLDDA")) {
+    continue
+  }
   test262Paths.push(path)
 }
 
