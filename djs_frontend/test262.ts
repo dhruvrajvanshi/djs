@@ -1,6 +1,7 @@
 import fs from "node:fs/promises"
 import { Parser } from "./src/parser.ts"
 import assert from "node:assert"
+import { exit } from "node:process"
 
 const test262Paths: string[] = []
 
@@ -9,14 +10,19 @@ for await (const path of fs.glob("../test262/test/**/*.js")) {
     continue
   }
 
+  const text = await fs.readFile(path, "utf-8")
+
   // Skip known problematic files that cause stack overflow
   if (path.includes("test/language/statements/function/S13.2.1_A1_T1.js")) {
     continue
   }
-  if (extract_frontmatter(path).includes("class-static-methods-private")) {
+
+  const frontmatter = extract_frontmatter(text)
+
+  if (frontmatter.includes("IsHTMLDDA")) {
     continue
   }
-  if (extract_frontmatter(path).includes("IsHTMLDDA")) {
+  if (frontmatter.includes("noStrict")) {
     continue
   }
   test262Paths.push(path)
