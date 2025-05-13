@@ -273,11 +273,18 @@ export function lexer_impl(
   function at_comment(): boolean {
     return (
       (current_char() === "/" && next_char() === "/") ||
+      at("<!--") ||
       (current_char() === "/" && next_char() === "*")
     )
   }
 
   function skip_comment(): string | void {
+    if (at("<!--")) {
+      while (current_char() !== "\n" && current_char() !== "\0") {
+        advance()
+      }
+      return
+    }
     const first = advance()
     assert(first === "/", "Expected '/' at the start of a comment")
 

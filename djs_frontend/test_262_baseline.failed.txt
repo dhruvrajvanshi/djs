@@ -5,7 +5,6 @@
 ../test262/test/annexB/language/comments/single-line-html-close-first-line-3.js
 ../test262/test/annexB/language/comments/single-line-html-close-unicode-separators.js
 ../test262/test/annexB/language/comments/single-line-html-close.js
-../test262/test/annexB/language/comments/single-line-html-open.js
 ../test262/test/annexB/language/expressions/assignment/dstr/array-pattern-emulates-undefined.js
 ../test262/test/annexB/language/expressions/assignment/dstr/object-pattern-emulates-undefined.js
 ../test262/test/annexB/language/expressions/logical-assignment/emulates-undefined-and.js
@@ -5592,6 +5591,7 @@
 ../test262/test/language/literals/string/legacy-non-octal-escape-sequence-strict.js
 ../test262/test/language/literals/string/legacy-octal-escape-sequence-prologue-strict.js
 ../test262/test/language/literals/string/legacy-octal-escape-sequence-strict.js
+../test262/test/language/module-code/comment-single-line-html-open.js
 ../test262/test/language/module-code/early-dup-export-decl.js
 ../test262/test/language/module-code/early-dup-lables.js
 ../test262/test/language/module-code/early-dup-lex.js
