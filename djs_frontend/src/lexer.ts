@@ -243,6 +243,7 @@ export function lexer_impl(
     // c if c.is_ascii_digit() => self.lex_number(),
     else if (is_ascii_digit(current_char())) return lex_number()
     else {
+      const c = current_char()
       let limit = 100
       while (current_char() !== "\0" && !is_whitespace(current_char())) {
         limit--
@@ -251,7 +252,7 @@ export function lexer_impl(
         }
         advance()
       }
-      return make_token(TokenKind.Error)
+      return error_token(`Unexpected character: '${c}'`)
     }
   }
   function skip_whitespace_and_comments(): string | void {
