@@ -1069,6 +1069,7 @@ export type TypeAnnotation =
   | {
       readonly kind: "Func"
       readonly span: Span
+      readonly type_params: readonly TypeParam[]
       readonly params: readonly FuncTypeParam[]
       readonly returns: TypeAnnotation
     }
@@ -1127,11 +1128,13 @@ export const TypeAnnotation = {
 
   Func: (
     span: Span,
+    type_params: readonly TypeParam[],
     params: readonly FuncTypeParam[],
     returns: TypeAnnotation,
   ): TypeAnnotationWithKind<"Func"> => ({
     kind: "Func",
     span,
+    type_params: type_params,
     params: params,
     returns: returns,
   }),
