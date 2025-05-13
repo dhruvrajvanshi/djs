@@ -252,7 +252,9 @@ export function lexer_impl(
         }
         advance()
       }
-      return error_token(`Unexpected character: '${c}'`)
+      return error_token(
+        `Unexpected character: '${c}' (code point: ${c.codePointAt(0)})`,
+      )
     }
   }
   function skip_whitespace_and_comments(): string | void {
@@ -742,7 +744,14 @@ export function lexer_impl(
 }
 
 function is_whitespace(c: string): boolean {
-  return c === " " || c === "\t" || c === "\n" || c === "\r"
+  return (
+    c === " " ||
+    c === "\t" ||
+    c === "\n" ||
+    c === "\r" ||
+    /* non-breaking space */
+    c.charCodeAt(0) === 0xa0
+  )
 }
 function is_ascii_digit(c: string): boolean {
   return c >= "0" && c <= "9"

@@ -103,12 +103,10 @@
 ../test262/test/built-ins/Promise/all/invoke-resolve-on-promises-every-iteration-of-custom.js
 ../test262/test/built-ins/Promise/all/invoke-resolve-on-promises-every-iteration-of-promise.js
 ../test262/test/built-ins/Promise/all/invoke-resolve-on-values-every-iteration-of-promise.js
-../test262/test/built-ins/Promise/all/resolve-non-callable.js
 ../test262/test/built-ins/Promise/all/resolve-not-callable-reject-with-typeerror.js
 ../test262/test/built-ins/Promise/allSettled/invoke-resolve-on-promises-every-iteration-of-custom.js
 ../test262/test/built-ins/Promise/allSettled/invoke-resolve-on-promises-every-iteration-of-promise.js
 ../test262/test/built-ins/Promise/allSettled/invoke-resolve-on-values-every-iteration-of-promise.js
-../test262/test/built-ins/Promise/allSettled/resolve-non-callable.js
 ../test262/test/built-ins/Promise/allSettled/resolve-not-callable-reject-with-typeerror.js
 ../test262/test/built-ins/Promise/any/capability-resolve-throws-no-close.js
 ../test262/test/built-ins/Promise/any/capability-resolve-throws-reject.js
@@ -123,12 +121,10 @@
 ../test262/test/built-ins/Promise/any/iter-arg-is-empty-iterable-reject.js
 ../test262/test/built-ins/Promise/any/iter-arg-is-empty-string-reject.js
 ../test262/test/built-ins/Promise/any/reject-all-mixed.js
-../test262/test/built-ins/Promise/any/resolve-non-callable.js
 ../test262/test/built-ins/Promise/any/resolve-not-callable-reject-with-typeerror.js
 ../test262/test/built-ins/Promise/race/invoke-resolve-on-promises-every-iteration-of-custom.js
 ../test262/test/built-ins/Promise/race/invoke-resolve-on-promises-every-iteration-of-promise.js
 ../test262/test/built-ins/Promise/race/invoke-resolve-on-values-every-iteration-of-promise.js
-../test262/test/built-ins/Promise/race/resolve-non-callable.js
 ../test262/test/built-ins/Proxy/get/trap-is-undefined-target-is-proxy.js
 ../test262/test/built-ins/Proxy/has/trap-is-undefined-target-is-proxy.js
 ../test262/test/built-ins/Proxy/preventExtensions/trap-is-undefined-target-is-proxy.js
@@ -8428,7 +8424,6 @@
 ../test262/test/language/white-space/after-regular-expression-literal-ideographic-space.js
 ../test262/test/language/white-space/after-regular-expression-literal-line-separator.js
 ../test262/test/language/white-space/after-regular-expression-literal-medium-mathematical-space.js
-../test262/test/language/white-space/after-regular-expression-literal-nbsp.js
 ../test262/test/language/white-space/after-regular-expression-literal-nnbsp.js
 ../test262/test/language/white-space/after-regular-expression-literal-ogham-space.js
 ../test262/test/language/white-space/after-regular-expression-literal-paragraph-separator.js
@@ -8439,5 +8434,4 @@
 ../test262/test/language/white-space/after-regular-expression-literal-vertical-tab.js
 ../test262/test/language/white-space/after-regular-expression-literal-zwnbsp.js
 ../test262/test/language/white-space/between-form-feed.js
-../test262/test/language/white-space/between-nbsp.js
 ../test262/test/language/white-space/between-vertical-tab.js
