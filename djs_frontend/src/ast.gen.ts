@@ -2,7 +2,7 @@
 // DO NOT EDIT
 // node djs_ast/gen_ts_ast.js | pnpm prettier > src/ast.gen.ts
 
-import type { Span } from "./Span.js"
+import type { Span } from "./Span.ts"
 
 /**
  * Raw source text
