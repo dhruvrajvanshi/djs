@@ -208,7 +208,12 @@ const DExpr = Enum(Expr, ["span", "visit"], {
     body: ArrowFnBody,
   },
   Func: { func: Func },
-  Call: { callee: Expr, args: Array(Expr), is_optional: "boolean" },
+  Call: {
+    callee: Expr,
+    args: Array(Expr),
+    spread: Option(Expr),
+    is_optional: "boolean",
+  },
   Index: { lhs: Expr, property: Expr, is_optional: "boolean" },
   Prop: { lhs: Expr, property: Ident, is_optional: "boolean" },
   String: { text: Text },
