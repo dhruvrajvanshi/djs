@@ -368,33 +368,12 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   function parse_arguments(): Err | ArgsWithSpan {
     const first = advance()
     assert(first.kind === t.LParen)
-    const args = parse_arg_list()
+    const args = parse_comma_separated_list(t.RParen, parse_assignment_expr)
     if (args === ERR) return ERR
     const last = expect(t.RParen)
     if (last === ERR) return ERR
     const span = Span.between(first.span, last.span)
     return { args, span }
-  }
-
-  function parse_arg_list(): Expr[] | Err {
-    const args: Expr[] = []
-    while (true) {
-      if (at(t.RParen) || at(t.EndOfFile)) {
-        break
-      }
-
-      // Parse each argument as an assignment expression instead of a comma expression
-      const arg = parse_assignment_expr()
-      if (arg === ERR) return ERR
-      args.push(arg)
-
-      if (at(t.Comma)) {
-        advance()
-      } else {
-        break
-      }
-    }
-    return args
   }
 
   function parse_unary_expr(): Expr | Err {
