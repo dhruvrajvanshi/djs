@@ -60,34 +60,43 @@ const PARSER_FLAGS = {
   ALLOW_TYPE_ANNOTATIONS: 1,
 }
 
-function parser_impl(path: string, source: string, flags: number): Parser {
-  let lexer = Lexer(source)
-  let previous_lexer: Lexer = lexer.clone()
-  let last_token: Token | null = null
-  let current_token = lexer.next()
-  let errors: ParseError[] = []
+type ParserState = {
+  previous_lexer: Lexer
+  lexer: Lexer
+  last_token: Token | null
+  current_token: Token
+  errors: ParseError[]
+}
 
-  type ParserState = {
-    previous_lexer: Lexer
-    lexer: Lexer
-    last_token: Token | null
-    current_token: Token
-    errors: ParseError[]
+function mk_parser_state(source: string, flags: number): ParserState {
+  const lexer = Lexer(source)
+  const previous_lexer: Lexer = lexer.clone()
+  const current_token = lexer.next()
+  return {
+    previous_lexer,
+    last_token: null,
+    lexer,
+    current_token,
+    errors: [],
   }
+}
+function parser_impl(path: string, source: string, flags: number): Parser {
+  let self: ParserState = mk_parser_state(source, flags)
+
   function create_snapshot(): ParserState {
     return {
-      previous_lexer,
-      lexer: lexer.clone(),
-      last_token,
-      current_token,
-      errors: [...errors],
+      previous_lexer: self.previous_lexer.clone(),
+      lexer: self.lexer.clone(),
+      last_token: self.last_token,
+      current_token: self.current_token,
+      errors: [...self.errors],
     }
   }
   function restore_snapshot(snapshot: ParserState) {
-    lexer = snapshot.lexer
-    last_token = snapshot.last_token
-    current_token = snapshot.current_token
-    errors = snapshot.errors
+    self.lexer = snapshot.lexer
+    self.last_token = snapshot.last_token
+    self.current_token = snapshot.current_token
+    self.errors = snapshot.errors
   }
 
   function fork(): <T>(value: T) => T {
@@ -232,7 +241,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
   function parse_update_expr(): Expr | Err {
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.PlusPlus: {
         const start = advance()
         const expr = parse_unary_expr()
@@ -261,10 +270,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
   function current_is_on_new_line(): boolean {
-    if (last_token === null) {
+    if (self.last_token === null) {
       return false
     }
-    return current_token.line > last_token.line
+    return self.current_token.line > self.last_token.line
   }
   function parse_member_or_call_expr(allow_calls: boolean): Expr | Err {
     let lhs: Expr
@@ -358,7 +367,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function parse_member_ident_name(): Ident | Err {
-    if (TokenKind.is_keyword(current_token.kind)) {
+    if (TokenKind.is_keyword(self.current_token.kind)) {
       const token = advance()
       return { span: token.span, text: token.text }
     } else {
@@ -378,8 +387,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         if (expr === ERR) return ERR
         spread = expr
         if (
-          !(current_token.kind === t.RParen) &&
-          !(current_token.kind === t.Comma && next_is(t.RParen))
+          !(self.current_token.kind === t.RParen) &&
+          !(self.current_token.kind === t.Comma && next_is(t.RParen))
         ) {
           emit_error("Spread operator must be the last argument")
           return ERR
@@ -399,7 +408,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function parse_unary_expr(): Expr | Err {
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Delete: {
         const start = advance().span
         const expr = parse_unary_expr()
@@ -454,7 +463,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function parse_primary_expr(): Expr | Err {
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Ident: {
         const ident = parse_ident()
         if (ident === ERR) return ERR
@@ -518,7 +527,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           throw new AssertionError({
             message:
               "Expected the current token to be a regex immediately after calling `re_lex_regex`",
-            actual: current_token.kind,
+            actual: self.current_token.kind,
             expected: [t.Regex, t.Error],
           })
         }
@@ -542,14 +551,14 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function re_lex_regex() {
-    const l = previous_lexer.clone()
+    const l = self.previous_lexer.clone()
     l.enable_regex()
-    current_token = l.next()
+    self.current_token = l.next()
     l.disable_regex()
-    lexer = l
+    self.lexer = l
   }
   function parse_template_literal(): Expr | Err {
-    let span = current_token.span
+    let span = self.current_token.span
     const fragments: TemplateLiteralFragment[] = []
 
     while (true) {
@@ -558,11 +567,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         fragments.push(TemplateLiteralFragment.Text(tok.span, tok.text))
 
         if (tok.text.endsWith("${")) {
-          lexer.start_template_literal_interpolation()
+          self.lexer.start_template_literal_interpolation()
           const expr = parse_expr()
           if (expr === ERR) return ERR
           fragments.push(TemplateLiteralFragment.Expr(expr.span, expr))
-          lexer.end_template_literal_interpolation()
+          self.lexer.end_template_literal_interpolation()
         } else if (tok.text.endsWith("`")) {
           span = Span.between(span, tok.span)
           break
@@ -641,10 +650,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       current_matches(is_accessor_type) &&
       next_matches(Token.can_start_object_property_name)
     ) {
-      if (current_token.text === "get") {
+      if (self.current_token.text === "get") {
         advance()
         accessor_type = AccessorType.Get
-      } else if (current_token.text === "set") {
+      } else if (self.current_token.text === "set") {
         advance()
         accessor_type = AccessorType.Set
       }
@@ -725,13 +734,13 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     } else if (at(t.Ident) && next_is(t.LParen)) {
       return parse_object_literal_entry_method()
     } else {
-      const start = current_token.span
+      const start = self.current_token.span
       const name = parse_object_key()
       if (name === ERR) return ERR
       const type_params = parse_optional_type_params()
       if (type_params === ERR) return ERR
 
-      switch (current_token.kind) {
+      switch (self.current_token.kind) {
         case t.LParen: {
           const params = parse_params_with_parens()
           if (params === ERR) return ERR
@@ -776,17 +785,17 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
   function parse_object_literal_entry_method(): ObjectLiteralEntry | Err {
-    const start = current_token.span
+    const start = self.current_token.span
     let accessor_type: AccessorType | null = null
 
     if (
       current_matches(is_accessor_type) &&
       next_matches(Token.can_start_object_property_name)
     ) {
-      if (current_token.text === "get") {
+      if (self.current_token.text === "get") {
         advance()
         accessor_type = AccessorType.Get
-      } else if (current_token.text === "set") {
+      } else if (self.current_token.text === "set") {
         advance()
         accessor_type = AccessorType.Set
       }
@@ -847,11 +856,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return TokenKind.is_keyword(next_token().kind)
   }
   function current_matches(predicate: (token: Token) => boolean): boolean {
-    return predicate(current_token)
+    return predicate(self.current_token)
   }
 
   function parse_object_key(): ObjectKey | Err {
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.String: {
         const tok = advance()
         return ObjectKey.String(tok.span, tok.text)
@@ -946,7 +955,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (head === ERR) return ERR
 
     loop: while (true) {
-      switch (current_token.kind) {
+      switch (self.current_token.kind) {
         case t.LSquare: {
           advance()
           const end = expect(t.RSquare)
@@ -973,9 +982,9 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return head
   }
   function parse_primary_type_annotation(): TypeAnnotation | Err {
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Ident: {
-        if (current_token.text === "readonly") {
+        if (self.current_token.text === "readonly") {
           const start = advance()
           const annot = parse_array_type_annotation_or_below()
           if (annot === ERR) return ERR
@@ -1021,7 +1030,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
   function parse_generic_func_type_annotation(): TypeAnnotation | Err {
-    const start = current_token
+    const start = self.current_token
     const type_params = parse_type_params()
     if (type_params === ERR) return ERR
     if (expect(t.LParen) === ERR) return ERR
@@ -1081,8 +1090,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     let first = true
 
     while (
-      current_token.kind !== t.EndOfFile &&
-      current_token.kind !== end_token
+      self.current_token.kind !== t.EndOfFile &&
+      self.current_token.kind !== end_token
     ) {
       if (!first) {
         if (at(t.Comma)) {
@@ -1116,13 +1125,16 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     let first = true
 
     while (
-      current_token.kind !== t.EndOfFile &&
-      current_token.kind !== end_token
+      self.current_token.kind !== t.EndOfFile &&
+      self.current_token.kind !== end_token
     ) {
       if (!first) {
         if (at(t.Comma) || at(t.Semi)) {
           advance()
-        } else if (last_token && last_token.line < current_token.line) {
+        } else if (
+          self.last_token &&
+          self.last_token.line < self.current_token.line
+        ) {
         } else {
           emit_error(`Expected a comma, ; a newline or ${end_token}`)
           return ERR
@@ -1155,10 +1167,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function next_is(token_kind: TokenKind): boolean {
-    return lexer.clone().next().kind === token_kind
+    return self.lexer.clone().next().kind === token_kind
   }
   function next_token(): Token {
-    return lexer.clone().next()
+    return self.lexer.clone().next()
   }
 
   function parse_assignment_expr(): Expr | Err {
@@ -1213,7 +1225,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     } else {
       const lhs = parse_conditional_expr()
       if (lhs === ERR) return ERR
-      const assignOp = assign_op(current_token.kind)
+      const assignOp = assign_op(self.current_token.kind)
 
       if (assignOp !== null) {
         const lhsPattern = expr_to_pattern(lhs)
@@ -1238,7 +1250,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (
       at(t.Ident) &&
       next_is(t.FatArrow) &&
-      next_token().line === current_token.line
+      next_token().line === self.current_token.line
     ) {
       const pattern = parse_pattern()
       if (pattern === ERR) return ERR
@@ -1279,7 +1291,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   function parse_pattern_with_precedence(flags: number): Pattern | Err {
     let head: Pattern
 
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Ident: {
         const ident = parse_binding_ident()
         if (ident === ERR) return ERR
@@ -1373,7 +1385,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         break
       }
       default:
-        emit_error(`Expected a pattern, got ${current_token.kind}`)
+        emit_error(`Expected a pattern, got ${self.current_token.kind}`)
         return ERR
     }
 
@@ -1460,7 +1472,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     const lhs = parse_short_circuit_expr()
     if (lhs === ERR) return ERR
 
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Question: {
         advance()
         const consequent = parse_expr()
@@ -1476,7 +1488,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     }
   }
   function parse_arrow_fn_body(): ArrowFnBody | Err {
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.LBrace: {
         const block = parse_block()
         if (block === ERR) return ERR
@@ -1507,8 +1519,8 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   ): Stmt[] {
     const stmts: Stmt[] = []
     while (
-      !end_token(current_token.kind) &&
-      current_token.kind !== t.EndOfFile
+      !end_token(self.current_token.kind) &&
+      self.current_token.kind !== t.EndOfFile
     ) {
       const stmt = parse_stmt()
       if (stmt === ERR) {
@@ -1557,10 +1569,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function expect(token_kind: TokenKind): Token | Err {
-    if (current_token.kind === token_kind) {
+    if (self.current_token.kind === token_kind) {
       return advance()
     } else {
-      emit_error(`Expected ${token_kind}, got ${current_token.kind}`)
+      emit_error(`Expected ${token_kind}, got ${self.current_token.kind}`)
       return ERR
     }
   }
@@ -1581,7 +1593,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       advance()
       return parse_stmt(export_token)
     }
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Let:
       case t.Const:
       case t.Var: {
@@ -1601,7 +1613,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
             { span: label.span, name: label.text },
             stmt,
           )
-        } else if (current_token.text === "type") {
+        } else if (self.current_token.text === "type") {
           return parse_type_decl()
         } else {
           return parse_expr_stmt()
@@ -1770,7 +1782,11 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
   function parse_struct_type_decl_field(): StructTypeDeclField | Err {
     let is_readonly = false
-    if (at(t.Ident) && next_is(t.Ident) && current_token.text === "readonly") {
+    if (
+      at(t.Ident) &&
+      next_is(t.Ident) &&
+      self.current_token.text === "readonly"
+    ) {
       advance()
       is_readonly = true
     }
@@ -1787,9 +1803,9 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function parse_import_specifier(): ImportSpecifier | Err {
-    const start = current_token.span
+    const start = self.current_token.span
     let type_only = false
-    if (at(t.Ident) && current_token.text === "type") {
+    if (at(t.Ident) && self.current_token.text === "type") {
       advance()
       type_only = true
     }
@@ -1893,7 +1909,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (expect(t.LParen) === ERR) return ERR
 
     let decl_type: DeclType | null = null
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Let:
         advance()
         decl_type = DeclType.Let
@@ -1912,7 +1928,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (lhs === ERR) return ERR
 
     let in_or_of: InOrOf
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.In:
         advance()
         in_or_of = InOrOf.In
@@ -1922,7 +1938,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         in_or_of = InOrOf.Of
         break
       default:
-        emit_error(`Expected 'in' or 'of', got ${current_token.kind}`)
+        emit_error(`Expected 'in' or 'of', got ${self.current_token.kind}`)
         return ERR
     }
 
@@ -2174,10 +2190,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return params.map((ident) => ({ ident }))
   }
   function parse_var_decl(): VarDecl | Err {
-    let span = current_token.span
+    let span = self.current_token.span
 
     let decl_type: DeclType
-    switch (current_token.kind) {
+    switch (self.current_token.kind) {
       case t.Let:
         advance()
         decl_type = DeclType.Let
@@ -2192,7 +2208,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         break
       default:
         throw new Error(
-          `Expected let, const, or var, got ${current_token.kind}`,
+          `Expected let, const, or var, got ${self.current_token.kind}`,
         )
     }
 
@@ -2248,7 +2264,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   function can_start_arrow_fn(): boolean {
     assert(
       at(t.LParen),
-      `Expected can_start_arrow_fn to be called when current token is a (, found ${current_token.kind}`,
+      `Expected can_start_arrow_fn to be called when current token is a (, found ${self.current_token.kind}`,
     )
     const restore = fork()
     if (!expect(t.LParen)) return restore(false)
@@ -2267,9 +2283,9 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function emit_error(message: string): void {
-    errors.push({
+    self.errors.push({
       message,
-      span: current_token.span,
+      span: self.current_token.span,
     })
   }
 
@@ -2317,7 +2333,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     if (at(t.RBrace) || at(t.EndOfFile)) {
       return
     }
-    if (current_token.line !== last_token?.line) {
+    if (self.current_token.line !== self.last_token?.line) {
       return
     }
     emit_error("Missing semicolon")
@@ -2326,7 +2342,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
 
   function parse_source_file(): SourceFile {
     const stmts: Stmt[] = []
-    const span = current_token.span
+    const span = self.current_token.span
     while (!at(t.EndOfFile)) {
       const stmt = parse_stmt(/* top_level */)
       if (stmt === ERR) {
@@ -2335,10 +2351,10 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       }
       stmts.push(stmt)
     }
-    return { span, stmts, errors }
+    return { span, stmts, errors: self.errors }
   }
   function at_any(...kinds: readonly TokenKind[]): boolean {
-    return kinds.some((kind) => current_token.kind === kind)
+    return kinds.some((kind) => self.current_token.kind === kind)
   }
   function recover_till_next_stmt(): void {
     if (at(t.EndOfFile)) return
@@ -2365,7 +2381,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           t.Import,
         ) ||
         (at(t.Ident) && next_is(t.LParen)) ||
-        (at(t.Ident) && current_token.text === "type")
+        (at(t.Ident) && self.current_token.text === "type")
       ) {
         break
       }
@@ -2373,22 +2389,25 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function at(token_kind: TokenKind): boolean {
-    return current_token.kind === token_kind
+    return self.current_token.kind === token_kind
   }
   function current_kind(): TokenKind {
-    return current_token.kind
+    return self.current_token.kind
   }
 
   function advance(): Token {
-    assert(current_token.kind !== t.EndOfFile, "Tried to advance past the EOF")
-    previous_lexer = lexer.clone()
-    last_token = current_token
-    current_token = lexer.next()
+    assert(
+      self.current_token.kind !== t.EndOfFile,
+      "Tried to advance past the EOF",
+    )
+    self.previous_lexer = self.lexer.clone()
+    self.last_token = self.current_token
+    self.current_token = self.lexer.next()
     if (at(t.Error)) {
-      emit_error(current_token.text)
+      emit_error(self.current_token.text)
     }
-    assert(current_token.span.start >= last_token.span.start)
-    return last_token
+    assert(self.current_token.span.start >= self.last_token.span.start)
+    return self.last_token
   }
 
   function define_binop_parser(
@@ -2399,7 +2418,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       let lhs = next_fn()
       if (lhs === ERR) return ERR
       const op_kinds = new Set(kinds)
-      while (op_kinds.has(current_token.kind)) {
+      while (op_kinds.has(self.current_token.kind)) {
         const op = parse_bin_op(advance().kind)
         const rhs = next_fn()
         if (rhs === ERR) return ERR
