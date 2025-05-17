@@ -1,7 +1,7 @@
 import { Span } from "./Span.ts"
 import { TokenKind } from "./TokenKind.ts"
 
-export interface Token {
+export type Token = {
   readonly kind: TokenKind
   readonly span: Span
   readonly line: number
@@ -19,4 +19,4 @@ export const Token = {
   is_valid_property_name: (self: Token): boolean => {
     return self.kind === TokenKind.Ident || TokenKind.is_keyword(self.kind)
   },
-} as const
+}
