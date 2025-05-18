@@ -4,8 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "license": "UNLICENSED",
-  "main": "index.ts",
+  "exports": {
+    "import": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
   "scripts": {
+    "build": "tsc",
     "test": "vitest",
     "run_parser": "node src/run_parser.ts"
   },
