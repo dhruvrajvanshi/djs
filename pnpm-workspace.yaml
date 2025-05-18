@@ -1,5 +1,6 @@
 packages:
   - djs_ast
+  - djs_parser
   - djs_il
   - djs_frontend
 
