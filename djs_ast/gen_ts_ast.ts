@@ -1,10 +1,10 @@
-import { ast_items } from "./src/ast.def.ts"
+import { ast_items } from "./ast.def.ts"
 import type {
   EnumItem,
   EnumVariant,
   StructItem,
   Type,
-} from "./src/astgen_items.js"
+} from "./astgen_items.js"
 
 let output = `
 // This file is generated automatically
