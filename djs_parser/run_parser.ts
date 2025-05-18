@@ -1,14 +1,14 @@
 import { show_diagnostics } from "./diagnostic.js"
 
-export { TokenKind } from "./TokenKind.js"
-export type { Token } from "./Token.js"
 export {
-  Expr,
-  Pattern,
+  type Token,
+  type TokenKind,
+  type Expr,
+  type Pattern,
   type SourceFile,
   type BinOp,
   type AssignOp,
-} from "./ast.gen.js"
+} from "djs_ast"
 
 if (process.argv[1] === import.meta.filename) {
   await main(process.argv.slice(2))

@@ -1,5 +1,4 @@
-import { type ParseError } from "./ast.gen.ts"
-import { Span } from "./Span.ts"
+import type { ParseError, Span } from "djs_ast"
 
 const COLOR_ERROR = "\x1b[31;1m"
 const COLOR_RESET = "\x1b[0m"
