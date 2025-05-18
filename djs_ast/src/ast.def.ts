@@ -1,3 +1,12 @@
+import type {
+  Type,
+  Item,
+  EnumItem,
+  Tag,
+  EnumVariant,
+  StructItem,
+} from "./astgen_items"
+
 /**
  * {@link DStmt}
  */
@@ -478,13 +487,7 @@ const ast_items = [
   DAccessorType,
 ]
 
-/**
- *
- * @param {string} name
- * @param  {...string} variants
- * @returns {EnumItem}
- */
-function StringUnion(name, ...variants) {
+function StringUnion(name: string, ...variants: readonly string[]): EnumItem {
   return {
     kind: "enum",
     name,
@@ -497,39 +500,30 @@ function StringUnion(name, ...variants) {
   }
 }
 
-/**
- * @param {string} name
- * @param {Tag[]} tags
- * @param {Record<string, Record<string, Type>>} variants
- * @returns {EnumItem}
- */
-function Enum(name, tags, variants) {
+function Enum(
+  name: string,
+  tags: Tag[],
+  variants: Record<string, Record<string, Type>>,
+): EnumItem {
   return {
     kind: "enum",
     name,
     tags,
-    variants: Object.entries(variants).map(
-      /**
-       * @returns {EnumVariant}
-       */
-      ([name, args]) => {
-        return {
-          name,
-          tags: [],
-          args,
-        }
-      },
-    ),
+    variants: Object.entries(variants).map(([name, args]): EnumVariant => {
+      return {
+        name,
+        tags: [],
+        args,
+      }
+    }),
   }
 }
 
-/**
- * @param {string} name
- * @param {Tag[]} tags
- * @param {Record<string, Type>} fields
- * @returns {StructItem}
- */
-function Struct(name, tags, fields) {
+function Struct(
+  name: string,
+  tags: Tag[],
+  fields: Record<string, Type>,
+): StructItem {
   return {
     kind: "struct",
     name,
@@ -538,22 +532,11 @@ function Struct(name, tags, fields) {
   }
 }
 
-/**
- *
- * @template {Type} T
- * @param {T} type
- * @returns {["Option", T]}
- */
-function Option(type) {
+function Option<T extends Type>(type: T): ["Option", T] {
   return ["Option", type]
 }
 
-/**
- * @template {Type} T
- * @param {T} type
- * @returns {["Vec", T]}
- */
-function Array(type) {
+function Array<T extends Type>(type: T): ["Vec", T] {
   return ["Vec", type]
 }
 
@@ -573,11 +556,7 @@ function needs_lifetime_param_set() {
 
   return result
 
-  /**
-   * @param {Item} item
-   * @returns {boolean}
-   **/
-  function item_contains_ident_or_text(item) {
+  function item_contains_ident_or_text(item: Item): boolean {
     if (result.has(item.name)) {
       return true
     }
@@ -595,11 +574,7 @@ function needs_lifetime_param_set() {
     }
   }
 
-  /**
-   * @param {Type} type
-   * @returns {boolean}
-   */
-  function type_contains_ident_or_text(type) {
+  function type_contains_ident_or_text(type: Type): boolean {
     if (typeof type === "string") {
       if (type === "str" || type === "Text") {
         return true
