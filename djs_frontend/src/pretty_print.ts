@@ -1,4 +1,4 @@
-import { Expr, SourceFile, Stmt } from "./ast.gen"
+import { Expr, type SourceFile, Stmt } from "djs_ast"
 import assert from "node:assert"
 
 export function pretty_print(source_file: SourceFile): string {
@@ -22,8 +22,6 @@ function pp_stmt_or_expr(item: Stmt | Expr): string {
       return pp`${item.expr};`
     case "Var":
       return item.ident.text
-    case "ParseError":
-      return `#PARSE_ERROR`
     default:
       assert(false, `TODO: ${item.kind}`)
   }

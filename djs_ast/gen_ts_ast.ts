@@ -1,5 +1,10 @@
-/// <reference path="./index.d.ts" />
-import { ast_items } from "./src/ast.def.js"
+import { ast_items } from "./src/ast.def.ts"
+import type {
+  EnumItem,
+  EnumVariant,
+  StructItem,
+  Type,
+} from "./src/astgen_items.js"
 
 let output = `
 // This file is generated automatically
@@ -23,10 +28,7 @@ for (const item of ast_items) {
 }
 console.log(output)
 
-/**
- * @param {StructItem} item
- */
-function gen_struct(item) {
+function gen_struct(item: StructItem) {
   const span = item.tags.includes("span") ? `readonly span: Span` : ``
   return `
     export interface ${item.name} {
@@ -38,11 +40,7 @@ function gen_struct(item) {
   `
 }
 
-/**
- * @param {Type} ty
- * @returns {string}
- */
-function gen_type(ty) {
+function gen_type(ty: Type): string {
   if (typeof ty === "string") {
     if (ty === "str") {
       return "string"
@@ -62,12 +60,7 @@ function gen_type(ty) {
   }
 }
 
-/**
- *
- * @param {EnumItem} item
- * @returns {string}
- */
-function gen_enum_factories(item) {
+function gen_enum_factories(item: EnumItem): string {
   if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
     const variants = item.variants.map(gen_variant)
     return `
@@ -84,12 +77,7 @@ function gen_enum_factories(item) {
     } as const`
   }
 
-  /**
-   *
-   * @param {EnumVariant} variant
-   * @returns {string}
-   */
-  function gen_variant(variant) {
+  function gen_variant(variant: EnumVariant): string {
     if (Object.entries(variant.args).length > 0 || item.tags.includes("span")) {
       const variantType = `${item.name}WithKind<${JSON.stringify(variant.name)}>`
       const params = Object.entries(variant.args)
@@ -106,23 +94,15 @@ function gen_enum_factories(item) {
     }
   }
 }
-/**
- *
- * @param {string} name
- * @returns {string}
- */
-function escape_js_name(name) {
+
+function escape_js_name(name: string): string {
   if (name === "class") {
     return "klass"
   }
   return name
 }
 
-/**
- * @param {EnumItem} item
- * @returns {string}
- */
-function gen_enum(item) {
+function gen_enum(item: EnumItem): string {
   if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
     const variants = item.variants.map(gen_variant).join(" | ")
     return `export type ${item.name} = ${variants};`
@@ -134,11 +114,7 @@ function gen_enum(item) {
     return `export type ${item.name} = ${variants};`
   }
 
-  /**
-   * @param {EnumVariant} variant
-   * @returns {string}
-   */
-  function gen_variant(variant) {
+  function gen_variant(variant: EnumVariant): string {
     const span = item.tags.includes("span") ? `readonly span: Span;` : ``
     return `{
         readonly kind: "${variant.name}"; ${span}
