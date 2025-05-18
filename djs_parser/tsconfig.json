@@ -6,7 +6,7 @@
         "outDir": "./dist",
         "strict": true,
         "target": "ES2022",
-        "module": "ESNext",
+        "module": "NodeNext",
         "rewriteRelativeImportExtensions": true,
         "verbatimModuleSyntax": true
     }
