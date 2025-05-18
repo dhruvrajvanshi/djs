@@ -1,7 +1,7 @@
 import { test, expect } from "vitest"
-import { Parser } from "./parser"
-import { AssignOp, Expr } from "./ast.gen"
-import { pretty_print } from "./pretty_print"
+import { Parser } from "./parser.ts"
+import { AssignOp, Expr } from "djs_ast"
+import { pretty_print } from "./pretty_print.ts"
 import assert from "assert"
 import fs from "node:fs/promises"
 

@@ -1,4 +1,4 @@
-import { Span } from "./Span.ts"
+import type { Span } from "./Span.ts"
 import { TokenKind } from "./TokenKind.ts"
 
 export type Token = {

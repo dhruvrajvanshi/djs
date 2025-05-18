@@ -33,11 +33,11 @@ import {
   type VarDecl,
   type VarDeclarator,
   type Func,
-} from "./ast.gen.ts"
+  Span,
+  Token,
+  TokenKind,
+} from "djs_ast"
 import { Lexer } from "./lexer.ts"
-import { Span } from "./Span.ts"
-import { Token } from "./Token.ts"
-import { TokenKind } from "./TokenKind.ts"
 import assert, { AssertionError } from "node:assert"
 
 type Parser = {

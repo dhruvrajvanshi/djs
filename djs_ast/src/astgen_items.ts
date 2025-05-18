@@ -1,0 +1,21 @@
+export type Type1 = ["Vec" | "Option", Type]
+export type Type = string | Type1
+export type Tag = "span" | "visit"
+export type EnumVariant = {
+  name: string
+  args: Record<string, Type>
+  tags: Tag[]
+}
+export type EnumItem = {
+  kind: "enum"
+  name: string
+  tags: Tag[]
+  variants: EnumVariant[]
+}
+export type StructItem = {
+  kind: "struct"
+  name: string
+  tags: Tag[]
+  fields: Record<string, Type>
+}
+export type Item = EnumItem | StructItem

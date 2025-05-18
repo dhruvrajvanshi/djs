@@ -12,7 +12,17 @@ importers:
         specifier: ^10.8.1
         version: 10.8.1
 
+  djs_ast:
+    devDependencies:
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+
   djs_frontend:
+    dependencies:
+      djs_ast:
+        specifier: workspace:*
+        version: link:../djs_ast
     devDependencies:
       '@types/node':
         specifier: ^22.14.1
