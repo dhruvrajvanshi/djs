@@ -5,5 +5,4 @@ packages:
   - djs_frontend
 
 onlyBuiltDependencies:
-  - '@biomejs/biome'
   - esbuild
