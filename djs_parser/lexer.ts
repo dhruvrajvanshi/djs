@@ -10,39 +10,47 @@ export type Lexer = {
   disable_regex: () => void
 }
 export function Lexer(input: string) {
-  return lexer_impl(
+  return lexer_impl({
     input,
-    /* line */ 1,
-    /* span_start */ 0,
-    /* index */ 0,
-    /* regex_enabled */ false,
-    /* template_literal_interpolation */ false,
-  )
+    line: 1,
+    span_start: 0,
+    current_index: 0,
+    regex_enabled: false,
+    template_literal_interpolation: false,
+  })
 }
 
-export function lexer_impl(
-  input: string,
-  _line: number,
-  _span_start: number,
-  _index: number,
-  _regex_enabled: boolean,
-  _template_literal_interpolation: boolean,
-): Lexer {
-  let line = _line
-  let span_start = _span_start
-  let current_index = _index
-  let regex_enabled = _regex_enabled
-  let template_literal_interpolation = _template_literal_interpolation
+type LexerState = {
+  input: string
+  line: number
+  span_start: number
+  current_index: number
+  regex_enabled: boolean
+  template_literal_interpolation: boolean
+}
+
+function lexer_state_advance(self: LexerState): string {
+  if (self.current_index >= self.input.length) {
+    throw new AssertionError({
+      message: "End of input",
+      stackStartFn: lexer_state_advance,
+    })
+  }
+  let last_char = self.input[self.current_index]
+  self.current_index++
+  if (last_char === "\n") {
+    self.line++
+  }
+  return last_char
+}
+function lexer_state_clone(self: LexerState): LexerState {
+  return { ...self }
+}
+
+export function lexer_impl(self: LexerState): Lexer {
   return {
     clone(): Lexer {
-      return lexer_impl(
-        input,
-        line,
-        span_start,
-        current_index,
-        regex_enabled,
-        template_literal_interpolation,
-      )
+      return lexer_impl(lexer_state_clone(self))
     },
     next,
     start_template_literal_interpolation,
@@ -51,27 +59,30 @@ export function lexer_impl(
     disable_regex,
   }
   function enable_regex(): void {
-    regex_enabled = true
+    self.regex_enabled = true
   }
   function disable_regex(): void {
-    regex_enabled = false
+    self.regex_enabled = false
   }
   function start_template_literal_interpolation(): void {
-    template_literal_interpolation = true
+    self.template_literal_interpolation = true
   }
   function end_template_literal_interpolation(): void {
-    template_literal_interpolation = false
+    self.template_literal_interpolation = false
   }
   function at(text: string): boolean {
     for (let i = 0; i < text.length; i++) {
-      if (current_index + i >= input.length) {
+      if (self.current_index + i >= self.input.length) {
         return false
       }
-      if (input[current_index + i] !== text[i]) {
+      if (self.input[self.current_index + i] !== text[i]) {
         return false
       }
     }
     return true
+  }
+  function advance() {
+    return lexer_state_advance(self)
   }
   function lex_n_char_token(n: number, kind: TokenKind): Token {
     for (let i = 0; i < n; i++) {
@@ -98,7 +109,7 @@ export function lexer_impl(
   function next(): Token {
     const comment_err = skip_whitespace_and_comments()
     if (comment_err) return error_token(comment_err)
-    span_start = current_index
+    self.span_start = self.current_index
     if (current_char() === "\0") {
       return make_token(TokenKind.EndOfFile)
     } else if (is_identifier_start(current_char())) {
@@ -111,8 +122,8 @@ export function lexer_impl(
     //     self.end_template_literal_interpolation();
     //     self.lex_template_literal_post_interpolation()
     // }
-    else if (at("}") && template_literal_interpolation) {
-      template_literal_interpolation = false
+    else if (at("}") && self.template_literal_interpolation) {
+      self.template_literal_interpolation = false
       return lex_template_literal_post_interpolation()
     }
     // '}' => self.lex_single_char_token(TokenKind::RBrace),
@@ -184,7 +195,7 @@ export function lexer_impl(
     // '~' => self.lex_single_char_token(TokenKind::Tilde),
     else if (at("~")) return lex_single_char_token(TokenKind.Tilde)
     // '/' if self.regex_enabled => self.lex_regex(),
-    else if (regex_enabled && at("/")) return lex_regex()
+    else if (self.regex_enabled && at("/")) return lex_regex()
     // '/' => self.lex_single_char_token(TokenKind::Slash),
     else if (at("/")) return lex_single_char_token(TokenKind.Slash)
     // '?' => self.lex_single_char_token(TokenKind::Question),
@@ -497,7 +508,7 @@ export function lexer_impl(
           c !== "\n"
         ) {
           return error_token(
-            `Invalid escape sequence: ${current_char()} at line ${line}`,
+            `Invalid escape sequence: ${current_char()} at line ${self.line}`,
           )
         } else {
           advance()
@@ -512,7 +523,7 @@ export function lexer_impl(
 
     if (end_quote !== quote) {
       throw new Error(
-        `Unclosed string literal, expected ${quote} at line ${line}`,
+        `Unclosed string literal, expected ${quote} at line ${self.line}`,
       )
     }
 
@@ -521,8 +532,8 @@ export function lexer_impl(
   function error_token(message: string): Token {
     return {
       kind: TokenKind.Error,
-      span: { start: span_start, stop: current_index },
-      line,
+      span: { start: self.span_start, stop: self.current_index },
+      line: self.line,
       text: message,
     }
   }
@@ -548,7 +559,7 @@ export function lexer_impl(
         if (next_char() === "{") {
           advance() // Consume $
           advance() // Consume {
-          template_literal_interpolation = true
+          self.template_literal_interpolation = true
           return make_token(TokenKind.TemplateLiteralFragment)
         } else {
           advance()
@@ -582,14 +593,14 @@ export function lexer_impl(
         if (next_char() === "{") {
           advance() // Consume $
           advance() // Consume {
-          template_literal_interpolation = true
+          self.template_literal_interpolation = true
           return make_token(TokenKind.TemplateLiteralFragment)
         } else {
           advance()
         }
       } else if (current === "\0") {
         throw new Error(
-          `Unclosed template literal at line ${line}, expected \``,
+          `Unclosed template literal at line ${self.line}, expected \``,
         )
       } else {
         advance()
@@ -612,7 +623,7 @@ export function lexer_impl(
     if (first === "u" && current_char() === "{") {
       // Unicode code point escape: \u{XXXXXX}
       advance()
-      const start_offset = current_index
+      const start_offset = self.current_index
       let end_offset = start_offset
 
       while (current_char() !== "}" && current_char() !== "\0") {
@@ -620,11 +631,11 @@ export function lexer_impl(
         if (!is_hex_digit(c)) {
           return `Expected a hex character but got '${c}'`
         } else {
-          end_offset = current_index
+          end_offset = self.current_index
         }
       }
 
-      const hex_string = input.slice(start_offset, end_offset)
+      const hex_string = self.input.slice(start_offset, end_offset)
       // Validate code point is between 0x0 and 0x10FFFF inclusive
       const code_point = parseInt(hex_string, 16)
 
@@ -701,15 +712,15 @@ export function lexer_impl(
     return make_token(token_kind)
   }
   function current_text() {
-    return input.slice(span_start, current_index)
+    return self.input.slice(self.span_start, self.current_index)
   }
 
   function make_token(kind: TokenKind): Token {
     assert(typeof kind === "string", "Expected kind to be a string")
     return {
       kind,
-      span: { start: span_start, stop: current_index },
-      line,
+      span: { start: self.span_start, stop: self.current_index },
+      line: self.line,
       text:
         kind === TokenKind.Ident ||
         kind === TokenKind.String ||
@@ -720,25 +731,10 @@ export function lexer_impl(
     }
   }
   function current_char(): string {
-    return input[current_index] ?? "\0"
+    return self.input[self.current_index] ?? "\0"
   }
   function next_char(): string {
-    return input[current_index + 1] ?? "\0"
-  }
-
-  function advance(): string {
-    if (current_index >= input.length) {
-      throw new AssertionError({
-        message: "End of input",
-        stackStartFn: advance,
-      })
-    }
-    let last_char = input[current_index]
-    current_index++
-    if (last_char === "\n") {
-      line++
-    }
-    return last_char
+    return self.input[self.current_index + 1] ?? "\0"
   }
 }
 
