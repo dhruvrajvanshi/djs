@@ -8,7 +8,7 @@
     "import": "./dist/src/index.js",
     "types": "./dist/src/index.d.ts"
   },
-    "scripts": {
+  "scripts": {
     "test": "vitest",
     "gen": "pnpm gen:ast && pnpm gen:tokens",
     "gen:ast": "node gen_ts_ast.ts | prettier > src/ast.gen.ts",
@@ -16,6 +16,7 @@
     "build": "tsc"
   },
   "devDependencies": {
+    "prettier": "^3.5.3",
     "typescript": "5.8.3"
   }
 }
