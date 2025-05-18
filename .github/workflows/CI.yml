@@ -28,9 +28,17 @@ jobs:
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install
-    - name: Run tests
+    - name: Build djs_ast
+      run: pnpm build
+      working-directory: djs_ast
+
+    - name: Run tests (djs_parser)
       run: pnpm vitest --coverage
-      working-directory: djs_frontend
+      working-directory: djs_parser
+
+    - name: Run tests (djs_il)
+      run: pnpm vitest --coverage
+      working-directory: djs_il
 
     - name: Codecov
       uses: codecov/codecov-action@v5
