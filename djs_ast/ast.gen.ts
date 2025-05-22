@@ -135,10 +135,10 @@ export type Stmt =
       readonly stmt: Stmt
     }
   | {
-      readonly kind: "StructTypeDecl"
+      readonly kind: "ObjectTypeDecl"
       readonly span: Span
       readonly name: Ident
-      readonly fields: readonly StructTypeDeclField[]
+      readonly fields: readonly ObjectTypeDeclField[]
     }
   | {
       readonly kind: "TypeAlias"
@@ -321,12 +321,12 @@ export const Stmt = {
     stmt: stmt,
   }),
 
-  StructTypeDecl: (
+  ObjectTypeDecl: (
     span: Span,
     name: Ident,
-    fields: readonly StructTypeDeclField[],
-  ): StmtWithKind<"StructTypeDecl"> => ({
-    kind: "StructTypeDecl",
+    fields: readonly ObjectTypeDeclField[],
+  ): StmtWithKind<"ObjectTypeDecl"> => ({
+    kind: "ObjectTypeDecl",
     span,
     name: name,
     fields: fields,
@@ -1030,7 +1030,7 @@ export const Expr = {
   }),
 } as const
 
-export interface StructTypeDeclField {
+export interface ObjectTypeDeclField {
   readonly is_readonly: boolean
   readonly label: Ident
   readonly type_annotation: TypeAnnotation

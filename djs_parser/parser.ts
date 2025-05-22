@@ -25,7 +25,7 @@ import {
   Pattern,
   type SourceFile,
   Stmt,
-  type StructTypeDeclField,
+  type ObjectTypeDeclField,
   type SwitchCase,
   TemplateLiteralFragment,
   TypeAnnotation,
@@ -48,6 +48,10 @@ export function Parser(path: string, source: string): Parser {
   if (path.endsWith(".ts") || path.endsWith(".tsx")) {
     flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
   }
+  if (path.endsWith(".ljs")) {
+    flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
+    flags |= PARSER_FLAGS.LJS
+  }
   return parser_impl(path, source, flags)
 }
 
@@ -57,7 +61,8 @@ const ERR: Err = "ParseError"
 const t = TokenKind
 
 const PARSER_FLAGS = {
-  ALLOW_TYPE_ANNOTATIONS: 1,
+  ALLOW_TYPE_ANNOTATIONS: 1 << 0,
+  LJS: 1 << 1,
 }
 type ParserState = {
   previous_lexer: Lexer
@@ -1764,12 +1769,12 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       advance()
       const fields = parse_comma_semi_or_newline_separated_list(
         t.RBrace,
-        parse_struct_type_decl_field,
+        parse_object_type_decl_field,
       )
       if (fields === ERR) return ERR
       const last = expect(t.RBrace)
       if (last === ERR) return ERR
-      return Stmt.StructTypeDecl(Span.between(start, last), ident, fields)
+      return Stmt.ObjectTypeDecl(Span.between(start, last), ident, fields)
     } else {
       const type_annotation = parse_type_annotation()
       if (type_annotation === ERR) return ERR
@@ -1781,7 +1786,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       )
     }
   }
-  function parse_struct_type_decl_field(): StructTypeDeclField | Err {
+  function parse_object_type_decl_field(): ObjectTypeDeclField | Err {
     let is_readonly = false
     if (
       at(t.Ident) &&
