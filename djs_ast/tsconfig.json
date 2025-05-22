@@ -10,6 +10,7 @@
         "module": "ESNext",
         "rewriteRelativeImportExtensions": true,
         "verbatimModuleSyntax": true,
-        "declaration": true
+        "declaration": true,
+        "declarationMap": true
     }
 }
