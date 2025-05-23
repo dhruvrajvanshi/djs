@@ -147,6 +147,11 @@ export type Stmt =
       readonly type_annotation: TypeAnnotation
     }
   | {
+      readonly kind: "LJSExternFunction"
+      readonly span: Span
+      readonly func: LJSExternFunction
+    }
+  | {
       readonly kind: "Empty"
       readonly span: Span
     }
@@ -341,6 +346,15 @@ export const Stmt = {
     span,
     name: name,
     type_annotation: type_annotation,
+  }),
+
+  LJSExternFunction: (
+    span: Span,
+    func: LJSExternFunction,
+  ): StmtWithKind<"LJSExternFunction"> => ({
+    kind: "LJSExternFunction",
+    span,
+    func: func,
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
@@ -1142,6 +1156,13 @@ export const TypeAnnotation = {
     returns: returns,
   }),
 } as const
+
+export interface LJSExternFunction {
+  readonly span: Span
+  readonly name: Ident
+  readonly params: readonly Param[]
+  readonly return_type: TypeAnnotation
+}
 
 export interface FuncTypeParam {
   readonly label: Ident

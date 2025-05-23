@@ -1,8 +1,9 @@
 packages:
   - djs_ast
-  - djs_parser
-  - djs_il
   - djs_frontend
+  - djs_il
+  - djs_ljs
+  - djs_parser
 
 onlyBuiltDependencies:
   - esbuild

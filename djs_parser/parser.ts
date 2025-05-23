@@ -1608,7 +1608,13 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         return Stmt.VarDecl(decl.span, decl)
       }
       case t.Ident: {
-        if (next_is(t.Colon)) {
+        if (
+          flags | PARSER_FLAGS.LJS &&
+          self.current_token.text === "extern" &&
+          next_is(t.Function)
+        ) {
+          return parse_extern_function()
+        } else if (next_is(t.Colon)) {
           const label = parse_ident()
           assert(label !== ERR) // because of the lookahead above
           assert(advance().kind === t.Colon) // because of the lookahead above
@@ -1712,6 +1718,29 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       default:
         return parse_expr_stmt()
     }
+  }
+  function parse_extern_function(): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "extern")
+    if (expect(t.Function) === ERR) return ERR
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+
+    const params = parse_params_with_parens()
+    if (params === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const return_type = parse_type_annotation()
+    if (return_type === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+
+    const span = Span.between(start, return_type)
+    return Stmt.LJSExternFunction(span, {
+      span,
+      name,
+      params: params.params,
+      return_type,
+    })
   }
   function parse_import_stmt(): Stmt | Err {
     const start = advance()
