@@ -1,4 +1,6 @@
-import { show_diagnostics } from "./diagnostic.js"
+import { show_diagnostics } from "./diagnostic.ts"
+import fs from "node:fs/promises"
+import { Parser } from "./parser.ts"
 
 export {
   type Token,
@@ -15,8 +17,6 @@ if (process.argv[1] === import.meta.filename) {
 }
 
 async function main(paths: string[]) {
-  const fs = await import("node:fs/promises")
-  const { Parser } = await import("./parser.js")
   let total_errors = 0
   for (const path of paths) {
     const source_text = await fs.readFile(path, "utf-8")
