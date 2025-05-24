@@ -297,6 +297,7 @@ function parser_impl(
   }
   function parse_member_or_call_expr(allow_calls: boolean): Expr | Err {
     let lhs: Expr
+    let in_optional_chain = false
 
     if (at(t.New)) {
       const start = advance()
@@ -344,6 +345,7 @@ function parser_impl(
           }
         }
         case t.QuestionDot: {
+          in_optional_chain = true
           advance()
           switch (current_kind()) {
             case t.Ident: {
@@ -396,6 +398,13 @@ function parser_impl(
               lhs.span,
               fragments[fragments.length - 1]?.span ?? lhs.span,
             )
+            if (in_optional_chain) {
+              emit_error(
+                "Tagged template literals cannot be used with optional chaining",
+                fragments[0]?.span,
+              )
+              return ERR
+            }
             lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
             break
           }
@@ -2386,7 +2395,10 @@ function parser_impl(
     return restore(false)
   }
 
-  function emit_error(message: string): void {
+  function emit_error(
+    message: string,
+    span: Span = self.current_token.span,
+  ): void {
     if (config.throwOnError) {
       throw new AssertionError({
         message,
@@ -2395,7 +2407,7 @@ function parser_impl(
     }
     self.errors.push({
       message,
-      span: self.current_token.span,
+      span,
     })
   }
 

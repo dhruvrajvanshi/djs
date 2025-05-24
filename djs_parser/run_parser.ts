@@ -36,6 +36,7 @@ async function main(paths: string[], config: Config & { raw?: string }) {
   if (config.raw) {
     const parser = Parser("<raw input>", config.raw, config)
     const source_file = parser.parse_source_file()
+    console.dir(source_file, { depth: Infinity })
     show_diagnostics("<raw input>", config.raw, source_file.errors)
     total_errors += source_file.errors.length
   } else {
