@@ -1090,6 +1090,16 @@ export type TypeAnnotation =
       readonly params: readonly FuncTypeParam[]
       readonly returns: TypeAnnotation
     }
+  | {
+      readonly kind: "LJSConstPtr"
+      readonly span: Span
+      readonly to: TypeAnnotation
+    }
+  | {
+      readonly kind: "LJSPtr"
+      readonly span: Span
+      readonly to: TypeAnnotation
+    }
 export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
   TypeAnnotation,
   { kind: K }
@@ -1155,6 +1165,20 @@ export const TypeAnnotation = {
     params: params,
     returns: returns,
   }),
+
+  LJSConstPtr: (
+    span: Span,
+    to: TypeAnnotation,
+  ): TypeAnnotationWithKind<"LJSConstPtr"> => ({
+    kind: "LJSConstPtr",
+    span,
+    to: to,
+  }),
+
+  LJSPtr: (
+    span: Span,
+    to: TypeAnnotation,
+  ): TypeAnnotationWithKind<"LJSPtr"> => ({ kind: "LJSPtr", span, to: to }),
 } as const
 
 export interface LJSExternFunction {

@@ -276,6 +276,12 @@ const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
     params: Array("FuncTypeParam"),
     returns: TypeAnnotation,
   },
+  LJSConstPtr: {
+    to: TypeAnnotation,
+  },
+  LJSPtr: {
+    to: TypeAnnotation,
+  },
 })
 const DLJSExternFunction = Struct("LJSExternFunction", ["span"], {
   name: Ident,
