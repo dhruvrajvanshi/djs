@@ -31073,6 +31073,14 @@
 ../test262/test/language/expressions/object/setter-prop-desc.js
 ../test262/test/language/expressions/object/setter-super-prop.js
 ../test262/test/language/expressions/optional-chaining/call-expression.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-op-template-string-esi.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-op-template-string.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-optchain-template-string-esi.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-optchain-template-string.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-op-template-string-esi.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-op-template-string.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-optchain-template-string-esi.js
+../test262/test/language/expressions/optional-chaining/early-errors-tail-position-optchain-template-string.js
 ../test262/test/language/expressions/optional-chaining/eval-optional-call.js
 ../test262/test/language/expressions/optional-chaining/iteration-statement-do.js
 ../test262/test/language/expressions/optional-chaining/iteration-statement-for-in.js

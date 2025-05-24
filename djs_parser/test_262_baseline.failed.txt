@@ -3745,14 +3745,6 @@
 ../test262/test/language/expressions/object/setter-param-arguments-strict-outside.js
 ../test262/test/language/expressions/object/setter-param-eval-strict-outside.js
 ../test262/test/language/expressions/optional-chaining/call-expression-super-no-base.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-op-template-string-esi.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-op-template-string.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-optchain-template-string-esi.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-null-optchain-template-string.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-op-template-string-esi.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-op-template-string.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-optchain-template-string-esi.js
-../test262/test/language/expressions/optional-chaining/early-errors-tail-position-optchain-template-string.js
 ../test262/test/language/expressions/optional-chaining/iteration-statement-for-await-of.js
 ../test262/test/language/expressions/optional-chaining/member-expression.js
 ../test262/test/language/expressions/optional-chaining/new-target-optional-call.js
