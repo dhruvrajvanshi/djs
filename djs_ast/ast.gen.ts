@@ -147,6 +147,11 @@ export type Stmt =
       readonly type_annotation: TypeAnnotation
     }
   | {
+      readonly kind: "LJSExternFunction"
+      readonly span: Span
+      readonly func: LJSExternFunction
+    }
+  | {
       readonly kind: "Empty"
       readonly span: Span
     }
@@ -341,6 +346,15 @@ export const Stmt = {
     span,
     name: name,
     type_annotation: type_annotation,
+  }),
+
+  LJSExternFunction: (
+    span: Span,
+    func: LJSExternFunction,
+  ): StmtWithKind<"LJSExternFunction"> => ({
+    kind: "LJSExternFunction",
+    span,
+    func: func,
   }),
 
   Empty: (span: Span): StmtWithKind<"Empty"> => ({ kind: "Empty", span }),
@@ -756,6 +770,12 @@ export type Expr =
       readonly span: Span
       readonly fragments: readonly TemplateLiteralFragment[]
     }
+  | {
+      readonly kind: "TaggedTemplateLiteral"
+      readonly span: Span
+      readonly tag: Expr
+      readonly fragments: readonly TemplateLiteralFragment[]
+    }
 export type ExprWithKind<K extends Expr["kind"]> = Extract<Expr, { kind: K }>
 export const Expr = {
   Var: (span: Span, ident: Ident): ExprWithKind<"Var"> => ({
@@ -1028,6 +1048,17 @@ export const Expr = {
     span,
     fragments: fragments,
   }),
+
+  TaggedTemplateLiteral: (
+    span: Span,
+    tag: Expr,
+    fragments: readonly TemplateLiteralFragment[],
+  ): ExprWithKind<"TaggedTemplateLiteral"> => ({
+    kind: "TaggedTemplateLiteral",
+    span,
+    tag: tag,
+    fragments: fragments,
+  }),
 } as const
 
 export interface ObjectTypeDeclField {
@@ -1075,6 +1106,16 @@ export type TypeAnnotation =
       readonly type_params: readonly TypeParam[]
       readonly params: readonly FuncTypeParam[]
       readonly returns: TypeAnnotation
+    }
+  | {
+      readonly kind: "LJSConstPtr"
+      readonly span: Span
+      readonly to: TypeAnnotation
+    }
+  | {
+      readonly kind: "LJSPtr"
+      readonly span: Span
+      readonly to: TypeAnnotation
     }
 export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
   TypeAnnotation,
@@ -1141,7 +1182,28 @@ export const TypeAnnotation = {
     params: params,
     returns: returns,
   }),
+
+  LJSConstPtr: (
+    span: Span,
+    to: TypeAnnotation,
+  ): TypeAnnotationWithKind<"LJSConstPtr"> => ({
+    kind: "LJSConstPtr",
+    span,
+    to: to,
+  }),
+
+  LJSPtr: (
+    span: Span,
+    to: TypeAnnotation,
+  ): TypeAnnotationWithKind<"LJSPtr"> => ({ kind: "LJSPtr", span, to: to }),
 } as const
+
+export interface LJSExternFunction {
+  readonly span: Span
+  readonly name: Ident
+  readonly params: readonly Param[]
+  readonly return_type: TypeAnnotation
+}
 
 export interface FuncTypeParam {
   readonly label: Ident

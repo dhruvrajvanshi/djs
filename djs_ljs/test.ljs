@@ -1,0 +1,5 @@
+extern function puts(s: *const u8): void
+
+export function main(): void {
+  puts(c`Hello, world!`)
+}
