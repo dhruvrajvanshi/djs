@@ -11,7 +11,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest",
-    "run_parser": "node src/run_parser.ts"
+    "run_parser": "node run_parser.ts"
   },
   "dependencies": {
     "djs_ast": "workspace:*"
