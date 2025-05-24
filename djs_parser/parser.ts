@@ -374,7 +374,10 @@ function parser_impl(
               break
             }
             default:
-              break
+              emit_error(
+                "Expected an identifier, a square bracket or a parenthesis after the optional chaining operator",
+              )
+              return ERR
           }
           break
         }
