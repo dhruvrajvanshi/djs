@@ -376,15 +376,30 @@ function parser_impl(
           }
           break
         }
-        case t.TemplateLiteralFragment: {
-          const fragments = parse_template_literal_fragments()
-          if (fragments === ERR) return ERR
-          const span = Span.between(
-            lhs.span,
-            fragments[fragments.length - 1]?.span ?? lhs.span,
-          )
-          lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
-        }
+        case t.TemplateLiteralFragment:
+          // The lexer doesn't differentiate between a template literal start and a template literal continuation
+          // For example, `foo ${bar}baz`,
+          // will be lexed ast
+          //   TemplateLiteralFragment("`foo ${")
+          //   Ident("bar")
+          //   TemplateLiteralFragment("}baz`")
+          // My gut feeling is that the second TemplateLiteralFragment should be treated as a different
+          // kind of a token, something like `TemplateLiteralContinuation` but I'm not implementing it
+          // right now because I suspect it will complicate `parse_template_literal_fragments` a bit.
+          // and I don't wanna deal with that right now :)
+          //
+          // Till then, this check will do
+          if (self.current_token.text.startsWith("`")) {
+            const fragments = parse_template_literal_fragments()
+            if (fragments === ERR) return ERR
+            const span = Span.between(
+              lhs.span,
+              fragments[fragments.length - 1]?.span ?? lhs.span,
+            )
+            lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
+            break
+          }
+        // Fallthrought
         default:
           return lhs
       }
