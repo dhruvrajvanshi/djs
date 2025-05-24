@@ -21,31 +21,6 @@ importers:
         specifier: 5.8.3
         version: 5.8.3
 
-  djs_frontend:
-    dependencies:
-      djs_ast:
-        specifier: workspace:*
-        version: link:../djs_ast
-    devDependencies:
-      '@types/node':
-        specifier: ^22.14.1
-        version: 22.14.1
-      '@vitest/coverage-v8':
-        specifier: 3.1.1
-        version: 3.1.1(vitest@3.1.1(@types/node@22.14.1)(tsx@4.19.4))
-      prettier:
-        specifier: ^3.5.3
-        version: 3.5.3
-      tsx:
-        specifier: ^4.19.4
-        version: 4.19.4
-      typescript:
-        specifier: 5.8.3
-        version: 5.8.3
-      vitest:
-        specifier: ^3.1.1
-        version: 3.1.1(@types/node@22.14.1)(tsx@4.19.4)
-
   djs_il:
     devDependencies:
       '@types/node':
@@ -57,6 +32,25 @@ importers:
       prettier:
         specifier: ^3.5.3
         version: 3.5.3
+      typescript:
+        specifier: 5.8.3
+        version: 5.8.3
+      vitest:
+        specifier: ^3.1.1
+        version: 3.1.1(@types/node@22.14.1)(tsx@4.19.4)
+
+  djs_ljs:
+    dependencies:
+      djs_ast:
+        specifier: workspace:*
+        version: link:../djs_ast
+      djs_parser:
+        specifier: workspace:*
+        version: link:../djs_parser
+    devDependencies:
+      '@types/node':
+        specifier: ^22.14.1
+        version: 22.14.1
       typescript:
         specifier: 5.8.3
         version: 5.8.3
@@ -1193,6 +1187,7 @@ snapshots:
   get-tsconfig@4.10.0:
     dependencies:
       resolve-pkg-maps: 1.0.0
+    optional: true
 
   glob@10.4.5:
     dependencies:
@@ -1293,7 +1288,8 @@ snapshots:
 
   prettier@3.5.3: {}
 
-  resolve-pkg-maps@1.0.0: {}
+  resolve-pkg-maps@1.0.0:
+    optional: true
 
   rollup@4.40.0:
     dependencies:
@@ -1390,6 +1386,7 @@ snapshots:
       get-tsconfig: 4.10.0
     optionalDependencies:
       fsevents: 2.3.3
+    optional: true
 
   typescript@5.8.3: {}
 

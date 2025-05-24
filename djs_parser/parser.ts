@@ -43,7 +43,16 @@ import assert, { AssertionError } from "node:assert"
 type Parser = {
   parse_source_file: () => SourceFile
 }
-export function Parser(path: string, source: string): Parser {
+export type ParserConfig = {
+  throwOnError: boolean
+}
+export function Parser(
+  path: string,
+  source: string,
+  config: ParserConfig = {
+    throwOnError: false,
+  },
+): Parser {
   let flags = 0
   if (path.endsWith(".ts") || path.endsWith(".tsx")) {
     flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
@@ -52,7 +61,7 @@ export function Parser(path: string, source: string): Parser {
     flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
     flags |= PARSER_FLAGS.LJS
   }
-  return parser_impl(path, source, flags)
+  return parser_impl(path, source, flags, config)
 }
 
 type Err = "ParseError"
@@ -87,7 +96,12 @@ function make_parser_state(source: string): ParserState {
   }
 }
 
-function parser_impl(path: string, source: string, flags: number): Parser {
+function parser_impl(
+  path: string,
+  source: string,
+  flags: number,
+  config: ParserConfig,
+): Parser {
   const self: ParserState = make_parser_state(source)
   function create_snapshot(): ParserState {
     return {
@@ -283,6 +297,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
   function parse_member_or_call_expr(allow_calls: boolean): Expr | Err {
     let lhs: Expr
+    let in_optional_chain = false
 
     if (at(t.New)) {
       const start = advance()
@@ -330,6 +345,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           }
         }
         case t.QuestionDot: {
+          in_optional_chain = true
           advance()
           switch (current_kind()) {
             case t.Ident: {
@@ -358,10 +374,44 @@ function parser_impl(path: string, source: string, flags: number): Parser {
               break
             }
             default:
-              break
+              emit_error(
+                "Expected an identifier, a square bracket or a parenthesis after the optional chaining operator",
+              )
+              return ERR
           }
           break
         }
+        case t.TemplateLiteralFragment:
+          // The lexer doesn't differentiate between a template literal start and a template literal continuation
+          // For example, `foo ${bar}baz`,
+          // will be lexed ast
+          //   TemplateLiteralFragment("`foo ${")
+          //   Ident("bar")
+          //   TemplateLiteralFragment("}baz`")
+          // My gut feeling is that the second TemplateLiteralFragment should be treated as a different
+          // kind of a token, something like `TemplateLiteralContinuation` but I'm not implementing it
+          // right now because I suspect it will complicate `parse_template_literal_fragments` a bit.
+          // and I don't wanna deal with that right now :)
+          //
+          // Till then, this check will do
+          if (self.current_token.text.startsWith("`")) {
+            const fragments = parse_template_literal_fragments()
+            if (fragments === ERR) return ERR
+            const span = Span.between(
+              lhs.span,
+              fragments[fragments.length - 1]?.span ?? lhs.span,
+            )
+            if (in_optional_chain) {
+              emit_error(
+                "Tagged template literals cannot be used with optional chaining",
+                fragments[0]?.span,
+              )
+              return ERR
+            }
+            lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
+            break
+          }
+        // Fallthrought
         default:
           return lhs
       }
@@ -564,7 +614,14 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     self.lexer = l
   }
   function parse_template_literal(): Expr | Err {
-    let span = self.current_token.span
+    let start = self.current_token.span
+    const fragments = parse_template_literal_fragments()
+    if (fragments === ERR) return ERR
+    const end = fragments[fragments.length - 1]?.span ?? start
+
+    return Expr.TemplateLiteral(Span.between(start, end), fragments)
+  }
+  function parse_template_literal_fragments(): TemplateLiteralFragment[] | Err {
     const fragments: TemplateLiteralFragment[] = []
 
     while (true) {
@@ -579,7 +636,6 @@ function parser_impl(path: string, source: string, flags: number): Parser {
           fragments.push(TemplateLiteralFragment.Expr(expr.span, expr))
           self.lexer.end_template_literal_interpolation()
         } else if (tok.text.endsWith("`")) {
-          span = Span.between(span, tok.span)
           break
         }
       } else {
@@ -587,8 +643,7 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         return ERR
       }
     }
-
-    return Expr.TemplateLiteral(span, fragments)
+    return fragments
   }
   function parse_class(): Class | Err {
     const first = expect(t.Class)
@@ -1030,11 +1085,37 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         return parse_parenthesized_or_func_type_annotation()
       case t.LessThan:
         return parse_generic_func_type_annotation()
+      case t.Star:
+        return parse_ptr_type_annotation()
       default:
         emit_error("Expected a type annotation")
         return ERR
     }
   }
+  function parse_ptr_type_annotation(): TypeAnnotation | Err {
+    const start = advance()
+    assert(start.kind === t.Star)
+    const is_const = at(t.Const)
+    if (is_const) advance()
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return ERR
+    if (!(flags | PARSER_FLAGS.LJS)) {
+      emit_error("Pointer type annotations are only supported in LJS mode")
+    }
+
+    if (is_const) {
+      return TypeAnnotation.LJSConstPtr(
+        Span.between(start.span, type_annotation.span),
+        type_annotation,
+      )
+    } else {
+      return TypeAnnotation.LJSPtr(
+        Span.between(start.span, type_annotation.span),
+        type_annotation,
+      )
+    }
+  }
+
   function parse_generic_func_type_annotation(): TypeAnnotation | Err {
     const start = self.current_token
     const type_params = parse_type_params()
@@ -1608,7 +1689,13 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         return Stmt.VarDecl(decl.span, decl)
       }
       case t.Ident: {
-        if (next_is(t.Colon)) {
+        if (
+          flags | PARSER_FLAGS.LJS &&
+          self.current_token.text === "extern" &&
+          next_is(t.Function)
+        ) {
+          return parse_extern_function()
+        } else if (next_is(t.Colon)) {
           const label = parse_ident()
           assert(label !== ERR) // because of the lookahead above
           assert(advance().kind === t.Colon) // because of the lookahead above
@@ -1712,6 +1799,29 @@ function parser_impl(path: string, source: string, flags: number): Parser {
       default:
         return parse_expr_stmt()
     }
+  }
+  function parse_extern_function(): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "extern")
+    if (expect(t.Function) === ERR) return ERR
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+
+    const params = parse_params_with_parens()
+    if (params === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const return_type = parse_type_annotation()
+    if (return_type === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+
+    const span = Span.between(start, return_type)
+    return Stmt.LJSExternFunction(span, {
+      span,
+      name,
+      params: params.params,
+      return_type,
+    })
   }
   function parse_import_stmt(): Stmt | Err {
     const start = advance()
@@ -2288,10 +2398,19 @@ function parser_impl(path: string, source: string, flags: number): Parser {
     return restore(false)
   }
 
-  function emit_error(message: string): void {
+  function emit_error(
+    message: string,
+    span: Span = self.current_token.span,
+  ): void {
+    if (config.throwOnError) {
+      throw new AssertionError({
+        message,
+        stackStartFn: emit_error,
+      })
+    }
     self.errors.push({
       message,
-      span: self.current_token.span,
+      span,
     })
   }
 
