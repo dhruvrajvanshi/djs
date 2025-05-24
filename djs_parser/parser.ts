@@ -43,7 +43,16 @@ import assert, { AssertionError } from "node:assert"
 type Parser = {
   parse_source_file: () => SourceFile
 }
-export function Parser(path: string, source: string): Parser {
+export type ParserConfig = {
+  throwOnError: boolean
+}
+export function Parser(
+  path: string,
+  source: string,
+  config: ParserConfig = {
+    throwOnError: false,
+  },
+): Parser {
   let flags = 0
   if (path.endsWith(".ts") || path.endsWith(".tsx")) {
     flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
@@ -52,7 +61,7 @@ export function Parser(path: string, source: string): Parser {
     flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
     flags |= PARSER_FLAGS.LJS
   }
-  return parser_impl(path, source, flags)
+  return parser_impl(path, source, flags, config)
 }
 
 type Err = "ParseError"
@@ -87,7 +96,12 @@ function make_parser_state(source: string): ParserState {
   }
 }
 
-function parser_impl(path: string, source: string, flags: number): Parser {
+function parser_impl(
+  path: string,
+  source: string,
+  flags: number,
+  config: ParserConfig,
+): Parser {
   const self: ParserState = make_parser_state(source)
   function create_snapshot(): ParserState {
     return {
@@ -1030,11 +1044,37 @@ function parser_impl(path: string, source: string, flags: number): Parser {
         return parse_parenthesized_or_func_type_annotation()
       case t.LessThan:
         return parse_generic_func_type_annotation()
+      case t.Star:
+        return parse_ptr_type_annotation()
       default:
         emit_error("Expected a type annotation")
         return ERR
     }
   }
+  function parse_ptr_type_annotation(): TypeAnnotation | Err {
+    const start = advance()
+    assert(start.kind === t.Star)
+    const is_const = at(t.Const)
+    if (is_const) advance()
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return ERR
+    if (!(flags | PARSER_FLAGS.LJS)) {
+      emit_error("Pointer type annotations are only supported in LJS mode")
+    }
+
+    if (is_const) {
+      return TypeAnnotation.LJSConstPtr(
+        Span.between(start.span, type_annotation.span),
+        type_annotation,
+      )
+    } else {
+      return TypeAnnotation.LJSPtr(
+        Span.between(start.span, type_annotation.span),
+        type_annotation,
+      )
+    }
+  }
+
   function parse_generic_func_type_annotation(): TypeAnnotation | Err {
     const start = self.current_token
     const type_params = parse_type_params()
@@ -2318,6 +2358,12 @@ function parser_impl(path: string, source: string, flags: number): Parser {
   }
 
   function emit_error(message: string): void {
+    if (config.throwOnError) {
+      throw new AssertionError({
+        message,
+        stackStartFn: emit_error,
+      })
+    }
     self.errors.push({
       message,
       span: self.current_token.span,
