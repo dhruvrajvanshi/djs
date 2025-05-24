@@ -19,25 +19,34 @@ if (process.argv[1] === import.meta.filename) {
     allowPositionals: true,
     options: {
       "internal-throw-on-error": { type: "boolean", default: false },
+      raw: { type: "string" },
     },
   })
   await main(positionals, {
     throwOnError: values["internal-throw-on-error"],
+    raw: values.raw,
   })
 }
 
 interface Config {
   throwOnError: boolean
 }
-async function main(paths: string[], config: Config) {
+async function main(paths: string[], config: Config & { raw?: string }) {
   let total_errors = 0
-  for (const path of paths) {
-    const source_text = await fs.readFile(path, "utf-8")
-    const parser = Parser(path, source_text, config)
+  if (config.raw) {
+    const parser = Parser("<raw input>", config.raw, config)
     const source_file = parser.parse_source_file()
-
-    show_diagnostics(path, source_text, source_file.errors)
+    show_diagnostics("<raw input>", config.raw, source_file.errors)
     total_errors += source_file.errors.length
+  } else {
+    for (const path of paths) {
+      const source_text = await fs.readFile(path, "utf-8")
+      const parser = Parser(path, source_text, config)
+      const source_file = parser.parse_source_file()
+
+      show_diagnostics(path, source_text, source_file.errors)
+      total_errors += source_file.errors.length
+    }
   }
 
   console.log(`Found ${total_errors} error(s)`)
