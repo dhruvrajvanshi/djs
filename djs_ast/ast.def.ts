@@ -263,6 +263,10 @@ const DExpr = Enum(Expr, ["span", "visit"], {
   Super: {},
   Class: { class: "Class" },
   TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
+  TaggedTemplateLiteral: {
+    tag: Expr,
+    fragments: Array(TemplateLiteralFragment),
+  },
 })
 const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { ident: Ident },

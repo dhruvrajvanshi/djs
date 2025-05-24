@@ -770,6 +770,12 @@ export type Expr =
       readonly span: Span
       readonly fragments: readonly TemplateLiteralFragment[]
     }
+  | {
+      readonly kind: "TaggedTemplateLiteral"
+      readonly span: Span
+      readonly tag: Expr
+      readonly fragments: readonly TemplateLiteralFragment[]
+    }
 export type ExprWithKind<K extends Expr["kind"]> = Extract<Expr, { kind: K }>
 export const Expr = {
   Var: (span: Span, ident: Ident): ExprWithKind<"Var"> => ({
@@ -1040,6 +1046,17 @@ export const Expr = {
   ): ExprWithKind<"TemplateLiteral"> => ({
     kind: "TemplateLiteral",
     span,
+    fragments: fragments,
+  }),
+
+  TaggedTemplateLiteral: (
+    span: Span,
+    tag: Expr,
+    fragments: readonly TemplateLiteralFragment[],
+  ): ExprWithKind<"TaggedTemplateLiteral"> => ({
+    kind: "TaggedTemplateLiteral",
+    span,
+    tag: tag,
     fragments: fragments,
   }),
 } as const

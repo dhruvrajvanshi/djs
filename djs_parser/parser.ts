@@ -376,6 +376,15 @@ function parser_impl(
           }
           break
         }
+        case t.TemplateLiteralFragment: {
+          const fragments = parse_template_literal_fragments()
+          if (fragments === ERR) return ERR
+          const span = Span.between(
+            lhs.span,
+            fragments[fragments.length - 1]?.span ?? lhs.span,
+          )
+          lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
+        }
         default:
           return lhs
       }
@@ -578,7 +587,14 @@ function parser_impl(
     self.lexer = l
   }
   function parse_template_literal(): Expr | Err {
-    let span = self.current_token.span
+    let start = self.current_token.span
+    const fragments = parse_template_literal_fragments()
+    if (fragments === ERR) return ERR
+    const end = fragments[fragments.length - 1]?.span ?? start
+
+    return Expr.TemplateLiteral(Span.between(start, end), fragments)
+  }
+  function parse_template_literal_fragments(): TemplateLiteralFragment[] | Err {
     const fragments: TemplateLiteralFragment[] = []
 
     while (true) {
@@ -593,7 +609,6 @@ function parser_impl(
           fragments.push(TemplateLiteralFragment.Expr(expr.span, expr))
           self.lexer.end_template_literal_interpolation()
         } else if (tok.text.endsWith("`")) {
-          span = Span.between(span, tok.span)
           break
         }
       } else {
@@ -601,8 +616,7 @@ function parser_impl(
         return ERR
       }
     }
-
-    return Expr.TemplateLiteral(span, fragments)
+    return fragments
   }
   function parse_class(): Class | Err {
     const first = expect(t.Class)
