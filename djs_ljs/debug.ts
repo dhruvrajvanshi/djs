@@ -2,8 +2,7 @@
 
 import { parseArgs } from "node:util"
 import fs from "node:fs/promises"
-import { parse_source_file, show_diagnostics } from "djs_parser"
-import { source_file_to_sexpr } from "../djs_ast/sexpr.ts"
+import { parse_source_file } from "djs_parser"
 import type { SourceFile } from "djs_ast"
 import assert from "node:assert"
 
