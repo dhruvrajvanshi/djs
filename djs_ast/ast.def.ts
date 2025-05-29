@@ -7,6 +7,8 @@ import type {
   StructItem,
 } from "./astgen_items.ts"
 
+export const type_registry: Record<string, Item> = {}
+
 /**
  * {@link DStmt}
  */
@@ -513,7 +515,7 @@ const ast_items = [
 ]
 
 function StringUnion(name: string, ...variants: readonly string[]): EnumItem {
-  return {
+  return register_item({
     kind: "enum",
     name,
     tags: [],
@@ -522,7 +524,14 @@ function StringUnion(name: string, ...variants: readonly string[]): EnumItem {
       args: {},
       tags: [],
     })),
+  })
+}
+function register_item<I extends Item>(item: I): I {
+  if (type_registry[item.name]) {
+    throw new Error(`Item with name ${item.name} already exists`)
   }
+  type_registry[item.name] = item
+  return item
 }
 
 function Enum(
@@ -530,7 +539,7 @@ function Enum(
   tags: Tag[],
   variants: Record<string, Record<string, Type>>,
 ): EnumItem {
-  return {
+  return register_item({
     kind: "enum",
     name,
     tags,
@@ -541,7 +550,7 @@ function Enum(
         args,
       }
     }),
-  }
+  })
 }
 
 function Struct(
@@ -549,12 +558,12 @@ function Struct(
   tags: Tag[],
   fields: Record<string, Type>,
 ): StructItem {
-  return {
+  return register_item({
     kind: "struct",
     name,
     tags,
     fields,
-  }
+  })
 }
 
 function Option<T extends Type>(type: T): ["Option", T] {
