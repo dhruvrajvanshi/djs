@@ -11,6 +11,7 @@ type Text = string
 
 export interface SourceFile {
   readonly span: Span
+  readonly path: string
   readonly stmts: readonly Stmt[]
   readonly errors: readonly ParseError[]
 }
