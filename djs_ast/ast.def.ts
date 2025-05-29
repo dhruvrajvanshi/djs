@@ -5,7 +5,7 @@ import type {
   Tag,
   EnumVariant,
   StructItem,
-} from "./astgen_items"
+} from "./astgen_items.ts"
 
 /**
  * {@link DStmt}
@@ -158,7 +158,7 @@ const DPattern = Enum(Pattern, ["span", "visit"], {
   Elision: {},
   Rest: { pattern: Pattern },
 })
-const DStmt = Enum(Stmt, ["span", "visit"], {
+export const DStmt = Enum(Stmt, ["span", "visit"], {
   Expr: { expr: Expr },
   Block: { block: Block },
   Return: { value: Option(Expr) },
@@ -215,7 +215,7 @@ const DObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
   type_annotation: TypeAnnotation,
 })
 
-const DExpr = Enum(Expr, ["span", "visit"], {
+export const DExpr = Enum(Expr, ["span", "visit"], {
   Var: { ident: Ident },
   Paren: { expr: Expr },
   BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
