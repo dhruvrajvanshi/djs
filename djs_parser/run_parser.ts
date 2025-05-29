@@ -3,6 +3,7 @@ import fs from "node:fs/promises"
 import { Parser } from "./parser.ts"
 import { parseArgs } from "node:util"
 import type { SourceFile } from "djs_ast"
+import { source_file_to_sexpr } from "djs_ast"
 
 export {
   type Token,
@@ -40,7 +41,7 @@ async function main() {
     total_errors += source_file.errors.length
     if (args["dump-ast"]) {
       console.log(`${ANSI_BLUE}${ANSI_BOLD}AST Dump:${ANSI_RESET}`)
-      console.dir(source_file, { depth: Infinity })
+      dump_source_file(source_file)
     }
   } else {
     const source_files: SourceFile[] = []
@@ -58,10 +59,16 @@ async function main() {
     if (args["dump-ast"]) {
       console.log(`${ANSI_BLUE}${ANSI_BOLD}AST Dump:${ANSI_RESET}`)
       for (const source_file of source_files) {
-        console.dir(source_file, { depth: Infinity })
+        dump_source_file(source_file)
       }
     }
   }
 
   console.log(`Found ${total_errors} error(s)`)
+}
+function dump_source_file(source_file: SourceFile) {
+  console.dir(source_file_to_sexpr(source_file), {
+    depth: Infinity,
+    colors: true,
+  })
 }
