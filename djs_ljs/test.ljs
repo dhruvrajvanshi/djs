@@ -1,3 +1,4 @@
+import { puts } from "libc.ljs"
 
 export function main(): void {
   puts(c`Hello, world!`)
