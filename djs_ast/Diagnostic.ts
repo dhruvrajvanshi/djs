@@ -1,28 +1,39 @@
 import type { Span } from "./Span.ts"
+import fs from "node:fs/promises"
 
 export interface Diagnostic {
   span: Span
   message: string
+  hint: string | null
 }
 
 const COLOR_ERROR = "\x1b[31;1m"
+const COLOR_BLUE = "\x1b[34m"
 const COLOR_RESET = "\x1b[0m"
 const COLOR_DIMMED = "\x1b[2m"
+const BOLD = "\x1b[1m"
 
-export function show_diagnostics(
+export async function show_diagnostics(
   path: string,
-  source_text: string,
   errors: readonly Diagnostic[],
+  source_text: string | null,
 ) {
+  if (source_text === null) {
+    source_text = await fs.readFile(path, "utf8")
+  }
   console.log(
     [...errors]
       .sort((a, b) => b.span.start - a.span.start)
       .map(
         (e) =>
-          `${COLOR_ERROR}ERROR:${COLOR_RESET} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}`,
+          `${COLOR_ERROR}ERROR:${COLOR_RESET} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}${show_hint(e.hint)}`,
       )
       .join("\n\n"),
   )
+}
+function show_hint(hint: string | null): string {
+  if (hint === null) return ""
+  return `\n\n${COLOR_BLUE}${BOLD}HINT: ${hint}${COLOR_RESET}`
 }
 export function preview_lines(source: string, span: Span) {
   const [start_line, col] = offset_to_line_and_col(source, span.start)
