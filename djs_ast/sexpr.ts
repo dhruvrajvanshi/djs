@@ -4,7 +4,21 @@ import type { EnumItem, StructItem, Type } from "./astgen_items.js"
 import { DStmt as StmtDef } from "./ast.def.js"
 import assert from "node:assert/strict"
 
-type SExpr = string | null | boolean | number | SExpr[]
+type SExpr = string | null | boolean | number | SExpr[] | SObject
+interface SObject {
+  [key: string]: SExpr
+}
+function makeSObject(name: string, fields: Record<string, SExpr>): SObject {
+  const cls = class {
+    constructor(fields: Record<string, SExpr>) {
+      Object.assign(this, fields)
+    }
+  }
+  Object.defineProperty(cls, "name", {
+    value: name,
+  })
+  return new cls(fields) as never
+}
 
 function stmt_to_sexpr(stmt: Stmt): SExpr {
   return variant_dumper<Stmt>(StmtDef)(stmt)
@@ -24,14 +38,14 @@ function variant_dumper<T>(item: EnumItem): (value: T) => SExpr {
       const kind = value["kind"]
       const variant = item.variants.find((v) => v.name === kind)
       assert(variant, `Unknown variant: ${kind} in ${item.name}`)
-      const entries: SExpr[] = []
+      const entries: Record<string, SExpr> = {}
       for (const [name, type] of Object.entries(variant.args)) {
         const dumper = type_to_dumper(type)
         assert(name in value, `Missing field: ${name} in ${item.name}.${kind}`)
         const field = (value as Record<string, unknown>)[name]
-        entries.push([name, dumper(field)])
+        entries[name] = dumper(field)
       }
-      return [`${item.name}.${kind}`, ...entries]
+      return makeSObject(`${item.name}.${kind}`, entries)
     }
   } else {
     return (value: unknown) => {
@@ -53,13 +67,13 @@ function struct_dumper(item: StructItem): (value: unknown) => SExpr {
       typeof value === "object" && value !== null,
       `Expected object, got ${JSON.stringify(value)}`,
     )
-    const result: SExpr[] = [item.name]
+    const fields: Record<string, SExpr> = {}
     for (const [name, type] of Object.entries(item.fields)) {
       const dumper = type_to_dumper(type)
       assert(name in value, `Missing field: ${name} in ${item.name}`)
-      result.push([name, dumper((value as Record<string, unknown>)[name])])
+      fields[name] = dumper((value as Record<string, unknown>)[name])
     }
-    return result
+    return makeSObject(item.name, fields)
   }
 }
 
@@ -71,7 +85,14 @@ function type_to_dumper(type: Type): (value: unknown) => SExpr {
           assert(typeof value === "string")
           return value
         }
-
+      case "Ident":
+        return (value: unknown) => {
+          assert(value !== null)
+          assert(typeof value === "object")
+          assert("text" in value, JSON.stringify(value))
+          assert(typeof value.text === "string", JSON.stringify(value))
+          return value.text
+        }
       case "boolean":
         return primitive_dumper
       case "str":
@@ -100,7 +121,7 @@ function type_to_dumper(type: Type): (value: unknown) => SExpr {
           if (!isROArray(value)) {
             throw new Error(`Expected Vec, got ${JSON.stringify(value)}`)
           }
-          return ["Vec", ...value.map(type_to_dumper(arg))]
+          return value.map(type_to_dumper(arg))
         }
       case "Option":
         return (value: unknown) => {
