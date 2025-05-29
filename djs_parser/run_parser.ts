@@ -1,9 +1,8 @@
-import { show_diagnostics } from "./diagnostic.ts"
 import fs from "node:fs/promises"
 import { Parser } from "./parser.ts"
 import { parseArgs, inspect } from "node:util"
 import type { SourceFile } from "djs_ast"
-import { source_file_to_sexpr } from "djs_ast"
+import { source_file_to_sexpr, show_diagnostics } from "djs_ast"
 
 export {
   type Token,
