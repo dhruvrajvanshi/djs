@@ -1,0 +1,2 @@
+export extern function puts(s: *const u8): void
+
