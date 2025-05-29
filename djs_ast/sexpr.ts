@@ -24,7 +24,10 @@ function stmt_to_sexpr(stmt: Stmt): SExpr {
   return variant_dumper<Stmt>(StmtDef)(stmt)
 }
 export function source_file_to_sexpr(source_file: SourceFile): SExpr {
-  return ["SourceFile", ...source_file.stmts.map(stmt_to_sexpr)]
+  return [
+    `SourceFile(${source_file.path})`,
+    ...source_file.stmts.map(stmt_to_sexpr),
+  ]
 }
 
 function variant_dumper<T>(item: EnumItem): (value: T) => SExpr {

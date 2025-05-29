@@ -376,6 +376,7 @@ const DParseError = Struct("ParseError", ["span"], {
 })
 
 const DSourceFile = Struct("SourceFile", ["span", "visit"], {
+  path: "str",
   stmts: Array(Stmt),
   errors: Array("ParseError"),
 })

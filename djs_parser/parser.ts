@@ -2476,7 +2476,7 @@ function parser_impl(
       }
       stmts.push(stmt)
     }
-    return { span, stmts, errors: self.errors }
+    return { path, span, stmts, errors: self.errors }
   }
   function at_any(...kinds: readonly TokenKind[]): boolean {
     return kinds.some((kind) => self.current_token.kind === kind)
