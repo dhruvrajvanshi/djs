@@ -3,6 +3,7 @@
 // node djs_ast/gen_ts_ast.js | pnpm prettier > src/ast.gen.ts
 
 import type { Span } from "./Span.ts"
+import type { Diagnostic } from "./Diagnostic.ts"
 
 /**
  * Raw source text
@@ -13,12 +14,7 @@ export interface SourceFile {
   readonly span: Span
   readonly path: string
   readonly stmts: readonly Stmt[]
-  readonly errors: readonly ParseError[]
-}
-
-export interface ParseError {
-  readonly span: Span
-  readonly message: string
+  readonly errors: readonly Diagnostic[]
 }
 
 export type Stmt =

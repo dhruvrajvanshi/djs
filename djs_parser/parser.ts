@@ -21,7 +21,7 @@ import {
   type ObjectPatternProperty,
   type Param,
   type ParamList,
-  type ParseError,
+  type Diagnostic,
   Pattern,
   type SourceFile,
   Stmt,
@@ -79,14 +79,14 @@ type ParserState = {
   lexer: Lexer
   last_token: Token | null
   current_token: Token
-  errors: ParseError[]
+  errors: Diagnostic[]
 }
 function make_parser_state(source: string): ParserState {
   let lexer = Lexer(source)
   let previous_lexer: Lexer = lexer.clone()
   let last_token: Token | null = null
   let current_token = lexer.next()
-  let errors: ParseError[] = []
+  let errors: Diagnostic[] = []
 
   return {
     previous_lexer,
