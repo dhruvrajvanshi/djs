@@ -1,7 +1,7 @@
-import { type_registry } from "./ast.def.js"
-import type { SourceFile, Stmt } from "./ast.gen.js"
-import type { EnumItem, StructItem, Type } from "./astgen_items.js"
-import { DStmt as StmtDef } from "./ast.def.js"
+import { type_registry } from "./ast.def.ts"
+import type { SourceFile, Stmt } from "./ast.gen.ts"
+import type { EnumItem, StructItem, Type } from "./astgen_items.ts"
+import { DStmt as StmtDef } from "./ast.def.ts"
 import assert from "node:assert/strict"
 
 type SExpr = string | null | boolean | number | SExpr[] | SObject
