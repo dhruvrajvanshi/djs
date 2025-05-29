@@ -38,7 +38,7 @@ async function main() {
     })
     const source_file = parser.parse_source_file()
     if (!args["no-errors"]) {
-      show_diagnostics("<raw input>", args.raw, source_file.errors)
+      show_diagnostics("<raw input>", source_file.errors, args.raw)
     }
     total_errors += source_file.errors.length
     if (args["dump-ast"]) {
@@ -56,7 +56,7 @@ async function main() {
       source_files.push(source_file)
 
       if (!args["no-errors"]) {
-        show_diagnostics(path, source_text, source_file.errors)
+        show_diagnostics(path, source_file.errors, null)
       }
       total_errors += source_file.errors.length
     }
