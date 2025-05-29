@@ -39,6 +39,7 @@ import {
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
+import Path from "node:path"
 
 type Parser = {
   parse_source_file: () => SourceFile
@@ -2476,7 +2477,12 @@ function parser_impl(
       }
       stmts.push(stmt)
     }
-    return { path, span, stmts, errors: self.errors }
+    return {
+      path: Path.relative(process.cwd(), path),
+      span,
+      stmts,
+      errors: self.errors,
+    }
   }
   function at_any(...kinds: readonly TokenKind[]): boolean {
     return kinds.some((kind) => self.current_token.kind === kind)
