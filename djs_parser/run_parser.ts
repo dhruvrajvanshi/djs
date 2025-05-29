@@ -2,6 +2,7 @@ import { show_diagnostics } from "./diagnostic.ts"
 import fs from "node:fs/promises"
 import { Parser } from "./parser.ts"
 import { parseArgs } from "node:util"
+import type { SourceFile } from "djs_ast"
 
 export {
   type Token,
@@ -13,40 +14,52 @@ export {
   type AssignOp,
 } from "djs_ast"
 
-if (process.argv[1] === import.meta.filename) {
-  const { values, positionals } = parseArgs({
-    args: process.argv.slice(2),
-    allowPositionals: true,
-    options: {
-      "internal-throw-on-error": { type: "boolean", default: false },
-      raw: { type: "string" },
-    },
-  })
-  await main(positionals, {
-    throwOnError: values["internal-throw-on-error"],
-    raw: values.raw,
-  })
-}
+const { values: args, positionals: paths } = parseArgs({
+  args: process.argv.slice(2),
+  allowPositionals: true,
+  options: {
+    "internal-throw-on-error": { type: "boolean", default: false },
+    "dump-ast": { type: "boolean", default: false },
+    raw: { type: "string" },
+  },
+})
 
-interface Config {
-  throwOnError: boolean
-}
-async function main(paths: string[], config: Config & { raw?: string }) {
+const ANSI_BLUE = "\x1b[34m"
+const ANSI_RESET = "\x1b[0m"
+const ANSI_BOLD = "\x1b[1m"
+await main()
+
+async function main() {
   let total_errors = 0
-  if (config.raw) {
-    const parser = Parser("<raw input>", config.raw, config)
+  if (args.raw) {
+    const parser = Parser("<raw input>", args.raw, {
+      throwOnError: args["internal-throw-on-error"],
+    })
     const source_file = parser.parse_source_file()
-    console.dir(source_file, { depth: Infinity })
-    show_diagnostics("<raw input>", config.raw, source_file.errors)
+    show_diagnostics("<raw input>", args.raw, source_file.errors)
     total_errors += source_file.errors.length
+    if (args["dump-ast"]) {
+      console.log(`${ANSI_BLUE}${ANSI_BOLD}AST Dump:${ANSI_RESET}`)
+      console.dir(source_file, { depth: Infinity })
+    }
   } else {
+    const source_files: SourceFile[] = []
     for (const path of paths) {
       const source_text = await fs.readFile(path, "utf-8")
-      const parser = Parser(path, source_text, config)
+      const parser = Parser(path, source_text, {
+        throwOnError: args["internal-throw-on-error"],
+      })
       const source_file = parser.parse_source_file()
+      source_files.push(source_file)
 
       show_diagnostics(path, source_text, source_file.errors)
       total_errors += source_file.errors.length
+    }
+    if (args["dump-ast"]) {
+      console.log(`${ANSI_BLUE}${ANSI_BOLD}AST Dump:${ANSI_RESET}`)
+      for (const source_file of source_files) {
+        console.dir(source_file, { depth: Infinity })
+      }
     }
   }
 
