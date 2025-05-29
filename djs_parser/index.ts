@@ -1,6 +1,5 @@
 import type { SourceFile } from "djs_ast"
 import { Parser } from "./parser.ts"
-export { show_diagnostics } from "./diagnostic.ts"
 
 export function parse_source_file(path: string, text: string): SourceFile {
   const parser = Parser(path, text)
