@@ -7,6 +7,7 @@ let output = `
 // node djs_ast/gen_ts_ast.js | pnpm prettier > src/ast.gen.ts
 
 import type { Span } from "./Span.ts";
+import type { Diagnostic } from "./Diagnostic.ts";
 
 /**
  * Raw source text

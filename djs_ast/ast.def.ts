@@ -372,14 +372,10 @@ const DLabel = Struct("Label", ["span"], {
   name: "str",
 })
 
-const DParseError = Struct("ParseError", ["span"], {
-  message: "str",
-})
-
 const DSourceFile = Struct("SourceFile", ["span", "visit"], {
   path: "str",
   stmts: Array(Stmt),
-  errors: Array("ParseError"),
+  errors: Array("Diagnostic"),
 })
 const DSwitchCase = Struct("SwitchCase", ["span"], {
   test: Option(Expr),
@@ -477,7 +473,6 @@ const DAccessorType = StringUnion(AccessorType, "Get", "Set")
 
 const ast_items = [
   DSourceFile,
-  DParseError,
   DStmt,
   DClass,
   DBlock,
