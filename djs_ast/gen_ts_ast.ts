@@ -18,7 +18,6 @@ for (const item of ast_items) {
     output += gen_struct(item) + "\n"
   } else {
     output += gen_enum(item)
-    output += gen_enum_factories(item) + "\n"
   }
 }
 console.log(output)
@@ -98,15 +97,22 @@ function escape_js_name(name: string): string {
 }
 
 function gen_enum(item: EnumItem): string {
-  if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
-    const variants = item.variants.map(gen_variant).join(" | ")
-    return `export type ${item.name} = ${variants};`
-  } else {
-    const variants = item.variants
-      .map((v) => v.name)
-      .map((name) => JSON.stringify(name))
-      .join(" | ")
-    return `export type ${item.name} = ${variants};`
+  let result: string = ""
+  result += gen_type_decl(item) + "\n"
+  result += gen_enum_factories(item) + "\n"
+  return result
+
+  function gen_type_decl(item: EnumItem): string {
+    if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
+      const variants = item.variants.map(gen_variant).join(" | ")
+      return `export type ${item.name} = ${variants};`
+    } else {
+      const variants = item.variants
+        .map((v) => v.name)
+        .map((name) => JSON.stringify(name))
+        .join(" | ")
+      return `export type ${item.name} = ${variants};`
+    }
   }
 
   function gen_variant(variant: EnumVariant): string {

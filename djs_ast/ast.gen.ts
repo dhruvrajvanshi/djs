@@ -155,6 +155,7 @@ export type Stmt =
       readonly kind: "Empty"
       readonly span: Span
     }
+
 export type StmtWithKind<K extends Stmt["kind"]> = Extract<Stmt, { kind: K }>
 export const Stmt = {
   Expr: (span: Span, expr: Expr): StmtWithKind<"Expr"> => ({
@@ -394,6 +395,7 @@ export type ClassMember =
       readonly kind: "FieldDef"
       readonly field: FieldDef
     }
+
 export type ClassMemberWithKind<K extends ClassMember["kind"]> = Extract<
   ClassMember,
   { kind: K }
@@ -459,6 +461,7 @@ export type Pattern =
       readonly span: Span
       readonly pattern: Pattern
     }
+
 export type PatternWithKind<K extends Pattern["kind"]> = Extract<
   Pattern,
   { kind: K }
@@ -555,6 +558,7 @@ export type ForInit =
       readonly kind: "Expr"
       readonly expr: Expr
     }
+
 export type ForInitWithKind<K extends ForInit["kind"]> = Extract<
   ForInit,
   { kind: K }
@@ -776,6 +780,7 @@ export type Expr =
       readonly tag: Expr
       readonly fragments: readonly TemplateLiteralFragment[]
     }
+
 export type ExprWithKind<K extends Expr["kind"]> = Extract<Expr, { kind: K }>
 export const Expr = {
   Var: (span: Span, ident: Ident): ExprWithKind<"Var"> => ({
@@ -1117,6 +1122,7 @@ export type TypeAnnotation =
       readonly span: Span
       readonly to: TypeAnnotation
     }
+
 export type TypeAnnotationWithKind<K extends TypeAnnotation["kind"]> = Extract<
   TypeAnnotation,
   { kind: K }
@@ -1232,6 +1238,7 @@ export type ObjectLiteralEntry =
       readonly span: Span
       readonly expr: Expr
     }
+
 export type ObjectLiteralEntryWithKind<K extends ObjectLiteralEntry["kind"]> =
   Extract<ObjectLiteralEntry, { kind: K }>
 export const ObjectLiteralEntry = {
@@ -1283,6 +1290,7 @@ export type ObjectKey =
       readonly span: Span
       readonly expr: Expr
     }
+
 export type ObjectKeyWithKind<K extends ObjectKey["kind"]> = Extract<
   ObjectKey,
   { kind: K }
@@ -1349,6 +1357,7 @@ export type ArrayLiteralMember =
       readonly span: Span
       readonly expr: Expr
     }
+
 export type ArrayLiteralMemberWithKind<K extends ArrayLiteralMember["kind"]> =
   Extract<ArrayLiteralMember, { kind: K }>
 export const ArrayLiteralMember = {
@@ -1380,6 +1389,7 @@ export type ArrowFnBody =
       readonly span: Span
       readonly block: Block
     }
+
 export type ArrowFnBodyWithKind<K extends ArrowFnBody["kind"]> = Extract<
   ArrowFnBody,
   { kind: K }
@@ -1408,6 +1418,7 @@ export type TemplateLiteralFragment =
       readonly span: Span
       readonly expr: Expr
     }
+
 export type TemplateLiteralFragmentWithKind<
   K extends TemplateLiteralFragment["kind"],
 > = Extract<TemplateLiteralFragment, { kind: K }>
@@ -1440,6 +1451,7 @@ export type ModuleExportName =
       readonly kind: "String"
       readonly text: Text
     }
+
 export type ModuleExportNameWithKind<K extends ModuleExportName["kind"]> =
   Extract<ModuleExportName, { kind: K }>
 export const ModuleExportName = {
