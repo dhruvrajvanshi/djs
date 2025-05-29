@@ -1,7 +1,7 @@
 import { show_diagnostics } from "./diagnostic.ts"
 import fs from "node:fs/promises"
 import { Parser } from "./parser.ts"
-import { parseArgs } from "node:util"
+import { parseArgs, inspect } from "node:util"
 import type { SourceFile } from "djs_ast"
 import { source_file_to_sexpr } from "djs_ast"
 
@@ -21,6 +21,7 @@ const { values: args, positionals: paths } = parseArgs({
   options: {
     "internal-throw-on-error": { type: "boolean", default: false },
     "dump-ast": { type: "boolean", default: false },
+    "no-errors": { type: "boolean", default: false },
     raw: { type: "string" },
   },
 })
@@ -37,7 +38,9 @@ async function main() {
       throwOnError: args["internal-throw-on-error"],
     })
     const source_file = parser.parse_source_file()
-    show_diagnostics("<raw input>", args.raw, source_file.errors)
+    if (!args["no-errors"]) {
+      show_diagnostics("<raw input>", args.raw, source_file.errors)
+    }
     total_errors += source_file.errors.length
     if (args["dump-ast"]) {
       console.log(`${ANSI_BLUE}${ANSI_BOLD}AST Dump:${ANSI_RESET}`)
@@ -53,7 +56,9 @@ async function main() {
       const source_file = parser.parse_source_file()
       source_files.push(source_file)
 
-      show_diagnostics(path, source_text, source_file.errors)
+      if (!args["no-errors"]) {
+        show_diagnostics(path, source_text, source_file.errors)
+      }
       total_errors += source_file.errors.length
     }
     if (args["dump-ast"]) {
@@ -67,8 +72,10 @@ async function main() {
   console.log(`Found ${total_errors} error(s)`)
 }
 function dump_source_file(source_file: SourceFile) {
-  console.dir(source_file_to_sexpr(source_file), {
-    depth: Infinity,
-    colors: true,
-  })
+  console.log(
+    inspect(source_file_to_sexpr(source_file), {
+      depth: Infinity,
+      colors: true,
+    }),
+  )
 }
