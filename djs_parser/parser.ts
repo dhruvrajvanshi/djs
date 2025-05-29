@@ -1676,6 +1676,7 @@ function parser_impl(
         next_is(t.Var) ||
         next_is(t.Let) ||
         next_is(t.Const) ||
+        next_is_soft_keyword("extern") ||
         next_is_soft_keyword("type"))
     ) {
       advance()
@@ -1695,7 +1696,7 @@ function parser_impl(
           self.current_token.text === "extern" &&
           next_is(t.Function)
         ) {
-          return parse_extern_function()
+          return parse_extern_function(export_token)
         } else if (next_is(t.Colon)) {
           const label = parse_ident()
           assert(label !== ERR) // because of the lookahead above
@@ -1801,7 +1802,7 @@ function parser_impl(
         return parse_expr_stmt()
     }
   }
-  function parse_extern_function(): Stmt | Err {
+  function parse_extern_function(export_token: Token | null): Stmt | Err {
     const start = advance()
     assert.equal(t.Ident, start.kind)
     assert.equal(start.text, "extern")
@@ -1816,8 +1817,9 @@ function parser_impl(
     if (return_type === ERR) return ERR
     if (expect_semi() === ERR) return ERR
 
-    const span = Span.between(start, return_type)
+    const span = Span.between(export_token ?? start, return_type)
     return Stmt.LJSExternFunction(span, {
+      is_exported: export_token !== null,
       span,
       name,
       params: params.params,

@@ -1207,6 +1207,7 @@ export const TypeAnnotation = {
 
 export interface LJSExternFunction {
   readonly span: Span
+  readonly is_exported: boolean
   readonly name: Ident
   readonly params: readonly Param[]
   readonly return_type: TypeAnnotation
