@@ -2414,6 +2414,7 @@ function parser_impl(
     self.errors.push({
       message,
       span,
+      hint: null,
     })
   }
 
