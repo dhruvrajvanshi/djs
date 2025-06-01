@@ -42,68 +42,91 @@ export type Stmt =
   | LJSExternFunctionStmt
   | EmptyStmt
 export class ExprStmt {
-  readonly kind: "Expr" = "Expr"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Expr" {
+    return "Expr"
+  }
 }
 export class BlockStmt {
-  readonly kind: "Block" = "Block"
   constructor(
     readonly span: Span,
     readonly block: Block,
   ) {}
+
+  get kind(): "Block" {
+    return "Block"
+  }
 }
 export class ReturnStmt {
-  readonly kind: "Return" = "Return"
   constructor(
     readonly span: Span,
     readonly value: Expr | null,
   ) {}
+
+  get kind(): "Return" {
+    return "Return"
+  }
 }
 export class VarDeclStmt {
-  readonly kind: "VarDecl" = "VarDecl"
   constructor(
     readonly span: Span,
     readonly decl: VarDecl,
   ) {}
+
+  get kind(): "VarDecl" {
+    return "VarDecl"
+  }
 }
 export class IfStmt {
-  readonly kind: "If" = "If"
   constructor(
     readonly span: Span,
     readonly condition: Expr,
     readonly if_true: Stmt,
     readonly if_false: Stmt | null,
   ) {}
+
+  get kind(): "If" {
+    return "If"
+  }
 }
 export class SwitchStmt {
-  readonly kind: "Switch" = "Switch"
   constructor(
     readonly span: Span,
     readonly condition: Expr,
     readonly cases: readonly SwitchCase[],
   ) {}
+
+  get kind(): "Switch" {
+    return "Switch"
+  }
 }
 export class WhileStmt {
-  readonly kind: "While" = "While"
   constructor(
     readonly span: Span,
     readonly condition: Expr,
     readonly body: Stmt,
   ) {}
+
+  get kind(): "While" {
+    return "While"
+  }
 }
 export class DoWhileStmt {
-  readonly kind: "DoWhile" = "DoWhile"
   constructor(
     readonly span: Span,
     readonly body: Stmt,
     readonly condition: Expr,
   ) {}
+
+  get kind(): "DoWhile" {
+    return "DoWhile"
+  }
 }
 export class TryStmt {
-  readonly kind: "Try" = "Try"
   constructor(
     readonly span: Span,
     readonly try_block: Block,
@@ -111,9 +134,12 @@ export class TryStmt {
     readonly catch_block: Block | null,
     readonly finally_block: Block | null,
   ) {}
+
+  get kind(): "Try" {
+    return "Try"
+  }
 }
 export class ForStmt {
-  readonly kind: "For" = "For"
   constructor(
     readonly span: Span,
     readonly init: ForInit,
@@ -121,9 +147,12 @@ export class ForStmt {
     readonly update: Expr | null,
     readonly body: Stmt,
   ) {}
+
+  get kind(): "For" {
+    return "For"
+  }
 }
 export class ForInOrOfStmt {
-  readonly kind: "ForInOrOf" = "ForInOrOf"
   constructor(
     readonly span: Span,
     readonly decl_type: DeclType | null,
@@ -132,90 +161,130 @@ export class ForInOrOfStmt {
     readonly rhs: Expr,
     readonly body: Stmt,
   ) {}
+
+  get kind(): "ForInOrOf" {
+    return "ForInOrOf"
+  }
 }
 export class BreakStmt {
-  readonly kind: "Break" = "Break"
   constructor(
     readonly span: Span,
     readonly label: Label | null,
   ) {}
+
+  get kind(): "Break" {
+    return "Break"
+  }
 }
 export class ContinueStmt {
-  readonly kind: "Continue" = "Continue"
   constructor(
     readonly span: Span,
     readonly label: Label | null,
   ) {}
+
+  get kind(): "Continue" {
+    return "Continue"
+  }
 }
 export class DebuggerStmt {
-  readonly kind: "Debugger" = "Debugger"
   constructor(readonly span: Span) {}
+
+  get kind(): "Debugger" {
+    return "Debugger"
+  }
 }
 export class WithStmt {
-  readonly kind: "With" = "With"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
     readonly body: Stmt,
   ) {}
+
+  get kind(): "With" {
+    return "With"
+  }
 }
 export class FuncStmt {
-  readonly kind: "Func" = "Func"
   constructor(
     readonly span: Span,
     readonly func: Func,
   ) {}
+
+  get kind(): "Func" {
+    return "Func"
+  }
 }
 export class ClassDeclStmt {
-  readonly kind: "ClassDecl" = "ClassDecl"
   constructor(
     readonly span: Span,
     readonly klass: Class,
   ) {}
+
+  get kind(): "ClassDecl" {
+    return "ClassDecl"
+  }
 }
 export class ImportStmt {
-  readonly kind: "Import" = "Import"
   constructor(
     readonly span: Span,
     readonly default_import: Ident | null,
     readonly named_imports: readonly ImportSpecifier[],
     readonly module_specifier: Text,
   ) {}
+
+  get kind(): "Import" {
+    return "Import"
+  }
 }
 export class LabeledStmt {
-  readonly kind: "Labeled" = "Labeled"
   constructor(
     readonly span: Span,
     readonly label: Label,
     readonly stmt: Stmt,
   ) {}
+
+  get kind(): "Labeled" {
+    return "Labeled"
+  }
 }
 export class ObjectTypeDeclStmt {
-  readonly kind: "ObjectTypeDecl" = "ObjectTypeDecl"
   constructor(
     readonly span: Span,
     readonly name: Ident,
     readonly fields: readonly ObjectTypeDeclField[],
   ) {}
+
+  get kind(): "ObjectTypeDecl" {
+    return "ObjectTypeDecl"
+  }
 }
 export class TypeAliasStmt {
-  readonly kind: "TypeAlias" = "TypeAlias"
   constructor(
     readonly span: Span,
     readonly name: Ident,
     readonly type_annotation: TypeAnnotation,
   ) {}
+
+  get kind(): "TypeAlias" {
+    return "TypeAlias"
+  }
 }
 export class LJSExternFunctionStmt {
-  readonly kind: "LJSExternFunction" = "LJSExternFunction"
   constructor(
     readonly span: Span,
     readonly func: LJSExternFunction,
   ) {}
+
+  get kind(): "LJSExternFunction" {
+    return "LJSExternFunction"
+  }
 }
 export class EmptyStmt {
-  readonly kind: "Empty" = "Empty"
   constructor(readonly span: Span) {}
+
+  get kind(): "Empty" {
+    return "Empty"
+  }
 }
 
 export const Stmt = {
@@ -349,12 +418,18 @@ export interface MethodDef {
 
 export type ClassMember = MethodDefClassMember | FieldDefClassMember
 export class MethodDefClassMember {
-  readonly kind: "MethodDef" = "MethodDef"
   constructor(readonly method: MethodDef) {}
+
+  get kind(): "MethodDef" {
+    return "MethodDef"
+  }
 }
 export class FieldDefClassMember {
-  readonly kind: "FieldDef" = "FieldDef"
   constructor(readonly field: FieldDef) {}
+
+  get kind(): "FieldDef" {
+    return "FieldDef"
+  }
 }
 
 export const ClassMember = {
@@ -385,53 +460,74 @@ export type Pattern =
   | ElisionPattern
   | RestPattern
 export class VarPattern {
-  readonly kind: "Var" = "Var"
   constructor(
     readonly span: Span,
     readonly ident: Ident,
   ) {}
+
+  get kind(): "Var" {
+    return "Var"
+  }
 }
 export class AssignmentPattern {
-  readonly kind: "Assignment" = "Assignment"
   constructor(
     readonly span: Span,
     readonly pattern: Pattern,
     readonly initializer: Expr,
   ) {}
+
+  get kind(): "Assignment" {
+    return "Assignment"
+  }
 }
 export class ArrayPattern {
-  readonly kind: "Array" = "Array"
   constructor(
     readonly span: Span,
     readonly items: readonly Pattern[],
   ) {}
+
+  get kind(): "Array" {
+    return "Array"
+  }
 }
 export class ObjectPattern {
-  readonly kind: "Object" = "Object"
   constructor(
     readonly span: Span,
     readonly properties: readonly ObjectPatternProperty[],
     readonly rest: Pattern | null,
   ) {}
+
+  get kind(): "Object" {
+    return "Object"
+  }
 }
 export class PropPattern {
-  readonly kind: "Prop" = "Prop"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
     readonly key: ObjectKey,
   ) {}
+
+  get kind(): "Prop" {
+    return "Prop"
+  }
 }
 export class ElisionPattern {
-  readonly kind: "Elision" = "Elision"
   constructor(readonly span: Span) {}
+
+  get kind(): "Elision" {
+    return "Elision"
+  }
 }
 export class RestPattern {
-  readonly kind: "Rest" = "Rest"
   constructor(
     readonly span: Span,
     readonly pattern: Pattern,
   ) {}
+
+  get kind(): "Rest" {
+    return "Rest"
+  }
 }
 
 export const Pattern = {
@@ -492,12 +588,18 @@ export interface VarDeclarator {
 
 export type ForInit = VarDeclForInit | ExprForInit
 export class VarDeclForInit {
-  readonly kind: "VarDecl" = "VarDecl"
   constructor(readonly decl: VarDecl) {}
+
+  get kind(): "VarDecl" {
+    return "VarDecl"
+  }
 }
 export class ExprForInit {
-  readonly kind: "Expr" = "Expr"
   constructor(readonly expr: Expr) {}
+
+  get kind(): "Expr" {
+    return "Expr"
+  }
 }
 
 export const ForInit = {
@@ -547,46 +649,60 @@ export type Expr =
   | TemplateLiteralExpr
   | TaggedTemplateLiteralExpr
 export class VarExpr {
-  readonly kind: "Var" = "Var"
   constructor(
     readonly span: Span,
     readonly ident: Ident,
   ) {}
+
+  get kind(): "Var" {
+    return "Var"
+  }
 }
 export class ParenExpr {
-  readonly kind: "Paren" = "Paren"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Paren" {
+    return "Paren"
+  }
 }
 export class BinOpExpr {
-  readonly kind: "BinOp" = "BinOp"
   constructor(
     readonly span: Span,
     readonly lhs: Expr,
     readonly operator: BinOp,
     readonly rhs: Expr,
   ) {}
+
+  get kind(): "BinOp" {
+    return "BinOp"
+  }
 }
 export class ArrowFnExpr {
-  readonly kind: "ArrowFn" = "ArrowFn"
   constructor(
     readonly span: Span,
     readonly params: ParamList,
     readonly return_type: TypeAnnotation | null,
     readonly body: ArrowFnBody,
   ) {}
+
+  get kind(): "ArrowFn" {
+    return "ArrowFn"
+  }
 }
 export class FuncExpr {
-  readonly kind: "Func" = "Func"
   constructor(
     readonly span: Span,
     readonly func: Func,
   ) {}
+
+  get kind(): "Func" {
+    return "Func"
+  }
 }
 export class CallExpr {
-  readonly kind: "Call" = "Call"
   constructor(
     readonly span: Span,
     readonly callee: Expr,
@@ -594,237 +710,340 @@ export class CallExpr {
     readonly spread: Expr | null,
     readonly is_optional: boolean,
   ) {}
+
+  get kind(): "Call" {
+    return "Call"
+  }
 }
 export class IndexExpr {
-  readonly kind: "Index" = "Index"
   constructor(
     readonly span: Span,
     readonly lhs: Expr,
     readonly property: Expr,
     readonly is_optional: boolean,
   ) {}
+
+  get kind(): "Index" {
+    return "Index"
+  }
 }
 export class PropExpr {
-  readonly kind: "Prop" = "Prop"
   constructor(
     readonly span: Span,
     readonly lhs: Expr,
     readonly property: Ident,
     readonly is_optional: boolean,
   ) {}
+
+  get kind(): "Prop" {
+    return "Prop"
+  }
 }
 export class StringExpr {
-  readonly kind: "String" = "String"
   constructor(
     readonly span: Span,
     readonly text: Text,
   ) {}
+
+  get kind(): "String" {
+    return "String"
+  }
 }
 export class NumberExpr {
-  readonly kind: "Number" = "Number"
   constructor(
     readonly span: Span,
     readonly text: Text,
   ) {}
+
+  get kind(): "Number" {
+    return "Number"
+  }
 }
 export class BooleanExpr {
-  readonly kind: "Boolean" = "Boolean"
   constructor(
     readonly span: Span,
     readonly value: boolean,
   ) {}
+
+  get kind(): "Boolean" {
+    return "Boolean"
+  }
 }
 export class NullExpr {
-  readonly kind: "Null" = "Null"
   constructor(readonly span: Span) {}
+
+  get kind(): "Null" {
+    return "Null"
+  }
 }
 export class UndefinedExpr {
-  readonly kind: "Undefined" = "Undefined"
   constructor(readonly span: Span) {}
+
+  get kind(): "Undefined" {
+    return "Undefined"
+  }
 }
 export class ObjectExpr {
-  readonly kind: "Object" = "Object"
   constructor(
     readonly span: Span,
     readonly entries: readonly ObjectLiteralEntry[],
   ) {}
+
+  get kind(): "Object" {
+    return "Object"
+  }
 }
 export class ThrowExpr {
-  readonly kind: "Throw" = "Throw"
   constructor(
     readonly span: Span,
     readonly value: Expr,
   ) {}
+
+  get kind(): "Throw" {
+    return "Throw"
+  }
 }
 export class PostIncrementExpr {
-  readonly kind: "PostIncrement" = "PostIncrement"
   constructor(
     readonly span: Span,
     readonly value: Expr,
   ) {}
+
+  get kind(): "PostIncrement" {
+    return "PostIncrement"
+  }
 }
 export class PostDecrementExpr {
-  readonly kind: "PostDecrement" = "PostDecrement"
   constructor(
     readonly span: Span,
     readonly value: Expr,
   ) {}
+
+  get kind(): "PostDecrement" {
+    return "PostDecrement"
+  }
 }
 export class PreIncrementExpr {
-  readonly kind: "PreIncrement" = "PreIncrement"
   constructor(
     readonly span: Span,
     readonly value: Expr,
   ) {}
+
+  get kind(): "PreIncrement" {
+    return "PreIncrement"
+  }
 }
 export class PreDecrementExpr {
-  readonly kind: "PreDecrement" = "PreDecrement"
   constructor(
     readonly span: Span,
     readonly value: Expr,
   ) {}
+
+  get kind(): "PreDecrement" {
+    return "PreDecrement"
+  }
 }
 export class ArrayExpr {
-  readonly kind: "Array" = "Array"
   constructor(
     readonly span: Span,
     readonly items: readonly ArrayLiteralMember[],
   ) {}
+
+  get kind(): "Array" {
+    return "Array"
+  }
 }
 export class NewExpr {
-  readonly kind: "New" = "New"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "New" {
+    return "New"
+  }
 }
 export class YieldExpr {
-  readonly kind: "Yield" = "Yield"
   constructor(
     readonly span: Span,
     readonly value: Expr | null,
   ) {}
+
+  get kind(): "Yield" {
+    return "Yield"
+  }
 }
 export class YieldFromExpr {
-  readonly kind: "YieldFrom" = "YieldFrom"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "YieldFrom" {
+    return "YieldFrom"
+  }
 }
 export class TernaryExpr {
-  readonly kind: "Ternary" = "Ternary"
   constructor(
     readonly span: Span,
     readonly condition: Expr,
     readonly if_true: Expr,
     readonly if_false: Expr,
   ) {}
+
+  get kind(): "Ternary" {
+    return "Ternary"
+  }
 }
 export class AssignExpr {
-  readonly kind: "Assign" = "Assign"
   constructor(
     readonly span: Span,
     readonly pattern: Pattern,
     readonly operator: AssignOp,
     readonly value: Expr,
   ) {}
+
+  get kind(): "Assign" {
+    return "Assign"
+  }
 }
 export class RegexExpr {
-  readonly kind: "Regex" = "Regex"
   constructor(
     readonly span: Span,
     readonly text: Text,
   ) {}
+
+  get kind(): "Regex" {
+    return "Regex"
+  }
 }
 export class DeleteExpr {
-  readonly kind: "Delete" = "Delete"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Delete" {
+    return "Delete"
+  }
 }
 export class VoidExpr {
-  readonly kind: "Void" = "Void"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Void" {
+    return "Void"
+  }
 }
 export class TypeOfExpr {
-  readonly kind: "TypeOf" = "TypeOf"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "TypeOf" {
+    return "TypeOf"
+  }
 }
 export class UnaryPlusExpr {
-  readonly kind: "UnaryPlus" = "UnaryPlus"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "UnaryPlus" {
+    return "UnaryPlus"
+  }
 }
 export class UnaryMinusExpr {
-  readonly kind: "UnaryMinus" = "UnaryMinus"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "UnaryMinus" {
+    return "UnaryMinus"
+  }
 }
 export class BitNotExpr {
-  readonly kind: "BitNot" = "BitNot"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "BitNot" {
+    return "BitNot"
+  }
 }
 export class NotExpr {
-  readonly kind: "Not" = "Not"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Not" {
+    return "Not"
+  }
 }
 export class AwaitExpr {
-  readonly kind: "Await" = "Await"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Await" {
+    return "Await"
+  }
 }
 export class CommaExpr {
-  readonly kind: "Comma" = "Comma"
   constructor(
     readonly span: Span,
     readonly items: readonly Expr[],
   ) {}
+
+  get kind(): "Comma" {
+    return "Comma"
+  }
 }
 export class SuperExpr {
-  readonly kind: "Super" = "Super"
   constructor(readonly span: Span) {}
+
+  get kind(): "Super" {
+    return "Super"
+  }
 }
 export class ClassExpr {
-  readonly kind: "Class" = "Class"
   constructor(
     readonly span: Span,
     readonly klass: Class,
   ) {}
+
+  get kind(): "Class" {
+    return "Class"
+  }
 }
 export class TemplateLiteralExpr {
-  readonly kind: "TemplateLiteral" = "TemplateLiteral"
   constructor(
     readonly span: Span,
     readonly fragments: readonly TemplateLiteralFragment[],
   ) {}
+
+  get kind(): "TemplateLiteral" {
+    return "TemplateLiteral"
+  }
 }
 export class TaggedTemplateLiteralExpr {
-  readonly kind: "TaggedTemplateLiteral" = "TaggedTemplateLiteral"
   constructor(
     readonly span: Span,
     readonly tag: Expr,
     readonly fragments: readonly TemplateLiteralFragment[],
   ) {}
+
+  get kind(): "TaggedTemplateLiteral" {
+    return "TaggedTemplateLiteral"
+  }
 }
 
 export const Expr = {
@@ -976,71 +1195,98 @@ export type TypeAnnotation =
   | LJSConstPtrTypeAnnotation
   | LJSPtrTypeAnnotation
 export class IdentTypeAnnotation {
-  readonly kind: "Ident" = "Ident"
   constructor(
     readonly span: Span,
     readonly ident: Ident,
   ) {}
+
+  get kind(): "Ident" {
+    return "Ident"
+  }
 }
 export class UnionTypeAnnotation {
-  readonly kind: "Union" = "Union"
   constructor(
     readonly span: Span,
     readonly left: TypeAnnotation,
     readonly right: TypeAnnotation,
   ) {}
+
+  get kind(): "Union" {
+    return "Union"
+  }
 }
 export class ArrayTypeAnnotation {
-  readonly kind: "Array" = "Array"
   constructor(
     readonly span: Span,
     readonly item: TypeAnnotation,
   ) {}
+
+  get kind(): "Array" {
+    return "Array"
+  }
 }
 export class ReadonlyArrayTypeAnnotation {
-  readonly kind: "ReadonlyArray" = "ReadonlyArray"
   constructor(
     readonly span: Span,
     readonly item: TypeAnnotation,
   ) {}
+
+  get kind(): "ReadonlyArray" {
+    return "ReadonlyArray"
+  }
 }
 export class ApplicationTypeAnnotation {
-  readonly kind: "Application" = "Application"
   constructor(
     readonly span: Span,
     readonly callee: TypeAnnotation,
     readonly args: readonly TypeAnnotation[],
   ) {}
+
+  get kind(): "Application" {
+    return "Application"
+  }
 }
 export class StringTypeAnnotation {
-  readonly kind: "String" = "String"
   constructor(
     readonly span: Span,
     readonly text: Text,
   ) {}
+
+  get kind(): "String" {
+    return "String"
+  }
 }
 export class FuncTypeAnnotation {
-  readonly kind: "Func" = "Func"
   constructor(
     readonly span: Span,
     readonly type_params: readonly TypeParam[],
     readonly params: readonly FuncTypeParam[],
     readonly returns: TypeAnnotation,
   ) {}
+
+  get kind(): "Func" {
+    return "Func"
+  }
 }
 export class LJSConstPtrTypeAnnotation {
-  readonly kind: "LJSConstPtr" = "LJSConstPtr"
   constructor(
     readonly span: Span,
     readonly to: TypeAnnotation,
   ) {}
+
+  get kind(): "LJSConstPtr" {
+    return "LJSConstPtr"
+  }
 }
 export class LJSPtrTypeAnnotation {
-  readonly kind: "LJSPtr" = "LJSPtr"
   constructor(
     readonly span: Span,
     readonly to: TypeAnnotation,
   ) {}
+
+  get kind(): "LJSPtr" {
+    return "LJSPtr"
+  }
 }
 
 export const TypeAnnotation = {
@@ -1105,33 +1351,45 @@ export type ObjectLiteralEntry =
   | MethodObjectLiteralEntry
   | SpreadObjectLiteralEntry
 export class IdentObjectLiteralEntry {
-  readonly kind: "Ident" = "Ident"
   constructor(
     readonly span: Span,
     readonly ident: Ident,
   ) {}
+
+  get kind(): "Ident" {
+    return "Ident"
+  }
 }
 export class PropObjectLiteralEntry {
-  readonly kind: "Prop" = "Prop"
   constructor(
     readonly span: Span,
     readonly key: ObjectKey,
     readonly value: Expr,
   ) {}
+
+  get kind(): "Prop" {
+    return "Prop"
+  }
 }
 export class MethodObjectLiteralEntry {
-  readonly kind: "Method" = "Method"
   constructor(
     readonly span: Span,
     readonly method: MethodDef,
   ) {}
+
+  get kind(): "Method" {
+    return "Method"
+  }
 }
 export class SpreadObjectLiteralEntry {
-  readonly kind: "Spread" = "Spread"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Spread" {
+    return "Spread"
+  }
 }
 
 export const ObjectLiteralEntry = {
@@ -1150,25 +1408,34 @@ export const ObjectLiteralEntry = {
 
 export type ObjectKey = IdentObjectKey | StringObjectKey | ComputedObjectKey
 export class IdentObjectKey {
-  readonly kind: "Ident" = "Ident"
   constructor(
     readonly span: Span,
     readonly ident: Ident,
   ) {}
+
+  get kind(): "Ident" {
+    return "Ident"
+  }
 }
 export class StringObjectKey {
-  readonly kind: "String" = "String"
   constructor(
     readonly span: Span,
     readonly text: Text,
   ) {}
+
+  get kind(): "String" {
+    return "String"
+  }
 }
 export class ComputedObjectKey {
-  readonly kind: "Computed" = "Computed"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Computed" {
+    return "Computed"
+  }
 }
 
 export const ObjectKey = {
@@ -1214,22 +1481,31 @@ export type ArrayLiteralMember =
   | ElisionArrayLiteralMember
   | SpreadArrayLiteralMember
 export class ExprArrayLiteralMember {
-  readonly kind: "Expr" = "Expr"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Expr" {
+    return "Expr"
+  }
 }
 export class ElisionArrayLiteralMember {
-  readonly kind: "Elision" = "Elision"
   constructor(readonly span: Span) {}
+
+  get kind(): "Elision" {
+    return "Elision"
+  }
 }
 export class SpreadArrayLiteralMember {
-  readonly kind: "Spread" = "Spread"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Spread" {
+    return "Spread"
+  }
 }
 
 export const ArrayLiteralMember = {
@@ -1245,18 +1521,24 @@ export const ArrayLiteralMember = {
 
 export type ArrowFnBody = ExprArrowFnBody | BlockArrowFnBody
 export class ExprArrowFnBody {
-  readonly kind: "Expr" = "Expr"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Expr" {
+    return "Expr"
+  }
 }
 export class BlockArrowFnBody {
-  readonly kind: "Block" = "Block"
   constructor(
     readonly span: Span,
     readonly block: Block,
   ) {}
+
+  get kind(): "Block" {
+    return "Block"
+  }
 }
 
 export const ArrowFnBody = {
@@ -1271,18 +1553,24 @@ export type TemplateLiteralFragment =
   | TextTemplateLiteralFragment
   | ExprTemplateLiteralFragment
 export class TextTemplateLiteralFragment {
-  readonly kind: "Text" = "Text"
   constructor(
     readonly span: Span,
     readonly text: Text,
   ) {}
+
+  get kind(): "Text" {
+    return "Text"
+  }
 }
 export class ExprTemplateLiteralFragment {
-  readonly kind: "Expr" = "Expr"
   constructor(
     readonly span: Span,
     readonly expr: Expr,
   ) {}
+
+  get kind(): "Expr" {
+    return "Expr"
+  }
 }
 
 export const TemplateLiteralFragment = {
@@ -1301,12 +1589,18 @@ export interface ObjectPatternProperty {
 
 export type ModuleExportName = IdentModuleExportName | StringModuleExportName
 export class IdentModuleExportName {
-  readonly kind: "Ident" = "Ident"
   constructor(readonly ident: Ident) {}
+
+  get kind(): "Ident" {
+    return "Ident"
+  }
 }
 export class StringModuleExportName {
-  readonly kind: "String" = "String"
   constructor(readonly text: Text) {}
+
+  get kind(): "String" {
+    return "String"
+  }
 }
 
 export const ModuleExportName = {
