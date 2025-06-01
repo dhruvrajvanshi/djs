@@ -217,7 +217,7 @@ export class FuncStmt {
 export class ClassDeclStmt {
   constructor(
     readonly span: Span,
-    readonly klass: Class,
+    readonly class_def: Class,
   ) {}
 
   get kind(): "ClassDecl" {
@@ -357,8 +357,8 @@ export const Stmt = {
 
   Func: (span: Span, func: Func): FuncStmt => new FuncStmt(span, func),
 
-  ClassDecl: (span: Span, klass: Class): ClassDeclStmt =>
-    new ClassDeclStmt(span, klass),
+  ClassDecl: (span: Span, class_def: Class): ClassDeclStmt =>
+    new ClassDeclStmt(span, class_def),
 
   Import: (
     span: Span,
@@ -1017,7 +1017,7 @@ export class SuperExpr {
 export class ClassExpr {
   constructor(
     readonly span: Span,
-    readonly klass: Class,
+    readonly class_def: Class,
   ) {}
 
   get kind(): "Class" {
@@ -1163,7 +1163,8 @@ export const Expr = {
 
   Super: (span: Span): SuperExpr => new SuperExpr(span),
 
-  Class: (span: Span, klass: Class): ClassExpr => new ClassExpr(span, klass),
+  Class: (span: Span, class_def: Class): ClassExpr =>
+    new ClassExpr(span, class_def),
 
   TemplateLiteral: (
     span: Span,
