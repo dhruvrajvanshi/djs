@@ -1,7 +1,6 @@
 import { test, expect } from "vitest"
 import { Parser } from "./parser.ts"
-import { AssignOp, Expr } from "djs_ast"
-import { pretty_print } from "./pretty_print.ts"
+import { AssignOp, Expr, source_file_to_sexpr } from "djs_ast"
 import assert from "assert"
 import fs from "node:fs/promises"
 
@@ -26,7 +25,26 @@ test("parse error for missing parenthesis in if condition", () => {
     .toMatchInlineSnapshot(`
     "10: Expected '(' after 'if'"
   `)
-  expect(pretty_print(source_file)).toMatchInlineSnapshot(`"if (x) y; else z;"`)
+  expect(source_file_to_sexpr(source_file)).toMatchInlineSnapshot(`
+    [
+      "SourceFile(test.js)",
+      Stmt.If {
+        "condition": Expr.Var {
+          "ident": "x",
+        },
+        "if_false": Stmt.Expr {
+          "expr": Expr.Var {
+            "ident": "z",
+          },
+        },
+        "if_true": Stmt.Expr {
+          "expr": Expr.Var {
+            "ident": "y",
+          },
+        },
+      },
+    ]
+  `)
 })
 
 test("simple regex", () => {
