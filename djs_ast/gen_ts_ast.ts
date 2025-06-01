@@ -59,7 +59,6 @@ function gen_enum_factories(item: EnumItem): string {
   if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
     const variants = item.variants.map(gen_variant)
     return `
-    export type ${item.name}WithKind<K extends ${item.name}['kind']> = Extract<${item.name}, { kind: K }>
     export const ${item.name} = {
       ${variants.join(",\n\n")}
     } as const`
@@ -74,18 +73,18 @@ function gen_enum_factories(item: EnumItem): string {
 
   function gen_variant(variant: EnumVariant): string {
     if (Object.entries(variant.args).length > 0 || item.tags.includes("span")) {
-      const variantType = `${item.name}WithKind<${JSON.stringify(variant.name)}>`
+      const variantType = `${variant.name}${item.name}`
       const params = Object.entries(variant.args)
         .map(([name, type]) => `${escape_js_name(name)}: ${gen_type(type)}`)
         .join(", ")
       const param_names = Object.keys(variant.args)
-        .map((name) => `${name}: ${escape_js_name(name)}`)
+        .map((name) => escape_js_name(name))
         .join(", ")
       const span_param = item.tags.includes("span") ? `span: Span, ` : ``
       const span = item.tags.includes("span") ? `span, ` : ``
-      return `${variant.name}: (${span_param}${params}): ${variantType} => ({ kind: ${JSON.stringify(variant.name)}, ${span} ${param_names} })`
+      return `${variant.name}: (${span_param}${params}): ${variantType} => new ${variant.name}${item.name}(${span} ${param_names})`
     } else {
-      return `${variant.name}: ({ kind: ${JSON.stringify(variant.name)} }) as const`
+      return `${variant.name}: new ${variant.name}${item.name}()`
     }
   }
 }
@@ -105,8 +104,11 @@ function gen_enum(item: EnumItem): string {
 
   function gen_type_decl(item: EnumItem): string {
     if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
-      const variants = item.variants.map(gen_variant).join(" | ")
-      return `export type ${item.name} = ${variants};`
+      const variant_classes = item.variants.map(gen_variant_class).join("\n")
+      return `
+        export type ${item.name} = ${item.variants.map((it) => `${it.name}${item.name}`).join(" | ")};
+        ${variant_classes}
+      `
     } else {
       const variants = item.variants
         .map((v) => v.name)
@@ -116,13 +118,19 @@ function gen_enum(item: EnumItem): string {
     }
   }
 
-  function gen_variant(variant: EnumVariant): string {
-    const span = item.tags.includes("span") ? `readonly span: Span;` : ``
-    return `{
-        readonly kind: "${variant.name}"; ${span}
-        ${Object.entries(variant.args)
-          .map(([name, type]) => "readonly " + name + ": " + gen_type(type))
-          .join(", ")}
+  function gen_variant_class(variant: EnumVariant): string {
+    const span_param = item.tags.includes("span") ? `readonly span: Span, ` : ``
+    return `export class ${variant.name}${item.name} {
+        readonly kind: "${variant.name}" = "${variant.name}";
+        constructor(
+          ${span_param}
+          ${Object.entries(variant.args)
+            .map(
+              ([name, type]) =>
+                "readonly " + escape_js_name(name) + ": " + gen_type(type),
+            )
+            .join(", ")}
+        ) {}
       }`
   }
 }
