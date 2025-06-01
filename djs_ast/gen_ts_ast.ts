@@ -121,7 +121,6 @@ function gen_enum(item: EnumItem): string {
   function gen_variant_class(variant: EnumVariant): string {
     const span_param = item.tags.includes("span") ? `readonly span: Span, ` : ``
     return `export class ${variant.name}${item.name} {
-        readonly kind: "${variant.name}" = "${variant.name}";
         constructor(
           ${span_param}
           ${Object.entries(variant.args)
@@ -131,6 +130,8 @@ function gen_enum(item: EnumItem): string {
             )
             .join(", ")}
         ) {}
+
+        get kind(): "${variant.name}" { return "${variant.name}" }
       }`
   }
 }
