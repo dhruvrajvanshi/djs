@@ -188,7 +188,7 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   Debugger: {},
   With: { expr: Expr, body: Stmt },
   Func: { func: Func },
-  ClassDecl: { class: Class },
+  ClassDecl: { class_def: Class },
   Import: {
     default_import: Option(Ident),
     named_imports: Array("ImportSpecifier"),
@@ -263,7 +263,7 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   Await: { expr: Expr },
   Comma: { items: Array(Expr) },
   Super: {},
-  Class: { class: "Class" },
+  Class: { class_def: "Class" },
   TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
   TaggedTemplateLiteral: {
     tag: Expr,
@@ -352,7 +352,7 @@ const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
   Spread: { expr: Expr },
 })
 
-const DFunc = Struct("Func", ["span"], {
+const DFunc = Struct("Func", ["span", "visit"], {
   name: Option(Ident),
   type_params: Array("TypeParam"),
   params: ParamList,
@@ -364,7 +364,7 @@ const DFunc = Struct("Func", ["span"], {
 const DTypeParam = Struct("TypeParam", [], {
   ident: Ident,
 })
-const DBlock = Struct("Block", ["span"], {
+const DBlock = Struct("Block", ["span", "visit"], {
   stmts: Array(Stmt),
 })
 
@@ -372,7 +372,7 @@ const DLabel = Struct("Label", ["span"], {
   name: "str",
 })
 
-const DSourceFile = Struct("SourceFile", ["span", "visit"], {
+export const DSourceFile = Struct("SourceFile", ["span", "visit"], {
   path: "str",
   stmts: Array(Stmt),
   errors: Array("Diagnostic"),
