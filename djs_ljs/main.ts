@@ -4,29 +4,49 @@ import { parseArgs } from "node:util"
 import fs from "node:fs/promises"
 import { parse_source_file } from "djs_parser"
 import {
+  ASTVisitorBase,
   show_diagnostics,
   source_file_to_sexpr,
+  Stmt,
   type Diagnostic,
   type SourceFile,
 } from "djs_ast"
 import assert from "node:assert"
 import { existsSync } from "node:fs"
 
-const { positionals: files, values: args } = parseArgs({
-  allowPositionals: true,
-  options: {
-    "dump-ast": { type: "boolean", default: false },
-    "no-errors": { type: "boolean", default: false },
-  },
-})
+async function main() {
+  const { positionals: files, values: args } = parseArgs({
+    allowPositionals: true,
+    options: {
+      "dump-ast": { type: "boolean", default: false },
+      "no-errors": { type: "boolean", default: false },
+    },
+  })
 
-if (files.length === 0) {
-  console.error("No files provided.")
-  process.exit(1)
-}
-if (files.length > 1) {
-  console.error("Only one entrypoint must be provided.")
-  process.exit(1)
+  if (files.length === 0) {
+    console.error("No files provided.")
+    process.exit(1)
+  }
+  if (files.length > 1) {
+    console.error("Only one entrypoint must be provided.")
+    process.exit(1)
+  }
+
+  const diagnostics = new Diagnostics()
+  const source_files = await collect_source_files(files[0], diagnostics)
+
+  if (!args["no-errors"]) {
+    for (const [path, d] of diagnostics) {
+      await show_diagnostics(path, d, null)
+    }
+  }
+  if (args["dump-ast"]) {
+    for (const source_file of Object.values(source_files)) {
+      console.dir(source_file_to_sexpr(source_file), {
+        depth: null,
+      })
+    }
+  }
 }
 
 class Diagnostics implements Iterable<[string, Diagnostic[]]> {
@@ -41,22 +61,6 @@ class Diagnostics implements Iterable<[string, Diagnostic[]]> {
 
   [Symbol.iterator]() {
     return Object.entries(this.#by_path)[Symbol.iterator]()
-  }
-}
-const diagnostics = new Diagnostics()
-
-const source_files = await collect_source_files(files[0], diagnostics)
-
-if (!args["no-errors"]) {
-  for (const [path, d] of diagnostics) {
-    await show_diagnostics(path, d, null)
-  }
-}
-if (args["dump-ast"]) {
-  for (const source_file of Object.values(source_files)) {
-    console.dir(source_file_to_sexpr(source_file), {
-      depth: null,
-    })
   }
 }
 
@@ -85,17 +89,22 @@ async function collect_source_files(
   }
   return source_files
 }
-function collect_imports(
-  source_file: SourceFile,
-  diagnostics: Diagnostics,
-): string[] {
-  const imports: string[] = []
-  for (const stmt of source_file.stmts) {
-    // TODO(visitor): Handle nested imports when the visitor API is implemented
+
+class CollectImportsVisitor extends ASTVisitorBase {
+  #diagnostics: Diagnostics
+  #source_file: SourceFile
+  readonly imports: string[] = []
+  constructor(diagnostics: Diagnostics, source_file: SourceFile) {
+    super()
+    this.#diagnostics = diagnostics
+    this.#source_file = source_file
+  }
+
+  override visit_stmt(stmt: Stmt): void {
     if (stmt.kind === "Import") {
       const path = parse_module_specifier(stmt.module_specifier)
       if (!existsSync(path)) {
-        diagnostics.push(source_file.path, {
+        this.#diagnostics.push(this.#source_file.path, {
           span: {
             start: stmt.span.stop - stmt.module_specifier.length,
             stop: stmt.span.stop,
@@ -103,12 +112,37 @@ function collect_imports(
           message: `Module not found`,
           hint: "The module path must be a path to a file relative to the current file. For example, if the current file is `src/main.ts`, and you want to import `src/utils.ts`, you should use `./utils.ts` as the module specifier.",
         })
-        continue
       }
-      imports.push(path)
+    } else {
+      super.visit_stmt(stmt)
     }
   }
-  return imports
+}
+function collect_imports(
+  source_file: SourceFile,
+  diagnostics: Diagnostics,
+): string[] {
+  // for (const stmt of source_file.stmts) {
+  //   // TODO(visitor): Handle nested imports when the visitor API is implemented
+  //   if (stmt.kind === "Import") {
+  //     const path = parse_module_specifier(stmt.module_specifier)
+  //     if (!existsSync(path)) {
+  //       diagnostics.push(source_file.path, {
+  //         span: {
+  //           start: stmt.span.stop - stmt.module_specifier.length,
+  //           stop: stmt.span.stop,
+  //         },
+  //         message: `Module not found`,
+  //         hint: "The module path must be a path to a file relative to the current file. For example, if the current file is `src/main.ts`, and you want to import `src/utils.ts`, you should use `./utils.ts` as the module specifier.",
+  //       })
+  //       continue
+  //     }
+  //     imports.push(path)
+  //   }
+  // }
+  const visitor = new CollectImportsVisitor(diagnostics, source_file)
+  visitor.visit_source_file(source_file)
+  return visitor.imports
 }
 function parse_module_specifier(specifier: string): string {
   const value: unknown = JSON.parse(specifier)
@@ -123,3 +157,5 @@ function queue_take<T>(queue: Queue<T>): T | null {
 function queue_push<T>(queue: Queue<T>, item: T): void {
   queue.push(item)
 }
+
+await main()
