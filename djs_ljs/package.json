@@ -13,7 +13,7 @@
   },
   "$schema": "https://json.schemastore.org/package.json",
   "devDependencies": {
-    "@types/node": "^22.14.1",
+    "@types/node": "^22.15.30",
     "typescript": "5.8.3",
     "vitest": "^3.2.1"
   }
