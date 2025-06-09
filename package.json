@@ -5,6 +5,6 @@
   "packageManager": "pnpm@10.8.0",
   "$schema": "https://json.schemastore.org/package.json",
   "dependencies": {
-    "pnpm": "^10.11.1"
+    "pnpm": "^10.12.1"
   }
 }
