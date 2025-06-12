@@ -1,13 +1,15 @@
 import { ASTVisitorBase, type SourceFile, type Stmt } from "djs_ast"
 import { parse_source_file } from "djs_parser"
-import { existsSync, promises as fs } from "node:fs"
+import { existsSync, promises as node_fs } from "node:fs"
 import type { Diagnostics } from "./diagnostics.ts"
 import * as Queue from "./queue.ts"
 import assert from "node:assert"
+import type { FS } from "./FS.ts"
 
 export async function collect_source_files(
   entry_path: string,
   diagnostics: Diagnostics,
+  fs: FS = node_fs,
 ) {
   const queue = Queue.from([entry_path])
   const source_files: Record<string, SourceFile> = {}
