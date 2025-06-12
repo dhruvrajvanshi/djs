@@ -1,71 +1,84 @@
-import { ASTVisitorBase, type SourceFile, type Stmt } from "djs_ast"
+import { ASTVisitorBase, ImportStmt, type SourceFile, type Stmt } from "djs_ast"
 import { parse_source_file } from "djs_parser"
-import { existsSync, promises as node_fs } from "node:fs"
 import type { Diagnostics } from "./diagnostics.ts"
 import * as Queue from "./queue.ts"
 import assert from "node:assert"
-import type { FS } from "./FS.ts"
+import { FS } from "./FS.ts"
+import { exit } from "node:process"
 
 export async function collect_source_files(
   entry_path: string,
   diagnostics: Diagnostics,
-  fs: FS = node_fs,
+  fs: FS = FS.real,
 ) {
-  const queue = Queue.from([entry_path])
+  type ImportInfo = {
+    stmt: ImportStmt
+    imported_from: SourceFile
+  }
+  type Entry = { path: string; import_info: ImportInfo | null }
+  const queue = Queue.from<Entry>([
+    {
+      path: entry_path,
+      import_info: null,
+    },
+  ])
   const source_files: Record<string, SourceFile> = {}
   while (queue.length > 0) {
-    const path = Queue.take(queue)
-    if (path === null) {
+    const { path, import_info } = Queue.take(queue)
+
+    let source_text = ""
+    try {
+      source_text = await fs.read_file(path, "utf-8")
+    } catch (error) {
+      if (import_info) {
+        const imported_path = parse_module_specifier(
+          import_info.stmt.module_specifier,
+        )
+        diagnostics.push(import_info.imported_from.path, {
+          message: `Failed to import module "${imported_path}"`,
+          span: import_info.stmt.span,
+          hint: `You must specify a path relative to ${import_info.imported_from.path}`,
+        })
+      } else {
+        console.error(`Could not read the file "${path}"`)
+        exit(1)
+      }
       continue
     }
-    const source_text = await fs.readFile(path, "utf-8")
     const source_file = parse_source_file(path, source_text)
 
     source_files[path] = source_file
     diagnostics.push(path, ...source_file.errors)
-    const imports = collect_imports(source_file, diagnostics)
-    for (const import_path of imports) {
-      if (!(import_path in source_files)) {
-        Queue.push(queue, import_path)
-      }
+
+    const imports = collect_imports(source_file)
+    for (const import_stmt of imports) {
+      const imported_path = parse_module_specifier(import_stmt.module_specifier)
+      if (imported_path in source_files) continue
+
+      queue.push({
+        path: imported_path,
+        import_info: {
+          imported_from: source_file,
+          stmt: import_stmt,
+        },
+      })
     }
   }
   return source_files
 }
 
 class CollectImportsVisitor extends ASTVisitorBase {
-  #diagnostics: Diagnostics
-  #source_file: SourceFile
-  readonly imports: string[] = []
-  constructor(diagnostics: Diagnostics, source_file: SourceFile) {
-    super()
-    this.#diagnostics = diagnostics
-    this.#source_file = source_file
-  }
-
+  readonly imports: ImportStmt[] = []
   override visit_stmt(stmt: Stmt): void {
     if (stmt.kind === "Import") {
-      const path = parse_module_specifier(stmt.module_specifier)
-      if (!existsSync(path)) {
-        this.#diagnostics.push(this.#source_file.path, {
-          span: {
-            start: stmt.span.stop - stmt.module_specifier.length,
-            stop: stmt.span.stop,
-          },
-          message: `Module not found`,
-          hint: "The module path must be a path to a file relative to the current file. For example, if the current file is `src/main.ts`, and you want to import `src/utils.ts`, you should use `./utils.ts` as the module specifier.",
-        })
-      }
+      this.imports.push(stmt)
     } else {
       super.visit_stmt(stmt)
     }
   }
 }
-function collect_imports(
-  source_file: SourceFile,
-  diagnostics: Diagnostics,
-): string[] {
-  const visitor = new CollectImportsVisitor(diagnostics, source_file)
+function collect_imports(source_file: SourceFile): ImportStmt[] {
+  const visitor = new CollectImportsVisitor()
   visitor.visit_source_file(source_file)
   return visitor.imports
 }
