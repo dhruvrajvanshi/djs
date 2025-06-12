@@ -54,6 +54,9 @@ importers:
       '@types/node':
         specifier: ^22.15.30
         version: 22.15.30
+      '@vitest/coverage-v8':
+        specifier: 3.2.3
+        version: 3.2.3(vitest@3.2.3(@types/node@22.15.30)(tsx@4.19.4))
       typescript:
         specifier: 5.8.3
         version: 5.8.3

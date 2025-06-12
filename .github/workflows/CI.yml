@@ -40,6 +40,10 @@ jobs:
       run: pnpm vitest --coverage
       working-directory: djs_il
 
+    - name: Run tests (djs_ljs)
+      run: pnpm vitest --coverage
+      working-directory: djs_ljs
+
     - name: Codecov
       uses: codecov/codecov-action@v5
       env:
