@@ -1,4 +1,6 @@
-import type { Diagnostic } from "djs_ast"
+import { prettify_diagnostics, type Diagnostic } from "djs_ast"
+import type { FS } from "./FS.ts"
+import { promises as node_fs } from "node:fs"
 
 export class Diagnostics implements Iterable<[string, Diagnostic[]]> {
   #by_path: Record<string, Diagnostic[]> = {}
@@ -12,5 +14,18 @@ export class Diagnostics implements Iterable<[string, Diagnostic[]]> {
 
   [Symbol.iterator]() {
     return Object.entries(this.#by_path)[Symbol.iterator]()
+  }
+
+  async prettify(fs: FS = node_fs): Promise<string> {
+    let errors: string = ""
+    for (const path in this.#by_path) {
+      const diagnostics = await prettify_diagnostics(
+        path,
+        this.#by_path[path],
+        await fs.readFile(path, "utf-8"),
+      )
+      errors += diagnostics + "\n\n"
+    }
+    return errors.trimEnd()
   }
 }
