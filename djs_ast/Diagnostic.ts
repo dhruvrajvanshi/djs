@@ -13,7 +13,7 @@ const COLOR_RESET = "\x1b[0m"
 const COLOR_DIMMED = "\x1b[2m"
 const BOLD = "\x1b[1m"
 
-export async function show_diagnostics(
+export async function prettify_diagnostics(
   path: string,
   errors: readonly Diagnostic[],
   source_text: string | null,
@@ -21,15 +21,20 @@ export async function show_diagnostics(
   if (source_text === null) {
     source_text = await fs.readFile(path, "utf8")
   }
-  console.log(
-    [...errors]
-      .sort((a, b) => b.span.start - a.span.start)
-      .map(
-        (e) =>
-          `${COLOR_ERROR}ERROR:${COLOR_RESET} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}${show_hint(e.hint)}`,
-      )
-      .join("\n\n"),
-  )
+  return [...errors]
+    .sort((a, b) => b.span.start - a.span.start)
+    .map(
+      (e) =>
+        `${COLOR_ERROR}ERROR:${COLOR_RESET} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}${show_hint(e.hint)}`,
+    )
+    .join("\n\n")
+}
+export function show_diagnostics(
+  path: string,
+  errors: readonly Diagnostic[],
+  source_text: string | null,
+) {
+  console.log(prettify_diagnostics(path, errors, source_text))
 }
 function show_hint(hint: string | null): string {
   if (hint === null) return ""
