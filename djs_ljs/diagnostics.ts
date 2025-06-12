@@ -15,6 +15,10 @@ export class Diagnostics implements Iterable<[string, Diagnostic[]]> {
     return Object.entries(this.#by_path)[Symbol.iterator]()
   }
 
+  get(path: string): Diagnostic[] {
+    return this.#by_path[path] ?? []
+  }
+
   async prettify(fs: FS = FS.real): Promise<string> {
     let errors: string = ""
     for (const path in this.#by_path) {
