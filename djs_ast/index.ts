@@ -3,5 +3,9 @@ export { TokenKind } from "./TokenKind.ts"
 export * from "./ast.gen.ts"
 export { Span } from "./Span.ts"
 export { source_file_to_sexpr } from "./sexpr.ts"
-export { type Diagnostic, show_diagnostics } from "./Diagnostic.ts"
+export {
+  type Diagnostic,
+  show_diagnostics,
+  prettify_diagnostics,
+} from "./Diagnostic.ts"
 export { type ASTVisitor, ASTVisitorBase } from "./visitor.gen.ts"
