@@ -29,12 +29,12 @@ export async function prettify_diagnostics(
     )
     .join("\n\n")
 }
-export function show_diagnostics(
+export async function show_diagnostics(
   path: string,
   errors: readonly Diagnostic[],
   source_text: string | null,
 ) {
-  console.log(prettify_diagnostics(path, errors, source_text))
+  console.log(await prettify_diagnostics(path, errors, source_text))
 }
 function show_hint(hint: string | null): string {
   if (hint === null) return ""
