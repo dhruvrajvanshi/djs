@@ -8,7 +8,7 @@ import {
 } from "./ast.def.ts"
 import assert from "node:assert/strict"
 
-type SExpr =
+export type SExpr =
   | string
   | null
   | boolean
