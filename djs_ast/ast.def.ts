@@ -271,7 +271,7 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
     fragments: Array(TemplateLiteralFragment),
   },
 })
-const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
+export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { ident: Ident },
   Union: { left: TypeAnnotation, right: TypeAnnotation },
   Array: { item: TypeAnnotation },
