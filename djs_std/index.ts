@@ -1,3 +1,4 @@
+import { AssertionError } from "node:assert/strict"
 export type Prettify<T> = {
   [K in keyof T]: T[K]
 } & unknown
@@ -9,3 +10,10 @@ export type Prettify<T> = {
 export type ReadonlyUnion<T extends Record<string, unknown>> = T extends unknown
   ? Prettify<Readonly<T>>
   : never
+
+export function todo(message: string | null = null): never {
+  throw new AssertionError({
+    message: message ? `TODO(${message})` : "TODO",
+    stackStartFn: todo,
+  })
+}

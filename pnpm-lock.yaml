@@ -50,6 +50,9 @@ importers:
       djs_parser:
         specifier: workspace:*
         version: link:../djs_parser
+      djs_std:
+        specifier: workspace:*
+        version: link:../djs_std
     devDependencies:
       '@types/node':
         specifier: ^22.15.30
@@ -85,6 +88,9 @@ importers:
 
   djs_std:
     devDependencies:
+      '@types/node':
+        specifier: ^22.15.30
+        version: 22.15.30
       typescript:
         specifier: 5.8.3
         version: 5.8.3
