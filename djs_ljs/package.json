@@ -9,7 +9,8 @@
   },
   "dependencies": {
     "djs_ast": "workspace:*",
-    "djs_parser": "workspace:*"
+    "djs_parser": "workspace:*",
+    "djs_std": "workspace:*"
   },
   "$schema": "https://json.schemastore.org/package.json",
   "devDependencies": {

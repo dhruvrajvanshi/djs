@@ -19,6 +19,13 @@ export class Diagnostics implements Iterable<[string, Diagnostic[]]> {
     return this.#by_path[path] ?? []
   }
 
+  get length(): number {
+    return Object.values(this.#by_path).reduce(
+      (sum, diagnostics) => sum + diagnostics.length,
+      0,
+    )
+  }
+
   async prettify(fs: FS = FS.real): Promise<string> {
     let errors: string = ""
     for (const path in this.#by_path) {
