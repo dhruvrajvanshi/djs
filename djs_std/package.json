@@ -1,0 +1,18 @@
+{
+  "name": "djs_std",
+  "main": "dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "$schema": "https://json.schemastore.org/package.json",
+  "packageManager": "pnpm@10.8.0",
+  "devDependencies": {
+    "typescript": "5.8.3"
+  }
+}

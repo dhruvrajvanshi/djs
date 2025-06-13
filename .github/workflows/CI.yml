@@ -28,9 +28,15 @@ jobs:
         cache: 'pnpm'
     - name: Install dependencies
       run: pnpm install
+
+    - name: Build djs_std
+      run: pnpm build
+      working-directory: djs_std
+
     - name: Build djs_ast
       run: pnpm build
       working-directory: djs_ast
+
     - name: Build djs_parser
       run: pnpm build
       working-directory: djs_parser
