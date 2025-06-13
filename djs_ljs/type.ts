@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { assert_never, type ReadonlyUnion } from "djs_std"
 
 export type Type = ReadonlyUnion<
@@ -17,6 +18,26 @@ export type Type = ReadonlyUnion<
   | { kind: "MutPtr"; type: Type }
 >
 export const Type = {
+=======
+import { type Prettify } from "djs_std"
+export type PrimitiveKind = (typeof PrimitiveKindsList)[number]
+
+const PrimitiveKindsList = [
+  "u8",
+  "u16",
+  "u32",
+  "u64",
+  "i8",
+  "i16",
+  "i32",
+  "i64",
+  "f32",
+  "f64",
+  "boolean",
+] as const
+
+const PrimitiveTypes = {
+>>>>>>> 879a0f1 ([ljs] [type]: Add types.ts)
   u8: { kind: "u8" },
   u16: { kind: "u16" },
   u32: { kind: "u32" },
@@ -27,6 +48,7 @@ export const Type = {
   i64: { kind: "i64" },
   f32: { kind: "f32" },
   f64: { kind: "f64" },
+<<<<<<< HEAD
   c_char: { kind: "c_char" },
   boolean: { kind: "boolean" },
 
@@ -67,4 +89,28 @@ export function type_to_string(type: Type): string {
     default:
       return assert_never(type)
   }
+=======
+  boolean: { kind: "boolean" },
+} satisfies Record<PrimitiveKind, PrimitiveType>
+
+export interface PrimitiveType {
+  readonly kind: PrimitiveKind
+}
+
+export interface PtrType {
+  readonly kind: "ptr"
+  readonly is_const: boolean
+  readonly to: Type
+}
+
+export type Type = Prettify<PrimitiveType | PtrType>
+
+export const Type = {
+  ...PrimitiveTypes,
+  ptr: (is_const: boolean, to: Type): PtrType => ({
+    kind: "ptr",
+    is_const,
+    to,
+  }),
+>>>>>>> 879a0f1 ([ljs] [type]: Add types.ts)
 }
