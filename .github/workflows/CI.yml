@@ -31,9 +31,8 @@ jobs:
     - name: Build djs_ast
       run: pnpm build
       working-directory: djs_ast
-
-    - name: Run tests (djs_parser)
-      run: pnpm vitest --coverage
+    - name: Build djs_parser
+      run: pnpm build
       working-directory: djs_parser
 
     - name: Run tests (djs_il)
@@ -43,6 +42,10 @@ jobs:
     - name: Run tests (djs_ljs)
       run: pnpm vitest --coverage
       working-directory: djs_ljs
+
+    - name: Run tests (djs_parser)
+      run: pnpm vitest --coverage
+      working-directory: djs_parser
 
     - name: Codecov
       uses: codecov/codecov-action@v5
