@@ -4,21 +4,13 @@ import type { EnumItem, StructItem, Type } from "./astgen_items.ts"
 import { DStmt as StmtDef } from "./ast.def.ts"
 import assert from "node:assert/strict"
 
-type SExpr = string | null | boolean | number | SExpr[] | SObject
-interface SObject {
-  [key: string]: SExpr
-}
-function makeSObject(name: string, fields: Record<string, SExpr>): SObject {
-  const cls = class {
-    constructor(fields: Record<string, SExpr>) {
-      Object.assign(this, fields)
-    }
-  }
-  Object.defineProperty(cls, "name", {
-    value: name,
-  })
-  return new cls(fields) as never
-}
+type SExpr =
+  | string
+  | null
+  | boolean
+  | number
+  | SExpr[]
+  | { [key: string]: SExpr }
 
 function stmt_to_sexpr(stmt: Stmt): SExpr {
   return variant_dumper<Stmt>(StmtDef)(stmt)
@@ -39,6 +31,10 @@ function variant_dumper<T>(item: EnumItem): (value: T) => SExpr {
       )
       assert("kind" in value)
       const kind = value["kind"]
+      assert(
+        typeof kind === "string",
+        `Expected kind to be a string, got ${kind}`,
+      )
       const variant = item.variants.find((v) => v.name === kind)
       assert(variant, `Unknown variant: ${kind} in ${item.name}`)
       const entries: Record<string, SExpr> = {}
@@ -48,7 +44,7 @@ function variant_dumper<T>(item: EnumItem): (value: T) => SExpr {
         const field = (value as Record<string, unknown>)[name]
         entries[name] = dumper(field)
       }
-      return makeSObject(`${item.name}.${kind}`, entries)
+      return { kind: variant.name, ...entries }
     }
   } else {
     return (value: unknown) => {
@@ -76,7 +72,7 @@ function struct_dumper(item: StructItem): (value: unknown) => SExpr {
       assert(name in value, `Missing field: ${name} in ${item.name}`)
       fields[name] = dumper((value as Record<string, unknown>)[name])
     }
-    return makeSObject(item.name, fields)
+    return [item.name, fields]
   }
 }
 

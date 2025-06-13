@@ -25,26 +25,31 @@ test("parse error for missing parenthesis in if condition", () => {
     .toMatchInlineSnapshot(`
     "10: Expected '(' after 'if'"
   `)
-  expect(source_file_to_sexpr(source_file)).toMatchInlineSnapshot(`
-    [
-      "SourceFile(test.js)",
-      Stmt.If {
-        "condition": Expr.Var {
-          "ident": "x",
-        },
-        "if_false": Stmt.Expr {
-          "expr": Expr.Var {
-            "ident": "z",
-          },
-        },
-        "if_true": Stmt.Expr {
-          "expr": Expr.Var {
-            "ident": "y",
-          },
+
+  assert.deepEqual(source_file_to_sexpr(source_file), [
+    "SourceFile(test.js)",
+    {
+      kind: "If",
+      condition: {
+        kind: "Var",
+        ident: "x",
+      },
+      if_false: {
+        kind: "Expr",
+        expr: {
+          kind: "Var",
+          ident: "z",
         },
       },
-    ]
-  `)
+      if_true: {
+        kind: "Expr",
+        expr: {
+          kind: "Var",
+          ident: "y",
+        },
+      },
+    },
+  ])
 })
 
 test("simple regex", () => {
