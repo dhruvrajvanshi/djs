@@ -6,6 +6,7 @@ import type {
   EnumVariant,
   StructItem,
 } from "./astgen_items.ts"
+import assert from "node:assert/strict"
 
 export const type_registry: Record<string, Item> = {}
 
@@ -536,6 +537,12 @@ function Enum(
   tags: Tag[],
   variants: Record<string, Record<string, Type>>,
 ): EnumItem {
+  for (const args of Object.values(variants)) {
+    assert(
+      Object.keys(args).every((arg_name) => arg_name !== "kind"),
+      `Enum variant "${name}" cannot have a "kind" field because it reserved for the variant tag`,
+    )
+  }
   return register_item({
     kind: "enum",
     name,
