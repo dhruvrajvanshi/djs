@@ -47,7 +47,11 @@ test("should report errors if imported file can't be read", async () => {
         }
     `,
   })
-  const source_files = await collect_source_files("main.ljs", diagnostics, fs)
+  const { source_files } = await collect_source_files(
+    "main.ljs",
+    diagnostics,
+    fs,
+  )
   assert.equal(Object.values(source_files).length, 2)
 
   const correct_import_diagnostics = diagnostics.get("correct_import.ljs")
