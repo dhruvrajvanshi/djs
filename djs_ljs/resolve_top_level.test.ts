@@ -1,7 +1,6 @@
 import { test } from "vitest"
 import { FS } from "./FS.ts"
 import { collect_source_files } from "./collect_source_files.ts"
-import { Diagnostics } from "./diagnostics.ts"
 import assert from "node:assert/strict"
 import { resolve_top_level } from "./resolve_top_level.ts"
 
@@ -12,13 +11,11 @@ test("resolve top level", async () => {
        function foo() {}
     `,
   })
-  const collect_source_files_diagnostics = new Diagnostics()
-  const { source_files } = await collect_source_files(
+  const { source_files, diagnostics } = await collect_source_files(
     "main.djs",
-    collect_source_files_diagnostics,
     fs,
   )
-  assert.equal(collect_source_files_diagnostics.length, 0)
+  assert.equal(diagnostics.length, 0)
 
   const resolve_result = resolve_top_level(source_files)
   const entry_file = source_files["main.djs"]

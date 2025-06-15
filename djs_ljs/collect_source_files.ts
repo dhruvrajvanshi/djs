@@ -1,17 +1,21 @@
 import { ASTVisitorBase, ImportStmt, type SourceFile, type Stmt } from "djs_ast"
 import { parse_source_file } from "djs_parser"
-import type { Diagnostics } from "./diagnostics.ts"
+import { Diagnostics } from "./diagnostics.js"
 import * as Queue from "./queue.ts"
 import assert from "node:assert"
 import { FS } from "./FS.ts"
 import { exit } from "node:process"
-import type { Program } from "./program.ts"
+
+export type CollectSourceFilesResult = {
+  source_files: Record<string, SourceFile>
+  diagnostics: Diagnostics
+}
 
 export async function collect_source_files(
   entry_path: string,
-  diagnostics: Diagnostics,
   fs: FS = FS.real,
-): Promise<Program> {
+): Promise<CollectSourceFilesResult> {
+  const diagnostics = new Diagnostics()
   type ImportInfo = {
     stmt: ImportStmt
     imported_from: SourceFile
@@ -65,7 +69,7 @@ export async function collect_source_files(
       })
     }
   }
-  return { source_files }
+  return { source_files, diagnostics }
 }
 
 class CollectImportsVisitor extends ASTVisitorBase {
