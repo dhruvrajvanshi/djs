@@ -1,4 +1,6 @@
+export * from "./ansi.ts"
 import { AssertionError } from "node:assert/strict"
+
 export type Prettify<T> = {
   [K in keyof T]: T[K]
 } & unknown
