@@ -13,7 +13,7 @@ test("resolve top level", async () => {
     `,
   })
   const collect_source_files_diagnostics = new Diagnostics()
-  const source_files = await collect_source_files(
+  const { source_files } = await collect_source_files(
     "main.djs",
     collect_source_files_diagnostics,
     fs,

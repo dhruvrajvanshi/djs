@@ -24,7 +24,7 @@ async function main() {
   }
 
   const diagnostics = new Diagnostics()
-  const source_files = await collect_source_files(files[0], diagnostics)
+  const { source_files } = await collect_source_files(files[0], diagnostics)
 
   if (!args["no-errors"]) {
     for (const [path, d] of diagnostics) {

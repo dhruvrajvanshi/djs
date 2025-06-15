@@ -5,12 +5,13 @@ import * as Queue from "./queue.ts"
 import assert from "node:assert"
 import { FS } from "./FS.ts"
 import { exit } from "node:process"
+import type { Program } from "./program.ts"
 
 export async function collect_source_files(
   entry_path: string,
   diagnostics: Diagnostics,
   fs: FS = FS.real,
-) {
+): Promise<Program> {
   type ImportInfo = {
     stmt: ImportStmt
     imported_from: SourceFile
@@ -64,7 +65,7 @@ export async function collect_source_files(
       })
     }
   }
-  return source_files
+  return { source_files }
 }
 
 class CollectImportsVisitor extends ASTVisitorBase {
