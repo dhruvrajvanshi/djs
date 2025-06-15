@@ -17,3 +17,15 @@ export function todo(message: string | null = null): never {
     stackStartFn: todo,
   })
 }
+
+export function assert_todo(
+  condition: unknown,
+  message: string | null = null,
+): asserts condition {
+  if (!condition) {
+    throw new AssertionError({
+      message: message ? `TODO(${message})` : "TODO",
+      stackStartFn: assert_todo,
+    })
+  }
+}
