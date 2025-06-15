@@ -1,11 +1,9 @@
 import { test, expect } from "vitest"
 import { collect_source_files } from "./collect_source_files.ts"
-import { Diagnostics } from "./diagnostics.ts"
 import { FS } from "./FS.ts"
 import assert from "node:assert"
 
 test("collect_source_files smoke test", async () => {
-  const diagnostics = new Diagnostics()
   const fs = FS.fake({
     "main.ljs": `
          import { print_hello } from "./imported.ljs"
@@ -25,12 +23,11 @@ test("collect_source_files smoke test", async () => {
        export function do_nothing(): void {}
      `,
   })
-  await collect_source_files("main.ljs", diagnostics, fs)
+  const { diagnostics } = await collect_source_files("main.ljs", fs)
   assert.equal(await diagnostics.prettify(fs), "")
 })
 
 test("should report errors if imported file can't be read", async () => {
-  const diagnostics = new Diagnostics()
   const fs = FS.fake({
     "main.ljs": `
         import { correct_import } from "./correct_import.ljs"
@@ -47,9 +44,8 @@ test("should report errors if imported file can't be read", async () => {
         }
     `,
   })
-  const { source_files } = await collect_source_files(
+  const { source_files, diagnostics } = await collect_source_files(
     "main.ljs",
-    diagnostics,
     fs,
   )
   assert.equal(Object.values(source_files).length, 2)
