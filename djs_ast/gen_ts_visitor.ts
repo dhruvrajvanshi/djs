@@ -65,13 +65,13 @@ function visitor_methods(item_name: string): string {
 
   function visit_struct(item: StructItem) {
     const field_walkers = Object.entries(item.fields)
-      .map(([name, type]) => field_walker(`node.${name}`, type))
+      .map(([name, field]) => field_walker(`node.${name}`, field.type))
       .join("\n")
     result += `visit_${to_snake_case(item.name)}(node: ast.${item.name}): void {
         ${field_walkers}
       }\n`
-    for (const field_ty of Object.values(item.fields)) {
-      visit_ty(field_ty)
+    for (const field of Object.values(item.fields)) {
+      visit_ty(field.type)
     }
   }
 

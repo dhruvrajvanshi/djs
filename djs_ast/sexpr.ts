@@ -79,8 +79,8 @@ function struct_dumper(item: StructItem): (value: unknown) => SExpr {
     const fields: Record<string, SExpr> = {
       kind: item.name,
     }
-    for (const [name, type] of Object.entries(item.fields)) {
-      const dumper = type_to_dumper(type)
+    for (const [name, field] of Object.entries(item.fields)) {
+      const dumper = type_to_dumper(field.type)
       assert(name in value, `Missing field: ${name} in ${item.name}`)
       fields[name] = dumper((value as Record<string, unknown>)[name])
     }
