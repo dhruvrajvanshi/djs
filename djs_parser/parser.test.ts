@@ -26,30 +26,33 @@ test("parse error for missing parenthesis in if condition", () => {
     "10: Expected '(' after 'if'"
   `)
 
-  assert.deepEqual(source_file_to_sexpr(source_file), [
-    "SourceFile(test.js)",
-    {
-      kind: "If",
-      condition: {
-        kind: "Var",
-        ident: "x",
-      },
-      if_false: {
-        kind: "Expr",
-        expr: {
+  assert.deepEqual(source_file_to_sexpr(source_file), {
+    kind: "SourceFile",
+    path: "test.js",
+    stmts: [
+      {
+        kind: "If",
+        condition: {
           kind: "Var",
-          ident: "z",
+          ident: "x",
+        },
+        if_false: {
+          kind: "Expr",
+          expr: {
+            kind: "Var",
+            ident: "z",
+          },
+        },
+        if_true: {
+          kind: "Expr",
+          expr: {
+            kind: "Var",
+            ident: "y",
+          },
         },
       },
-      if_true: {
-        kind: "Expr",
-        expr: {
-          kind: "Var",
-          ident: "y",
-        },
-      },
-    },
-  ])
+    ],
+  })
 })
 
 test("simple regex", () => {
