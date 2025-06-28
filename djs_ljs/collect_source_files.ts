@@ -1,6 +1,6 @@
 import { ASTVisitorBase, ImportStmt, type SourceFile, type Stmt } from "djs_ast"
 import { parse_source_file } from "djs_parser"
-import { Diagnostics } from "./diagnostics.js"
+import { Diagnostics } from "./diagnostics.ts"
 import * as Queue from "./queue.ts"
 import assert from "node:assert"
 import { FS } from "./FS.ts"
