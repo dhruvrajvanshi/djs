@@ -1,11 +1,11 @@
 import { type_registry } from "./ast.def.ts"
-import type { Expr, Stmt, TypeAnnotation } from "./ast.gen.ts"
+import type { Expr, SourceFile, Stmt, TypeAnnotation } from "./ast.gen.ts"
 import type { EnumItem, StructItem, Type } from "./astgen_items.ts"
 import {
   DStmt as StmtDef,
   DExpr as ExprDef,
   DTypeAnnotation as TypeAnnotationDef,
-  DSourceFile as SourceFile,
+  DSourceFile as SourceFileDef,
 } from "./ast.def.ts"
 import assert from "node:assert/strict"
 
@@ -30,7 +30,10 @@ export function type_annotation_to_sexpr(type: TypeAnnotation): SExpr {
   return annotation_dumper(type)
 }
 
-export const source_file_to_sexpr = struct_dumper(SourceFile)
+export const source_file_dumper = struct_dumper(SourceFileDef)
+export function source_file_to_sexpr(source_file: SourceFile): SExpr {
+  return source_file_dumper(source_file)
+}
 
 function variant_dumper<T>(item: EnumItem): (value: T) => SExpr {
   if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
@@ -80,6 +83,8 @@ function struct_dumper(item: StructItem): (value: unknown) => SExpr {
       kind: item.name,
     }
     for (const [name, field] of Object.entries(item.fields)) {
+      if (field.tags.includes("sexpr_ignore")) continue
+
       const dumper = type_to_dumper(field.type)
       assert(name in value, `Missing field: ${name} in ${item.name}`)
       fields[name] = dumper((value as Record<string, unknown>)[name])

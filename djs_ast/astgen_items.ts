@@ -1,6 +1,6 @@
 export type Type1 = ["Vec" | "Option", Type]
 export type Type = string | Type1
-export type Tag = "span" | "visit"
+export type Tag = "span" | "visit" | "sexpr_ignore"
 export type EnumVariant = {
   name: string
   args: Record<string, Type>
