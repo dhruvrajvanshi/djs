@@ -550,17 +550,26 @@ function Enum(
 function Struct(
   name: string,
   tags: Tag[],
-  fields: Record<string, Type>,
+  fields: Record<string, Type | { type: Type; tags: Tag[] }>,
 ): StructItem {
   assert(
     Object.keys(fields).every((field_name) => field_name !== "kind"),
     `Struct "${name}" cannot have a "kind" field because it reserved for the struct tag`,
   )
+  const fields_with_tags = Object.fromEntries(
+    Object.entries(fields).map(([field_name, type]) => {
+      if (Array.isArray(type) || typeof type === "string") {
+        return [field_name, { type, tags: [] }]
+      } else {
+        return [field_name, type]
+      }
+    }),
+  )
   return register_item({
     kind: "struct",
     name,
     tags,
-    fields,
+    fields: fields_with_tags,
   })
 }
 
@@ -594,8 +603,8 @@ function needs_lifetime_param_set() {
     }
     switch (item.kind) {
       case "struct":
-        return Object.entries(item.fields).some(([_, type]) =>
-          type_contains_ident_or_text(type),
+        return Object.entries(item.fields).some(([_, field]) =>
+          type_contains_ident_or_text(field.type),
         )
       case "enum":
         return item.variants.some(

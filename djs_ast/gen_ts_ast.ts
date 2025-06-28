@@ -29,7 +29,7 @@ function gen_struct(item: StructItem) {
     export interface ${item.name} {
       ${span}
       ${Object.entries(item.fields)
-        .map(([name, ty]) => `readonly ${name}: ${gen_type(ty)};`)
+        .map(([name, field]) => `readonly ${name}: ${gen_type(field.type)};`)
         .join("\n")}
     }
   `

@@ -16,6 +16,7 @@ export type StructItem = {
   kind: "struct"
   name: string
   tags: Tag[]
-  fields: Record<string, Type>
+  fields: Record<string, { type: Type; tags: Tag[] }>
 }
+
 export type Item = EnumItem | StructItem
