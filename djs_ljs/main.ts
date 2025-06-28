@@ -2,7 +2,6 @@
 
 import { parseArgs } from "node:util"
 import { show_diagnostics, source_file_to_sexpr } from "djs_ast"
-import { Diagnostics } from "./diagnostics.ts"
 import { collect_source_files } from "./collect_source_files.ts"
 
 async function main() {
@@ -23,8 +22,7 @@ async function main() {
     process.exit(1)
   }
 
-  const diagnostics = new Diagnostics()
-  const { source_files } = await collect_source_files(files[0], diagnostics)
+  const { source_files, diagnostics } = await collect_source_files(files[0])
 
   if (!args["no-errors"]) {
     for (const [path, d] of diagnostics) {
