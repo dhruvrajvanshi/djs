@@ -5,6 +5,7 @@ import * as Queue from "./queue.ts"
 import assert from "node:assert"
 import { FS } from "./FS.ts"
 import { exit } from "node:process"
+import Path from "node:path"
 
 export type CollectSourceFilesResult = {
   source_files: Record<string, SourceFile>
@@ -20,10 +21,14 @@ export async function collect_source_files(
     stmt: ImportStmt
     imported_from: SourceFile
   }
-  type Entry = { path: string; import_info: ImportInfo | null }
+  type Entry = {
+    /* absolute path */
+    path: string
+    import_info: ImportInfo | null
+  }
   const queue = Queue.from<Entry>([
     {
-      path: entry_path,
+      path: fs.to_absolute(entry_path),
       import_info: null,
     },
   ])
@@ -57,7 +62,12 @@ export async function collect_source_files(
 
     const imports = collect_imports(source_file)
     for (const import_stmt of imports) {
-      const imported_path = parse_module_specifier(import_stmt.module_specifier)
+      const imported_path = fs.to_absolute(
+        Path.join(
+          Path.dirname(source_file.path),
+          parse_module_specifier(import_stmt.module_specifier),
+        ),
+      )
       if (imported_path in source_files) continue
 
       queue.push({
