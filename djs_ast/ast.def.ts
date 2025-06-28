@@ -552,6 +552,10 @@ function Struct(
   tags: Tag[],
   fields: Record<string, Type>,
 ): StructItem {
+  assert(
+    Object.keys(fields).every((field_name) => field_name !== "kind"),
+    `Struct "${name}" cannot have a "kind" field because it reserved for the struct tag`,
+  )
   return register_item({
     kind: "struct",
     name,

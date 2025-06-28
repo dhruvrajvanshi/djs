@@ -1,10 +1,11 @@
 import { type_registry } from "./ast.def.ts"
-import type { Expr, SourceFile, Stmt, TypeAnnotation } from "./ast.gen.ts"
+import type { Expr, Stmt, TypeAnnotation } from "./ast.gen.ts"
 import type { EnumItem, StructItem, Type } from "./astgen_items.ts"
 import {
   DStmt as StmtDef,
   DExpr as ExprDef,
   DTypeAnnotation as TypeAnnotationDef,
+  DSourceFile as SourceFile,
 } from "./ast.def.ts"
 import assert from "node:assert/strict"
 
@@ -29,12 +30,7 @@ export function type_annotation_to_sexpr(type: TypeAnnotation): SExpr {
   return annotation_dumper(type)
 }
 
-export function source_file_to_sexpr(source_file: SourceFile): SExpr {
-  return [
-    `SourceFile(${source_file.path})`,
-    ...source_file.stmts.map(stmt_to_sexpr),
-  ]
-}
+export const source_file_to_sexpr = struct_dumper(SourceFile)
 
 function variant_dumper<T>(item: EnumItem): (value: T) => SExpr {
   if (item.variants.some((v) => Object.entries(v.args).length > 0)) {
@@ -80,13 +76,15 @@ function struct_dumper(item: StructItem): (value: unknown) => SExpr {
       typeof value === "object" && value !== null,
       `Expected object, got ${JSON.stringify(value)}`,
     )
-    const fields: Record<string, SExpr> = {}
+    const fields: Record<string, SExpr> = {
+      kind: item.name,
+    }
     for (const [name, type] of Object.entries(item.fields)) {
       const dumper = type_to_dumper(type)
       assert(name in value, `Missing field: ${name} in ${item.name}`)
       fields[name] = dumper((value as Record<string, unknown>)[name])
     }
-    return [item.name, fields]
+    return fields
   }
 }
 
