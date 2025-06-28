@@ -20,7 +20,6 @@ import {
   ObjectLiteralEntry,
   type ObjectPatternProperty,
   type Param,
-  type ParamList,
   type Diagnostic,
   Pattern,
   type SourceFile,
@@ -738,8 +737,9 @@ function parser_impl(
 
     const type_params = parse_optional_type_params()
     if (type_params === ERR) return ERR
-    const params = parse_params_with_parens()
-    if (params === ERR) return ERR
+    const params_result = parse_params_with_parens()
+    if (params_result === ERR) return ERR
+    const [params] = params_result
     const return_type = parse_optional_type_annotation()
     if (return_type === ERR) return ERR
 
@@ -804,8 +804,9 @@ function parser_impl(
 
       switch (self.current_token.kind) {
         case t.LParen: {
-          const params = parse_params_with_parens()
-          if (params === ERR) return ERR
+          const params_result = parse_params_with_parens()
+          if (params_result === ERR) return ERR
+          const [params] = params_result
           const return_type = parse_optional_type_annotation()
           if (return_type === ERR) return ERR
 
@@ -877,15 +878,16 @@ function parser_impl(
     if (name === ERR) return ERR
     const type_params = parse_optional_type_params()
     if (type_params === ERR) return ERR
-    const params = parse_params_with_parens()
-    if (params === ERR) return ERR
+    const params_result = parse_params_with_parens()
+    if (params_result === ERR) return ERR
+    const [params] = params_result
     const return_type = parse_optional_type_annotation()
     if (return_type === ERR) return ERR
     const body = parse_block()
     if (body === ERR) return ERR
     const span = Span.between(start, body.span)
 
-    if (accessor_type === AccessorType.Get && params.params.length > 0) {
+    if (accessor_type === AccessorType.Get && params.length > 0) {
       emit_error(`Getter method should not have any parameters`)
       // Could return an error node here, but continuing with processing
     }
@@ -946,7 +948,7 @@ function parser_impl(
     }
   }
 
-  function parse_params_with_parens(): ParamList | Err {
+  function parse_params_with_parens(): [Param[], Span] | Err {
     const start = expect(t.LParen)
     if (start === ERR) return ERR
     const params: Param[] = []
@@ -968,10 +970,7 @@ function parser_impl(
 
     const stop = expect(t.RParen)
     if (stop === ERR) return ERR
-    return {
-      span: Span.between(start.span, stop.span),
-      params,
-    }
+    return [params, Span.between(start.span, stop.span)]
   }
   function parse_param(): Param | Err {
     const pattern = parse_pattern()
@@ -1288,22 +1287,19 @@ function parser_impl(
     ) {
       const pattern = parse_pattern()
       if (pattern === ERR) return ERR
-      const params: ParamList = {
-        span: pattern.span,
-        params: [
-          {
-            span: pattern.span,
-            pattern,
-            type_annotation: null,
-            initializer: null,
-          },
-        ],
-      }
+      const params = [
+        {
+          span: pattern.span,
+          pattern,
+          type_annotation: null,
+          initializer: null,
+        },
+      ]
       if (expect(t.FatArrow) === ERR) return ERR
       const body = parse_arrow_fn_body()
       if (body === ERR) return ERR
       return Expr.ArrowFn(
-        Span.between(params.span, body.span),
+        Span.between(pattern.span, body.span),
         params,
         /* type_annotation */ null,
         body,
@@ -1334,7 +1330,8 @@ function parser_impl(
   }
 
   function parse_arrow_fn(): Expr | Err {
-    let params: ParamList | Err
+    let params: Param[]
+    let params_span: Span
     if (
       at(t.Ident) &&
       next_is(t.FatArrow) &&
@@ -1342,21 +1339,23 @@ function parser_impl(
     ) {
       const pattern = parse_pattern()
       if (pattern === ERR) return ERR
-      params = {
-        span: pattern.span,
-        params: [
-          {
-            span: pattern.span,
-            pattern,
-            type_annotation: null,
-            initializer: null,
-          },
-        ],
-      }
+      params = [
+        {
+          span: pattern.span,
+          pattern,
+          type_annotation: null,
+          initializer: null,
+        },
+      ]
+      params_span = pattern.span
     } else {
-      params = parse_params_with_parens()
+      const params_result = parse_params_with_parens()
+      if (params_result === ERR) {
+        return ERR
+      } else {
+        ;[params, params_span] = params_result
+      }
     }
-    if (params === ERR) return ERR
     const return_type = parse_optional_type_annotation()
     if (return_type === ERR) return ERR
     if (expect(t.FatArrow) === ERR) return ERR
@@ -1365,7 +1364,7 @@ function parser_impl(
     if (body === ERR) return ERR
 
     return Expr.ArrowFn(
-      Span.between(params.span, body.span),
+      Span.between(params_span, body.span),
       params,
       return_type,
       body,
@@ -1810,8 +1809,9 @@ function parser_impl(
     const name = parse_binding_ident()
     if (name === ERR) return ERR
 
-    const params = parse_params_with_parens()
-    if (params === ERR) return ERR
+    const params_result = parse_params_with_parens()
+    if (params_result === ERR) return ERR
+    const [params] = params_result
     if (expect(t.Colon) === ERR) return ERR
     const return_type = parse_type_annotation()
     if (return_type === ERR) return ERR
@@ -1822,7 +1822,7 @@ function parser_impl(
       is_exported: export_token !== null,
       span,
       name,
-      params: params.params,
+      params,
       return_type,
     })
   }
@@ -2273,8 +2273,9 @@ function parser_impl(
     const type_params = parse_optional_type_params()
     if (type_params === ERR) return ERR
 
-    const params = parse_params_with_parens()
-    if (params === ERR) return ERR
+    const params_result = parse_params_with_parens()
+    if (params_result === ERR) return ERR
+    const params = params_result[0]
     const return_type = parse_optional_type_annotation()
     if (return_type === ERR) return ERR
     const body = parse_block()

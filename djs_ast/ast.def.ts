@@ -49,11 +49,6 @@ const Text = "Text"
 const Label = "Label"
 
 /**
- * {@link DParamList}
- */
-const ParamList = "ParamList"
-
-/**
  * {@link DParam}
  */
 const Param = "Param"
@@ -223,7 +218,7 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   Paren: { expr: Expr },
   BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
   ArrowFn: {
-    params: ParamList,
+    params: Array(Param),
     return_type: Option(TypeAnnotation),
     body: ArrowFnBody,
   },
@@ -337,10 +332,6 @@ const DObjectLiteralEntry = Enum(ObjectLiteralEntry, ["span"], {
   Spread: { expr: Expr },
 })
 
-const DParamList = Struct(ParamList, ["span"], {
-  params: Array(Param),
-})
-
 const DParam = Struct(Param, ["span"], {
   pattern: Pattern,
   type_annotation: Option(TypeAnnotation),
@@ -356,7 +347,7 @@ const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
 const DFunc = Struct("Func", ["span", "visit"], {
   name: Option(Ident),
   type_params: Array("TypeParam"),
-  params: ParamList,
+  params: Array(Param),
   body: Block,
   return_type: Option(TypeAnnotation),
   is_generator: "boolean",
@@ -496,7 +487,6 @@ const ast_items = [
   DFuncTypeParam,
   DObjectLiteralEntry,
   DObjectKey,
-  DParamList,
   DParam,
   DFunc,
   DTypeParam,

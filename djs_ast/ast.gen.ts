@@ -683,7 +683,7 @@ export class BinOpExpr {
 export class ArrowFnExpr {
   constructor(
     readonly span: Span,
-    readonly params: ParamList,
+    readonly params: readonly Param[],
     readonly return_type: TypeAnnotation | null,
     readonly body: ArrowFnBody,
   ) {}
@@ -1056,7 +1056,7 @@ export const Expr = {
 
   ArrowFn: (
     span: Span,
-    params: ParamList,
+    params: readonly Param[],
     return_type: TypeAnnotation | null,
     body: ArrowFnBody,
   ): ArrowFnExpr => new ArrowFnExpr(span, params, return_type, body),
@@ -1450,11 +1450,6 @@ export const ObjectKey = {
     new ComputedObjectKey(span, expr),
 } as const
 
-export interface ParamList {
-  readonly span: Span
-  readonly params: readonly Param[]
-}
-
 export interface Param {
   readonly span: Span
   readonly pattern: Pattern
@@ -1466,7 +1461,7 @@ export interface Func {
   readonly span: Span
   readonly name: Ident | null
   readonly type_params: readonly TypeParam[]
-  readonly params: ParamList
+  readonly params: readonly Param[]
   readonly body: Block
   readonly return_type: TypeAnnotation | null
   readonly is_generator: boolean

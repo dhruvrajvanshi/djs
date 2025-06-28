@@ -173,7 +173,9 @@ export class ASTVisitorBase implements ASTVisitor {
         break
       }
       case "ArrowFn": {
-        this.visit_param_list(expr.params)
+        for (const param of expr.params) {
+          this.visit_param(param)
+        }
         if (expr.return_type !== null) {
           this.visit_type_annotation(expr.return_type)
         }
@@ -340,11 +342,6 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_ident(node: ast.Ident): void {}
-  visit_param_list(node: ast.ParamList): void {
-    for (const param of node.params) {
-      this.visit_param(param)
-    }
-  }
   visit_param(node: ast.Param): void {
     this.visit_pattern(node.pattern)
     if (node.type_annotation !== null) {
@@ -493,7 +490,9 @@ export class ASTVisitorBase implements ASTVisitor {
     for (const type_param of node.type_params) {
       this.visit_type_param(type_param)
     }
-    this.visit_param_list(node.params)
+    for (const param of node.params) {
+      this.visit_param(param)
+    }
     this.visit_block(node.body)
     if (node.return_type !== null) {
       this.visit_type_annotation(node.return_type)
