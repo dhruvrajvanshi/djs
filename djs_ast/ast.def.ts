@@ -367,7 +367,10 @@ const DLabel = Struct("Label", ["span"], {
 export const DSourceFile = Struct("SourceFile", ["span", "visit"], {
   path: "str",
   stmts: List(Stmt),
-  errors: List("Diagnostic"),
+  errors: {
+    type: List("Diagnostic"),
+    tags: ["sexpr_ignore"],
+  },
 })
 const DSwitchCase = Struct("SwitchCase", ["span"], {
   test: Option(Expr),
