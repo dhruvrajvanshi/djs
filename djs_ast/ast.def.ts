@@ -150,8 +150,8 @@ const LJSExternFunction = "LJSExternFunction"
 const DPattern = Enum(Pattern, ["span", "visit"], {
   Var: { ident: Ident },
   Assignment: { pattern: Pattern, initializer: Expr },
-  Array: { items: Array(Pattern) },
-  Object: { properties: Array("ObjectPatternProperty"), rest: Option(Pattern) },
+  Array: { items: List(Pattern) },
+  Object: { properties: List("ObjectPatternProperty"), rest: Option(Pattern) },
   Prop: { expr: Expr, key: ObjectKey },
   Elision: {},
   Rest: { pattern: Pattern },
@@ -162,7 +162,7 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   Return: { value: Option(Expr) },
   VarDecl: { decl: VarDecl },
   If: { condition: Expr, if_true: Stmt, if_false: Option(Stmt) },
-  Switch: { condition: Expr, cases: Array(SwitchCase) },
+  Switch: { condition: Expr, cases: List(SwitchCase) },
   While: { condition: Expr, body: Stmt },
   DoWhile: { body: Stmt, condition: Expr },
   Try: {
@@ -187,7 +187,7 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   ClassDecl: { class_def: Class },
   Import: {
     default_import: Option(Ident),
-    named_imports: Array("ImportSpecifier"),
+    named_imports: List("ImportSpecifier"),
     module_specifier: Text,
   },
   Labeled: {
@@ -196,7 +196,7 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   },
   ObjectTypeDecl: {
     name: Ident,
-    fields: Array("ObjectTypeDeclField"),
+    fields: List("ObjectTypeDeclField"),
   },
   TypeAlias: {
     name: Ident,
@@ -218,14 +218,14 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   Paren: { expr: Expr },
   BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
   ArrowFn: {
-    params: Array(Param),
+    params: List(Param),
     return_type: Option(TypeAnnotation),
     body: ArrowFnBody,
   },
   Func: { func: Func },
   Call: {
     callee: Expr,
-    args: Array(Expr),
+    args: List(Expr),
     spread: Option(Expr),
     is_optional: "boolean",
   },
@@ -236,13 +236,13 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   Boolean: { value: "boolean" },
   Null: {},
   Undefined: {},
-  Object: { entries: Array(ObjectLiteralEntry) },
+  Object: { entries: List(ObjectLiteralEntry) },
   Throw: { value: Expr },
   PostIncrement: { value: Expr },
   PostDecrement: { value: Expr },
   PreIncrement: { value: Expr },
   PreDecrement: { value: Expr },
-  Array: { items: Array(ArrayLiteralMember) },
+  Array: { items: List(ArrayLiteralMember) },
   New: { expr: Expr },
   Yield: { value: Option(Expr) },
   YieldFrom: { expr: Expr },
@@ -257,13 +257,13 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   BitNot: { expr: Expr },
   Not: { expr: Expr },
   Await: { expr: Expr },
-  Comma: { items: Array(Expr) },
+  Comma: { items: List(Expr) },
   Super: {},
   Class: { class_def: "Class" },
-  TemplateLiteral: { fragments: Array(TemplateLiteralFragment) },
+  TemplateLiteral: { fragments: List(TemplateLiteralFragment) },
   TaggedTemplateLiteral: {
     tag: Expr,
-    fragments: Array(TemplateLiteralFragment),
+    fragments: List(TemplateLiteralFragment),
   },
 })
 export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
@@ -271,11 +271,11 @@ export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Union: { left: TypeAnnotation, right: TypeAnnotation },
   Array: { item: TypeAnnotation },
   ReadonlyArray: { item: TypeAnnotation },
-  Application: { callee: TypeAnnotation, args: Array(TypeAnnotation) },
+  Application: { callee: TypeAnnotation, args: List(TypeAnnotation) },
   String: { text: Text },
   Func: {
-    type_params: Array("TypeParam"),
-    params: Array("FuncTypeParam"),
+    type_params: List("TypeParam"),
+    params: List("FuncTypeParam"),
     returns: TypeAnnotation,
   },
   LJSConstPtr: {
@@ -288,7 +288,7 @@ export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
 const DLJSExternFunction = Struct("LJSExternFunction", ["span"], {
   is_exported: "boolean",
   name: Ident,
-  params: Array("Param"),
+  params: List("Param"),
   return_type: TypeAnnotation,
 })
 
@@ -302,7 +302,7 @@ const DClass = Struct(Class, ["span"], {
   body: ClassBody,
 })
 const DClassBody = Struct(ClassBody, ["span"], {
-  members: Array(ClassMember),
+  members: List(ClassMember),
 })
 const DClassMember = Enum(ClassMember, [], {
   MethodDef: { method: MethodDef },
@@ -346,8 +346,8 @@ const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
 
 const DFunc = Struct("Func", ["span", "visit"], {
   name: Option(Ident),
-  type_params: Array("TypeParam"),
-  params: Array(Param),
+  type_params: List("TypeParam"),
+  params: List(Param),
   body: Block,
   return_type: Option(TypeAnnotation),
   is_generator: "boolean",
@@ -357,7 +357,7 @@ const DTypeParam = Struct("TypeParam", [], {
   ident: Ident,
 })
 const DBlock = Struct("Block", ["span", "visit"], {
-  stmts: Array(Stmt),
+  stmts: List(Stmt),
 })
 
 const DLabel = Struct("Label", ["span"], {
@@ -366,17 +366,17 @@ const DLabel = Struct("Label", ["span"], {
 
 export const DSourceFile = Struct("SourceFile", ["span", "visit"], {
   path: "str",
-  stmts: Array(Stmt),
-  errors: Array("Diagnostic"),
+  stmts: List(Stmt),
+  errors: List("Diagnostic"),
 })
 const DSwitchCase = Struct("SwitchCase", ["span"], {
   test: Option(Expr),
-  body: Array(Stmt),
+  body: List(Stmt),
 })
 const DInOrOf = StringUnion(InOrOf, "In", "Of")
 const DVarDecl = Struct("VarDecl", ["span"], {
   decl_type: DeclType,
-  declarators: Array(VarDeclarator),
+  declarators: List(VarDeclarator),
 })
 const DVarDeclarator = Struct("VarDeclarator", [], {
   pattern: Pattern,
@@ -568,7 +568,7 @@ function Option<T extends Type>(type: T): ["Option", T] {
   return ["Option", type]
 }
 
-function Array<T extends Type>(type: T): ["Vec", T] {
+function List<T extends Type>(type: T): ["Vec", T] {
   return ["Vec", type]
 }
 
