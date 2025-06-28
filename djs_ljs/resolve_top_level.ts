@@ -3,6 +3,8 @@ import { Diagnostics } from "./diagnostics.js"
 import assert from "node:assert/strict"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { assert_todo } from "djs_std"
+import type { FS } from "./FS.ts"
+import type { SourceFiles } from "./SourceFiles.ts"
 
 type ResolveTopLevelResult = {
   diagnostics: Diagnostics
@@ -15,10 +17,11 @@ type ResolveTopLevelState = {
   source_file_value_decls: Map<SourceFile, Map<string, ValueDeclStmt>>
 }
 export function resolve_top_level(
-  source_files: Record<string, SourceFile>,
+  source_files: SourceFiles,
+  fs: FS,
 ): ResolveTopLevelResult {
   const self: ResolveTopLevelState = {
-    diagnostics: new Diagnostics(),
+    diagnostics: new Diagnostics(fs),
     source_file_value_decls: new Map(),
   }
   collect_module_values_decls(self, source_files)
@@ -30,9 +33,9 @@ export function resolve_top_level(
 }
 function collect_module_values_decls(
   self: ResolveTopLevelState,
-  source_files: Record<string, SourceFile>,
+  source_files: SourceFiles,
 ) {
-  for (const source_file of Object.values(source_files)) {
+  for (const source_file of source_files.values()) {
     assert(
       !self.source_file_value_decls.has(source_file),
       `Duplicate source file ${source_file.path}`,

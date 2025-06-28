@@ -48,7 +48,7 @@ test("should report errors if imported file can't be read", async () => {
     "main.ljs",
     fs,
   )
-  assert.equal(Object.values(source_files).length, 2)
+  assert.equal(source_files.size, 2)
 
   const correct_import_diagnostics = diagnostics.get("correct_import.ljs")
   expect(correct_import_diagnostics).toHaveLength(1)

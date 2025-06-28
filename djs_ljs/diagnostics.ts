@@ -1,41 +1,45 @@
 import { prettify_diagnostics, type Diagnostic } from "djs_ast"
 import { FS } from "./FS.ts"
+import { PathMap } from "./PathMap.ts"
 
-export class Diagnostics implements Iterable<[string, Diagnostic[]]> {
-  #by_path: Record<string, Diagnostic[]> = {}
-
-  push(path: string, ...diagnostics: Diagnostic[]) {
-    if (!(path in this.#by_path)) {
-      this.#by_path[path] = []
-    }
-    this.#by_path[path].push(...diagnostics)
+export class Diagnostics {
+  private by_path: PathMap<Diagnostic[]>
+  private fs: FS
+  constructor(fs: FS) {
+    this.by_path = new PathMap(fs)
+    this.fs = fs
   }
 
-  [Symbol.iterator]() {
-    return Object.entries(this.#by_path)[Symbol.iterator]()
+  push(path: string, ...diagnostics: Diagnostic[]) {
+    path = this.fs.to_absolute(path)
+    this.by_path.get_or_put(path, () => []).push(...diagnostics)
   }
 
   get(path: string): Diagnostic[] {
-    return this.#by_path[path] ?? []
+    return this.by_path.get(path) ?? []
   }
 
-  get length(): number {
-    return Object.values(this.#by_path).reduce(
-      (sum, diagnostics) => sum + diagnostics.length,
+  get size(): number {
+    return Array.from(this.by_path.entries()).reduce(
+      (sum, [_, diagnostics]) => sum + diagnostics.length,
       0,
     )
   }
 
   async prettify(fs: FS = FS.real): Promise<string> {
     let errors: string = ""
-    for (const path in this.#by_path) {
-      const diagnostics = await prettify_diagnostics(
+    for (const [path, diagnostics] of this.by_path.entries()) {
+      const pretty_diagnostics = await prettify_diagnostics(
         path,
-        this.#by_path[path],
+        diagnostics,
         await fs.read_file(path, "utf-8"),
       )
-      errors += diagnostics + "\n\n"
+      errors += pretty_diagnostics + "\n\n"
     }
     return errors.trimEnd()
+  }
+
+  entries(): IterableIterator<[string, Diagnostic[]]> {
+    return this.by_path.entries()
   }
 }

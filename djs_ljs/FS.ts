@@ -29,7 +29,6 @@ function fake_fs(_files: Record<string, string>): FS {
   }
 
   return {
-    files,
     read_file: async (path_) => {
       const path = to_absolute(path_)
       if (!(path in files)) {
@@ -39,7 +38,4 @@ function fake_fs(_files: Record<string, string>): FS {
     },
     to_absolute,
   }
-}
-function normalize_path(path: string): string {
-  return path.replace(/^\.\//g, "")
 }

@@ -6,9 +6,10 @@ import assert from "node:assert"
 import { FS } from "./FS.ts"
 import { exit } from "node:process"
 import Path from "node:path"
+import { SourceFiles } from "./SourceFiles.ts"
 
 export type CollectSourceFilesResult = {
-  source_files: Record<string, SourceFile>
+  source_files: SourceFiles
   diagnostics: Diagnostics
 }
 
@@ -16,7 +17,7 @@ export async function collect_source_files(
   entry_path: string,
   fs: FS = FS.real,
 ): Promise<CollectSourceFilesResult> {
-  const diagnostics = new Diagnostics()
+  const diagnostics = new Diagnostics(fs)
   type ImportInfo = {
     stmt: ImportStmt
     imported_from: SourceFile
@@ -32,7 +33,7 @@ export async function collect_source_files(
       import_info: null,
     },
   ])
-  const source_files: Record<string, SourceFile> = {}
+  const source_files = new SourceFiles(fs)
   while (queue.length > 0) {
     const { path, import_info } = Queue.take(queue)
 
@@ -57,7 +58,7 @@ export async function collect_source_files(
     }
     const source_file = parse_source_file(path, source_text)
 
-    source_files[path] = source_file
+    source_files.set(path, source_file)
     diagnostics.push(path, ...source_file.errors)
 
     const imports = collect_imports(source_file)

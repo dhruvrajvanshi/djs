@@ -15,10 +15,10 @@ test("resolve top level", async () => {
     "main.djs",
     fs,
   )
-  assert.equal(diagnostics.length, 0)
+  assert.equal(diagnostics.size, 0)
 
-  const resolve_result = resolve_top_level(source_files)
-  const entry_file = source_files["main.djs"]
+  const resolve_result = resolve_top_level(source_files, fs)
+  const entry_file = source_files.get("main.djs")
 
   assert(entry_file, "main.djs file not found in source_files")
 
