@@ -25,12 +25,12 @@ async function main() {
   const { source_files, diagnostics } = await collect_source_files(files[0])
 
   if (!args["no-errors"]) {
-    for (const [path, d] of diagnostics) {
+    for (const [path, d] of diagnostics.entries()) {
       await show_diagnostics(path, d, null)
     }
   }
   if (args["dump-ast"]) {
-    for (const source_file of Object.values(source_files)) {
+    for (const source_file of source_files.values()) {
       console.dir(source_file_to_sexpr(source_file), {
         depth: null,
       })
