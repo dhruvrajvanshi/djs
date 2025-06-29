@@ -208,6 +208,7 @@ export class FuncStmt {
   constructor(
     readonly span: Span,
     readonly func: Func,
+    readonly is_exported: boolean,
   ) {}
 
   get kind(): "Func" {
@@ -355,7 +356,8 @@ export const Stmt = {
   With: (span: Span, expr: Expr, body: Stmt): WithStmt =>
     new WithStmt(span, expr, body),
 
-  Func: (span: Span, func: Func): FuncStmt => new FuncStmt(span, func),
+  Func: (span: Span, func: Func, is_exported: boolean): FuncStmt =>
+    new FuncStmt(span, func, is_exported),
 
   ClassDecl: (span: Span, class_def: Class): ClassDeclStmt =>
     new ClassDeclStmt(span, class_def),

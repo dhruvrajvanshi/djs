@@ -183,7 +183,7 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   Continue: { label: Option(Label) },
   Debugger: {},
   With: { expr: Expr, body: Stmt },
-  Func: { func: Func },
+  Func: { func: Func, is_exported: "boolean" },
   ClassDecl: { class_def: Class },
   Import: {
     default_import: Option(Ident),
