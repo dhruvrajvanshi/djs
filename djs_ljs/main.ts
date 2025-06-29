@@ -1,11 +1,12 @@
 #!/usr/bin/env -S node --no-warnings
 
 import { deprecate, parseArgs } from "node:util"
-import { show_diagnostics, source_file_to_sexpr } from "djs_ast"
+import { show_diagnostics, source_file_to_sexpr, stmt_to_sexpr } from "djs_ast"
 import { collect_source_files } from "./collect_source_files.ts"
 import { resolve_top_level } from "./resolve_top_level.ts"
 import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
+import { MapUtils } from "djs_std"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -49,9 +50,15 @@ async function main() {
   )
   if (dump_resolve_top_level) {
     console.log("---- resolve_top_level ----")
-    console.dir(resolve_top_level_result.source_file_value_decls.toMap(), {
-      depth: Infinity,
-    })
+    console.dir(
+      MapUtils.map_values(
+        resolve_top_level_result.source_file_value_decls.toMap(),
+        (bindings) => MapUtils.map_values(bindings, stmt_to_sexpr),
+      ),
+      {
+        depth: Infinity,
+      },
+    )
   }
 
   const diagnostics = Diagnostics.merge(

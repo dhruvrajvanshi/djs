@@ -6,7 +6,8 @@ import assert from "node:assert"
 import { FS } from "./FS.ts"
 import { exit } from "node:process"
 import Path from "node:path"
-import { SourceFiles } from "./SourceFiles.ts"
+import { type SourceFiles } from "./SourceFiles.ts"
+import { PathMap } from "./PathMap.ts"
 
 export type CollectSourceFilesResult = {
   source_files: SourceFiles
@@ -33,7 +34,7 @@ export async function collect_source_files(
       import_info: null,
     },
   ])
-  const source_files = new SourceFiles(fs)
+  const source_files = new PathMap<SourceFile>(fs)
   while (queue.length > 0) {
     const { path, import_info } = Queue.take(queue)
 

@@ -31,3 +31,24 @@ export function assert_todo(
     })
   }
 }
+
+export const MapUtils = {
+  map_entries<K, V, K2, V2>(
+    map: Map<K, V>,
+    fn: (entry: [K, V]) => [K2, V2],
+  ): Map<K2, V2> {
+    const result = new Map<K2, V2>()
+    for (const entry of map.entries()) {
+      const [k, v] = fn(entry)
+      result.set(k, v)
+    }
+    return result
+  },
+  map_values<K, V, V2>(map: Map<K, V>, fn: (value: V) => V2): Map<K, V2> {
+    const result = new Map<K, V2>()
+    for (const [k, v] of map.entries()) {
+      result.set(k, fn(v))
+    }
+    return result
+  },
+}
