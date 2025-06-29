@@ -9,6 +9,7 @@ test("resolve top level", async () => {
     "main.djs": `
        const a_number = 1
        function foo() {}
+       extern function external_func(): void
     `,
   })
   const { source_files, diagnostics } = await collect_source_files(
@@ -30,4 +31,5 @@ test("resolve top level", async () => {
   assert.equal(entry_file_value_decls.get("a_number"), entry_file.stmts[0])
 
   assert.equal(entry_file_value_decls.get("foo"), entry_file.stmts[1])
+  assert.equal(entry_file_value_decls.get("external_func"), entry_file.stmts[2])
 })
