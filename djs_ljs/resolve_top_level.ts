@@ -1,20 +1,21 @@
-import type { ClassDeclStmt, FuncStmt, SourceFile, VarDeclStmt } from "djs_ast"
-import { Diagnostics } from "./diagnostics.js"
+import type { ClassDeclStmt, FuncStmt, VarDeclStmt } from "djs_ast"
+import { Diagnostics } from "./diagnostics.ts"
 import assert from "node:assert/strict"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { assert_todo } from "djs_std"
 import type { FS } from "./FS.ts"
 import type { SourceFiles } from "./SourceFiles.ts"
+import { PathMap } from "./PathMap.ts"
 
 type ResolveTopLevelResult = {
   diagnostics: Diagnostics
-  source_file_value_decls: Map<SourceFile, Map<string, ValueDeclStmt>>
+  source_file_value_decls: PathMap<Map<string, ValueDeclStmt>>
 }
 type ValueDeclStmt = FuncStmt | VarDeclStmt | ClassDeclStmt
 
 type ResolveTopLevelState = {
   diagnostics: Diagnostics
-  source_file_value_decls: Map<SourceFile, Map<string, ValueDeclStmt>>
+  source_file_value_decls: PathMap<Map<string, ValueDeclStmt>>
 }
 export function resolve_top_level(
   source_files: SourceFiles,
@@ -22,7 +23,7 @@ export function resolve_top_level(
 ): ResolveTopLevelResult {
   const self: ResolveTopLevelState = {
     diagnostics: new Diagnostics(fs),
-    source_file_value_decls: new Map(),
+    source_file_value_decls: new PathMap(fs),
   }
   collect_module_values_decls(self, source_files)
 
@@ -37,11 +38,11 @@ function collect_module_values_decls(
 ) {
   for (const source_file of source_files.values()) {
     assert(
-      !self.source_file_value_decls.has(source_file),
+      !self.source_file_value_decls.has(source_file.path),
       `Duplicate source file ${source_file.path}`,
     )
     const module_values_decls = new Map<string, ValueDeclStmt>()
-    self.source_file_value_decls.set(source_file, module_values_decls)
+    self.source_file_value_decls.set(source_file.path, module_values_decls)
     for (const stmt of source_file.stmts) {
       switch (stmt.kind) {
         case "VarDecl": {
