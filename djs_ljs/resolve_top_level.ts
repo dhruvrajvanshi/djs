@@ -1,4 +1,9 @@
-import type { ClassDeclStmt, FuncStmt, VarDeclStmt } from "djs_ast"
+import type {
+  ClassDeclStmt,
+  FuncStmt,
+  LJSExternFunctionStmt,
+  VarDeclStmt,
+} from "djs_ast"
 import { Diagnostics } from "./diagnostics.ts"
 import assert from "node:assert/strict"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
@@ -11,7 +16,11 @@ type ResolveTopLevelResult = {
   diagnostics: Diagnostics
   source_file_value_decls: PathMap<Map<string, ValueDeclStmt>>
 }
-type ValueDeclStmt = FuncStmt | VarDeclStmt | ClassDeclStmt
+type ValueDeclStmt =
+  | FuncStmt
+  | VarDeclStmt
+  | ClassDeclStmt
+  | LJSExternFunctionStmt
 
 type ResolveTopLevelState = {
   diagnostics: Diagnostics
@@ -64,9 +73,18 @@ function collect_module_values_decls(
             `Duplicate function declaration ${func.name.text} in ${source_file.path}`,
           )
           module_values_decls.set(func.name.text, stmt)
+          break
         }
-
-        default:
+        case "LJSExternFunction": {
+          const func = stmt.func
+          if (!func.name) break
+          assert_todo(
+            !module_values_decls.has(func.name.text),
+            `Duplicate extern function declaration ${func.name.text} in ${source_file.path}`,
+          )
+          module_values_decls.set(func.name.text, stmt)
+          break
+        }
       }
     }
   }
