@@ -2482,7 +2482,7 @@ function parser_impl(
       stmts.push(stmt)
     }
     return {
-      path: Path.relative(process.cwd(), path),
+      path,
       span,
       stmts,
       errors: self.errors,
