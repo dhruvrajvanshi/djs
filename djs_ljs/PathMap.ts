@@ -46,6 +46,13 @@ export class PathMap<T> {
   values(): IterableIterator<T> {
     return this.#map.values()
   }
+  toMap(): Map<string, T> {
+    const result = new Map<string, T>()
+    for (const [path, value] of this.#map.entries()) {
+      result.set(path, value)
+    }
+    return result
+  }
 
   toString(): string {
     return this.#map.toString()
