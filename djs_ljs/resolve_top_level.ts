@@ -76,13 +76,12 @@ function collect_module_values_decls(
           break
         }
         case "LJSExternFunction": {
-          const func = stmt.func
-          if (!func.name) break
+          if (!stmt.name) break
           assert_todo(
-            !module_values_decls.has(func.name.text),
-            `Duplicate extern function declaration ${func.name.text} in ${source_file.path}`,
+            !module_values_decls.has(stmt.name.text),
+            `Duplicate extern function declaration ${stmt.name.text} in ${source_file.path}`,
           )
-          module_values_decls.set(func.name.text, stmt)
+          module_values_decls.set(stmt.name.text, stmt)
           break
         }
       }

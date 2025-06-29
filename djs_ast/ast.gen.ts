@@ -273,7 +273,10 @@ export class TypeAliasStmt {
 export class LJSExternFunctionStmt {
   constructor(
     readonly span: Span,
-    readonly func: LJSExternFunction,
+    readonly is_exported: boolean,
+    readonly name: Ident,
+    readonly params: readonly Param[],
+    readonly return_type: TypeAnnotation,
   ) {}
 
   get kind(): "LJSExternFunction" {
@@ -387,8 +390,12 @@ export const Stmt = {
 
   LJSExternFunction: (
     span: Span,
-    func: LJSExternFunction,
-  ): LJSExternFunctionStmt => new LJSExternFunctionStmt(span, func),
+    is_exported: boolean,
+    name: Ident,
+    params: readonly Param[],
+    return_type: TypeAnnotation,
+  ): LJSExternFunctionStmt =>
+    new LJSExternFunctionStmt(span, is_exported, name, params, return_type),
 
   Empty: (span: Span): EmptyStmt => new EmptyStmt(span),
 } as const
@@ -1334,14 +1341,6 @@ export const TypeAnnotation = {
   LJSPtr: (span: Span, to: TypeAnnotation): LJSPtrTypeAnnotation =>
     new LJSPtrTypeAnnotation(span, to),
 } as const
-
-export interface LJSExternFunction {
-  readonly span: Span
-  readonly is_exported: boolean
-  readonly name: Ident
-  readonly params: readonly Param[]
-  readonly return_type: TypeAnnotation
-}
 
 export interface FuncTypeParam {
   readonly label: Ident

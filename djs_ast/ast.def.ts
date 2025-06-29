@@ -142,11 +142,6 @@ const ForInit = "ForInit"
  */
 const ArrayLiteralMember = "ArrayLiteralMember"
 
-/**
- * {@link DLJSExternFunction}
- */
-const LJSExternFunction = "LJSExternFunction"
-
 const DPattern = Enum(Pattern, ["span", "visit"], {
   Var: { ident: Ident },
   Assignment: { pattern: Pattern, initializer: Expr },
@@ -203,7 +198,10 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
     type_annotation: TypeAnnotation,
   },
   LJSExternFunction: {
-    func: LJSExternFunction,
+    is_exported: "boolean",
+    name: Ident,
+    params: List("Param"),
+    return_type: TypeAnnotation,
   },
   Empty: {},
 })
@@ -284,12 +282,6 @@ export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   LJSPtr: {
     to: TypeAnnotation,
   },
-})
-const DLJSExternFunction = Struct("LJSExternFunction", ["span"], {
-  is_exported: "boolean",
-  name: Ident,
-  params: List("Param"),
-  return_type: TypeAnnotation,
 })
 
 const DFuncTypeParam = Struct("FuncTypeParam", [], {
@@ -486,7 +478,6 @@ const ast_items = [
   DExpr,
   DObjectTypeDeclField,
   DTypeAnnotation,
-  DLJSExternFunction,
   DFuncTypeParam,
   DObjectLiteralEntry,
   DObjectKey,

@@ -1818,13 +1818,13 @@ function parser_impl(
     if (expect_semi() === ERR) return ERR
 
     const span = Span.between(export_token ?? start, return_type)
-    return Stmt.LJSExternFunction(span, {
-      is_exported: export_token !== null,
+    return Stmt.LJSExternFunction(
       span,
+      export_token !== null,
       name,
       params,
       return_type,
-    })
+    )
   }
   function parse_import_stmt(): Stmt | Err {
     const start = advance()

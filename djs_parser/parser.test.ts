@@ -118,16 +118,15 @@ test("conditional operator", () => {
 test("is_exported should be correctly set", () => {
   const source = `
     export extern function foo(): void;
-    export function bar(): void;
+    export function bar(): void {}
   `
   const parser = Parser("test.ljs", source)
   const source_file = parser.parse_source_file()
   expect(source_file.errors).toEqual([])
   assert(source_file.stmts[0].kind === "LJSExternFunction")
-  expect(source_file.stmts[0].func.is_exported).toBe(true)
+  expect(source_file.stmts[0].is_exported).toBe(true)
 
   assert(source_file.stmts[1].kind === "Func")
-  expect(source_file.stmts[1].is_exported).toBe(true)
   expect(source_file.stmts[1].is_exported).toBe(true)
 })
 
