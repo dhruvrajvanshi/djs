@@ -1669,6 +1669,7 @@ function parser_impl(
   }
   function parse_stmt(export_token: Token | null = null): Stmt | Err {
     if (
+      !export_token &&
       at(t.Export) &&
       (next_is(t.Function) ||
         next_is(t.Class) ||
@@ -1678,7 +1679,7 @@ function parser_impl(
         next_is_soft_keyword("extern") ||
         next_is_soft_keyword("type"))
     ) {
-      advance()
+      const export_token = advance()
       return parse_stmt(export_token)
     }
     switch (self.current_token.kind) {
