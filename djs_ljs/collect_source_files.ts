@@ -15,7 +15,7 @@ export type CollectSourceFilesResult = {
 
 export async function collect_source_files(
   entry_path: string,
-  fs: FS = FS.real,
+  fs: FS,
 ): Promise<CollectSourceFilesResult> {
   const diagnostics = new Diagnostics(fs)
   type ImportInfo = {
