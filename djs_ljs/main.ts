@@ -1,6 +1,6 @@
 #!/usr/bin/env -S node --no-warnings
 
-import { deprecate, parseArgs } from "node:util"
+import { parseArgs } from "node:util"
 import { show_diagnostics, source_file_to_sexpr, stmt_to_sexpr } from "djs_ast"
 import { collect_source_files } from "./collect_source_files.ts"
 import { resolve_top_level } from "./resolve_top_level.ts"
