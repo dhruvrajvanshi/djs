@@ -26,6 +26,10 @@ export class PathMap<T> {
     path = this.#fs.to_absolute(path)
     return this.#map.get(path)
   }
+  has(path: string): boolean {
+    path = this.#fs.to_absolute(path)
+    return this.#map.has(path)
+  }
 
   set(path: string, value: T): void {
     path = this.#fs.to_absolute(path)

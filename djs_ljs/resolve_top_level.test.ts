@@ -22,8 +22,9 @@ test("resolve top level", async () => {
 
   assert(entry_file, "main.djs file not found in source_files")
 
-  const entry_file_value_decls =
-    resolve_result.source_file_value_decls.get(entry_file)
+  const entry_file_value_decls = resolve_result.source_file_value_decls.get(
+    entry_file.path,
+  )
 
   assert(entry_file_value_decls, "No value declarations found for main.djs")
   assert.equal(entry_file_value_decls.get("a_number"), entry_file.stmts[0])

@@ -10,6 +10,17 @@ export class Diagnostics {
     this.fs = fs
   }
 
+  static merge(...diagnostics: Diagnostics[]): Diagnostics {
+    const fs = diagnostics[0].fs
+    const merged = new Diagnostics(fs)
+    for (const diag of diagnostics) {
+      for (const [path, diag_list] of diag.entries()) {
+        merged.by_path.get_or_put(path, () => []).push(...diag_list)
+      }
+    }
+    return merged
+  }
+
   push(path: string, ...diagnostics: Diagnostic[]) {
     path = this.fs.to_absolute(path)
     this.by_path.get_or_put(path, () => []).push(...diagnostics)
