@@ -56,7 +56,7 @@ async function main() {
         (bindings) => MapUtils.map_values(bindings, stmt_to_sexpr),
       ),
       {
-        depth: Infinity,
+        depth: 4,
       },
     )
   }

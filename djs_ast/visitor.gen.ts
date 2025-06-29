@@ -149,7 +149,11 @@ export class ASTVisitorBase implements ASTVisitor {
         break
       }
       case "LJSExternFunction": {
-        this.visit_ljsextern_function(stmt.func)
+        this.visit_ident(stmt.name)
+        for (const param of stmt.params) {
+          this.visit_param(param)
+        }
+        this.visit_type_annotation(stmt.return_type)
         break
       }
       case "Empty": {
@@ -647,12 +651,5 @@ export class ASTVisitorBase implements ASTVisitor {
   visit_object_type_decl_field(node: ast.ObjectTypeDeclField): void {
     this.visit_ident(node.label)
     this.visit_type_annotation(node.type_annotation)
-  }
-  visit_ljsextern_function(node: ast.LJSExternFunction): void {
-    this.visit_ident(node.name)
-    for (const param of node.params) {
-      this.visit_param(param)
-    }
-    this.visit_type_annotation(node.return_type)
   }
 }
