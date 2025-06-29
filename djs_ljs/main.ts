@@ -35,6 +35,7 @@ async function main() {
   const collect_source_files_result = await collect_source_files(files[0], fs)
 
   if (dump_ast) {
+    console.log("---- ast ----")
     for (const source_file of collect_source_files_result.source_files.values()) {
       console.dir(source_file_to_sexpr(source_file), {
         depth: null,
@@ -47,7 +48,8 @@ async function main() {
     fs,
   )
   if (dump_resolve_top_level) {
-    console.dir(resolve_top_level_result.source_file_value_decls, {
+    console.log("---- resolve_top_level ----")
+    console.dir(resolve_top_level_result.source_file_value_decls.toMap(), {
       depth: Infinity,
     })
   }
