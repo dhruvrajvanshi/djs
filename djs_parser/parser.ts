@@ -1777,7 +1777,7 @@ function parser_impl(
       case t.Function: {
         const f = parse_function()
         if (f === ERR) return ERR
-        return Stmt.Func(f.span, f)
+        return Stmt.Func(f.span, f, export_token !== null)
       }
       case t.Class: {
         const c = parse_class()
@@ -1789,7 +1789,7 @@ function parser_impl(
           advance()
           const f = parse_function()
           if (f === ERR) return ERR
-          return Stmt.Func(f.span, f)
+          return Stmt.Func(f.span, f, export_token !== null)
         } else {
           emit_error(`Expected 'function'`)
           return ERR
