@@ -115,6 +115,17 @@ test("conditional operator", () => {
   expect(source_file.stmts[0].expr.kind).toEqual("Ternary")
 })
 
+test("is_exported should be correctly set", () => {
+  const source = `
+    export extern function foo(): void;
+  `
+  const parser = Parser("test.ljs", source)
+  const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+  assert(source_file.stmts[0].kind === "LJSExternFunction")
+  expect(source_file.stmts[0].func.is_exported).toBe(true)
+})
+
 if (process.env.CI) {
   const test262Paths: string[] = []
 

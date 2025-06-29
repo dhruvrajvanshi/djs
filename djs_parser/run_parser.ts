@@ -1,3 +1,5 @@
+#!/usr/bin/env -S node --no-warnings
+
 import fs from "node:fs/promises"
 import { Parser } from "./parser.ts"
 import { parseArgs, inspect } from "node:util"
