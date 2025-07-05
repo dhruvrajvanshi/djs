@@ -1,5 +1,6 @@
-import { puts } from "libc.ljs"
+import * as c from "libc.ljs"
 
 export function main(): void {
-  puts(c`Hello, world!`)
+  const msg: *c.char = c.str`Hello, world!`
+  puts(msg)
 }
