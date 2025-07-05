@@ -131,6 +131,10 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
+      case "ImportStarAs": {
+        this.visit_ident(stmt.as_name)
+        break
+      }
       case "Labeled": {
         this.visit_label(stmt.label)
         this.visit_stmt(stmt.stmt)

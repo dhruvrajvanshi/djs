@@ -36,6 +36,7 @@ export type Stmt =
   | FuncStmt
   | ClassDeclStmt
   | ImportStmt
+  | ImportStarAsStmt
   | LabeledStmt
   | ObjectTypeDeclStmt
   | TypeAliasStmt
@@ -237,6 +238,17 @@ export class ImportStmt {
     return "Import"
   }
 }
+export class ImportStarAsStmt {
+  constructor(
+    readonly span: Span,
+    readonly as_name: Ident,
+    readonly module_specifier: Text,
+  ) {}
+
+  get kind(): "ImportStarAs" {
+    return "ImportStarAs"
+  }
+}
 export class LabeledStmt {
   constructor(
     readonly span: Span,
@@ -372,6 +384,12 @@ export const Stmt = {
     module_specifier: Text,
   ): ImportStmt =>
     new ImportStmt(span, default_import, named_imports, module_specifier),
+
+  ImportStarAs: (
+    span: Span,
+    as_name: Ident,
+    module_specifier: Text,
+  ): ImportStarAsStmt => new ImportStarAsStmt(span, as_name, module_specifier),
 
   Labeled: (span: Span, label: Label, stmt: Stmt): LabeledStmt =>
     new LabeledStmt(span, label, stmt),

@@ -185,6 +185,10 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
     named_imports: List("ImportSpecifier"),
     module_specifier: Text,
   },
+  ImportStarAs: {
+    as_name: Ident,
+    module_specifier: Text,
+  },
   Labeled: {
     label: Label,
     stmt: Stmt,

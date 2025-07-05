@@ -1866,9 +1866,27 @@ function parser_impl(
       return_type,
     )
   }
+  function parse_import_star_as_stmt(start: Token): Stmt | Err {
+    assert.equal(t.Import, start.kind)
+    assert.equal(t.Star, self.current_token.kind)
+    advance()
+    if (expect(t.As) === ERR) return ERR
+    const name = parse_ident()
+    if (name === ERR) return ERR
+    if (expect(t.From) === ERR) return ERR
+    const from_clause = expect(t.String)
+    if (from_clause === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+    return Stmt.ImportStarAs(
+      Span.between(start.span, from_clause.span),
+      name,
+      from_clause.text,
+    )
+  }
   function parse_import_stmt(): Stmt | Err {
     const start = advance()
     assert(start.kind === t.Import)
+    if (at(t.Star)) return parse_import_star_as_stmt(start)
     let default_import: Ident | null = null
     if (at(t.Ident)) {
       const token = advance()
