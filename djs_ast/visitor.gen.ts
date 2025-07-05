@@ -471,6 +471,13 @@ export class ASTVisitorBase implements ASTVisitor {
       case "Builtin": {
         break
       }
+      case "Qualified": {
+        this.visit_ident(type_annotation.head)
+        for (const tail of type_annotation.tail) {
+          this.visit_ident(tail)
+        }
+        break
+      }
     }
   }
   visit_type_param(node: ast.TypeParam): void {

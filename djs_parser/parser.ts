@@ -1080,6 +1080,7 @@ function parser_impl(
         }
         const ident = parse_ident()
         if (ident === ERR) return ERR
+        if (at(t.Dot)) return parse_qualified_type_annotation(ident)
         return TypeAnnotation.Ident(ident.span, ident)
       }
       case t.Void: {
@@ -1112,6 +1113,24 @@ function parser_impl(
         emit_error("Expected a type annotation")
         return ERR
     }
+  }
+  function parse_qualified_type_annotation(head: Ident): TypeAnnotation | Err {
+    assert(at(t.Dot))
+    advance()
+    const tail_start = parse_ident()
+    if (tail_start === ERR) return ERR
+    const tail = [tail_start]
+    while (at(t.Dot)) {
+      advance()
+      const ident_or_err = parse_ident()
+      if (ident_or_err === ERR) return ERR
+      tail.push(ident_or_err)
+    }
+    return TypeAnnotation.Qualified(
+      Span.between(head.span, tail.at(-1) ?? tail_start),
+      head,
+      tail,
+    )
   }
 
   function parse_decorator_type_annotation(): TypeAnnotation | Err {
