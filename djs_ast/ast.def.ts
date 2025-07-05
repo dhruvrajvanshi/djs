@@ -292,6 +292,10 @@ export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Builtin: {
     text: Text,
   },
+  Qualified: {
+    head: Ident,
+    tail: List(Ident),
+  },
 })
 
 const DFuncTypeParam = Struct("FuncTypeParam", [], {

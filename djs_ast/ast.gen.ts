@@ -1236,6 +1236,7 @@ export type TypeAnnotation =
   | LJSConstPtrTypeAnnotation
   | LJSPtrTypeAnnotation
   | BuiltinTypeAnnotation
+  | QualifiedTypeAnnotation
 export class IdentTypeAnnotation {
   constructor(
     readonly span: Span,
@@ -1340,6 +1341,17 @@ export class BuiltinTypeAnnotation {
     return "Builtin"
   }
 }
+export class QualifiedTypeAnnotation {
+  constructor(
+    readonly span: Span,
+    readonly head: Ident,
+    readonly tail: readonly Ident[],
+  ) {}
+
+  get kind(): "Qualified" {
+    return "Qualified"
+  }
+}
 
 export const TypeAnnotation = {
   Ident: (span: Span, ident: Ident): IdentTypeAnnotation =>
@@ -1385,6 +1397,12 @@ export const TypeAnnotation = {
 
   Builtin: (span: Span, text: Text): BuiltinTypeAnnotation =>
     new BuiltinTypeAnnotation(span, text),
+
+  Qualified: (
+    span: Span,
+    head: Ident,
+    tail: readonly Ident[],
+  ): QualifiedTypeAnnotation => new QualifiedTypeAnnotation(span, head, tail),
 } as const
 
 export interface FuncTypeParam {
