@@ -599,10 +599,30 @@ function parser_impl(
       }
       case t.TemplateLiteralFragment:
         return parse_template_literal()
+      case t.DecoratorIdent:
+        return parse_decorator_expr()
       default:
         emit_error("Expected an expression")
         return ERR
     }
+  }
+  function parse_decorator_expr(): Expr | Err {
+    const start = advance()
+    assert(start.kind === t.DecoratorIdent)
+    if (start.text !== "@builtin") {
+      emit_error(`Unrecognized decorator: ${start.text}`)
+      return ERR
+    }
+    if (expect(t.LParen) === ERR) return ERR
+    const expr = parse_expr()
+    if (expr === ERR) return ERR
+    if (expr.kind !== "String") {
+      emit_error("Expected a string literal as an argument to @builtin")
+      if (at(t.RParen)) advance()
+      return ERR
+    }
+    if (expect(t.RParen) === ERR) return ERR
+    return Expr.Builtin(Span.between(start.span, expr.span), expr.text)
   }
 
   function re_lex_regex() {
@@ -1086,11 +1106,31 @@ function parser_impl(
         return parse_generic_func_type_annotation()
       case t.Star:
         return parse_ptr_type_annotation()
+      case t.DecoratorIdent:
+        return parse_decorator_type_annotation()
       default:
         emit_error("Expected a type annotation")
         return ERR
     }
   }
+
+  function parse_decorator_type_annotation(): TypeAnnotation | Err {
+    const start = advance()
+    assert(start.kind === t.DecoratorIdent)
+    if (start.text !== "@builtin") {
+      emit_error(`Unrecognized decorator ${start.text}`)
+      return ERR
+    }
+    if (expect(t.LParen) === ERR) return ERR
+    const expr = expect(t.String)
+    if (expr === ERR) return ERR
+    if (expect(t.RParen) === ERR) return ERR
+    return TypeAnnotation.Builtin(
+      Span.between(start.span, expr.span),
+      expr.text,
+    )
+  }
+
   function parse_ptr_type_annotation(): TypeAnnotation | Err {
     const start = advance()
     assert(start.kind === t.Star)

@@ -250,6 +250,7 @@ export function lexer_impl(self: LexerState): Lexer {
     else if (at("0o") || at("0O")) return lex_octal_number()
     // _ if at!("0b") || at!("0b") => self.lex_binary_number(),
     else if (at("0b") || at("0B")) return lex_binary_number()
+    else if (at("@")) return lex_decorator_ident()
     // c if c.is_ascii_digit() => self.lex_number(),
     else if (is_ascii_digit(current_char())) return lex_number()
     else {
@@ -703,6 +704,21 @@ export function lexer_impl(self: LexerState): Lexer {
     }
   }
 
+  function lex_decorator_ident(): Token {
+    assert(current_char() === "@", "Expected '@' at the start of a decorator")
+    advance()
+
+    if (!is_identifier_start(current_char())) {
+      return error_token("Expected identifier after '@'")
+    }
+
+    while (is_identifier_char(current_char())) {
+      advance()
+    }
+
+    return make_token(TokenKind.DecoratorIdent)
+  }
+
   function lex_ident_or_keyword(): Token {
     advance()
     while (is_identifier_char(current_char())) {
@@ -725,7 +741,9 @@ export function lexer_impl(self: LexerState): Lexer {
         kind === TokenKind.Ident ||
         kind === TokenKind.String ||
         kind === TokenKind.Number ||
-        kind === TokenKind.TemplateLiteralFragment
+        kind === TokenKind.TemplateLiteralFragment ||
+        kind === TokenKind.DecoratorIdent ||
+        kind === TokenKind.Regex
           ? current_text()
           : "",
     }

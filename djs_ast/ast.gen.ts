@@ -657,6 +657,7 @@ export type Expr =
   | ClassExpr
   | TemplateLiteralExpr
   | TaggedTemplateLiteralExpr
+  | BuiltinExpr
 export class VarExpr {
   constructor(
     readonly span: Span,
@@ -1054,6 +1055,16 @@ export class TaggedTemplateLiteralExpr {
     return "TaggedTemplateLiteral"
   }
 }
+export class BuiltinExpr {
+  constructor(
+    readonly span: Span,
+    readonly text: Text,
+  ) {}
+
+  get kind(): "Builtin" {
+    return "Builtin"
+  }
+}
 
 export const Expr = {
   Var: (span: Span, ident: Ident): VarExpr => new VarExpr(span, ident),
@@ -1186,6 +1197,8 @@ export const Expr = {
     fragments: readonly TemplateLiteralFragment[],
   ): TaggedTemplateLiteralExpr =>
     new TaggedTemplateLiteralExpr(span, tag, fragments),
+
+  Builtin: (span: Span, text: Text): BuiltinExpr => new BuiltinExpr(span, text),
 } as const
 
 export interface ObjectTypeDeclField {
@@ -1204,6 +1217,7 @@ export type TypeAnnotation =
   | FuncTypeAnnotation
   | LJSConstPtrTypeAnnotation
   | LJSPtrTypeAnnotation
+  | BuiltinTypeAnnotation
 export class IdentTypeAnnotation {
   constructor(
     readonly span: Span,
@@ -1298,6 +1312,16 @@ export class LJSPtrTypeAnnotation {
     return "LJSPtr"
   }
 }
+export class BuiltinTypeAnnotation {
+  constructor(
+    readonly span: Span,
+    readonly text: Text,
+  ) {}
+
+  get kind(): "Builtin" {
+    return "Builtin"
+  }
+}
 
 export const TypeAnnotation = {
   Ident: (span: Span, ident: Ident): IdentTypeAnnotation =>
@@ -1340,6 +1364,9 @@ export const TypeAnnotation = {
 
   LJSPtr: (span: Span, to: TypeAnnotation): LJSPtrTypeAnnotation =>
     new LJSPtrTypeAnnotation(span, to),
+
+  Builtin: (span: Span, text: Text): BuiltinTypeAnnotation =>
+    new BuiltinTypeAnnotation(span, text),
 } as const
 
 export interface FuncTypeParam {
