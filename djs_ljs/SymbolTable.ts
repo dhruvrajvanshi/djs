@@ -17,17 +17,23 @@ type ValueDecl =
   | ImportStarAsStmt
 
 export class SymbolTable {
-  private symbols = new Map<string, ValueDecl>()
+  private values = new Map<string, ValueDecl>()
+  private duplicate_values = new Map<string, ValueDecl[]>()
 
-  add(name: string, decl: ValueDecl): void {
-    assert(
-      !this.symbols.has(name),
-      `Symbol '${name}' already exists in the symbol table.`,
-    )
-    this.symbols.set(name, decl)
+  add_value(name: string, decl: ValueDecl): void {
+    if (this.values.has(name)) {
+      const existing = this.values.get(name)
+      assert(existing, `Expected existing value for ${name} to be defined`)
+      if (!this.duplicate_values.has(name)) {
+        this.duplicate_values.set(name, [existing])
+      }
+      this.duplicate_values.get(name)?.push(decl)
+      return
+    }
+    this.values.set(name, decl)
   }
 
-  get(name: string): ValueDecl | undefined {
-    return this.symbols.get(name)
+  get_value(name: string): ValueDecl | undefined {
+    return this.values.get(name)
   }
 }
