@@ -2,9 +2,9 @@
   "name": "djs",
   "version": "1.0.0",
   "license": "UNLICENSED",
-  "packageManager": "pnpm@10.8.0",
-  "$schema": "https://json.schemastore.org/package.json",
+  "packageManager": "pnpm@10.12.4",
   "volta": {
     "node": "23.11.1"
-  }
+  },
+  "$schema": "https://json.schemastore.org/package.json"
 }
