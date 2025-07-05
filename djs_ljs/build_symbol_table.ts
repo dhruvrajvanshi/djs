@@ -1,6 +1,7 @@
 import type { Func, SourceFile, Stmt } from "djs_ast"
 import { SymbolTable } from "./SymbolTable.js"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
+import { todo } from "djs_std"
 
 export function build_source_file_symbol_table(
   source_file: SourceFile,
@@ -47,6 +48,15 @@ function initialize_symbol_table(
       case "Import":
         if (stmt.default_import) {
           symbol_table.add_value(stmt.default_import.text, stmt)
+        }
+        for (const named_import of stmt.named_imports) {
+          if (named_import.as_name) {
+            symbol_table.add_value(named_import.as_name.text, stmt)
+          } else if (named_import.imported_name.kind === "Ident") {
+            symbol_table.add_value(named_import.imported_name.ident.text, stmt)
+          } else {
+            todo(`import { "quoted" as name } not supported yet.`)
+          }
         }
     }
   }
