@@ -7,6 +7,8 @@ import { resolve_top_level } from "./resolve_top_level.ts"
 import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { MapUtils } from "djs_std"
+import { typecheck } from "./typecheck.ts"
+import { type_to_string } from "./Type.ts"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -15,12 +17,14 @@ async function main() {
       "dump-phases": { type: "boolean", default: false },
       "dump-ast": { type: "boolean", default: false },
       "dump-resolve-top-level": { type: "boolean", default: false },
+      "dump-typecheck": { type: "boolean", default: false },
       "no-errors": { type: "boolean", default: false },
     },
   })
   const dump_ast = args["dump-ast"] || args["dump-phases"]
   const dump_resolve_top_level =
     args["dump-resolve-top-level"] || args["dump-phases"]
+  const dump_typecheck = args["dump-typecheck"] || args["dump-phases"]
 
   if (files.length === 0) {
     console.error("No files provided.")
@@ -60,10 +64,19 @@ async function main() {
       },
     )
   }
+  const typecheck_result = typecheck(
+    collect_source_files_result.source_files,
+    fs,
+  )
+  if (dump_typecheck) {
+    console.log("---- typecheck ----")
+    console.dir(MapUtils.map_values(typecheck_result.types, type_to_string))
+  }
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
     resolve_top_level_result.diagnostics,
+    typecheck_result.diagnostics,
   )
 
   if (!args["no-errors"]) {

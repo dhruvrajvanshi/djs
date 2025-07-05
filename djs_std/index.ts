@@ -31,6 +31,12 @@ export function assert_todo(
     })
   }
 }
+export function assert_never(condition: never): never {
+  throw new AssertionError({
+    message: `Unreachable code reached: ${JSON.stringify(condition)}`,
+    stackStartFn: assert_never,
+  })
+}
 
 export const MapUtils = {
   map_entries<K, V, K2, V2>(
