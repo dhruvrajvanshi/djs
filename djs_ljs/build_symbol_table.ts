@@ -28,28 +28,26 @@ function initialize_symbol_table(
     switch (stmt.kind) {
       case "VarDecl":
         for (const decl of flatten_var_decl(stmt)) {
-          if (symbol_table.get(decl.name)) {
-            continue
-          }
-          symbol_table.add(decl.name, stmt)
+          symbol_table.add_value(decl.name, stmt)
         }
         break
       case "Func":
         if (!stmt.func.name) break
-        if (symbol_table.get(stmt.func.name.text)) break
-        symbol_table.add(stmt.func.name.text, stmt)
+        symbol_table.add_value(stmt.func.name.text, stmt)
         break
       case "ClassDecl":
         if (!stmt.class_def.name) break
-        if (symbol_table.get(stmt.class_def.name.text)) break
-        symbol_table.add(stmt.class_def.name.text, stmt)
+        symbol_table.add_value(stmt.class_def.name.text, stmt)
         break
       case "LJSExternFunction": {
         if (!stmt.name) break
-        if (symbol_table.get(stmt.name.text)) break
-        symbol_table.add(stmt.name.text, stmt)
+        symbol_table.add_value(stmt.name.text, stmt)
         break
       }
+      case "Import":
+        if (stmt.default_import) {
+          symbol_table.add_value(stmt.default_import.text, stmt)
+        }
     }
   }
 }
