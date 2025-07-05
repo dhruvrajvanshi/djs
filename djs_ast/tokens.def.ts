@@ -1,6 +1,10 @@
-/** @type {(string | [string, string])[]} */
-export const tokens = [
+export const tokens: (string | [string, string])[] = [
   "Ident",
+
+  /**
+   * like `@foo`
+   */
+  "DecoratorIdent",
 
   ["True", "true"],
   ["False", "false"],

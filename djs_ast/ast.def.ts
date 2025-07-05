@@ -263,6 +263,9 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
     tag: Expr,
     fragments: List(TemplateLiteralFragment),
   },
+  Builtin: {
+    text: Text,
+  },
 })
 export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { ident: Ident },
@@ -281,6 +284,9 @@ export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   },
   LJSPtr: {
     to: TypeAnnotation,
+  },
+  Builtin: {
+    text: Text,
   },
 })
 

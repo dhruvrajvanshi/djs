@@ -343,6 +343,9 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
+      case "Builtin": {
+        break
+      }
     }
   }
   visit_ident(node: ast.Ident): void {}
@@ -459,6 +462,9 @@ export class ASTVisitorBase implements ASTVisitor {
       }
       case "LJSPtr": {
         this.visit_type_annotation(type_annotation.to)
+        break
+      }
+      case "Builtin": {
         break
       }
     }
