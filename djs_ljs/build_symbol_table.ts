@@ -1,7 +1,7 @@
-import type { Func, SourceFile, Stmt } from "djs_ast"
-import { SymbolTable } from "./SymbolTable.js"
+import type { Func, FuncStmt, Pattern, SourceFile, Stmt } from "djs_ast"
+import { SymbolTable, type ValueDecl } from "./SymbolTable.js"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
-import { todo } from "djs_std"
+import { assert_never, todo } from "djs_std"
 
 export function build_source_file_symbol_table(
   source_file: SourceFile,
@@ -15,10 +15,42 @@ export function build_block_symbol_table(stmts: readonly Stmt[]): SymbolTable {
   initialize_symbol_table(symbol_table, stmts)
   return symbol_table
 }
-export function build_function_symbol_table(func: Func): SymbolTable {
+export function build_function_symbol_table(stmt: FuncStmt): SymbolTable {
   const symbol_table = new SymbolTable()
-  initialize_symbol_table(symbol_table, func.body.stmts)
+  for (const param of stmt.func.params) {
+    add_pattern_bindings_to_symbol_table(symbol_table, param.pattern, stmt)
+  }
+  initialize_symbol_table(symbol_table, stmt.func.body.stmts)
   return symbol_table
+}
+function add_pattern_bindings_to_symbol_table(
+  symbol_table: SymbolTable,
+  pattern: Pattern,
+  stmt: ValueDecl,
+) {
+  switch (pattern.kind) {
+    case "Var":
+      symbol_table.add_value(pattern.ident.text, stmt)
+      break
+    case "Array":
+      for (const item of pattern.items) {
+        add_pattern_bindings_to_symbol_table(symbol_table, item, stmt)
+      }
+      break
+    case "Object":
+      todo()
+    case "Elision":
+      break
+    case "Rest":
+      add_pattern_bindings_to_symbol_table(symbol_table, pattern.pattern, stmt)
+      break
+    case "Assignment":
+      todo()
+    case "Prop":
+      todo()
+    default:
+      assert_never(pattern)
+  }
 }
 
 function initialize_symbol_table(
