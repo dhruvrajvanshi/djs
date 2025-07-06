@@ -26,12 +26,15 @@ export function todo(
   } else if (typeof first === "string") {
     message = `TODO(${first})`
   } else {
-    message =
-      "TODO: " +
-      first.reduce((acc, str, i) => {
-        const arg = args[i - 1]
-        return acc + str + (arg !== undefined ? JSON.stringify(arg) : "")
-      }, "")
+    message = "TODO: "
+
+    for (let i = 0; i < first.length; i++) {
+      message += first[i]
+      const arg = args[i]
+      if (arg !== undefined) {
+        message += JSON.stringify(arg)
+      }
+    }
   }
   throw new AssertionError({
     message: message,
