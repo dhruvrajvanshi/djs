@@ -13,9 +13,28 @@ export type ReadonlyUnion<T extends Record<string, unknown>> = T extends unknown
   ? Prettify<Readonly<T>>
   : never
 
-export function todo(message: string | null = null): never {
+export function todo(template: TemplateStringsArray, ...args: unknown[]): never
+export function todo(): never
+export function todo(message: string): never
+export function todo(
+  first?: string | TemplateStringsArray,
+  ...args: unknown[]
+): never {
+  let message: string
+  if (first === undefined) {
+    message = "TODO"
+  } else if (typeof first === "string") {
+    message = `TODO(${first})`
+  } else {
+    message =
+      "TODO: " +
+      first.reduce((acc, str, i) => {
+        const arg = args[i - 1]
+        return acc + str + (arg !== undefined ? JSON.stringify(arg) : "")
+      }, "")
+  }
   throw new AssertionError({
-    message: message ? `TODO(${message})` : "TODO",
+    message: message,
     stackStartFn: todo,
   })
 }
