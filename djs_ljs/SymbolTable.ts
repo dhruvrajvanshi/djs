@@ -8,7 +8,7 @@ import type {
 } from "djs_ast"
 import assert from "node:assert"
 
-type ValueDecl =
+export type ValueDecl =
   | VarDeclStmt
   | FuncStmt
   | ClassDeclStmt
