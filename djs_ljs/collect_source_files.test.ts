@@ -56,3 +56,23 @@ test("should report errors if imported file can't be read", async () => {
     'Failed to import module "./missing_import.ljs"',
   )
 })
+
+test("should collect import * as name imports", async () => {
+  const fs = FS.fake({
+    "main.ljs": `
+        import * as imported from "./imported.ljs"
+        function main(): void {
+            imported.do_stuff()
+        }
+    `,
+    "imported.ljs": `
+        export function do_stuff(): void {}
+    `,
+  })
+  const { source_files, diagnostics } = await collect_source_files(
+    "main.ljs",
+    fs,
+  )
+  assert.equal(await diagnostics.prettify(fs), "")
+  assert(source_files.get("imported.ljs"))
+})

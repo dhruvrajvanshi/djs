@@ -1,4 +1,10 @@
-import { ASTVisitorBase, ImportStmt, type SourceFile, type Stmt } from "djs_ast"
+import {
+  ASTVisitorBase,
+  ImportStarAsStmt,
+  ImportStmt,
+  type SourceFile,
+  type Stmt,
+} from "djs_ast"
 import { parse_source_file } from "djs_parser"
 import { Diagnostics } from "./diagnostics.ts"
 import * as Queue from "./queue.ts"
@@ -20,7 +26,7 @@ export async function collect_source_files(
 ): Promise<CollectSourceFilesResult> {
   const diagnostics = new Diagnostics(fs)
   type ImportInfo = {
-    stmt: ImportStmt
+    stmt: ImportStmt | ImportStarAsStmt
     imported_from: SourceFile
   }
   type Entry = {
@@ -85,16 +91,18 @@ export async function collect_source_files(
 }
 
 class CollectImportsVisitor extends ASTVisitorBase {
-  readonly imports: ImportStmt[] = []
+  readonly imports: (ImportStmt | ImportStarAsStmt)[] = []
   override visit_stmt(stmt: Stmt): void {
-    if (stmt.kind === "Import") {
+    if (stmt.kind === "Import" || stmt.kind === "ImportStarAs") {
       this.imports.push(stmt)
     } else {
       super.visit_stmt(stmt)
     }
   }
 }
-function collect_imports(source_file: SourceFile): ImportStmt[] {
+function collect_imports(
+  source_file: SourceFile,
+): (ImportStmt | ImportStarAsStmt)[] {
   const visitor = new CollectImportsVisitor()
   visitor.visit_source_file(source_file)
   return visitor.imports
