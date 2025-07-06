@@ -13,6 +13,14 @@ export type ReadonlyUnion<T extends Record<string, unknown>> = T extends unknown
   ? Prettify<Readonly<T>>
   : never
 
+export function* indicies<T>(
+  array: readonly unknown[],
+): IterableIterator<number> {
+  for (let i = 0; i < array.length; i++) {
+    yield i
+  }
+}
+
 export function todo(template: TemplateStringsArray, ...args: unknown[]): never
 export function todo(): never
 export function todo(message: string): never
@@ -28,7 +36,7 @@ export function todo(
   } else {
     message = "TODO: "
 
-    for (let i = 0; i < first.length; i++) {
+    for (const i of indicies(first)) {
       message += first[i]
       const arg = args[i]
       if (arg !== undefined) {
