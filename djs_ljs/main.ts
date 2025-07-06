@@ -7,6 +7,7 @@ import { resolve_top_level } from "./resolve_top_level.ts"
 import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { MapUtils } from "djs_std"
+import { emit_c } from "./emit_c.ts"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -71,6 +72,7 @@ async function main() {
       await show_diagnostics(path, d, null)
     }
   }
+  emit_c(collect_source_files_result.source_files)
 }
 
 await main()
