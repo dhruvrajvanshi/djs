@@ -18,7 +18,7 @@ export type ValueDecl =
   | ImportStmt
   | ImportStarAsStmt
 
-export type TypeDecl = TypeAliasStmt
+export type TypeDecl = TypeAliasStmt | ImportStmt
 export class SymbolTable {
   private values = new Map<string, ValueDecl>()
   private types = new Map<string, TypeDecl>()
@@ -49,5 +49,8 @@ export class SymbolTable {
     } else {
       this.types.set(name, decl)
     }
+  }
+  get_type(name: string): TypeDecl | undefined {
+    return this.types.get(name)
   }
 }
