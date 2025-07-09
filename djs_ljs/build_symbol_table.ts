@@ -1,7 +1,7 @@
-import type { Func, FuncStmt, Pattern, SourceFile, Stmt } from "djs_ast"
+import type { FuncStmt, Pattern, SourceFile, Stmt } from "djs_ast"
 import { SymbolTable, type ValueDecl } from "./SymbolTable.js"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
-import { assert_never, todo } from "djs_std"
+import { todo } from "djs_std"
 
 export function build_source_file_symbol_table(
   source_file: SourceFile,
@@ -90,6 +90,10 @@ function initialize_symbol_table(
             todo(`import { "quoted" as name } not supported yet.`)
           }
         }
+        break
+      case "TypeAlias": {
+        symbol_table.add_type(stmt.name.text, stmt)
+      }
     }
   }
 }

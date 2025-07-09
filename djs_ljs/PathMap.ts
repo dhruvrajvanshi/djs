@@ -36,6 +36,14 @@ export class PathMap<T> {
     this.#map.set(path, value)
   }
 
+  map_values<U>(f: (value: T) => U): PathMap<U> {
+    const result = new PathMap<U>(this.#fs)
+    for (const [key, value] of this.entries()) {
+      result.set(key, f(value))
+    }
+    return result
+  }
+
   get size(): number {
     return this.#map.size
   }

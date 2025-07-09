@@ -81,4 +81,12 @@ export const MapUtils = {
     }
     return result
   },
+  get_or_set<K, V>(map: Map<K, V>, key: K, default_value: V): V {
+    if (map.has(key)) {
+      return map.get(key)!
+    } else {
+      map.set(key, default_value)
+      return default_value
+    }
+  },
 }
