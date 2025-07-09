@@ -86,6 +86,7 @@ function initialize_symbol_table(
             symbol_table.add_value(named_import.as_name.text, stmt)
           } else if (named_import.imported_name.kind === "Ident") {
             symbol_table.add_value(named_import.imported_name.ident.text, stmt)
+            symbol_table.add_type(named_import.imported_name.ident.text, stmt)
           } else {
             todo(`import { "quoted" as name } not supported yet.`)
           }

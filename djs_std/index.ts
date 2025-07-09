@@ -20,6 +20,14 @@ export function* indicies<T>(
     yield i
   }
 }
+export function assert_never(value: never): never {
+  throw new AssertionError({
+    message: `Unreachable assertion reached`,
+    actual: value,
+    expected: "<unreachable>",
+    stackStartFn: assert_never,
+  })
+}
 
 export function todo(template: TemplateStringsArray, ...args: unknown[]): never
 export function todo(): never
