@@ -1,5 +1,6 @@
 export * from "./ansi.ts"
 import { AssertionError } from "node:assert/strict"
+import { inspect } from "node:util"
 
 export type Prettify<T> = {
   [K in keyof T]: T[K]
@@ -32,16 +33,14 @@ export function assert_never(value: never): never {
 export function todo(template: TemplateStringsArray, ...args: unknown[]): never
 export function todo(): never
 export function todo(message: string): never
-export function todo(
-  first?: string | TemplateStringsArray,
-  ...args: unknown[]
-): never {
+export function todo(message: unknown): never
+export function todo(first?: unknown, ...args: unknown[]): never {
   let message: string
   if (first === undefined) {
     message = "TODO"
   } else if (typeof first === "string") {
     message = `TODO(${first})`
-  } else {
+  } else if (Array.isArray(first) && "raw" in first) {
     message = "TODO: "
 
     for (const i of indicies(first)) {
@@ -51,6 +50,8 @@ export function todo(
         message += JSON.stringify(arg)
       }
     }
+  } else {
+    message = inspect(first)
   }
   throw new AssertionError({
     message: message,
@@ -97,4 +98,23 @@ export const MapUtils = {
       return default_value
     }
   },
+}
+
+export function omit<T extends Record<string, unknown>, K extends keyof T>(
+  value: T,
+  ...keys: K[]
+): Omit<T, K> {
+  const result: Record<string, unknown> = {}
+  for (const key of Object.keys(value)) {
+    if (!keys.includes(key as K)) {
+      result[key] = value[key]
+    }
+  }
+  return result as Omit<T, K>
+}
+
+export function is_readonly_array(
+  value: unknown,
+): value is ReadonlyArray<unknown> {
+  return Array.isArray(value)
 }

@@ -9,6 +9,10 @@ importers:
   .: {}
 
   djs_ast:
+    dependencies:
+      djs_std:
+        specifier: workspace:*
+        version: link:../djs_std
     devDependencies:
       '@types/node':
         specifier: ^24.0.3
