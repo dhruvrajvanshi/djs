@@ -8,14 +8,32 @@ import {
   DSourceFile as SourceFileDef,
 } from "./ast.def.ts"
 import assert from "node:assert/strict"
+import { is_readonly_array } from "djs_std"
 
 export type SExpr =
   | string
   | null
   | boolean
   | number
-  | SExpr[]
-  | { [key: string]: SExpr }
+  | readonly SExpr[]
+  | { readonly [key: string]: SExpr }
+
+export function sexpr_to_string(sexpr: SExpr): string {
+  switch (typeof sexpr) {
+    case "string":
+    case "number":
+    case "boolean":
+      return String(sexpr)
+    case "object": {
+      if (sexpr === null) return "null"
+      else if (is_readonly_array(sexpr)) {
+        return "(" + sexpr.map(sexpr_to_string).join(" ") + ")"
+      } else {
+        return "{" + Object.entries(sexpr).map(sexpr_to_string).join(", ") + "}"
+      }
+    }
+  }
+}
 
 const stmt_dumper = variant_dumper<Stmt>(StmtDef)
 export function stmt_to_sexpr(stmt: Stmt): SExpr {

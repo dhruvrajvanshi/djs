@@ -2,8 +2,8 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import type { FS } from "./FS.ts"
 import { build_source_file_symbol_table } from "./build_symbol_table.ts"
 import { PathMap } from "./PathMap.ts"
-import { Type } from "./type.js"
-import { assert_never, assert_todo, todo } from "djs_std"
+import { Type, type_to_string } from "./type.js"
+import { assert_never, assert_todo, MapUtils, todo } from "djs_std"
 import type {
   FuncStmt,
   ImportStmt,
@@ -11,7 +11,6 @@ import type {
   TypeAnnotation,
   VarDeclStmt,
 } from "djs_ast"
-import { inspect } from "node:util"
 import assert from "node:assert"
 import Path from "node:path"
 import { SymbolTable, type TypeDecl } from "./SymbolTable.js"
@@ -21,7 +20,6 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
   const result = new PathMap<Map<string, Type>>(fs)
 
   for (const source_file of source_files.values()) {
-    const symbol_table = symbol_tables.get(source_file.path)
     for (const stmt of source_file.stmts) {
       switch (stmt.kind) {
         case "VarDecl":
@@ -32,13 +30,15 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
           break
         case "Import":
           break
+        case "TypeAlias":
+          break
 
         default:
           todo(stmt.kind)
       }
     }
   }
-  return result.toMap()
+  return result
   function visit_var_decl(source_file: SourceFile, stmt: VarDeclStmt) {
     assert_todo(stmt.decl.declarators.length === 1)
     const declarator = stmt.decl.declarators[0]
@@ -107,7 +107,12 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
       assert_todo(p.type_annotation)
       return annotation_to_type(resolve, p.type_annotation)
     })
-    todo(inspect(param_types))
+    const return_type = func.return_type
+      ? annotation_to_type(resolve, func.return_type)
+      : Type.Error("Top level functions must have a return type annotation")
+
+    const ty = Type.UnboxedFunc(param_types, return_type)
+    result.get_or_put(source_file.path, () => new Map()).set(func.name.text, ty)
   }
 }
 

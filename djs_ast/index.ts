@@ -7,6 +7,7 @@ export {
   stmt_to_sexpr,
   expr_to_sexpr,
   type_annotation_to_sexpr,
+  sexpr_to_string,
   type SExpr,
 } from "./sexpr.ts"
 export {

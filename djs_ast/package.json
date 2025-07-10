@@ -16,6 +16,9 @@
     "gen:visitor": "node gen_ts_visitor.ts | prettier > visitor.gen.ts",
     "build": "tsc"
   },
+  "dependencies": {
+    "djs_std": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^24.0.3",
     "prettier": "^3.6.2",
