@@ -15,8 +15,8 @@ export type ValueDecl =
   | FuncStmt
   | ClassDeclStmt
   | LJSExternFunctionStmt
-  | ImportStmt
-  | ImportStarAsStmt
+  | { kind: "Import"; stmt: ImportStmt; from_path: string }
+  | { kind: "ImportStarAs"; stmt: ImportStarAsStmt; from_path: string }
 
 export type TypeDecl = TypeAliasStmt | ImportStmt
 export class SymbolTable {

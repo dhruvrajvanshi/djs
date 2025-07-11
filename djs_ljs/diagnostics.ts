@@ -37,7 +37,7 @@ export class Diagnostics {
     )
   }
 
-  async prettify(fs: FS = FS.real): Promise<string> {
+  async prettify(fs: FS): Promise<string> {
     let errors: string = ""
     for (const [path, diagnostics] of this.by_path.entries()) {
       const pretty_diagnostics = await prettify_diagnostics(
