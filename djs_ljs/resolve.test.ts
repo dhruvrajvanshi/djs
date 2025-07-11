@@ -4,7 +4,7 @@ import { collect_source_files } from "./collect_source_files.ts"
 import assert from "node:assert"
 import { resolve } from "./resolve.ts"
 
-test.todo("resolve smoke test", async () => {
+test("resolve smoke test", async () => {
   const fs = FS.fake({
     "foo.ljs": `
         export type SomeType = string
@@ -16,8 +16,8 @@ test.todo("resolve smoke test", async () => {
         type Bar = Foo
         const x: Bar = some_import
 
-        function foo(x: SomeType): SomeType {
-          return x
+        function foo(a: SomeType): SomeType {
+          return a
         }
 
         function main(): void {

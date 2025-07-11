@@ -1,5 +1,4 @@
-import { sexpr_to_string, type Diagnostic, type SExpr } from "djs_ast"
-import { assert_never, omit, todo, type ReadonlyUnion } from "djs_std"
+import { assert_never, type ReadonlyUnion } from "djs_std"
 
 export type Type = ReadonlyUnion<
   | { kind: "u8" }
@@ -13,6 +12,7 @@ export type Type = ReadonlyUnion<
   | { kind: "f32" }
   | { kind: "f64" }
   | { kind: "c_char" }
+  | { kind: "void" }
   | { kind: "boolean" }
   | { kind: "Ptr"; type: Type }
   | { kind: "MutPtr"; type: Type }
@@ -30,6 +30,7 @@ export const Type = {
   i64: { kind: "i64" },
   f32: { kind: "f32" },
   f64: { kind: "f64" },
+  void: { kind: "void" },
   c_char: { kind: "c_char" },
   boolean: { kind: "boolean" },
 
@@ -78,6 +79,8 @@ export function type_to_string(type: Type): string {
       return `(${params}) => ${type_to_string(type.return_type)}`
     case "Error":
       return "<Error>"
+    case "void":
+      return "void"
     default:
       return assert_never(type)
   }
@@ -108,6 +111,8 @@ export function type_to_sexpr(type: Type): string {
       return "c_char"
     case "boolean":
       return "boolean"
+    case "void":
+      return "void"
     case "Ptr":
       return `(* ${type_to_sexpr(type.type)})`
     case "MutPtr":
