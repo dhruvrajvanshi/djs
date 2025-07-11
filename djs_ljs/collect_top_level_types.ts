@@ -2,8 +2,8 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import type { FS } from "./FS.ts"
 import { build_source_file_symbol_table } from "./build_symbol_table.ts"
 import { PathMap } from "./PathMap.ts"
-import { Type, type_to_string } from "./type.js"
-import { assert_never, assert_todo, MapUtils, todo } from "djs_std"
+import { Type } from "./type.js"
+import { assert_never, assert_todo, todo } from "djs_std"
 import type {
   FuncStmt,
   ImportStmt,

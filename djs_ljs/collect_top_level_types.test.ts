@@ -4,7 +4,7 @@ import { FS } from "./FS.ts"
 import assert from "node:assert"
 import { collect_top_level_types } from "./collect_top_level_types.ts"
 import { MapUtils } from "djs_std"
-import { Type, type_to_sexpr, type_to_string } from "./type.ts"
+import { Type, type_to_sexpr } from "./type.ts"
 
 test("collect_top_level_types", async () => {
   const fs = FS.fake({
