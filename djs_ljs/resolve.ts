@@ -2,11 +2,15 @@ import {
   ASTVisitorBase,
   Expr,
   TypeAnnotation,
+  type Block,
   type Ident,
   type SourceFile,
 } from "djs_ast"
 import { SymbolTable, type TypeDecl, type ValueDecl } from "./SymbolTable.ts"
-import { build_source_file_symbol_table } from "./build_symbol_table.ts"
+import {
+  build_block_symbol_table,
+  build_source_file_symbol_table,
+} from "./build_symbol_table.ts"
 import assert from "node:assert"
 import { Diagnostics } from "./diagnostics.ts"
 import type { FS } from "./FS.ts"
@@ -37,6 +41,7 @@ class Resolver extends ASTVisitorBase {
     this.source_file = source_file
     this.diagnostics = new Diagnostics(fs)
     this.scope = new Stack<SymbolTable>()
+    this.scope.push(SymbolTable.Global)
     this.values = new Map<Ident, ValueDecl>()
     this.types = new Map<Ident, TypeDecl>()
   }
@@ -48,8 +53,18 @@ class Resolver extends ASTVisitorBase {
     super.visit_source_file(source_file)
     assert(this.scope.pop() === this_symbol_table, "Scope stack mismatch")
     assert(
-      this.scope.is_empty(),
-      "Scope stack should be empty after visiting source file",
+      this.scope.peek() === SymbolTable.Global,
+      "Expected global scope at the end",
+    )
+  }
+
+  override visit_block(block: Block): void {
+    const block_symbol_table = build_block_symbol_table(block.stmts)
+    this.scope.push(block_symbol_table)
+    super.visit_block(block)
+    assert(
+      this.scope.pop() === block_symbol_table,
+      "Expected to pop the current block's symbol table",
     )
   }
 
