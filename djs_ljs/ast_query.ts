@@ -107,9 +107,9 @@ class FindTypeVisitor<
 function find_stmt<Kind extends Stmt["kind"]>(
   source_file: SourceFile,
   kind: Kind,
-  predicate: Predicate<Stmt>,
+  predicate: Predicate<Extract<Stmt, { kind: Kind }>>,
   stackStartFn: AnyFunc = find_stmt,
-): Extract<Stmt, { kind: string }> {
+): Extract<Stmt, { kind: Kind }> {
   const visitor = new FindStmtVisitor(kind, predicate, stackStartFn)
   visitor.visit_source_file(source_file)
   if (!visitor.result) {
@@ -124,14 +124,14 @@ class FindStmtVisitor<Kind extends Stmt["kind"]> extends ASTVisitorBase {
   result: Extract<Stmt, { kind: Kind }> | undefined
   constructor(
     private readonly kind: Kind,
-    private readonly predicate: Predicate<Stmt>,
+    private readonly predicate: Predicate<Extract<Stmt, { kind: Kind }>>,
     private readonly stackStartFn: AnyFunc = find_stmt,
   ) {
     super()
   }
 
   override visit_stmt(stmt: Stmt): void {
-    if (this.kind == stmt.kind && this.predicate(stmt)) {
+    if (this.kind == stmt.kind && this.predicate(stmt as never)) {
       if (this.result) {
         throw new AssertionError({
           message: `Multiple Stmt(kind = ${this.kind}, match = ${this.predicate})" found`,
