@@ -23,10 +23,13 @@ export function build_function_symbol_table(
   func: Func,
 ): SymbolTable {
   const symbol_table = new SymbolTable()
+  let index = -1
   for (const param of func.params) {
+    index++
     add_pattern_bindings_to_symbol_table(symbol_table, param.pattern, {
-      kind: "Func",
+      kind: "Param",
       func,
+      param_index: index,
     })
   }
   initialize_symbol_table(source_file, symbol_table, func.body.stmts)

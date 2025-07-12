@@ -15,6 +15,7 @@ import { Type } from "./type.js"
 export type ValueDecl =
   | VarDeclStmt
   | { kind: "Func"; func: Func }
+  | { kind: "Param"; func: Func; param_index: number }
   | ClassDeclStmt
   | LJSExternFunctionStmt
   | {
