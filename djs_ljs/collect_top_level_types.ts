@@ -4,16 +4,14 @@ import { build_source_file_symbol_table } from "./build_symbol_table.ts"
 import { PathMap } from "./PathMap.ts"
 import { Type } from "./type.js"
 import { assert_never, assert_todo, todo } from "djs_std"
-import type {
-  FuncStmt,
-  ImportStmt,
-  SourceFile,
-  TypeAnnotation,
-  VarDeclStmt,
-} from "djs_ast"
+import type { FuncStmt, SourceFile, TypeAnnotation, VarDeclStmt } from "djs_ast"
 import assert from "node:assert"
 import Path from "node:path"
-import { SymbolTable, type TypeDecl } from "./SymbolTable.js"
+import {
+  SymbolTable,
+  type ImportTypeDecl,
+  type TypeDecl,
+} from "./SymbolTable.js"
 
 export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
   const symbol_tables = source_files.map_values(build_source_file_symbol_table)
@@ -61,7 +59,7 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
     ): Type => {
       switch (decl.kind) {
         case "Import":
-          return resolve_type_import(decl_source_file, name, decl)
+          return resolve_type_import(name, decl)
         case "TypeAlias": {
           const source_file_symbol_table = symbol_tables.get(
             decl_source_file.path,
@@ -71,6 +69,8 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
             resolve_type(source_file_symbol_table, name)
           return annotation_to_type(resolve, decl.type_annotation)
         }
+        case "Builtin":
+          todo()
         default:
           assert_never(decl)
       }
@@ -84,13 +84,12 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
       return resolve_type_from_decl(name, decl, source_file)
     }
     const resolve_type_import = (
-      from_source_file: SourceFile,
       name: string,
-      stmt: ImportStmt,
+      { imported_from, stmt }: ImportTypeDecl,
     ): Type => {
       const imported_path = fs.to_absolute(
         Path.join(
-          Path.dirname(from_source_file.path),
+          Path.dirname(imported_from.path),
           parse_module_specifier(stmt.module_specifier),
         ),
       )

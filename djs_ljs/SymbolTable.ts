@@ -1,9 +1,10 @@
 import type {
   ClassDeclStmt,
-  FuncStmt,
+  Func,
   ImportStarAsStmt,
   ImportStmt,
   LJSExternFunctionStmt,
+  SourceFile,
   TypeAliasStmt,
   VarDeclStmt,
 } from "djs_ast"
@@ -13,16 +14,49 @@ import { Type } from "./type.js"
 
 export type ValueDecl =
   | VarDeclStmt
-  | FuncStmt
+  | { kind: "Func"; func: Func }
   | ClassDeclStmt
   | LJSExternFunctionStmt
-  | { kind: "Import"; stmt: ImportStmt; from_path: string }
-  | { kind: "ImportStarAs"; stmt: ImportStarAsStmt; from_path: string }
+  | {
+      kind: "Import"
+      stmt: ImportStmt
+      /**
+       * The file in which this import statement is declared.
+       */
+      imported_from: SourceFile
+    }
+  | {
+      kind: "ImportStarAs"
+      stmt: ImportStarAsStmt
+      /**
+       * The file in which this import statement is declared.
+       */
+      imported_from: SourceFile
+    }
+export type VarStmtValueDecl = Extract<ValueDecl, { kind: "VarDecl" }>
+export type FuncValueDecl = Extract<ValueDecl, { kind: "Func" }>
+export type ClassValueDecl = Extract<ValueDecl, { kind: "ClassDecl" }>
+export type LJSExternFunctionValueDecl = Extract<
+  ValueDecl,
+  { kind: "LJSExternFunction" }
+>
+export type ImportValueDecl = Extract<ValueDecl, { kind: "Import" }>
+export type ImportStarAsValueDecl = Extract<ValueDecl, { kind: "ImportStarAs" }>
 
 export type TypeDecl =
   | TypeAliasStmt
-  | { kind: "Import"; stmt: ImportStmt; from_path: string }
+  | {
+      kind: "Import"
+      stmt: ImportStmt
+      /**
+       * The file in which this import statement is declared.
+       */
+      imported_from: SourceFile
+    }
   | { kind: "Builtin"; type: Type }
+export type ImportTypeDecl = Extract<TypeDecl, { kind: "Import" }>
+export type TypeAliasTypeDecl = Extract<TypeDecl, { kind: "TypeAlias" }>
+export type BuiltinTypeDecl = Extract<TypeDecl, { kind: "Builtin" }>
 
 export class SymbolTable {
   private values = new Map<string, ValueDecl>()

@@ -1,26 +1,35 @@
-import type { FuncStmt, Pattern, SourceFile, Stmt } from "djs_ast"
+import type { Func, Pattern, SourceFile, Stmt } from "djs_ast"
 import { SymbolTable, type ValueDecl } from "./SymbolTable.js"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
-import { todo } from "djs_std"
+import { assert_never, todo } from "djs_std"
 
 export function build_source_file_symbol_table(
   source_file: SourceFile,
 ): SymbolTable {
   const symbol_table = new SymbolTable()
-  initialize_symbol_table(symbol_table, source_file.stmts)
+  initialize_symbol_table(source_file, symbol_table, source_file.stmts)
   return symbol_table
 }
-export function build_block_symbol_table(stmts: readonly Stmt[]): SymbolTable {
+export function build_block_symbol_table(
+  source_file: SourceFile,
+  stmts: readonly Stmt[],
+): SymbolTable {
   const symbol_table = new SymbolTable()
-  initialize_symbol_table(symbol_table, stmts)
+  initialize_symbol_table(source_file, symbol_table, stmts)
   return symbol_table
 }
-export function build_function_symbol_table(stmt: FuncStmt): SymbolTable {
+export function build_function_symbol_table(
+  source_file: SourceFile,
+  func: Func,
+): SymbolTable {
   const symbol_table = new SymbolTable()
-  for (const param of stmt.func.params) {
-    add_pattern_bindings_to_symbol_table(symbol_table, param.pattern, stmt)
+  for (const param of func.params) {
+    add_pattern_bindings_to_symbol_table(symbol_table, param.pattern, {
+      kind: "Func",
+      func,
+    })
   }
-  initialize_symbol_table(symbol_table, stmt.func.body.stmts)
+  initialize_symbol_table(source_file, symbol_table, func.body.stmts)
   return symbol_table
 }
 function add_pattern_bindings_to_symbol_table(
@@ -54,6 +63,7 @@ function add_pattern_bindings_to_symbol_table(
 }
 
 function initialize_symbol_table(
+  source_file: SourceFile,
   symbol_table: SymbolTable,
   stmts: readonly Stmt[],
 ) {
@@ -66,7 +76,10 @@ function initialize_symbol_table(
         break
       case "Func":
         if (!stmt.func.name) break
-        symbol_table.add_value(stmt.func.name.text, stmt)
+        symbol_table.add_value(stmt.func.name.text, {
+          kind: "Func",
+          func: stmt.func,
+        })
         break
       case "ClassDecl":
         if (!stmt.class_def.name) break
@@ -78,15 +91,20 @@ function initialize_symbol_table(
         break
       }
       case "Import":
+        const decl = {
+          kind: "Import",
+          stmt,
+          imported_from: source_file,
+        } as const
         if (stmt.default_import) {
-          symbol_table.add_value(stmt.default_import.text, stmt)
+          symbol_table.add_value(stmt.default_import.text, decl)
         }
         for (const named_import of stmt.named_imports) {
           if (named_import.as_name) {
-            symbol_table.add_value(named_import.as_name.text, stmt)
+            symbol_table.add_value(named_import.as_name.text, decl)
           } else if (named_import.imported_name.kind === "Ident") {
-            symbol_table.add_value(named_import.imported_name.ident.text, stmt)
-            symbol_table.add_type(named_import.imported_name.ident.text, stmt)
+            symbol_table.add_value(named_import.imported_name.ident.text, decl)
+            symbol_table.add_type(named_import.imported_name.ident.text, decl)
           } else {
             todo(`import { "quoted" as name } not supported yet.`)
           }

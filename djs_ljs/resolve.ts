@@ -3,12 +3,14 @@ import {
   Expr,
   TypeAnnotation,
   type Block,
+  type Func,
   type Ident,
   type SourceFile,
 } from "djs_ast"
 import { SymbolTable, type TypeDecl, type ValueDecl } from "./SymbolTable.ts"
 import {
   build_block_symbol_table,
+  build_function_symbol_table,
   build_source_file_symbol_table,
 } from "./build_symbol_table.ts"
 import assert from "node:assert"
@@ -58,8 +60,41 @@ class Resolver extends ASTVisitorBase {
     )
   }
 
+  override visit_func(node: Func): void {
+    const func_symbol_table = build_function_symbol_table(
+      this.source_file,
+      node,
+    )
+    this.scope.push(func_symbol_table)
+
+    // The default visit_func implementation calls visit_block,
+    // which will push a new scope, however, the function's scope is the
+    // same as the block's scope, so can't call super.visit_func here
+    // Instead, we manually visit it
+    for (const type_param of node.type_params) {
+      this.visit_type_param(type_param)
+    }
+    for (const param of node.params) {
+      this.visit_param(param)
+    }
+    for (const stmt of node.body.stmts) {
+      this.visit_stmt(stmt)
+    }
+    if (node.return_type !== null) {
+      this.visit_type_annotation(node.return_type)
+    }
+
+    assert(
+      this.scope.pop() === func_symbol_table,
+      "Expected to pop the current function's symbol table",
+    )
+  }
+
   override visit_block(block: Block): void {
-    const block_symbol_table = build_block_symbol_table(block.stmts)
+    const block_symbol_table = build_block_symbol_table(
+      this.source_file,
+      block.stmts,
+    )
     this.scope.push(block_symbol_table)
     super.visit_block(block)
     assert(
