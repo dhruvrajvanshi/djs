@@ -142,7 +142,7 @@ const ForInit = "ForInit"
  */
 const ArrayLiteralMember = "ArrayLiteralMember"
 
-const DPattern = Enum(Pattern, ["span", "visit"], {
+export const DPattern = Enum(Pattern, ["span", "visit"], {
   Var: { ident: Ident },
   Assignment: { pattern: Pattern, initializer: Expr },
   Array: { items: List(Pattern) },
