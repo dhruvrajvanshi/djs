@@ -118,3 +118,33 @@ export function is_readonly_array(
 ): value is ReadonlyArray<unknown> {
   return Array.isArray(value)
 }
+
+export function rx(...parts: (string | RegExp)[]): RegExp {
+  const pattern = parts
+    .map((part) => (typeof part === "string" ? rx.escape(part) : part.source))
+    .join("")
+
+  try {
+    return new RegExp(pattern)
+  } catch (e) {
+    const wrapped = new AssertionError({
+      message: `Invalid regex: ${pattern}`,
+      stackStartFn: rx,
+    })
+    wrapped.cause = e
+    throw wrapped
+  }
+}
+rx.named = function named(name: string, regex: RegExp): RegExp {
+  if (regex.flags.includes("g")) {
+    throw new Error("Cannot name a global regex")
+  }
+  return new RegExp(`(?<${name}>${regex.source})`, regex.flags)
+}
+
+rx.escape = function (str: string): string {
+  return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&")
+}
+
+export type Predicate<T> = (value: T) => boolean
+export type AnyFunc = (...args: never[]) => unknown
