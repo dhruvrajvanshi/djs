@@ -18,7 +18,7 @@ test("build_symbol_table", async () => {
   assert(source_file.stmts.length === 1)
   const fn = source_file.stmts[0]
   assert(fn.kind === "Func")
-  const symbol_table = build_function_symbol_table(fn)
+  const symbol_table = build_function_symbol_table(source_file, fn.func)
 
   assert(symbol_table.get_value("x"))
   assert(symbol_table.get_value("y"))
