@@ -93,8 +93,10 @@ class FindTypeVisitor<
     ) {
       if (this.result) {
         throw new AssertionError({
-          message: `Multiple TypeAnnotation with kind "${this.kind}" found`,
+          message: `Multiple TypeAnnotation(kind = "${this.kind}", match = ${this.predicate}) found`,
           stackStartFn: this.stackStartFn,
+          expected: this.result,
+          actual: type_annotation,
         })
       }
       this.result = type_annotation as Extract<TypeAnnotation, { kind: Kind }>

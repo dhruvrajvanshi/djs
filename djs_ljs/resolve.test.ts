@@ -5,8 +5,8 @@ import assert from "node:assert"
 import { resolve } from "./resolve.ts"
 import { VarDeclStmt } from "djs_ast"
 import { rx } from "djs_std"
-import { find_expr, find_stmt } from "./ast_query.ts"
-import { type ValueDecl } from "./SymbolTable.ts"
+import { find_expr, find_stmt, find_type } from "./ast_query.ts"
+import { type TypeDecl, type ValueDecl } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 
 test("resolve smoke test", async () => {
@@ -21,7 +21,7 @@ test("resolve smoke test", async () => {
         type Bar = /* Foo1 */ Foo
         const x: /* Bar1 */ Bar = /* some_import_1 */ some_import
 
-        function foo(a: /* SomeType2 */ SomeType): /* SomeType3 */ SomeType {
+        function foo(a: /* SomeType2 */ SomeType): /* Bar2 */ Bar {
           return /* a1 */ a
         }
 
@@ -85,6 +85,50 @@ test("resolve smoke test", async () => {
     const expr = find_expr(main, "Var", (e) => has_marker(e, name))
     const decl = resolve_result.values.get(expr.ident)
     assert(decl, `Value declaration for "${name}" not found`)
+    assertions(decl)
+  }
+
+  const expected_types: Record<string, (decl: TypeDecl) => void> = {
+    SomeType1: (decl) => {
+      assert(decl.kind === "Import")
+      assert.equal(
+        decl.stmt,
+        find_stmt(main, "Import", (s) => s.module_specifier === `"./foo.ljs"`),
+      )
+    },
+    Foo1: (decl) => {
+      assert(decl.kind === "TypeAlias")
+      assert.equal(
+        decl,
+        find_stmt(main, "TypeAlias", (s) => s.name.text === "Foo"),
+      )
+    },
+    SomeType2: (decl) => {
+      assert(decl.kind === "Import")
+      assert.equal(
+        decl.stmt,
+        find_stmt(main, "Import", (s) => s.module_specifier === `"./foo.ljs"`),
+      )
+    },
+    Bar1: (decl) => {
+      assert(decl.kind === "TypeAlias")
+      assert.equal(
+        decl,
+        find_stmt(main, "TypeAlias", (s) => s.name.text === "Bar"),
+      )
+    },
+    Bar2: (decl) => {
+      assert(decl.kind === "TypeAlias")
+      assert.equal(
+        decl,
+        find_stmt(main, "TypeAlias", (s) => s.name.text === "Bar"),
+      )
+    },
+  }
+  for (const [name, assertions] of Object.entries(expected_types)) {
+    const type_annotation = find_type(main, "Ident", (e) => has_marker(e, name))
+    const decl = resolve_result.types.get(type_annotation.ident)
+    assert(decl, `Type declaration for "${name}" not found`)
     assertions(decl)
   }
 })

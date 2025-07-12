@@ -19,6 +19,7 @@ import type { FS } from "./FS.ts"
 
 interface ResolveResult {
   values: Map<Ident, ValueDecl>
+  types: Map<Ident, TypeDecl>
   diagnostics: Diagnostics
 }
 
@@ -29,6 +30,7 @@ export function resolve(fs: FS, source_file: SourceFile): ResolveResult {
   return {
     values: resolver.values,
     diagnostics: resolver.diagnostics,
+    types: resolver.types,
   }
 }
 class Resolver extends ASTVisitorBase {
