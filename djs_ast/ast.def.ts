@@ -350,7 +350,7 @@ const DArrayLiteralMember = Enum(ArrayLiteralMember, ["span"], {
   Spread: { expr: Expr },
 })
 
-const DFunc = Struct("Func", ["span", "visit"], {
+export const DFunc = Struct("Func", ["span", "visit"], {
   name: Option(Ident),
   type_params: List("TypeParam"),
   params: List(Param),
