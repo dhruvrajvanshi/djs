@@ -1,5 +1,3 @@
-import type { ImportStarAsStmt, ImportStmt, SourceFile } from "./ast.gen.ts"
-
 export { Token } from "./Token.ts"
 export { TokenKind } from "./TokenKind.ts"
 export * from "./ast.gen.ts"
@@ -9,6 +7,7 @@ export {
   stmt_to_sexpr,
   expr_to_sexpr,
   type_annotation_to_sexpr,
+  func_to_sexpr,
   sexpr_to_string,
   type SExpr,
 } from "./sexpr.ts"
