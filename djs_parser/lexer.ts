@@ -17,6 +17,7 @@ export function Lexer(input: string) {
     current_index: 0,
     regex_enabled: false,
     template_literal_interpolation: false,
+    leading_trivia: "",
   })
 }
 
@@ -27,6 +28,11 @@ type LexerState = {
   current_index: number
   regex_enabled: boolean
   template_literal_interpolation: boolean
+  leading_trivia: string
+}
+
+class Err {
+  constructor(public message: string) {}
 }
 
 function lexer_state_advance(self: LexerState): string {
@@ -107,8 +113,10 @@ export function lexer_impl(self: LexerState): Lexer {
   }
 
   function next(): Token {
-    const comment_err = skip_whitespace_and_comments()
-    if (comment_err) return error_token(comment_err)
+    const leading_trivia = skip_whitespace_and_comments()
+    if (leading_trivia instanceof Err)
+      return error_token(leading_trivia.message)
+    self.leading_trivia = leading_trivia
     self.span_start = self.current_index
     if (current_char() === "\0") {
       return make_token(TokenKind.EndOfFile)
@@ -268,15 +276,20 @@ export function lexer_impl(self: LexerState): Lexer {
       )
     }
   }
-  function skip_whitespace_and_comments(): string | void {
+  type Trivia = string
+  function skip_whitespace_and_comments(): Trivia | Err {
+    let trivia: Trivia = ""
     while (is_whitespace(current_char()) || at_comment()) {
       if (is_whitespace(current_char())) {
         skip_whitespace()
       } else {
+        const start_offset = self.current_index
         const err = skip_comment()
         if (err) return err
+        trivia = self.input.slice(self.span_start, start_offset)
       }
     }
+    return trivia
   }
 
   function skip_whitespace(): void {
@@ -536,6 +549,7 @@ export function lexer_impl(self: LexerState): Lexer {
       span: { start: self.span_start, stop: self.current_index },
       line: self.line,
       text: message,
+      leading_trivia: "",
     }
   }
   function lex_template_literal_start(): Token {
@@ -746,6 +760,7 @@ export function lexer_impl(self: LexerState): Lexer {
         kind === TokenKind.Regex
           ? current_text()
           : "",
+      leading_trivia: self.leading_trivia,
     }
   }
   function current_char(): string {

@@ -6,6 +6,7 @@ export type Token = {
   readonly span: Span
   readonly line: number
   readonly text: string
+  readonly leading_trivia: string
 }
 
 export const Token = {
