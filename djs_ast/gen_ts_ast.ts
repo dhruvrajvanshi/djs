@@ -26,8 +26,12 @@ console.log(output)
 
 function gen_struct(item: StructItem) {
   const span = item.tags.includes("span") ? `readonly span: Span` : ``
+  const leading_trivia = item.tags.includes("trivia")
+    ? `readonly leading_trivia: string`
+    : ``
   return `
     export interface ${item.name} {
+      ${leading_trivia}
       ${span}
       ${Object.entries(item.fields)
         .map(([name, field]) => `readonly ${name}: ${gen_type(field.type)};`)
@@ -83,7 +87,16 @@ function gen_enum_factories(item: EnumItem): string {
         .join(", ")
       const span_param = item.tags.includes("span") ? `span: Span, ` : ``
       const span = item.tags.includes("span") ? `span, ` : ``
-      return `${variant.name}: (${span_param}${params}): ${variantType} => new ${variant.name}${item.name}(${span} ${param_names})`
+      const leading_trivia_param = item.tags.includes("trivia")
+        ? `leading_trivia: string, `
+        : ``
+      const leading_trivia = item.tags.includes("trivia")
+        ? `leading_trivia, `
+        : ``
+      return (
+        `${variant.name}: (${span_param}${leading_trivia_param}${params}): ${variantType} => ` +
+        `new ${variant.name}${item.name}(${span} ${leading_trivia} ${param_names})`
+      )
     } else {
       return `${variant.name}: new ${variant.name}${item.name}()`
     }
@@ -121,6 +134,9 @@ function gen_enum(item: EnumItem): string {
 
   function gen_variant_class(variant: EnumVariant): string {
     const span_param = item.tags.includes("span") ? `readonly span: Span, ` : ``
+    const leading_trivia_param = item.tags.includes("trivia")
+      ? `readonly leading_trivia: string, `
+      : ``
     let toString = ""
     if (item.name === "Stmt") {
       toString = `toString(): string { return sexpr_to_string(stmt_to_sexpr(this)) }`
@@ -137,6 +153,7 @@ function gen_enum(item: EnumItem): string {
     return `export class ${variant.name}${item.name} {
         constructor(
           ${span_param}
+          ${leading_trivia_param}
           ${Object.entries(variant.args)
             .map(
               ([name, type]) =>

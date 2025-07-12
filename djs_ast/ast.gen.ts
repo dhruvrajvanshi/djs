@@ -52,6 +52,7 @@ export type Stmt =
 export class ExprStmt {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -66,6 +67,7 @@ export class ExprStmt {
 export class BlockStmt {
   constructor(
     readonly span: Span,
+
     readonly block: Block,
   ) {}
 
@@ -80,6 +82,7 @@ export class BlockStmt {
 export class ReturnStmt {
   constructor(
     readonly span: Span,
+
     readonly value: Expr | null,
   ) {}
 
@@ -94,6 +97,7 @@ export class ReturnStmt {
 export class VarDeclStmt {
   constructor(
     readonly span: Span,
+
     readonly decl: VarDecl,
   ) {}
 
@@ -108,6 +112,7 @@ export class VarDeclStmt {
 export class IfStmt {
   constructor(
     readonly span: Span,
+
     readonly condition: Expr,
     readonly if_true: Stmt,
     readonly if_false: Stmt | null,
@@ -124,6 +129,7 @@ export class IfStmt {
 export class SwitchStmt {
   constructor(
     readonly span: Span,
+
     readonly condition: Expr,
     readonly cases: readonly SwitchCase[],
   ) {}
@@ -139,6 +145,7 @@ export class SwitchStmt {
 export class WhileStmt {
   constructor(
     readonly span: Span,
+
     readonly condition: Expr,
     readonly body: Stmt,
   ) {}
@@ -154,6 +161,7 @@ export class WhileStmt {
 export class DoWhileStmt {
   constructor(
     readonly span: Span,
+
     readonly body: Stmt,
     readonly condition: Expr,
   ) {}
@@ -169,6 +177,7 @@ export class DoWhileStmt {
 export class TryStmt {
   constructor(
     readonly span: Span,
+
     readonly try_block: Block,
     readonly catch_pattern: Pattern | null,
     readonly catch_block: Block | null,
@@ -186,6 +195,7 @@ export class TryStmt {
 export class ForStmt {
   constructor(
     readonly span: Span,
+
     readonly init: ForInit,
     readonly test: Expr | null,
     readonly update: Expr | null,
@@ -203,6 +213,7 @@ export class ForStmt {
 export class ForInOrOfStmt {
   constructor(
     readonly span: Span,
+
     readonly decl_type: DeclType | null,
     readonly lhs: Pattern,
     readonly in_or_of: InOrOf,
@@ -221,6 +232,7 @@ export class ForInOrOfStmt {
 export class BreakStmt {
   constructor(
     readonly span: Span,
+
     readonly label: Label | null,
   ) {}
 
@@ -235,6 +247,7 @@ export class BreakStmt {
 export class ContinueStmt {
   constructor(
     readonly span: Span,
+
     readonly label: Label | null,
   ) {}
 
@@ -260,6 +273,7 @@ export class DebuggerStmt {
 export class WithStmt {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
     readonly body: Stmt,
   ) {}
@@ -275,6 +289,7 @@ export class WithStmt {
 export class FuncStmt {
   constructor(
     readonly span: Span,
+
     readonly func: Func,
     readonly is_exported: boolean,
   ) {}
@@ -290,6 +305,7 @@ export class FuncStmt {
 export class ClassDeclStmt {
   constructor(
     readonly span: Span,
+
     readonly class_def: Class,
   ) {}
 
@@ -304,6 +320,7 @@ export class ClassDeclStmt {
 export class ImportStmt {
   constructor(
     readonly span: Span,
+
     readonly default_import: Ident | null,
     readonly named_imports: readonly ImportSpecifier[],
     readonly module_specifier: Text,
@@ -320,6 +337,7 @@ export class ImportStmt {
 export class ImportStarAsStmt {
   constructor(
     readonly span: Span,
+
     readonly as_name: Ident,
     readonly module_specifier: Text,
   ) {}
@@ -335,6 +353,7 @@ export class ImportStarAsStmt {
 export class LabeledStmt {
   constructor(
     readonly span: Span,
+
     readonly label: Label,
     readonly stmt: Stmt,
   ) {}
@@ -350,6 +369,7 @@ export class LabeledStmt {
 export class ObjectTypeDeclStmt {
   constructor(
     readonly span: Span,
+
     readonly name: Ident,
     readonly fields: readonly ObjectTypeDeclField[],
   ) {}
@@ -365,6 +385,7 @@ export class ObjectTypeDeclStmt {
 export class TypeAliasStmt {
   constructor(
     readonly span: Span,
+
     readonly name: Ident,
     readonly type_annotation: TypeAnnotation,
   ) {}
@@ -380,6 +401,7 @@ export class TypeAliasStmt {
 export class LJSExternFunctionStmt {
   constructor(
     readonly span: Span,
+
     readonly is_exported: boolean,
     readonly name: Ident,
     readonly params: readonly Param[],
@@ -592,6 +614,7 @@ export type Pattern =
 export class VarPattern {
   constructor(
     readonly span: Span,
+
     readonly ident: Ident,
   ) {}
 
@@ -606,6 +629,7 @@ export class VarPattern {
 export class AssignmentPattern {
   constructor(
     readonly span: Span,
+
     readonly pattern: Pattern,
     readonly initializer: Expr,
   ) {}
@@ -621,6 +645,7 @@ export class AssignmentPattern {
 export class ArrayPattern {
   constructor(
     readonly span: Span,
+
     readonly items: readonly Pattern[],
   ) {}
 
@@ -635,6 +660,7 @@ export class ArrayPattern {
 export class ObjectPattern {
   constructor(
     readonly span: Span,
+
     readonly properties: readonly ObjectPatternProperty[],
     readonly rest: Pattern | null,
   ) {}
@@ -650,6 +676,7 @@ export class ObjectPattern {
 export class PropPattern {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
     readonly key: ObjectKey,
   ) {}
@@ -676,6 +703,7 @@ export class ElisionPattern {
 export class RestPattern {
   constructor(
     readonly span: Span,
+
     readonly pattern: Pattern,
   ) {}
 
@@ -810,6 +838,8 @@ export type Expr =
 export class VarExpr {
   constructor(
     readonly span: Span,
+
+    readonly leading_trivia: Text,
     readonly ident: Ident,
   ) {}
 
@@ -824,6 +854,7 @@ export class VarExpr {
 export class ParenExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -838,6 +869,7 @@ export class ParenExpr {
 export class BinOpExpr {
   constructor(
     readonly span: Span,
+
     readonly lhs: Expr,
     readonly operator: BinOp,
     readonly rhs: Expr,
@@ -854,6 +886,7 @@ export class BinOpExpr {
 export class ArrowFnExpr {
   constructor(
     readonly span: Span,
+
     readonly params: readonly Param[],
     readonly return_type: TypeAnnotation | null,
     readonly body: ArrowFnBody,
@@ -870,6 +903,7 @@ export class ArrowFnExpr {
 export class FuncExpr {
   constructor(
     readonly span: Span,
+
     readonly func: Func,
   ) {}
 
@@ -884,6 +918,7 @@ export class FuncExpr {
 export class CallExpr {
   constructor(
     readonly span: Span,
+
     readonly callee: Expr,
     readonly args: readonly Expr[],
     readonly spread: Expr | null,
@@ -901,6 +936,7 @@ export class CallExpr {
 export class IndexExpr {
   constructor(
     readonly span: Span,
+
     readonly lhs: Expr,
     readonly property: Expr,
     readonly is_optional: boolean,
@@ -917,6 +953,7 @@ export class IndexExpr {
 export class PropExpr {
   constructor(
     readonly span: Span,
+
     readonly lhs: Expr,
     readonly property: Ident,
     readonly is_optional: boolean,
@@ -933,6 +970,7 @@ export class PropExpr {
 export class StringExpr {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -947,6 +985,7 @@ export class StringExpr {
 export class NumberExpr {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -961,6 +1000,7 @@ export class NumberExpr {
 export class BooleanExpr {
   constructor(
     readonly span: Span,
+
     readonly value: boolean,
   ) {}
 
@@ -997,6 +1037,7 @@ export class UndefinedExpr {
 export class ObjectExpr {
   constructor(
     readonly span: Span,
+
     readonly entries: readonly ObjectLiteralEntry[],
   ) {}
 
@@ -1011,6 +1052,7 @@ export class ObjectExpr {
 export class ThrowExpr {
   constructor(
     readonly span: Span,
+
     readonly value: Expr,
   ) {}
 
@@ -1025,6 +1067,7 @@ export class ThrowExpr {
 export class PostIncrementExpr {
   constructor(
     readonly span: Span,
+
     readonly value: Expr,
   ) {}
 
@@ -1039,6 +1082,7 @@ export class PostIncrementExpr {
 export class PostDecrementExpr {
   constructor(
     readonly span: Span,
+
     readonly value: Expr,
   ) {}
 
@@ -1053,6 +1097,7 @@ export class PostDecrementExpr {
 export class PreIncrementExpr {
   constructor(
     readonly span: Span,
+
     readonly value: Expr,
   ) {}
 
@@ -1067,6 +1112,7 @@ export class PreIncrementExpr {
 export class PreDecrementExpr {
   constructor(
     readonly span: Span,
+
     readonly value: Expr,
   ) {}
 
@@ -1081,6 +1127,7 @@ export class PreDecrementExpr {
 export class ArrayExpr {
   constructor(
     readonly span: Span,
+
     readonly items: readonly ArrayLiteralMember[],
   ) {}
 
@@ -1095,6 +1142,7 @@ export class ArrayExpr {
 export class NewExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1109,6 +1157,7 @@ export class NewExpr {
 export class YieldExpr {
   constructor(
     readonly span: Span,
+
     readonly value: Expr | null,
   ) {}
 
@@ -1123,6 +1172,7 @@ export class YieldExpr {
 export class YieldFromExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1137,6 +1187,7 @@ export class YieldFromExpr {
 export class TernaryExpr {
   constructor(
     readonly span: Span,
+
     readonly condition: Expr,
     readonly if_true: Expr,
     readonly if_false: Expr,
@@ -1153,6 +1204,7 @@ export class TernaryExpr {
 export class AssignExpr {
   constructor(
     readonly span: Span,
+
     readonly pattern: Pattern,
     readonly operator: AssignOp,
     readonly value: Expr,
@@ -1169,6 +1221,7 @@ export class AssignExpr {
 export class RegexExpr {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -1183,6 +1236,7 @@ export class RegexExpr {
 export class DeleteExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1197,6 +1251,7 @@ export class DeleteExpr {
 export class VoidExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1211,6 +1266,7 @@ export class VoidExpr {
 export class TypeOfExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1225,6 +1281,7 @@ export class TypeOfExpr {
 export class UnaryPlusExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1239,6 +1296,7 @@ export class UnaryPlusExpr {
 export class UnaryMinusExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1253,6 +1311,7 @@ export class UnaryMinusExpr {
 export class BitNotExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1267,6 +1326,7 @@ export class BitNotExpr {
 export class NotExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1281,6 +1341,7 @@ export class NotExpr {
 export class AwaitExpr {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1295,6 +1356,7 @@ export class AwaitExpr {
 export class CommaExpr {
   constructor(
     readonly span: Span,
+
     readonly items: readonly Expr[],
   ) {}
 
@@ -1320,6 +1382,7 @@ export class SuperExpr {
 export class ClassExpr {
   constructor(
     readonly span: Span,
+
     readonly class_def: Class,
   ) {}
 
@@ -1334,6 +1397,7 @@ export class ClassExpr {
 export class TemplateLiteralExpr {
   constructor(
     readonly span: Span,
+
     readonly fragments: readonly TemplateLiteralFragment[],
   ) {}
 
@@ -1348,6 +1412,7 @@ export class TemplateLiteralExpr {
 export class TaggedTemplateLiteralExpr {
   constructor(
     readonly span: Span,
+
     readonly tag: Expr,
     readonly fragments: readonly TemplateLiteralFragment[],
   ) {}
@@ -1363,6 +1428,7 @@ export class TaggedTemplateLiteralExpr {
 export class BuiltinExpr {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -1376,7 +1442,8 @@ export class BuiltinExpr {
 }
 
 export const Expr = {
-  Var: (span: Span, ident: Ident): VarExpr => new VarExpr(span, ident),
+  Var: (span: Span, leading_trivia: Text, ident: Ident): VarExpr =>
+    new VarExpr(span, leading_trivia, ident),
 
   Paren: (span: Span, expr: Expr): ParenExpr => new ParenExpr(span, expr),
 
@@ -1531,6 +1598,8 @@ export type TypeAnnotation =
 export class IdentTypeAnnotation {
   constructor(
     readonly span: Span,
+
+    readonly leading_trivia: Text,
     readonly ident: Ident,
   ) {}
 
@@ -1545,6 +1614,7 @@ export class IdentTypeAnnotation {
 export class UnionTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly left: TypeAnnotation,
     readonly right: TypeAnnotation,
   ) {}
@@ -1560,6 +1630,7 @@ export class UnionTypeAnnotation {
 export class ArrayTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly item: TypeAnnotation,
   ) {}
 
@@ -1574,6 +1645,7 @@ export class ArrayTypeAnnotation {
 export class ReadonlyArrayTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly item: TypeAnnotation,
   ) {}
 
@@ -1588,6 +1660,7 @@ export class ReadonlyArrayTypeAnnotation {
 export class ApplicationTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly callee: TypeAnnotation,
     readonly args: readonly TypeAnnotation[],
   ) {}
@@ -1603,6 +1676,7 @@ export class ApplicationTypeAnnotation {
 export class StringTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -1617,6 +1691,7 @@ export class StringTypeAnnotation {
 export class FuncTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly type_params: readonly TypeParam[],
     readonly params: readonly FuncTypeParam[],
     readonly returns: TypeAnnotation,
@@ -1633,6 +1708,7 @@ export class FuncTypeAnnotation {
 export class LJSConstPtrTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly to: TypeAnnotation,
   ) {}
 
@@ -1647,6 +1723,7 @@ export class LJSConstPtrTypeAnnotation {
 export class LJSPtrTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly to: TypeAnnotation,
   ) {}
 
@@ -1661,6 +1738,7 @@ export class LJSPtrTypeAnnotation {
 export class BuiltinTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -1675,6 +1753,7 @@ export class BuiltinTypeAnnotation {
 export class QualifiedTypeAnnotation {
   constructor(
     readonly span: Span,
+
     readonly head: Ident,
     readonly tail: readonly Ident[],
   ) {}
@@ -1689,8 +1768,12 @@ export class QualifiedTypeAnnotation {
 }
 
 export const TypeAnnotation = {
-  Ident: (span: Span, ident: Ident): IdentTypeAnnotation =>
-    new IdentTypeAnnotation(span, ident),
+  Ident: (
+    span: Span,
+    leading_trivia: Text,
+    ident: Ident,
+  ): IdentTypeAnnotation =>
+    new IdentTypeAnnotation(span, leading_trivia, ident),
 
   Union: (
     span: Span,
@@ -1753,6 +1836,7 @@ export type ObjectLiteralEntry =
 export class IdentObjectLiteralEntry {
   constructor(
     readonly span: Span,
+
     readonly ident: Ident,
   ) {}
 
@@ -1763,6 +1847,7 @@ export class IdentObjectLiteralEntry {
 export class PropObjectLiteralEntry {
   constructor(
     readonly span: Span,
+
     readonly key: ObjectKey,
     readonly value: Expr,
   ) {}
@@ -1774,6 +1859,7 @@ export class PropObjectLiteralEntry {
 export class MethodObjectLiteralEntry {
   constructor(
     readonly span: Span,
+
     readonly method: MethodDef,
   ) {}
 
@@ -1784,6 +1870,7 @@ export class MethodObjectLiteralEntry {
 export class SpreadObjectLiteralEntry {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1810,6 +1897,7 @@ export type ObjectKey = IdentObjectKey | StringObjectKey | ComputedObjectKey
 export class IdentObjectKey {
   constructor(
     readonly span: Span,
+
     readonly ident: Ident,
   ) {}
 
@@ -1820,6 +1908,7 @@ export class IdentObjectKey {
 export class StringObjectKey {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -1830,6 +1919,7 @@ export class StringObjectKey {
 export class ComputedObjectKey {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1878,6 +1968,7 @@ export type ArrayLiteralMember =
 export class ExprArrayLiteralMember {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1895,6 +1986,7 @@ export class ElisionArrayLiteralMember {
 export class SpreadArrayLiteralMember {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1918,6 +2010,7 @@ export type ArrowFnBody = ExprArrowFnBody | BlockArrowFnBody
 export class ExprArrowFnBody {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 
@@ -1928,6 +2021,7 @@ export class ExprArrowFnBody {
 export class BlockArrowFnBody {
   constructor(
     readonly span: Span,
+
     readonly block: Block,
   ) {}
 
@@ -1950,6 +2044,7 @@ export type TemplateLiteralFragment =
 export class TextTemplateLiteralFragment {
   constructor(
     readonly span: Span,
+
     readonly text: Text,
   ) {}
 
@@ -1960,6 +2055,7 @@ export class TextTemplateLiteralFragment {
 export class ExprTemplateLiteralFragment {
   constructor(
     readonly span: Span,
+
     readonly expr: Expr,
   ) {}
 

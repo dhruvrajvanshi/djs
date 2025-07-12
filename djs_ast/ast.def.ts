@@ -216,7 +216,7 @@ const DObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
 })
 
 export const DExpr = Enum(Expr, ["span", "visit"], {
-  Var: { ident: Ident },
+  Var: { leading_trivia: Text, ident: Ident },
   Paren: { expr: Expr },
   BinOp: { lhs: Expr, operator: BinOp, rhs: Expr },
   ArrowFn: {
@@ -272,7 +272,7 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   },
 })
 export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
-  Ident: { ident: Ident },
+  Ident: { leading_trivia: Text, ident: Ident },
   Union: { left: TypeAnnotation, right: TypeAnnotation },
   Array: { item: TypeAnnotation },
   ReadonlyArray: { item: TypeAnnotation },

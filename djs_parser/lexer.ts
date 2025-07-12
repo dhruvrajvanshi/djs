@@ -286,7 +286,7 @@ export function lexer_impl(self: LexerState): Lexer {
         const start_offset = self.current_index
         const err = skip_comment()
         if (err) return err
-        trivia = self.input.slice(self.span_start, start_offset)
+        trivia = self.input.slice(start_offset, self.current_index)
       }
     }
     return trivia

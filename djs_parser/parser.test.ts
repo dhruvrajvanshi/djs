@@ -1,6 +1,6 @@
 import { test, expect } from "vitest"
 import { Parser } from "./parser.ts"
-import { AssignOp, Expr, source_file_to_sexpr } from "djs_ast"
+import { AssignOp, Expr, source_file_to_sexpr, TypeAnnotation } from "djs_ast"
 import assert from "assert"
 import fs from "node:fs/promises"
 
@@ -35,12 +35,14 @@ test("parse error for missing parenthesis in if condition", () => {
         condition: {
           kind: "Var",
           ident: "x",
+          leading_trivia: "",
         },
         if_false: {
           kind: "Expr",
           expr: {
             kind: "Var",
             ident: "z",
+            leading_trivia: "",
           },
         },
         if_true: {
@@ -48,6 +50,7 @@ test("parse error for missing parenthesis in if condition", () => {
           expr: {
             kind: "Var",
             ident: "y",
+            leading_trivia: "",
           },
         },
       },
@@ -129,6 +132,11 @@ test("is_exported should be correctly set", () => {
   assert(source_file.stmts[1].kind === "Func")
   expect(source_file.stmts[1].is_exported).toBe(true)
 })
+test("preserves leading trivia in type aliases", () => {
+  const t = parse_type(`/* leading trivia comment */ Foo`)
+  assert(t.kind === "Ident")
+  assert.equal(t.leading_trivia, "/* leading trivia comment */")
+})
 
 if (process.env.CI) {
   const test262Paths: string[] = []
@@ -157,4 +165,12 @@ function parse_expr(input: string): Expr {
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "Expr")
   return stmt.expr
+}
+function parse_type(input: string): TypeAnnotation {
+  const parser = Parser("test.js", `type Foo = ${input}`)
+  const source_file = parser.parse_source_file()
+  expect(source_file.errors).toEqual([])
+  const stmt = source_file.stmts[0]
+  assert(stmt.kind === "TypeAlias")
+  return stmt.type_annotation
 }
