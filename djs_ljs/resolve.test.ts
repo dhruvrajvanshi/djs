@@ -53,11 +53,12 @@ test("resolve smoke test", async () => {
       )
     },
     a1: (decl) => {
-      assert(decl.kind === "Func")
+      assert(decl.kind === "Param")
       assert.equal(
         decl.func,
         find_stmt(main, "Func", (s) => s.func.name?.text === "foo").func,
       )
+      assert.equal(decl.param_index, 0)
     },
     x1: (decl) => {
       assert(decl.kind === "VarDecl")
