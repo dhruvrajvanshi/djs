@@ -24,12 +24,12 @@ test("Simple var decls", () => {
       "let",
       "x",
       ":",
-      { kind: "Ident", ident: "Foo" },
+      { kind: "Ident", ident: "Foo", leading_trivia: "" },
       "=",
       { kind: "Number", text: "30" },
     ],
     ["let", "y", "=", { kind: "String", text: '"hello"' }],
-    ["let", "z", ":", { kind: "Ident", ident: "boolean" }],
+    ["let", "z", ":", { kind: "Ident", ident: "boolean", leading_trivia: "" }],
     ["let", "t"],
   ])
 })
