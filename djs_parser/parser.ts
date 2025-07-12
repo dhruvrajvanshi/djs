@@ -520,9 +520,10 @@ function parser_impl(
   function parse_primary_expr(): Expr | Err {
     switch (self.current_token.kind) {
       case t.Ident: {
+        const leading_trivia = self.current_token.leading_trivia
         const ident = parse_ident()
         if (ident === ERR) return ERR
-        return Expr.Var(ident.span, ident)
+        return Expr.Var(ident.span, leading_trivia, ident)
       }
       case t.True:
         return Expr.Boolean(advance().span, true)
@@ -1078,21 +1079,22 @@ function parser_impl(
             annot.item,
           )
         }
+        const leading_trivia = self.current_token.leading_trivia
         const ident = parse_ident()
         if (ident === ERR) return ERR
         if (at(t.Dot)) return parse_qualified_type_annotation(ident)
-        return TypeAnnotation.Ident(ident.span, ident)
+        return TypeAnnotation.Ident(ident.span, leading_trivia, ident)
       }
       case t.Void: {
         const tok = advance()
-        return TypeAnnotation.Ident(tok.span, {
+        return TypeAnnotation.Ident(tok.span, tok.leading_trivia, {
           span: tok.span,
           text: "void",
         })
       }
       case t.Null: {
         const tok = advance()
-        return TypeAnnotation.Ident(tok.span, {
+        return TypeAnnotation.Ident(tok.span, tok.leading_trivia, {
           span: tok.span,
           text: "null",
         })
