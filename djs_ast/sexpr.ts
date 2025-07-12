@@ -1,5 +1,12 @@
 import { type_registry } from "./ast.def.ts"
-import type { Expr, SourceFile, Stmt, TypeAnnotation, Func } from "./ast.gen.ts"
+import type {
+  Expr,
+  SourceFile,
+  Stmt,
+  TypeAnnotation,
+  Func,
+  Pattern,
+} from "./ast.gen.ts"
 import type { EnumItem, StructItem, Type } from "./astgen_items.ts"
 import {
   DStmt as StmtDef,
@@ -7,6 +14,7 @@ import {
   DTypeAnnotation as TypeAnnotationDef,
   DSourceFile as SourceFileDef,
   DFunc as FuncDef,
+  DPattern as PatternDef,
 } from "./ast.def.ts"
 import assert from "node:assert/strict"
 import { is_readonly_array } from "djs_std"
@@ -47,6 +55,11 @@ export function expr_to_sexpr(expr: Expr): SExpr {
 const annotation_dumper = variant_dumper<TypeAnnotation>(TypeAnnotationDef)
 export function type_annotation_to_sexpr(type: TypeAnnotation): SExpr {
   return annotation_dumper(type)
+}
+
+export const pattern_dumper = variant_dumper(PatternDef)
+export function pattern_to_sexpr(pattern: Pattern): SExpr {
+  return pattern_dumper(pattern)
 }
 
 export const source_file_dumper = struct_dumper(SourceFileDef)

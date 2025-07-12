@@ -8,6 +8,7 @@ let output = `
 
 import type { Span } from "./Span.ts";
 import type { Diagnostic } from "./Diagnostic.ts";
+import { expr_to_sexpr, stmt_to_sexpr, type_annotation_to_sexpr, pattern_to_sexpr, sexpr_to_string } from "./sexpr.ts";
 
 /**
  * Raw source text
@@ -120,6 +121,19 @@ function gen_enum(item: EnumItem): string {
 
   function gen_variant_class(variant: EnumVariant): string {
     const span_param = item.tags.includes("span") ? `readonly span: Span, ` : ``
+    let toString = ""
+    if (item.name === "Stmt") {
+      toString = `toString(): string { return sexpr_to_string(stmt_to_sexpr(this)) }`
+    } else if (item.name === "Expr") {
+      toString = `toString(): string { return sexpr_to_string(expr_to_sexpr(this)) }`
+    } else if (item.name === "TypeAnnotation") {
+      toString = `toString(): string { return sexpr_to_string(type_annotation_to_sexpr(this)) }`
+    } else if (item.name === "Pattern") {
+      toString = `toString(): string { return sexpr_to_string(pattern_to_sexpr(this)) }`
+    } else if (item.name === "Func") {
+      toString = `toString(): string { return sexpr_to_string(func_to_sexpr(this)) }`
+    }
+
     return `export class ${variant.name}${item.name} {
         constructor(
           ${span_param}
@@ -132,6 +146,8 @@ function gen_enum(item: EnumItem): string {
         ) {}
 
         get kind(): "${variant.name}" { return "${variant.name}" }
+
+        ${toString}
       }`
   }
 }

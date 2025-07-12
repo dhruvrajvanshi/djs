@@ -4,6 +4,13 @@
 
 import type { Span } from "./Span.ts"
 import type { Diagnostic } from "./Diagnostic.ts"
+import {
+  expr_to_sexpr,
+  stmt_to_sexpr,
+  type_annotation_to_sexpr,
+  pattern_to_sexpr,
+  sexpr_to_string,
+} from "./sexpr.ts"
 
 /**
  * Raw source text
@@ -51,6 +58,10 @@ export class ExprStmt {
   get kind(): "Expr" {
     return "Expr"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class BlockStmt {
   constructor(
@@ -60,6 +71,10 @@ export class BlockStmt {
 
   get kind(): "Block" {
     return "Block"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class ReturnStmt {
@@ -71,6 +86,10 @@ export class ReturnStmt {
   get kind(): "Return" {
     return "Return"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class VarDeclStmt {
   constructor(
@@ -80,6 +99,10 @@ export class VarDeclStmt {
 
   get kind(): "VarDecl" {
     return "VarDecl"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class IfStmt {
@@ -93,6 +116,10 @@ export class IfStmt {
   get kind(): "If" {
     return "If"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class SwitchStmt {
   constructor(
@@ -103,6 +130,10 @@ export class SwitchStmt {
 
   get kind(): "Switch" {
     return "Switch"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class WhileStmt {
@@ -115,6 +146,10 @@ export class WhileStmt {
   get kind(): "While" {
     return "While"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class DoWhileStmt {
   constructor(
@@ -125,6 +160,10 @@ export class DoWhileStmt {
 
   get kind(): "DoWhile" {
     return "DoWhile"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class TryStmt {
@@ -139,6 +178,10 @@ export class TryStmt {
   get kind(): "Try" {
     return "Try"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class ForStmt {
   constructor(
@@ -151,6 +194,10 @@ export class ForStmt {
 
   get kind(): "For" {
     return "For"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class ForInOrOfStmt {
@@ -166,6 +213,10 @@ export class ForInOrOfStmt {
   get kind(): "ForInOrOf" {
     return "ForInOrOf"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class BreakStmt {
   constructor(
@@ -175,6 +226,10 @@ export class BreakStmt {
 
   get kind(): "Break" {
     return "Break"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class ContinueStmt {
@@ -186,12 +241,20 @@ export class ContinueStmt {
   get kind(): "Continue" {
     return "Continue"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class DebuggerStmt {
   constructor(readonly span: Span) {}
 
   get kind(): "Debugger" {
     return "Debugger"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class WithStmt {
@@ -204,6 +267,10 @@ export class WithStmt {
   get kind(): "With" {
     return "With"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class FuncStmt {
   constructor(
@@ -215,6 +282,10 @@ export class FuncStmt {
   get kind(): "Func" {
     return "Func"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class ClassDeclStmt {
   constructor(
@@ -224,6 +295,10 @@ export class ClassDeclStmt {
 
   get kind(): "ClassDecl" {
     return "ClassDecl"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class ImportStmt {
@@ -237,6 +312,10 @@ export class ImportStmt {
   get kind(): "Import" {
     return "Import"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class ImportStarAsStmt {
   constructor(
@@ -247,6 +326,10 @@ export class ImportStarAsStmt {
 
   get kind(): "ImportStarAs" {
     return "ImportStarAs"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class LabeledStmt {
@@ -259,6 +342,10 @@ export class LabeledStmt {
   get kind(): "Labeled" {
     return "Labeled"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class ObjectTypeDeclStmt {
   constructor(
@@ -270,6 +357,10 @@ export class ObjectTypeDeclStmt {
   get kind(): "ObjectTypeDecl" {
     return "ObjectTypeDecl"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class TypeAliasStmt {
   constructor(
@@ -280,6 +371,10 @@ export class TypeAliasStmt {
 
   get kind(): "TypeAlias" {
     return "TypeAlias"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 export class LJSExternFunctionStmt {
@@ -294,12 +389,20 @@ export class LJSExternFunctionStmt {
   get kind(): "LJSExternFunction" {
     return "LJSExternFunction"
   }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
 }
 export class EmptyStmt {
   constructor(readonly span: Span) {}
 
   get kind(): "Empty" {
     return "Empty"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
 
@@ -495,6 +598,10 @@ export class VarPattern {
   get kind(): "Var" {
     return "Var"
   }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
+  }
 }
 export class AssignmentPattern {
   constructor(
@@ -506,6 +613,10 @@ export class AssignmentPattern {
   get kind(): "Assignment" {
     return "Assignment"
   }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
+  }
 }
 export class ArrayPattern {
   constructor(
@@ -515,6 +626,10 @@ export class ArrayPattern {
 
   get kind(): "Array" {
     return "Array"
+  }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
   }
 }
 export class ObjectPattern {
@@ -527,6 +642,10 @@ export class ObjectPattern {
   get kind(): "Object" {
     return "Object"
   }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
+  }
 }
 export class PropPattern {
   constructor(
@@ -538,12 +657,20 @@ export class PropPattern {
   get kind(): "Prop" {
     return "Prop"
   }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
+  }
 }
 export class ElisionPattern {
   constructor(readonly span: Span) {}
 
   get kind(): "Elision" {
     return "Elision"
+  }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
   }
 }
 export class RestPattern {
@@ -554,6 +681,10 @@ export class RestPattern {
 
   get kind(): "Rest" {
     return "Rest"
+  }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
   }
 }
 
@@ -685,6 +816,10 @@ export class VarExpr {
   get kind(): "Var" {
     return "Var"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class ParenExpr {
   constructor(
@@ -694,6 +829,10 @@ export class ParenExpr {
 
   get kind(): "Paren" {
     return "Paren"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class BinOpExpr {
@@ -707,6 +846,10 @@ export class BinOpExpr {
   get kind(): "BinOp" {
     return "BinOp"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class ArrowFnExpr {
   constructor(
@@ -719,6 +862,10 @@ export class ArrowFnExpr {
   get kind(): "ArrowFn" {
     return "ArrowFn"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class FuncExpr {
   constructor(
@@ -728,6 +875,10 @@ export class FuncExpr {
 
   get kind(): "Func" {
     return "Func"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class CallExpr {
@@ -742,6 +893,10 @@ export class CallExpr {
   get kind(): "Call" {
     return "Call"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class IndexExpr {
   constructor(
@@ -753,6 +908,10 @@ export class IndexExpr {
 
   get kind(): "Index" {
     return "Index"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class PropExpr {
@@ -766,6 +925,10 @@ export class PropExpr {
   get kind(): "Prop" {
     return "Prop"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class StringExpr {
   constructor(
@@ -775,6 +938,10 @@ export class StringExpr {
 
   get kind(): "String" {
     return "String"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class NumberExpr {
@@ -786,6 +953,10 @@ export class NumberExpr {
   get kind(): "Number" {
     return "Number"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class BooleanExpr {
   constructor(
@@ -796,6 +967,10 @@ export class BooleanExpr {
   get kind(): "Boolean" {
     return "Boolean"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class NullExpr {
   constructor(readonly span: Span) {}
@@ -803,12 +978,20 @@ export class NullExpr {
   get kind(): "Null" {
     return "Null"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class UndefinedExpr {
   constructor(readonly span: Span) {}
 
   get kind(): "Undefined" {
     return "Undefined"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class ObjectExpr {
@@ -820,6 +1003,10 @@ export class ObjectExpr {
   get kind(): "Object" {
     return "Object"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class ThrowExpr {
   constructor(
@@ -829,6 +1016,10 @@ export class ThrowExpr {
 
   get kind(): "Throw" {
     return "Throw"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class PostIncrementExpr {
@@ -840,6 +1031,10 @@ export class PostIncrementExpr {
   get kind(): "PostIncrement" {
     return "PostIncrement"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class PostDecrementExpr {
   constructor(
@@ -849,6 +1044,10 @@ export class PostDecrementExpr {
 
   get kind(): "PostDecrement" {
     return "PostDecrement"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class PreIncrementExpr {
@@ -860,6 +1059,10 @@ export class PreIncrementExpr {
   get kind(): "PreIncrement" {
     return "PreIncrement"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class PreDecrementExpr {
   constructor(
@@ -869,6 +1072,10 @@ export class PreDecrementExpr {
 
   get kind(): "PreDecrement" {
     return "PreDecrement"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class ArrayExpr {
@@ -880,6 +1087,10 @@ export class ArrayExpr {
   get kind(): "Array" {
     return "Array"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class NewExpr {
   constructor(
@@ -889,6 +1100,10 @@ export class NewExpr {
 
   get kind(): "New" {
     return "New"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class YieldExpr {
@@ -900,6 +1115,10 @@ export class YieldExpr {
   get kind(): "Yield" {
     return "Yield"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class YieldFromExpr {
   constructor(
@@ -909,6 +1128,10 @@ export class YieldFromExpr {
 
   get kind(): "YieldFrom" {
     return "YieldFrom"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class TernaryExpr {
@@ -922,6 +1145,10 @@ export class TernaryExpr {
   get kind(): "Ternary" {
     return "Ternary"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class AssignExpr {
   constructor(
@@ -934,6 +1161,10 @@ export class AssignExpr {
   get kind(): "Assign" {
     return "Assign"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class RegexExpr {
   constructor(
@@ -943,6 +1174,10 @@ export class RegexExpr {
 
   get kind(): "Regex" {
     return "Regex"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class DeleteExpr {
@@ -954,6 +1189,10 @@ export class DeleteExpr {
   get kind(): "Delete" {
     return "Delete"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class VoidExpr {
   constructor(
@@ -963,6 +1202,10 @@ export class VoidExpr {
 
   get kind(): "Void" {
     return "Void"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class TypeOfExpr {
@@ -974,6 +1217,10 @@ export class TypeOfExpr {
   get kind(): "TypeOf" {
     return "TypeOf"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class UnaryPlusExpr {
   constructor(
@@ -983,6 +1230,10 @@ export class UnaryPlusExpr {
 
   get kind(): "UnaryPlus" {
     return "UnaryPlus"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class UnaryMinusExpr {
@@ -994,6 +1245,10 @@ export class UnaryMinusExpr {
   get kind(): "UnaryMinus" {
     return "UnaryMinus"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class BitNotExpr {
   constructor(
@@ -1003,6 +1258,10 @@ export class BitNotExpr {
 
   get kind(): "BitNot" {
     return "BitNot"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class NotExpr {
@@ -1014,6 +1273,10 @@ export class NotExpr {
   get kind(): "Not" {
     return "Not"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class AwaitExpr {
   constructor(
@@ -1023,6 +1286,10 @@ export class AwaitExpr {
 
   get kind(): "Await" {
     return "Await"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class CommaExpr {
@@ -1034,12 +1301,20 @@ export class CommaExpr {
   get kind(): "Comma" {
     return "Comma"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class SuperExpr {
   constructor(readonly span: Span) {}
 
   get kind(): "Super" {
     return "Super"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class ClassExpr {
@@ -1051,6 +1326,10 @@ export class ClassExpr {
   get kind(): "Class" {
     return "Class"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class TemplateLiteralExpr {
   constructor(
@@ -1060,6 +1339,10 @@ export class TemplateLiteralExpr {
 
   get kind(): "TemplateLiteral" {
     return "TemplateLiteral"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 export class TaggedTemplateLiteralExpr {
@@ -1072,6 +1355,10 @@ export class TaggedTemplateLiteralExpr {
   get kind(): "TaggedTemplateLiteral" {
     return "TaggedTemplateLiteral"
   }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
 }
 export class BuiltinExpr {
   constructor(
@@ -1081,6 +1368,10 @@ export class BuiltinExpr {
 
   get kind(): "Builtin" {
     return "Builtin"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
   }
 }
 
@@ -1246,6 +1537,10 @@ export class IdentTypeAnnotation {
   get kind(): "Ident" {
     return "Ident"
   }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
 }
 export class UnionTypeAnnotation {
   constructor(
@@ -1257,6 +1552,10 @@ export class UnionTypeAnnotation {
   get kind(): "Union" {
     return "Union"
   }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
 }
 export class ArrayTypeAnnotation {
   constructor(
@@ -1267,6 +1566,10 @@ export class ArrayTypeAnnotation {
   get kind(): "Array" {
     return "Array"
   }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
 }
 export class ReadonlyArrayTypeAnnotation {
   constructor(
@@ -1276,6 +1579,10 @@ export class ReadonlyArrayTypeAnnotation {
 
   get kind(): "ReadonlyArray" {
     return "ReadonlyArray"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
 export class ApplicationTypeAnnotation {
@@ -1288,6 +1595,10 @@ export class ApplicationTypeAnnotation {
   get kind(): "Application" {
     return "Application"
   }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
 }
 export class StringTypeAnnotation {
   constructor(
@@ -1297,6 +1608,10 @@ export class StringTypeAnnotation {
 
   get kind(): "String" {
     return "String"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
 export class FuncTypeAnnotation {
@@ -1310,6 +1625,10 @@ export class FuncTypeAnnotation {
   get kind(): "Func" {
     return "Func"
   }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
 }
 export class LJSConstPtrTypeAnnotation {
   constructor(
@@ -1319,6 +1638,10 @@ export class LJSConstPtrTypeAnnotation {
 
   get kind(): "LJSConstPtr" {
     return "LJSConstPtr"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
 export class LJSPtrTypeAnnotation {
@@ -1330,6 +1653,10 @@ export class LJSPtrTypeAnnotation {
   get kind(): "LJSPtr" {
     return "LJSPtr"
   }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
 }
 export class BuiltinTypeAnnotation {
   constructor(
@@ -1339,6 +1666,10 @@ export class BuiltinTypeAnnotation {
 
   get kind(): "Builtin" {
     return "Builtin"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
 export class QualifiedTypeAnnotation {
@@ -1350,6 +1681,10 @@ export class QualifiedTypeAnnotation {
 
   get kind(): "Qualified" {
     return "Qualified"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
 
