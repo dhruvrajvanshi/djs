@@ -2,5 +2,5 @@ import * as c from "libc.ljs"
 
 export function main(): void {
   const msg: *c.char = c.str`Hello, world!`
-  puts(msg)
+  c.puts(msg)
 }

@@ -118,6 +118,8 @@ class Resolver extends ASTVisitorBase {
     switch (type_annotation.kind) {
       case "Ident":
         return this.visit_var_type(type_annotation.ident)
+      case "Qualified":
+        return this.visit_var_type(type_annotation.head)
       default:
         super.visit_type_annotation(type_annotation)
     }
