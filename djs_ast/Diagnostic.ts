@@ -17,7 +17,10 @@ export async function prettify_diagnostics(
   path: string,
   errors: readonly Diagnostic[],
   source_text: string | null,
+  colors = true,
 ) {
+  const color_error = colors ? COLOR_ERROR : ""
+  const color_reset = colors ? COLOR_RESET : ""
   if (source_text === null) {
     source_text = await fs.readFile(path, "utf8")
   }
@@ -25,7 +28,7 @@ export async function prettify_diagnostics(
     .sort((a, b) => b.span.start - a.span.start)
     .map(
       (e) =>
-        `${COLOR_ERROR}ERROR:${COLOR_RESET} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span)}${show_hint(e.hint)}`,
+        `${color_error}ERROR:${color_reset} ${path}:${offset_to_line(source_text, e.span.start)}: ${e.message}\n${preview_lines(source_text, e.span, colors)}${show_hint(e.hint, colors)}`,
     )
     .join("\n\n")
 }
@@ -36,24 +39,34 @@ export async function show_diagnostics(
 ) {
   console.log(await prettify_diagnostics(path, errors, source_text))
 }
-function show_hint(hint: string | null): string {
+function show_hint(hint: string | null, colors = true): string {
+  const color_blue = colors ? COLOR_BLUE : ""
+  const bold = colors ? BOLD : ""
+  const color_reset = colors ? COLOR_RESET : ""
   if (hint === null) return ""
-  return `\n\n${COLOR_BLUE}${BOLD}HINT: ${hint}${COLOR_RESET}`
+  return `\n\n${color_blue}${bold}HINT: ${hint}${color_reset}`
 }
-export function preview_lines(source: string, span: Span) {
+export function preview_lines(
+  source: string,
+  span: Span,
+  colors = true,
+): string {
   const [start_line, col] = offset_to_line_and_col(source, span.start)
   const lines = source.split("\n").slice(start_line - 1, start_line + 2)
+  const color_dimmed = colors ? COLOR_DIMMED : ""
+  const color_reset = colors ? COLOR_RESET : ""
+  const color_error = colors ? COLOR_ERROR : ""
   return lines
     .map((line, idx) => {
       const line_number = start_line + idx
       const prefix = `${line_number}|  `
-      const first = `${COLOR_DIMMED}${prefix}${COLOR_RESET}${line}`
+      const first = `${color_dimmed}${prefix}${color_reset}${line}`
       if (idx === 0) {
         return (
           first +
           "\n" +
           " ".repeat(prefix.length + col - 1) +
-          `${COLOR_ERROR}^~~${COLOR_RESET}`
+          `${color_error}^~~${color_reset}`
         )
       } else return first
     })

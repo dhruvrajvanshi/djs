@@ -37,13 +37,14 @@ export class Diagnostics {
     )
   }
 
-  async prettify(fs: FS): Promise<string> {
+  async prettify(fs: FS, colors = true): Promise<string> {
     let errors: string = ""
     for (const [path, diagnostics] of this.by_path.entries()) {
       const pretty_diagnostics = await prettify_diagnostics(
         path,
         diagnostics,
         await fs.read_file(path, "utf-8"),
+        colors,
       )
       errors += pretty_diagnostics + "\n\n"
     }
