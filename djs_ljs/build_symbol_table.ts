@@ -113,6 +113,16 @@ function initialize_symbol_table(
           }
         }
         break
+      case "ImportStarAs": {
+        const decl = {
+          kind: "ImportStarAs",
+          stmt,
+          imported_from: source_file,
+        } as const
+        symbol_table.add_value(stmt.as_name.text, decl)
+        symbol_table.add_type(stmt.as_name.text, decl)
+        break
+      }
       case "TypeAlias": {
         symbol_table.add_type(stmt.name.text, stmt)
       }

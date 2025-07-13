@@ -1,12 +1,12 @@
-import type {
-  ClassDeclStmt,
-  Func,
+import {
   ImportStarAsStmt,
-  ImportStmt,
-  LJSExternFunctionStmt,
-  SourceFile,
-  TypeAliasStmt,
-  VarDeclStmt,
+  type ClassDeclStmt,
+  type Func,
+  type ImportStmt,
+  type LJSExternFunctionStmt,
+  type SourceFile,
+  type TypeAliasStmt,
+  type VarDeclStmt,
 } from "djs_ast"
 import { MapUtils } from "djs_std"
 import assert from "node:assert"
@@ -49,6 +49,14 @@ export type TypeDecl =
   | {
       kind: "Import"
       stmt: ImportStmt
+      /**
+       * The file in which this import statement is declared.
+       */
+      imported_from: SourceFile
+    }
+  | {
+      kind: "ImportStarAs"
+      stmt: ImportStarAsStmt
       /**
        * The file in which this import statement is declared.
        */

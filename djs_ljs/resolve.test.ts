@@ -134,6 +134,52 @@ test("resolve smoke test", async () => {
   }
 })
 
+test("resolve import * as foo from 'bar'", async () => {
+  const fs = FS.fake({
+    "bar.ljs": `
+        export type Bar = u32
+        export const foo: Bar = 42
+    `,
+    "main.ljs": `
+        import * as b from "./bar.ljs"
+        export const x: b.Bar = b.bar
+    `,
+  })
+  const { source_files, ...source_files_result } = await collect_source_files(
+    "main.ljs",
+    fs,
+  )
+  assert.equal(await source_files_result.diagnostics.prettify(fs), "")
+  const main = source_files.get("main.ljs")
+  assert(main, "main.ljs file not found in source_files")
+  const resolve_result = resolve(fs, main)
+  assert.equal(await resolve_result.diagnostics.prettify(fs), "")
+
+  const const_x_stmt = find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x"))
+  assert(const_x_stmt.decl.declarators.length === 1)
+  const const_x_decl = const_x_stmt.decl.declarators[0]
+  const const_x_type = const_x_decl.type_annotation
+  assert(const_x_type?.kind === "Qualified")
+
+  const b_type_decl = resolve_result.types.get(const_x_type.head)
+  assert(b_type_decl?.kind === "ImportStarAs")
+  assert.equal(
+    b_type_decl.stmt,
+    find_stmt(main, "ImportStarAs", (s) => s.as_name.text === "b"),
+  )
+
+  const const_x_value = const_x_decl.init
+  assert(const_x_value?.kind === "Prop")
+  assert(const_x_value.lhs.kind === "Var")
+  const b_value_decl = resolve_result.values.get(const_x_value.lhs.ident)
+
+  assert(b_value_decl?.kind === "ImportStarAs")
+  assert.equal(
+    b_value_decl.stmt,
+    find_stmt(main, "ImportStarAs", (s) => s.as_name.text === "b"),
+  )
+})
+
 function var_decl_binds(stmt: VarDeclStmt, name: string): boolean {
   for (const s of flatten_var_decl(stmt)) {
     if (s.name === name) {
