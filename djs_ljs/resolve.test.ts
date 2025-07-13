@@ -2,7 +2,7 @@ import { expect, test } from "vitest"
 import { FS } from "./FS.ts"
 import { collect_source_files } from "./collect_source_files.ts"
 import assert from "node:assert"
-import { resolve } from "./resolve.ts"
+import { resolve_source_file } from "./resolve.ts"
 import { VarDeclStmt } from "djs_ast"
 import { rx } from "djs_std"
 import { find_expr, find_stmt, find_type } from "./ast_query.ts"
@@ -41,7 +41,7 @@ test("resolve smoke test", async () => {
 
   const main = source_files.get("main.ljs")
   assert(main, "main.ljs file not found in source_files")
-  const resolve_result = resolve(fs, main)
+  const resolve_result = resolve_source_file(fs, main)
   assert.equal(await resolve_result.diagnostics.prettify(fs), "")
 
   const expected_values: Record<string, (decl: ValueDecl) => void> = {
@@ -152,7 +152,7 @@ test("resolve import * as foo from 'bar'", async () => {
   assert.equal(await source_files_result.diagnostics.prettify(fs), "")
   const main = source_files.get("main.ljs")
   assert(main, "main.ljs file not found in source_files")
-  const resolve_result = resolve(fs, main)
+  const resolve_result = resolve_source_file(fs, main)
   assert.equal(await resolve_result.diagnostics.prettify(fs), "")
 
   const const_x_stmt = find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x"))
@@ -196,11 +196,10 @@ test("reports unbound variables", async () => {
   assert.equal(await source_files_result.diagnostics.prettify(fs), "")
   const main = source_files.get("main.ljs")
   assert(main, "main.ljs file not found in source_files")
-  const resolve_result = resolve(fs, main)
+  const resolve_result = resolve_source_file(fs, main)
   const diagnostics = resolve_result.diagnostics
-  expect(
-    await diagnostics.prettify(fs, /* colors */ false),
-  ).toMatchInlineSnapshot(`
+  expect(await diagnostics.prettify(fs, /* colors */ false))
+    .toMatchInlineSnapshot(`
     "ERROR: /main.ljs:4: Unbound variable "b"
     4|            return a(b)
                            ^~~
