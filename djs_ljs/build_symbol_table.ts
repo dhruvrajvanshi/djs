@@ -1,5 +1,5 @@
 import type { Func, Pattern, SourceFile, Stmt } from "djs_ast"
-import { SymbolTable, type ValueDecl } from "./SymbolTable.js"
+import { SymbolTable, type ValueDecl } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { assert_never, todo } from "djs_std"
 
