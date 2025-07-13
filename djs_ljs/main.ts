@@ -7,8 +7,14 @@ import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { emit_c } from "./emit_c.ts"
 import { resolve, type ResolveResult } from "./resolve.ts"
-import { ANSI_BLUE, ANSI_BOLD, ANSI_RESET, MapUtils } from "djs_std"
-import type { PathMap } from "./PathMap.ts"
+import {
+  ANSI_BLUE,
+  ANSI_BOLD,
+  ANSI_CYAN,
+  ANSI_MAGENTA,
+  ANSI_RESET,
+  MapUtils,
+} from "djs_std"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -44,17 +50,15 @@ async function main() {
       })
     }
   }
-  const resolution_results =
-    collect_source_files_result.source_files.map_values((source_file) =>
-      resolve(fs, source_file),
-    )
+  const resolve_result = resolve(fs, collect_source_files_result.source_files)
+
   if (dump_resolve) {
-    dump_resolve_results(resolution_results)
+    dump_resolve_results(resolve_result)
   }
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
-    ...[...resolution_results.values()].map((result) => result.diagnostics),
+    resolve_result.diagnostics,
   )
 
   if (!args["no-errors"]) {
@@ -65,22 +69,26 @@ async function main() {
   emit_c(collect_source_files_result.source_files)
 }
 
-function dump_resolve_results(resolution_results: PathMap<ResolveResult>) {
-  console.log(`${ANSI_BLUE}${ANSI_BOLD}---- resolve ----${ANSI_RESET}`)
-  for (const [path, result] of resolution_results.entries()) {
-    console.log(`Path: ${path}`)
-    console.log("Types:")
+function dump_resolve_results(resolve_result: ResolveResult) {
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}Resolve:${ANSI_RESET}`)
+  for (const [path, types] of resolve_result.types.entries()) {
+    console.log(`${ANSI_CYAN}${ANSI_BOLD}resolve: ${path}${ANSI_RESET}`)
+    console.log(`${ANSI_MAGENTA}Types:${ANSI_RESET}`)
     console.dir(
-      MapUtils.map_entries(result.types, ([key, value]) => [key.text, value]),
+      MapUtils.map_entries(types, ([key, value]) => [key.text, value]),
       { depth: 2 },
     )
-    console.log("Values:")
+    console.log(`${ANSI_CYAN}Values:${ANSI_RESET}`)
     console.dir(
-      MapUtils.map_entries(result.values, ([key, value]) => [key.text, value]),
+      MapUtils.map_entries(
+        resolve_result.values.get(path) ?? new Map(),
+        ([key, value]) => [key.text, value],
+      ),
       { depth: 2 },
     )
-    console.log(`/ ${path}`)
+    console.log(`${ANSI_CYAN}${ANSI_BOLD}/resolve ${path}${ANSI_RESET}`)
   }
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}/resolve${ANSI_RESET}`)
 }
 
 await main()

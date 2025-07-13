@@ -16,14 +16,42 @@ import {
 import assert from "node:assert"
 import { Diagnostics } from "./diagnostics.ts"
 import type { FS } from "./FS.ts"
+import type { SourceFiles } from "./SourceFiles.ts"
+import { PathMap } from "./PathMap.ts"
 
 export interface ResolveResult {
+  values: PathMap<Map<Ident, ValueDecl>>
+  types: PathMap<Map<Ident, TypeDecl>>
+  diagnostics: Diagnostics
+}
+export function resolve(fs: FS, source_files: SourceFiles): ResolveResult {
+  const values = new PathMap<Map<Ident, ValueDecl>>(fs)
+  const types = new PathMap<Map<Ident, TypeDecl>>(fs)
+  const diagnostics: Diagnostics[] = []
+  for (const source_file of source_files.values()) {
+    const result = resolve_source_file(fs, source_file)
+    diagnostics.push(result.diagnostics)
+    types.set(source_file.path, result.types)
+    values.set(source_file.path, result.values)
+  }
+
+  return {
+    values,
+    types,
+    diagnostics: Diagnostics.merge(...diagnostics),
+  }
+}
+
+export interface ResolveSourceFileResult {
   values: Map<Ident, ValueDecl>
   types: Map<Ident, TypeDecl>
   diagnostics: Diagnostics
 }
 
-export function resolve(fs: FS, source_file: SourceFile): ResolveResult {
+export function resolve_source_file(
+  fs: FS,
+  source_file: SourceFile,
+): ResolveSourceFileResult {
   const resolver = new Resolver(fs, source_file)
   resolver.visit_source_file(source_file)
 
