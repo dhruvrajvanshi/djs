@@ -3,11 +3,10 @@
 import { parseArgs } from "node:util"
 import { show_diagnostics, source_file_to_sexpr, stmt_to_sexpr } from "djs_ast"
 import { collect_source_files } from "./collect_source_files.ts"
-import { resolve_top_level } from "./resolve_top_level.ts"
 import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
-import { MapUtils } from "djs_std"
 import { emit_c } from "./emit_c.ts"
+import { resolve } from "./resolve.ts"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -44,27 +43,14 @@ async function main() {
       })
     }
   }
-
-  const resolve_top_level_result = resolve_top_level(
-    collect_source_files_result.source_files,
-    fs,
-  )
-  if (dump_resolve_top_level) {
-    console.log("---- resolve_top_level ----")
-    console.dir(
-      MapUtils.map_values(
-        resolve_top_level_result.source_file_value_decls.toMap(),
-        (bindings) => MapUtils.map_values(bindings, stmt_to_sexpr),
-      ),
-      {
-        depth: 4,
-      },
+  const resolution_results =
+    collect_source_files_result.source_files.map_values((source_file) =>
+      resolve(fs, source_file),
     )
-  }
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
-    resolve_top_level_result.diagnostics,
+    ...[...resolution_results.values()].map((result) => result.diagnostics),
   )
 
   if (!args["no-errors"]) {

@@ -10,7 +10,7 @@ import type {
 } from "djs_ast"
 import { MapUtils } from "djs_std"
 import assert from "node:assert"
-import { Type } from "./type.js"
+import { Type } from "./type.ts"
 
 export type ValueDecl =
   | VarDeclStmt
