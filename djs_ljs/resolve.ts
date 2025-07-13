@@ -17,7 +17,7 @@ import assert from "node:assert"
 import { Diagnostics } from "./diagnostics.ts"
 import type { FS } from "./FS.ts"
 
-interface ResolveResult {
+export interface ResolveResult {
   values: Map<Ident, ValueDecl>
   types: Map<Ident, TypeDecl>
   diagnostics: Diagnostics
