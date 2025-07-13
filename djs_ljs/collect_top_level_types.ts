@@ -6,7 +6,7 @@ import { Type } from "./type.js"
 import { assert_never, assert_todo, todo } from "djs_std"
 import type { FuncStmt, SourceFile, TypeAnnotation, VarDeclStmt } from "djs_ast"
 import assert from "node:assert"
-import Path from "node:path"
+
 import {
   SymbolTable,
   type ImportTypeDecl,
@@ -69,6 +69,8 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
             resolve_type(source_file_symbol_table, name)
           return annotation_to_type(resolve, decl.type_annotation)
         }
+        case "ImportStarAs":
+          todo()
         case "Builtin":
           todo()
         default:
@@ -85,17 +87,11 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
     }
     const resolve_type_import = (
       name: string,
-      { imported_from, stmt }: ImportTypeDecl,
+      { imported_file }: ImportTypeDecl,
     ): Type => {
-      const imported_path = fs.to_absolute(
-        Path.join(
-          Path.dirname(imported_from.path),
-          parse_module_specifier(stmt.module_specifier),
-        ),
-      )
-      const imported_from_file = source_files.get(imported_path)
+      const imported_from_file = source_files.get(imported_file)
       assert_todo(imported_from_file)
-      const imported_from_symbol_table = symbol_tables.get(imported_path)
+      const imported_from_symbol_table = symbol_tables.get(imported_file)
       assert(imported_from_symbol_table)
       const decl = imported_from_symbol_table.get_type(name)
       assert_todo(decl)
@@ -130,9 +126,4 @@ function annotation_to_type(
     default:
       return todo(annotation.kind)
   }
-}
-function parse_module_specifier(specifier: string): string {
-  const value: unknown = JSON.parse(specifier)
-  assert(typeof value === "string", `Invalid module specifier: ${specifier}`)
-  return value
 }

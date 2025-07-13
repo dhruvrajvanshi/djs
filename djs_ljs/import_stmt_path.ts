@@ -1,5 +1,4 @@
 import type { ImportStarAsStmt, ImportStmt, SourceFile } from "djs_ast"
-import type { FS } from "./FS.ts"
 import Path from "node:path"
 import assert from "node:assert"
 
@@ -14,7 +13,6 @@ import assert from "node:assert"
  *    => "/some/path/foo.djs"
  */
 export function import_stmt_path(
-  fs: FS,
   /**
    * The file which contains the import statement.
    */
@@ -26,5 +24,5 @@ export function import_stmt_path(
     typeof value === "string",
     `Invalid module specifier: ${stmt.module_specifier}`,
   )
-  return fs.to_absolute(Path.join(Path.dirname(source_file.path), value))
+  return Path.join(Path.dirname(source_file.path), value)
 }
