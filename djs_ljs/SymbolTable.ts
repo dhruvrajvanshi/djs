@@ -12,6 +12,14 @@ import { MapUtils } from "djs_std"
 import assert from "node:assert"
 import { Type } from "./type.ts"
 
+export type ValueDeclOfKind<K extends ValueDecl["kind"]> = Extract<
+  ValueDecl,
+  { kind: K }
+>
+export type ValueDeclExcludingKind<K extends ValueDecl["kind"]> = Exclude<
+  ValueDecl,
+  { kind: K }
+>
 export type ValueDecl =
   | VarDeclStmt
   | { kind: "Func"; func: Func }
@@ -43,6 +51,15 @@ export type LJSExternFunctionValueDecl = Extract<
 >
 export type ImportValueDecl = Extract<ValueDecl, { kind: "Import" }>
 export type ImportStarAsValueDecl = Extract<ValueDecl, { kind: "ImportStarAs" }>
+
+export type TypeDeclOfKind<K extends TypeDecl["kind"]> = Extract<
+  TypeDecl,
+  { kind: K }
+>
+export type TypeDeclExcludingKind<K extends TypeDecl["kind"]> = Exclude<
+  TypeDecl,
+  { kind: K }
+>
 
 export type TypeDecl =
   | TypeAliasStmt
