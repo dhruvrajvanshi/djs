@@ -2,6 +2,7 @@ import type { Func, Pattern, SourceFile, Stmt } from "djs_ast"
 import { SymbolTable, type ValueDecl } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { assert_never, todo } from "djs_std"
+import { import_stmt_path } from "./import_stmt_path.ts"
 
 export function build_source_file_symbol_table(
   source_file: SourceFile,
@@ -97,7 +98,7 @@ function initialize_symbol_table(
         const decl = {
           kind: "Import",
           stmt,
-          imported_from: source_file,
+          imported_file: import_stmt_path(source_file, stmt),
         } as const
         if (stmt.default_import) {
           symbol_table.add_value(stmt.default_import.text, decl)
@@ -117,7 +118,7 @@ function initialize_symbol_table(
         const decl = {
           kind: "ImportStarAs",
           stmt,
-          imported_from: source_file,
+          imported_file: import_stmt_path(source_file, stmt),
         } as const
         symbol_table.add_value(stmt.as_name.text, decl)
         symbol_table.add_type(stmt.as_name.text, decl)

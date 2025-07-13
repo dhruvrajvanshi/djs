@@ -4,7 +4,6 @@ import {
   type Func,
   type ImportStmt,
   type LJSExternFunctionStmt,
-  type SourceFile,
   type TypeAliasStmt,
   type VarDeclStmt,
 } from "djs_ast"
@@ -30,17 +29,27 @@ export type ValueDecl =
       kind: "Import"
       stmt: ImportStmt
       /**
-       * The file in which this import statement is declared.
+       * The the absolute path to which this import points to.
+       * i.e.
+       * import { foo } from "./foo.djs",
+       * this will be the absolute version of "./foo.djs"
+       * So, if the import is in a file at /some/path/x.djs,
+       * the imported_file will be /some/path/foo.djs
        */
-      imported_from: SourceFile
+      imported_file: string
     }
   | {
       kind: "ImportStarAs"
       stmt: ImportStarAsStmt
       /**
-       * The file in which this import statement is declared.
+       * The the absolute path to which this import points to.
+       * i.e.
+       * import * as foo from "./foo.djs",
+       *  this will be the absolute version of "./foo.djs"
+       *  So, if the import is in a file at /some/path/x.djs,
+       *  the imported_file will be /some/path/foo.djs
        */
-      imported_from: SourceFile
+      imported_file: string
     }
 export type VarStmtValueDecl = Extract<ValueDecl, { kind: "VarDecl" }>
 export type FuncValueDecl = Extract<ValueDecl, { kind: "Func" }>
@@ -67,17 +76,27 @@ export type TypeDecl =
       kind: "Import"
       stmt: ImportStmt
       /**
-       * The file in which this import statement is declared.
+       * The the absolute path to which this import points to.
+       * i.e.
+       * import { foo } from "./foo.djs",
+       * this will be the absolute version of "./foo.djs"
+       * So, if the import is in a file at /some/path/x.djs,
+       * the imported_file will be /some/path/foo.djs
        */
-      imported_from: SourceFile
+      imported_file: string
     }
   | {
       kind: "ImportStarAs"
       stmt: ImportStarAsStmt
       /**
-       * The file in which this import statement is declared.
+       * The the absolute path to which this import points to.
+       * i.e.
+       * import * as foo from "./foo.djs",
+       *  this will be the absolute version of "./foo.djs"
+       *  So, if the import is in a file at /some/path/x.djs,
+       *  the imported_file will be /some/path/foo.djs
        */
-      imported_from: SourceFile
+      imported_file: string
     }
   | { kind: "Builtin"; type: Type }
 export type ImportTypeDecl = Extract<TypeDecl, { kind: "Import" }>
