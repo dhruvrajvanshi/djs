@@ -16,6 +16,10 @@ import {
   MapUtils,
 } from "djs_std"
 import type { SourceFiles } from "./SourceFiles.ts"
+import {
+  resolve_imports,
+  type ResolveImportsResult,
+} from "./resolve_imports.ts"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -24,11 +28,14 @@ async function main() {
       "dump-phases": { type: "boolean", default: false },
       "dump-ast": { type: "boolean", default: false },
       "dump-resolve": { type: "boolean", default: false },
+      "dump-resolve-imports": { type: "boolean", default: false },
       "no-errors": { type: "boolean", default: false },
     },
   })
   const dump_ast = args["dump-ast"] || args["dump-phases"]
   const dump_resolve = args["dump-resolve"] || args["dump-phases"]
+  const dump_resolve_imports =
+    args["dump-resolve-imports"] || args["dump-phases"]
 
   if (files.length === 0) {
     console.error("No files provided.")
@@ -43,11 +50,15 @@ async function main() {
 
   const { source_files, ...collect_source_files_result } =
     await collect_source_files(files[0], fs)
-
   if (dump_ast) dump_source_files(source_files)
-  const resolve_result = resolve(fs, source_files)
 
+  const resolve_result = resolve(fs, source_files)
   if (dump_resolve) dump_resolve_results(resolve_result)
+
+  const resolve_imports_result = resolve_imports(source_files, resolve_result)
+  if (dump_resolve_imports) {
+    return dump_resolve_imports_results(resolve_imports_result)
+  }
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
@@ -79,6 +90,7 @@ function dump_resolve_results(resolve_result: ResolveResult) {
       MapUtils.map_entries(types, ([key, value]) => [key.text, value]),
       { depth: 2 },
     )
+    console.log("")
     console.log(`${ANSI_CYAN}Values:${ANSI_RESET}`)
     console.dir(
       MapUtils.map_entries(
@@ -90,6 +102,34 @@ function dump_resolve_results(resolve_result: ResolveResult) {
     console.log(`${ANSI_CYAN}${ANSI_BOLD}/resolve ${path}${ANSI_RESET}`)
   }
   console.log(`${ANSI_BLUE}${ANSI_BOLD}/resolve${ANSI_RESET}`)
+  console.log("")
+}
+function dump_resolve_imports_results(resolve_result: ResolveImportsResult) {
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}Resolve imports:${ANSI_RESET}`)
+  for (const [path, types] of resolve_result.types.entries()) {
+    console.log(
+      `${ANSI_CYAN}${ANSI_BOLD}resolved imports: ${path}${ANSI_RESET}`,
+    )
+    console.log(`${ANSI_MAGENTA}Types:${ANSI_RESET}`)
+    console.dir(
+      MapUtils.map_entries(types, ([key, value]) => [key.text, value]),
+      { depth: 3 },
+    )
+    console.log("")
+    console.log(`${ANSI_CYAN}Values:${ANSI_RESET}`)
+    console.dir(
+      MapUtils.map_entries(
+        resolve_result.values.get(path) ?? new Map(),
+        ([key, value]) => [key.text, value],
+      ),
+      { depth: 3 },
+    )
+    console.log(
+      `${ANSI_CYAN}${ANSI_BOLD}/resolved imports ${path}${ANSI_RESET}`,
+    )
+  }
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}/resolve imports${ANSI_RESET}`)
+  console.log("")
 }
 
 await main()
