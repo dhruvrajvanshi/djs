@@ -15,6 +15,7 @@ import {
   ANSI_RESET,
   MapUtils,
 } from "djs_std"
+import type { SourceFiles } from "./SourceFiles.ts"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -40,21 +41,13 @@ async function main() {
 
   const fs = FS.real
 
-  const collect_source_files_result = await collect_source_files(files[0], fs)
+  const { source_files, ...collect_source_files_result } =
+    await collect_source_files(files[0], fs)
 
-  if (dump_ast) {
-    console.log(`${ANSI_BLUE}${ANSI_BOLD}---- ast ----${ANSI_RESET}`)
-    for (const source_file of collect_source_files_result.source_files.values()) {
-      console.dir(source_file_to_sexpr(source_file), {
-        depth: null,
-      })
-    }
-  }
-  const resolve_result = resolve(fs, collect_source_files_result.source_files)
+  if (dump_ast) dump_source_files(source_files)
+  const resolve_result = resolve(fs, source_files)
 
-  if (dump_resolve) {
-    dump_resolve_results(resolve_result)
-  }
+  if (dump_resolve) dump_resolve_results(resolve_result)
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
@@ -66,7 +59,15 @@ async function main() {
       await show_diagnostics(path, d, null)
     }
   }
-  emit_c(collect_source_files_result.source_files)
+  emit_c(source_files)
+}
+function dump_source_files(source_files: SourceFiles) {
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}---- ast ----${ANSI_RESET}`)
+  for (const source_file of source_files.values()) {
+    console.dir(source_file_to_sexpr(source_file), {
+      depth: null,
+    })
+  }
 }
 
 function dump_resolve_results(resolve_result: ResolveResult) {
