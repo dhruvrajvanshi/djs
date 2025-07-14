@@ -83,10 +83,13 @@ export const MapUtils = {
     }
     return result
   },
-  map_values<K, V, V2>(map: Map<K, V>, fn: (value: V) => V2): Map<K, V2> {
+  map_values<K, V, V2>(
+    map: Map<K, V>,
+    fn: (value: V, key: K) => V2,
+  ): Map<K, V2> {
     const result = new Map<K, V2>()
     for (const [k, v] of map.entries()) {
-      result.set(k, fn(v))
+      result.set(k, fn(v, k))
     }
     return result
   },

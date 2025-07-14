@@ -51,6 +51,21 @@ export type ValueDecl =
        */
       imported_file: string
     }
+  | {
+      /**
+       * The binding of the variable foo brought into scope by something like this
+       * import * as foo from "./foo.djs"
+       *
+       * All idents bound to this foo will have this declaration.
+       * This declaration is produced after resolving all imports.
+       * This simplifies the typechecking phase where we don't have to deal
+       * with imports. We can simply ask for the binding of any variable and compute
+       * the type from there.
+       */
+      kind: "Module"
+      path: string
+      values: Map<string, ValueDeclExcludingKind<"Import" | "ImportStarAs">>
+    }
 export type VarStmtValueDecl = Extract<ValueDecl, { kind: "VarDecl" }>
 export type FuncValueDecl = Extract<ValueDecl, { kind: "Func" }>
 export type ClassValueDecl = Extract<ValueDecl, { kind: "ClassDecl" }>
@@ -99,6 +114,11 @@ export type TypeDecl =
       imported_file: string
     }
   | { kind: "Builtin"; type: Type }
+  /**
+   * Introduced after resolving imports
+   * See the comment in ValueDecl for more details.
+   */
+  | { kind: "Module"; path: string; types: Map<string, TypeDecl> }
 export type ImportTypeDecl = Extract<TypeDecl, { kind: "Import" }>
 export type TypeAliasTypeDecl = Extract<TypeDecl, { kind: "TypeAlias" }>
 export type BuiltinTypeDecl = Extract<TypeDecl, { kind: "Builtin" }>
@@ -153,5 +173,12 @@ export class SymbolTable {
   }
   get_type(name: string): TypeDecl | undefined {
     return this.types.get(name)
+  }
+
+  value_entries(): IterableIterator<[string, ValueDecl]> {
+    return this.values.entries()
+  }
+  type_entries(): IterableIterator<[string, TypeDecl]> {
+    return this.types.entries()
   }
 }
