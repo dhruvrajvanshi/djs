@@ -1,7 +1,7 @@
 #!/usr/bin/env -S node --no-warnings
 
 import { parseArgs } from "node:util"
-import { show_diagnostics, source_file_to_sexpr } from "djs_ast"
+import { expr_to_sexpr, show_diagnostics, source_file_to_sexpr } from "djs_ast"
 import { collect_source_files } from "./collect_source_files.ts"
 import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
@@ -20,6 +20,8 @@ import {
   resolve_imports,
   type ResolveImportsResult,
 } from "./resolve_imports.ts"
+import { typecheck, type TypecheckResult } from "./typecheck.ts"
+import { type_to_sexpr } from "./type.ts"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -29,6 +31,7 @@ async function main() {
       "dump-ast": { type: "boolean", default: false },
       "dump-resolve": { type: "boolean", default: false },
       "dump-resolve-imports": { type: "boolean", default: false },
+      "dump-typecheck": { type: "boolean", default: false },
       "no-errors": { type: "boolean", default: false },
     },
   })
@@ -36,6 +39,7 @@ async function main() {
   const dump_resolve = args["dump-resolve"] || args["dump-phases"]
   const dump_resolve_imports =
     args["dump-resolve-imports"] || args["dump-phases"]
+  const dump_typecheck = args["dump-typecheck"] || args["dump-phases"]
 
   if (files.length === 0) {
     console.error("No files provided.")
@@ -60,9 +64,17 @@ async function main() {
     return dump_resolve_imports_results(resolve_imports_result)
   }
 
+  const typecheck_result = typecheck(
+    source_files,
+    resolve_imports_result.values,
+    resolve_imports_result.types,
+  )
+  if (dump_typecheck) dump_typecheck_result(typecheck_result)
+
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
     resolve_result.diagnostics,
+    typecheck_result.diagnostics,
   )
 
   if (!args["no-errors"]) {
@@ -129,6 +141,15 @@ function dump_resolve_imports_results(resolve_result: ResolveImportsResult) {
     )
   }
   console.log(`${ANSI_BLUE}${ANSI_BOLD}/resolve imports${ANSI_RESET}`)
+  console.log("")
+}
+
+function dump_typecheck_result(typecheck_result: TypecheckResult) {
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}Typecheck:${ANSI_RESET}`)
+  for (const [expr, type] of typecheck_result.types.entries()) {
+    console.dir([expr_to_sexpr(expr), type_to_sexpr(type)], { depth: 2 })
+  }
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}/typecheck${ANSI_RESET}`)
   console.log("")
 }
 

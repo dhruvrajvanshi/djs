@@ -11,6 +11,10 @@ export class PathMap<T> {
     this.#fs = fs
   }
 
+  get fs(): FS {
+    return this.#fs
+  }
+
   get_or_put(path: string, default_value: () => T): T {
     path = this.#fs.to_absolute(path)
     const existing = this.#map.get(this.#fs.to_absolute(path))
