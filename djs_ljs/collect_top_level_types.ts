@@ -69,8 +69,8 @@ export function collect_top_level_types(source_files: SourceFiles, fs: FS) {
             resolve_type(source_file_symbol_table, name)
           return annotation_to_type(resolve, decl.type_annotation)
         }
+        case "Module":
         case "ImportStarAs":
-          todo()
         case "Builtin":
           todo()
         default:
