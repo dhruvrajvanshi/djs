@@ -34,6 +34,7 @@ async function main() {
       "dump-resolve": { type: "boolean", default: false },
       "dump-resolve-imports": { type: "boolean", default: false },
       "dump-typecheck": { type: "boolean", default: false },
+      "tc-graph": { type: "string", default: "" },
       "no-errors": { type: "boolean", default: false },
     },
   })
@@ -74,6 +75,12 @@ async function main() {
     resolve_imports_result.types,
   )
   if (dump_typecheck) dump_typecheck_result(typecheck_result)
+
+  const tc_graph = build_tc_graph(source_files)
+  if (args["tc-graph"]) {
+    await tc_graph.render_to_file(args["tc-graph"])
+    console.log(`Typecheck graph written to ${args["tc-graph"]}`)
+  }
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
