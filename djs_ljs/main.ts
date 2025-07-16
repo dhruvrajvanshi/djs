@@ -22,7 +22,6 @@ import {
 } from "./resolve_imports.ts"
 import { typecheck, type TypecheckResult } from "./typecheck.ts"
 import { type_to_sexpr } from "./type.ts"
-import { build_tc_graph } from "./tc_graph.ts"
 import { exit } from "node:process"
 
 async function main() {
@@ -66,13 +65,7 @@ async function main() {
     return dump_resolve_imports_results(resolve_imports_result)
   }
 
-  build_tc_graph(source_files)
-
-  const typecheck_result = typecheck(
-    source_files,
-    resolve_imports_result.values,
-    resolve_imports_result.types,
-  )
+  const typecheck_result = typecheck(source_files)
   if (dump_typecheck) dump_typecheck_result(typecheck_result)
 
   const diagnostics = Diagnostics.merge(
