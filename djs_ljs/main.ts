@@ -22,6 +22,8 @@ import {
 } from "./resolve_imports.ts"
 import { typecheck, type TypecheckResult } from "./typecheck.ts"
 import { type_to_sexpr } from "./type.ts"
+import { build_tc_graph } from "./tc_graph.ts"
+import { exit } from "node:process"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -63,6 +65,8 @@ async function main() {
   if (dump_resolve_imports) {
     return dump_resolve_imports_results(resolve_imports_result)
   }
+
+  build_tc_graph(source_files)
 
   const typecheck_result = typecheck(
     source_files,
@@ -153,4 +157,9 @@ function dump_typecheck_result(typecheck_result: TypecheckResult) {
   console.log("")
 }
 
-await main()
+try {
+  await main()
+} catch (error) {
+  console.error(error)
+  exit(1)
+}
