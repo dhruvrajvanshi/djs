@@ -1,13 +1,18 @@
-import type {
-  FuncStmt,
-  Ident,
-  ImportStarAsStmt,
-  ImportStmt,
-  LJSExternFunctionStmt,
-  SourceFile,
-  Stmt,
-  TypeAliasStmt,
-  VarDeclStmt,
+import {
+  sexpr_to_string,
+  type_annotation_to_sexpr,
+  type FuncStmt,
+  type Ident,
+  type ImportStarAsStmt,
+  type ImportStmt,
+  type LJSExternFunctionStmt,
+  type ObjectKey,
+  type Pattern,
+  type SourceFile,
+  type Stmt,
+  type TypeAliasStmt,
+  type VarDeclarator,
+  type VarDeclStmt,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import { DirectedGraph, render_graph } from "./DirectedGraph.ts"
@@ -15,6 +20,7 @@ import { assert_never, todo } from "djs_std"
 import { import_stmt_path } from "./import_stmt_path.ts"
 import { relative, resolve } from "path"
 import { cwd } from "process"
+import { type_to_sexpr } from "./type.ts"
 
 type TCNode =
   | { kind: "ProgramDiagnostics"; program: SourceFiles }
@@ -35,7 +41,6 @@ function tc_node_attrs(node: TCNode): Record<string, string> {
       return {
         kind: "StmtDiagnostics",
         source_file: node.source_file.path.replace(cwd(), "."),
-        stmt_kind: node.stmt.kind,
         ...stmt_attrs(node.stmt),
         location: node.stmt.span.start.toString(),
       }
@@ -54,8 +59,71 @@ function stmt_attrs(stmt: Stmt): Record<string, string> {
       return {
         name: `function ` + (stmt.func.name?.text ?? "null") + `()`,
       }
+    case "LJSExternFunction":
+      return { name: `extern function ` + (stmt.name?.text ?? "null") + `()` }
+    case "VarDecl": {
+      return { name: var_decl_short_name(stmt) }
+    }
+    case "TypeAlias":
+      return {
+        name: `type ${stmt.name.text} = ...`,
+      }
+    case "ImportStarAs":
+      return {
+        name: `import * as ${stmt.as_name.text} from ${stmt.module_specifier}`,
+      }
   }
-  return {}
+  return { name: stmt.kind }
+}
+function var_decl_short_name(stmt: VarDeclStmt): string {
+  const decl_type = {
+    Let: "let",
+    Const: "const",
+    Var: "var",
+  }[stmt.decl.decl_type]
+  return (
+    `${decl_type} ` +
+    stmt.decl.declarators.map(declarator_short_name).join(", ") +
+    ` = ...`
+  )
+}
+function declarator_short_name(declarator: VarDeclarator): string {
+  return pattern_short_name(declarator.pattern)
+}
+function pattern_short_name(pattern: Pattern): string {
+  switch (pattern.kind) {
+    case "Var":
+      return pattern.ident.text
+    case "Array":
+      return `[${pattern.items.map(pattern_short_name).join(", ")}]`
+    case "Object":
+      return `{${pattern.properties
+        .map(
+          (prop) =>
+            `${object_key_short_name(prop.key)}: ${pattern_short_name(prop.value)}`,
+        )
+        .join(", ")}}`
+    case "Rest":
+      return `...${pattern_short_name(pattern.pattern)}`
+    case "Elision":
+      return ``
+    case "Assignment":
+      return `${pattern_short_name(pattern.pattern)} = ...`
+    case "Prop":
+      return "..."
+    default:
+      assert_never(pattern)
+  }
+}
+function object_key_short_name(key: ObjectKey): string {
+  switch (key.kind) {
+    case "Ident":
+      return key.ident.text
+    case "String":
+      return `${key.text}`
+    case "Computed":
+      return `[...]`
+  }
 }
 
 interface TCGraphResult {
