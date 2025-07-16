@@ -4,7 +4,7 @@
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.12.4",
   "volta": {
-    "node": "23.11.1"
+    "node": "24.4.1"
   },
   "$schema": "https://json.schemastore.org/package.json"
 }
