@@ -151,3 +151,53 @@ rx.escape = function (str: string): string {
 
 export type Predicate<T> = (value: T) => boolean
 export type AnyFunc = (...args: never[]) => unknown
+
+export function get_or_insert<K extends PropertyKey, V>(
+  record: Record<K, V>,
+  key: K,
+  default_value: () => V,
+): V
+export function get_or_insert<K, V>(
+  map: Map<K, V>,
+  key: K,
+  default_value: () => V,
+): V
+export function get_or_insert<K extends PropertyKey, V>(
+  arg: Record<K, V> | Map<K, V>,
+  key: K,
+  default_value: () => V,
+): V {
+  if (arg instanceof Map) {
+    return map_get_or_insert(arg, key, default_value)
+  } else {
+    return record_get_or_insert(arg, key, default_value)
+  }
+}
+
+export function record_get_or_insert<K extends PropertyKey, V>(
+  record: Record<K, V>,
+  key: K,
+  default_value: () => V,
+): V {
+  if (key in record) {
+    return record[key]
+  } else {
+    const value = default_value()
+    record[key] = value
+    return value
+  }
+}
+
+export function map_get_or_insert<K, V>(
+  map: Map<K, V>,
+  key: K,
+  default_value: () => V,
+): V {
+  if (map.has(key)) {
+    return map.get(key)!
+  } else {
+    const value = default_value()
+    map.set(key, value)
+    return value
+  }
+}
