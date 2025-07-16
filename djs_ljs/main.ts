@@ -1,4 +1,4 @@
-#!/usr/bin/env -S node --no-warnings
+#!/usr/bin/env -S node
 
 import { parseArgs } from "node:util"
 import { expr_to_sexpr, show_diagnostics, source_file_to_sexpr } from "djs_ast"
