@@ -11,7 +11,7 @@ import {
 import type { SourceFiles } from "./SourceFiles.ts"
 import { Type } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
-import { todo } from "djs_std"
+import { is_readonly_array, todo } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
@@ -98,6 +98,14 @@ export function typecheck(
     { func, span }: FuncStmt,
   ): void {
     using _ = trace.add(`check_func_stmt\n${source_file.path}:${span.start}`)
+    for (const param of func.params) {
+      if (param.type_annotation) {
+        check_type_annotation(source_file, param.type_annotation)
+      }
+    }
+    if (func.return_type) {
+      check_type_annotation(source_file, func.return_type)
+    }
     for (const stmt of func.body.stmts) {
       check_stmt(source_file, stmt)
     }
@@ -114,7 +122,7 @@ export function typecheck(
       const annotation = decl.type_annotation
       let type: Type | null = null
       if (annotation) {
-        type = check_type_annotation(annotation)
+        type = check_type_annotation(source_file, annotation)
       }
       if (decl.init) {
         if (type) {
@@ -156,9 +164,34 @@ export function typecheck(
     return Type.Error("Unimplemented: infer_expr for " + expr.kind)
   }
 
-  function check_type_annotation(annotation: TypeAnnotation): Type {
+  function check_type_annotation(
+    source_file: SourceFile,
+    annotation: TypeAnnotation,
+  ): Type {
     using _ = trace.add(`check_type_annotation(${annotation})`)
-    return annotation_to_type((v) => Type.Error("Unbound type" + v), annotation)
+    const existing = types.get(annotation)
+    if (existing) {
+      return existing
+    }
+
+    const t = annotation_to_type((t) => {
+      if (is_readonly_array(t)) {
+        return Type.Error(`TODO: QualifieldTypes`)
+      } else {
+        const decls = type_decls.get(source_file.path)
+        if (!decls) todo()
+        const decl = decls.get(t)
+        if (!decl) todo(`Unknown type: ${t.text} in ${source_file.path}`)
+        switch (decl.kind) {
+          case "Builtin":
+            return decl.type
+          default:
+            todo()
+        }
+      }
+    }, annotation)
+    types.set(annotation, t)
+    return t
   }
 }
 
