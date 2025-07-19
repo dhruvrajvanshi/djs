@@ -1,7 +1,12 @@
 #!/usr/bin/env -S node
 
 import { parseArgs } from "node:util"
-import { expr_to_sexpr, show_diagnostics, source_file_to_sexpr } from "djs_ast"
+import {
+  expr_to_sexpr,
+  show_diagnostics,
+  source_file_to_sexpr,
+  type_annotation_to_sexpr,
+} from "djs_ast"
 import { collect_source_files } from "./collect_source_files.ts"
 import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
@@ -66,7 +71,7 @@ async function main() {
     return dump_resolve_imports_results(resolve_imports_result)
   }
 
-  const typecheck_result = typecheck(source_files)
+  const typecheck_result = typecheck(source_files, resolve_imports_result)
   if (dump_typecheck) dump_typecheck_result(typecheck_result)
   if (args["tc-trace"]) {
     await typecheck_result.trace.write(args["tc-trace"])
@@ -147,8 +152,13 @@ function dump_resolve_imports_results(resolve_result: ResolveImportsResult) {
 
 function dump_typecheck_result(typecheck_result: TypecheckResult) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}Typecheck:${ANSI_RESET}`)
-  for (const [expr, type] of typecheck_result.types.entries()) {
+  for (const [expr, type] of typecheck_result.values.entries()) {
     console.dir([expr_to_sexpr(expr), type_to_sexpr(type)], { depth: 2 })
+  }
+  for (const [annotation, type] of typecheck_result.types.entries()) {
+    console.dir([type_annotation_to_sexpr(annotation), type_to_sexpr(type)], {
+      depth: 2,
+    })
   }
   console.log(`${ANSI_BLUE}${ANSI_BOLD}/typecheck${ANSI_RESET}`)
   console.log("")

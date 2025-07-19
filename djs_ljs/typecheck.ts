@@ -15,16 +15,24 @@ import { todo } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
+import type { ResolveImportsResult } from "./resolve_imports.ts"
 
 export interface TypecheckResult {
-  types: Map<Expr, Type>
+  values: Map<Expr, Type>
+  types: Map<TypeAnnotation, Type>
   diagnostics: Diagnostics
   trace: Trace
 }
 
-export function typecheck(source_files: SourceFiles): TypecheckResult {
+export function typecheck(
+  source_files: SourceFiles,
+  resolution: ResolveImportsResult,
+): TypecheckResult {
+  const value_decls = resolution.values
+  const type_decls = resolution.types
   const diagnostics = new Diagnostics(source_files.fs)
-  const types = new Map<Expr, Type>()
+  const values = new Map<Expr, Type>()
+  const types = new Map<TypeAnnotation, Type>()
   const trace = new Trace()
 
   for (const file of source_files.values()) {
@@ -33,6 +41,7 @@ export function typecheck(source_files: SourceFiles): TypecheckResult {
 
   return {
     diagnostics,
+    values,
     types,
     trace,
   }
