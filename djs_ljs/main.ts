@@ -33,6 +33,7 @@ async function main() {
       "dump-resolve": { type: "boolean", default: false },
       "dump-resolve-imports": { type: "boolean", default: false },
       "dump-typecheck": { type: "boolean", default: false },
+      "tc-trace": { type: "string", default: "" },
       "no-errors": { type: "boolean", default: false },
     },
   })
@@ -67,6 +68,9 @@ async function main() {
 
   const typecheck_result = typecheck(source_files)
   if (dump_typecheck) dump_typecheck_result(typecheck_result)
+  if (args["tc-trace"]) {
+    await typecheck_result.trace.write(args["tc-trace"])
+  }
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,
