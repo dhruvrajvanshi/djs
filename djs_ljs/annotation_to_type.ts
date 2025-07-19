@@ -7,7 +7,7 @@ import { Type } from "./type.ts"
 import { todo } from "djs_std"
 
 export function annotation_to_type(
-  env: (name: string | readonly [Ident, ...Ident[]]) => Type,
+  env: (name: Ident | readonly [Ident, ...Ident[]]) => Type,
   annotation: TypeAnnotation,
 ): Type {
   switch (annotation.kind) {
@@ -16,7 +16,7 @@ export function annotation_to_type(
         case "u32":
           return Type.u32
         default:
-          return env(annotation.ident.text)
+          return env(annotation.ident)
       }
     case "LJSConstPtr":
       return Type.Ptr(annotation_to_type(env, annotation.to))
