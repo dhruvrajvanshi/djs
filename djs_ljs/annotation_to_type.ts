@@ -2,7 +2,7 @@ import { type Ident, type TypeAnnotation } from "djs_ast"
 import { Type } from "./type.ts"
 import { todo } from "djs_std"
 
-type TypeVarEnv = (name: Ident | readonly Ident[]) => Type
+export type TypeVarEnv = (name: Ident | readonly Ident[]) => Type
 
 export function annotation_to_type(
   env: TypeVarEnv,
