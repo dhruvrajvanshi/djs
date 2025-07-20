@@ -121,7 +121,7 @@ export function type_to_sexpr(type: Type): string {
       const params = type.params.map(type_to_sexpr).join(" ")
       return `((${params}) => ${type_to_sexpr(type.return_type)})`
     case "Error":
-      return "<Error>"
+      return `<Error: ${type.message}>`
     default:
       return assert_never(type)
   }

@@ -130,7 +130,7 @@ function dump_resolve_imports_results(resolve_result: ResolveImportsResult) {
     )
     console.log(`${ANSI_MAGENTA}Types:${ANSI_RESET}`)
     console.dir(
-      MapUtils.map_entries(types, ([key, value]) => [key.text, value]),
+      MapUtils.map_entries(types, ([key, value]) => [key, value]),
       { depth: 3 },
     )
     console.log("")

@@ -86,7 +86,11 @@ export type TypeDeclExcludingKind<K extends TypeDecl["kind"]> = Exclude<
 >
 
 export type TypeDecl =
-  | TypeAliasStmt
+  | {
+      kind: "TypeAlias"
+      stmt: TypeAliasStmt
+      source_file: string
+    }
   | {
       kind: "Import"
       stmt: ImportStmt
@@ -118,7 +122,11 @@ export type TypeDecl =
    * Introduced after resolving imports
    * See the comment in ValueDecl for more details.
    */
-  | { kind: "Module"; path: string; types: Map<string, TypeDecl> }
+  | {
+      kind: "Module"
+      path: string
+      types: Map<string, TypeDeclExcludingKind<"Import" | "ImportStarAs">>
+    }
 export type ImportTypeDecl = Extract<TypeDecl, { kind: "Import" }>
 export type TypeAliasTypeDecl = Extract<TypeDecl, { kind: "TypeAlias" }>
 export type BuiltinTypeDecl = Extract<TypeDecl, { kind: "Builtin" }>

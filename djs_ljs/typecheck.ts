@@ -16,6 +16,7 @@ import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
+import assert from "node:assert"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -176,7 +177,55 @@ export function typecheck(
 
     const t = annotation_to_type((t) => {
       if (is_readonly_array(t)) {
-        return Type.Error(`TODO: QualifieldTypes`)
+        const [module_name, ...rest] = t
+        const decls = type_decls.get(source_file.path)
+        if (!decls) todo()
+        const decl = decls.get(module_name)
+
+        if (!decl || decl.kind !== "Module") {
+          diagnostics.push(source_file.path, {
+            message: `${module_name.text} is not a module`,
+            span: module_name.span,
+            hint: null,
+          })
+          return Type.Error(`Unknown module: ${module_name.text}`)
+        }
+        if (rest.length !== 1) {
+          diagnostics.push(source_file.path, {
+            message: `Expected a single type after module name, got ${rest.length}`,
+            span: module_name.span,
+            hint: null,
+          })
+          return Type.Error(
+            `Expected a single type after module name, got ${rest.length}`,
+          )
+        }
+
+        const member = decl.types.get(rest[0].text)
+        if (!member) {
+          diagnostics.push(source_file.path, {
+            message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
+            span: rest[0].span,
+            hint: null,
+          })
+          return Type.Error(
+            `Unknown type ${rest[0].text} in module ${module_name.text}`,
+          )
+        }
+        switch (member.kind) {
+          case "Builtin":
+            return member.type
+          case "TypeAlias": {
+            const source_file = source_files.get(member.source_file)
+            assert(source_file, `Unknown source file: ${member.source_file}`)
+            return check_type_annotation(
+              source_file,
+              member.stmt.type_annotation,
+            )
+          }
+          case "Module":
+            todo()
+        }
       } else {
         const decls = type_decls.get(source_file.path)
         if (!decls) todo()
