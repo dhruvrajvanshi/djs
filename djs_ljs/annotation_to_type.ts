@@ -1,13 +1,11 @@
-import {
-  type_annotation_to_sexpr,
-  type Ident,
-  type TypeAnnotation,
-} from "djs_ast"
+import { type Ident, type TypeAnnotation } from "djs_ast"
 import { Type } from "./type.ts"
 import { todo } from "djs_std"
 
+type TypeVarEnv = (name: Ident | readonly Ident[]) => Type
+
 export function annotation_to_type(
-  env: (name: Ident | readonly [Ident, ...Ident[]]) => Type,
+  env: TypeVarEnv,
   annotation: TypeAnnotation,
 ): Type {
   switch (annotation.kind) {
@@ -24,6 +22,13 @@ export function annotation_to_type(
       return Type.MutPtr(annotation_to_type(env, annotation.to))
     case "Qualified":
       return env([annotation.head, ...annotation.tail])
+    case "Builtin":
+      switch (annotation.text) {
+        case '"c_char"':
+          return Type.c_char
+        default:
+          todo(annotation.text)
+      }
     default:
       return todo(annotation.kind)
   }

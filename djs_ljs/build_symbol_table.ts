@@ -125,7 +125,11 @@ function initialize_symbol_table(
         break
       }
       case "TypeAlias": {
-        symbol_table.add_type(stmt.name.text, stmt)
+        symbol_table.add_type(stmt.name.text, {
+          kind: "TypeAlias",
+          stmt,
+          source_file: source_file.path,
+        })
       }
     }
   }
