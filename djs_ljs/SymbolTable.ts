@@ -2,6 +2,7 @@ import {
   ImportStarAsStmt,
   type ClassDeclStmt,
   type Func,
+  type Ident,
   type ImportStmt,
   type LJSExternFunctionStmt,
   type TypeAliasStmt,
@@ -20,7 +21,12 @@ export type ValueDeclExcludingKind<K extends ValueDecl["kind"]> = Exclude<
   { kind: K }
 >
 export type ValueDecl =
-  | VarDeclStmt
+  | {
+      kind: "VarDecl"
+      stmt: VarDeclStmt
+      name: string
+      source_file: string
+    }
   | { kind: "Func"; func: Func }
   | { kind: "Param"; func: Func; param_index: number }
   | ClassDeclStmt
