@@ -3,6 +3,7 @@ import {
   sexpr_to_string,
   type Expr,
   type FuncStmt,
+  type Ident,
   type SourceFile,
   type Stmt,
   type TypeAnnotation,
@@ -13,10 +14,11 @@ import { Type } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { is_readonly_array, todo } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
-import { annotation_to_type } from "./annotation_to_type.ts"
+import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
 import assert from "node:assert"
+import type { TypeDecl, TypeDeclExcludingKind } from "./SymbolTable.ts"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -165,6 +167,60 @@ export function typecheck(
     return Type.Error("Unimplemented: infer_expr for " + expr.kind)
   }
 
+  function make_type_var_env(source_file: SourceFile): TypeVarEnv {
+    return (t) => lookup_type_var(source_file, t)
+  }
+
+  function lookup_type_var(
+    source_file: SourceFile,
+    t: Ident | readonly Ident[],
+  ): Type {
+    if (is_readonly_array(t)) {
+      const [module_name, ...rest] = t
+      const decls = type_decls.get(source_file.path)
+      if (!decls) todo()
+      const decl = decls.get(module_name)
+
+      if (!decl || decl.kind !== "Module") {
+        diagnostics.push(source_file.path, {
+          message: `${module_name.text} is not a module`,
+          span: module_name.span,
+          hint: null,
+        })
+        return Type.Error(`Unknown module: ${module_name.text}`)
+      }
+      if (rest.length !== 1) {
+        diagnostics.push(source_file.path, {
+          message: `Expected a single type after module name, got ${rest.length}`,
+          span: module_name.span,
+          hint: null,
+        })
+        return Type.Error(
+          `Expected a single type after module name, got ${rest.length}`,
+        )
+      }
+
+      const member = decl.types.get(rest[0].text)
+      if (!member) {
+        diagnostics.push(source_file.path, {
+          message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
+          span: rest[0].span,
+          hint: null,
+        })
+        return Type.Error(
+          `Unknown type ${rest[0].text} in module ${module_name.text}`,
+        )
+      }
+      return type_decl_to_type(member)
+    } else {
+      const decls = type_decls.get(source_file.path)
+      if (!decls) todo()
+      const decl = decls.get(t)
+      if (!decl) todo(`Unknown type: ${t.text} in ${source_file.path}`)
+      return type_decl_to_type(decl)
+    }
+  }
+
   function check_type_annotation(
     source_file: SourceFile,
     annotation: TypeAnnotation,
@@ -175,72 +231,25 @@ export function typecheck(
       return existing
     }
 
-    const t = annotation_to_type((t) => {
-      if (is_readonly_array(t)) {
-        const [module_name, ...rest] = t
-        const decls = type_decls.get(source_file.path)
-        if (!decls) todo()
-        const decl = decls.get(module_name)
-
-        if (!decl || decl.kind !== "Module") {
-          diagnostics.push(source_file.path, {
-            message: `${module_name.text} is not a module`,
-            span: module_name.span,
-            hint: null,
-          })
-          return Type.Error(`Unknown module: ${module_name.text}`)
-        }
-        if (rest.length !== 1) {
-          diagnostics.push(source_file.path, {
-            message: `Expected a single type after module name, got ${rest.length}`,
-            span: module_name.span,
-            hint: null,
-          })
-          return Type.Error(
-            `Expected a single type after module name, got ${rest.length}`,
-          )
-        }
-
-        const member = decl.types.get(rest[0].text)
-        if (!member) {
-          diagnostics.push(source_file.path, {
-            message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
-            span: rest[0].span,
-            hint: null,
-          })
-          return Type.Error(
-            `Unknown type ${rest[0].text} in module ${module_name.text}`,
-          )
-        }
-        switch (member.kind) {
-          case "Builtin":
-            return member.type
-          case "TypeAlias": {
-            const source_file = source_files.get(member.source_file)
-            assert(source_file, `Unknown source file: ${member.source_file}`)
-            return check_type_annotation(
-              source_file,
-              member.stmt.type_annotation,
-            )
-          }
-          case "Module":
-            todo()
-        }
-      } else {
-        const decls = type_decls.get(source_file.path)
-        if (!decls) todo()
-        const decl = decls.get(t)
-        if (!decl) todo(`Unknown type: ${t.text} in ${source_file.path}`)
-        switch (decl.kind) {
-          case "Builtin":
-            return decl.type
-          default:
-            todo()
-        }
-      }
-    }, annotation)
+    const t = annotation_to_type(make_type_var_env(source_file), annotation)
     types.set(annotation, t)
     return t
+  }
+
+  function type_decl_to_type(
+    decl: TypeDeclExcludingKind<"ImportStarAs" | "Import">,
+  ): Type {
+    switch (decl.kind) {
+      case "Builtin":
+        return decl.type
+      case "TypeAlias": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        return check_type_annotation(source_file, decl.stmt.type_annotation)
+      }
+      case "Module":
+        return todo()
+    }
   }
 }
 
