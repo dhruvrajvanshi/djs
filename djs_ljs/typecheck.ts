@@ -18,14 +18,14 @@ import { is_readonly_array, todo } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
-import type { ResolveImportsResult } from "./resolve_imports.ts"
 import assert from "node:assert"
 import type {
-  TypeDeclExcludingKind,
+  TypeDecl,
+  ValueDecl,
   ValueDeclExcludingKind,
   ValueDeclOfKind,
 } from "./SymbolTable.ts"
-import { defaultMaxListeners } from "node:events"
+import type { ResolveResult } from "./resolve.ts"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -36,7 +36,7 @@ export interface TypecheckResult {
 
 export function typecheck(
   source_files: SourceFiles,
-  resolution: ResolveImportsResult,
+  resolution: ResolveResult,
 ): TypecheckResult {
   const value_decls = resolution.values
   const type_decls = resolution.types
@@ -206,9 +206,7 @@ export function typecheck(
     } else todo("Not a moudle")
   }
 
-  function type_of_decl(
-    decl: ValueDeclExcludingKind<"Import" | "ImportStarAs">,
-  ): Type {
+  function type_of_decl(decl: ValueDecl): Type {
     switch (decl.kind) {
       case "VarDecl": {
         const source_file = source_files.get(decl.source_file)
@@ -314,9 +312,7 @@ export function typecheck(
     return t
   }
 
-  function type_decl_to_type(
-    decl: TypeDeclExcludingKind<"ImportStarAs" | "Import">,
-  ): Type {
+  function type_decl_to_type(decl: TypeDecl): Type {
     switch (decl.kind) {
       case "Builtin":
         return decl.type
@@ -327,6 +323,10 @@ export function typecheck(
       }
       case "Module":
         return todo()
+      case "ImportStarAs":
+        return todo("ImportStarAs")
+      case "Import":
+        return todo("Import")
     }
   }
 }
