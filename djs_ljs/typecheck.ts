@@ -1,6 +1,8 @@
 import {
   expr_to_sexpr,
+  PropExpr,
   sexpr_to_string,
+  TaggedTemplateLiteralExpr,
   type Expr,
   type FuncStmt,
   type Ident,
@@ -18,7 +20,12 @@ import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
 import assert from "node:assert"
-import type { TypeDecl, TypeDeclExcludingKind } from "./SymbolTable.ts"
+import type {
+  TypeDeclExcludingKind,
+  ValueDeclExcludingKind,
+  ValueDeclOfKind,
+} from "./SymbolTable.ts"
+import { defaultMaxListeners } from "node:events"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -160,11 +167,82 @@ export function typecheck(
     infer_expr(source_file, expr)
   }
   function infer_expr(source_file: SourceFile, expr: Expr): Type {
+    const existing = values.get(expr)
+    if (existing) return existing
+
+    const ty = infer_expr_worker(source_file, expr)
+    values.set(expr, ty)
+    return ty
+  }
+  function infer_expr_worker(source_file: SourceFile, expr: Expr): Type {
     using _ = trace.add(
-      `infer_expr\n${source_file.path}:${expr.span.start}`,
+      `infer_expr\n${source_file.path}:${expr.span.start}:${expr.span.stop}`,
       sexpr_to_string(expr_to_sexpr(expr)),
     )
-    return Type.Error("Unimplemented: infer_expr for " + expr.kind)
+    switch (expr.kind) {
+      case "TaggedTemplateLiteral":
+        return infer_tagged_template_literal_expr(source_file, expr)
+      case "Prop":
+        return infer_prop_expr(source_file, expr)
+      default:
+        todo(expr.kind)
+    }
+  }
+  function infer_prop_expr(source_file: SourceFile, expr: PropExpr): Type {
+    const lhs_module_decl = get_module_decl(source_file, expr.lhs)
+    if (lhs_module_decl) {
+      const decl = lhs_module_decl.values.get(expr.property.text)
+      if (!decl) {
+        diagnostics.push(source_file.path, {
+          message: `${expr.property.text} was not found in the module`,
+          span: expr.property.span,
+          hint:
+            `Available properties: ` +
+            [...lhs_module_decl.values.keys()].slice(5).join(", "),
+        })
+        return Type.Error(``)
+      }
+      return type_of_decl(decl)
+    } else todo("Not a moudle")
+  }
+
+  function type_of_decl(
+    decl: ValueDeclExcludingKind<"Import" | "ImportStarAs">,
+  ): Type {
+    switch (decl.kind) {
+      case "VarDecl": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        check_stmt(source_file, decl.stmt)
+        return todo()
+      }
+      default:
+        todo(decl.kind)
+    }
+  }
+  function get_module_decl(
+    source_file: SourceFile,
+    expr: Expr,
+  ): ValueDeclOfKind<"Module"> | null {
+    if (expr.kind !== "Var") return null
+    const lhs_decl = value_decls.get(source_file.path)?.get(expr.ident)
+    if (!lhs_decl) return null
+    switch (lhs_decl.kind) {
+      case "Module":
+        return lhs_decl
+      default:
+        return null
+    }
+  }
+
+  function infer_tagged_template_literal_expr(
+    source_file: SourceFile,
+    expr: TaggedTemplateLiteralExpr,
+  ): Type {
+    const callee = expr.tag
+    const callee_ty = infer_expr(source_file, expr.tag)
+
+    todo()
   }
 
   function make_type_var_env(source_file: SourceFile): TypeVarEnv {
