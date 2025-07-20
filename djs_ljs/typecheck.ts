@@ -1,4 +1,5 @@
 import {
+  BuiltinExpr,
   expr_to_sexpr,
   PropExpr,
   sexpr_to_string,
@@ -44,6 +45,7 @@ export function typecheck(
   const values = new Map<Expr, Type>()
   const types = new Map<TypeAnnotation, Type>()
   const trace = new Trace()
+  const checked_stmts = new Set<Stmt>()
 
   for (const file of source_files.values()) {
     check_source_file(file)
@@ -63,7 +65,14 @@ export function typecheck(
     }
   }
   function check_stmt(source_file: SourceFile, stmt: Stmt): void {
-    using _ = trace.add(`check_stmt\n${source_file.path}:${stmt.span.start}`)
+    if (checked_stmts.has(stmt)) return
+    checked_stmts.add(stmt)
+    check_stmt_worker(source_file, stmt)
+  }
+  function check_stmt_worker(source_file: SourceFile, stmt: Stmt): void {
+    using _ = trace.add(
+      `check_stmt\n${source_file.path}:${stmt.span.start}:${stmt.span.stop}`,
+    )
     switch (stmt.kind) {
       case "Import":
         return check_import_stmt(source_file, stmt)
@@ -184,10 +193,58 @@ export function typecheck(
         return infer_tagged_template_literal_expr(source_file, expr)
       case "Prop":
         return infer_prop_expr(source_file, expr)
-      default:
-        todo(expr.kind)
+      case "Builtin":
+        return infer_builtin_expr(source_file, expr)
+      case "Call":
+        return infer_call_expr(source_file, expr)
+      default: {
+        diagnostics.push(source_file.path, {
+          message: `TODO(${expr.kind})`,
+          span: expr.span,
+          hint: null,
+        })
+        return Type.Error("TODO")
+      }
     }
   }
+  function infer_call_expr(
+    source_file: SourceFile,
+    expr: Expr & { kind: "Call" },
+  ): Type {
+    const lhs_type = infer_expr(source_file, expr.callee)
+    const arg_types = expr.args.map((arg) => infer_expr(source_file, arg))
+    if (lhs_type.kind === "UnboxedFunc") {
+      diagnostics.push(source_file.path, {
+        message: `TODO: match arg types with function parameters`,
+        span: expr.callee.span,
+        hint: `Expected: ${lhs_type.params.map((t) => t.toString()).join(", ")}`,
+      })
+      return lhs_type.return_type
+    } else {
+      diagnostics.push(source_file.path, {
+        message: `Expected a function, got ${lhs_type.toString()}`,
+        span: expr.callee.span,
+        hint: `Expected a function type, got ${lhs_type.toString()}`,
+      })
+      return Type.Error(`Expected a function, got ${lhs_type.toString()}`)
+    }
+  }
+  function infer_builtin_expr(
+    source_file: SourceFile,
+    expr: BuiltinExpr,
+  ): Type {
+    switch (expr.text) {
+      default: {
+        diagnostics.push(source_file.path, {
+          message: `Unknown builtin: ${expr.text}`,
+          span: expr.span,
+          hint: null,
+        })
+        return Type.Error(`Unknown builtin: ${expr.text}`)
+      }
+    }
+  }
+
   function infer_prop_expr(source_file: SourceFile, expr: PropExpr): Type {
     const lhs_module_decl = get_module_decl(source_file, expr.lhs)
     if (lhs_module_decl) {
@@ -212,10 +269,16 @@ export function typecheck(
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
         check_stmt(source_file, decl.stmt)
-        return todo()
+        diagnostics.push(source_file.path, {
+          message: `TODO: type_of_decl for VarDecl`,
+          span: decl.stmt.span,
+          hint: `This is a placeholder for type checking variable declarations.`,
+        })
+        return Type.Error("TODO: type_of_decl for VarDecl")
       }
-      default:
-        todo(decl.kind)
+      default: {
+        return Type.Error("TODO: type_of_decl for " + decl.kind)
+      }
     }
   }
   function get_module_decl(
@@ -239,8 +302,13 @@ export function typecheck(
   ): Type {
     const callee = expr.tag
     const callee_ty = infer_expr(source_file, expr.tag)
+    diagnostics.push(source_file.path, {
+      message: `TODO: infer_tagged_template_literal_expr for ${callee_ty}`,
+      span: callee.span,
+      hint: null,
+    })
 
-    todo()
+    return Type.Error("TODO")
   }
 
   function make_type_var_env(source_file: SourceFile): TypeVarEnv {
