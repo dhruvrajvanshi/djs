@@ -96,7 +96,11 @@ function initialize_symbol_table(
         break
       case "LJSExternFunction": {
         if (!stmt.name) break
-        symbol_table.add_value(stmt.name.text, stmt)
+        symbol_table.add_value(stmt.name.text, {
+          kind: "LJSExternFunction",
+          stmt,
+          source_file: source_file.path,
+        })
         break
       }
       case "Import":
