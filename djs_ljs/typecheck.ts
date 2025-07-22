@@ -4,6 +4,7 @@ import {
   PropExpr,
   sexpr_to_string,
   TaggedTemplateLiteralExpr,
+  VarExpr,
   type Expr,
   type FuncStmt,
   type Ident,
@@ -13,7 +14,7 @@ import {
   type VarDeclStmt,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
-import { Type } from "./type.ts"
+import { Type, type_to_string } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { is_readonly_array, todo } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
@@ -195,6 +196,8 @@ export function typecheck(
         return infer_builtin_expr(source_file, expr)
       case "Call":
         return infer_call_expr(source_file, expr)
+      case "Var":
+        return infer_var_expr(source_file, expr)
       default: {
         diagnostics.push(source_file.path, {
           message: `TODO(${expr.kind})`,
@@ -205,12 +208,28 @@ export function typecheck(
       }
     }
   }
+  function infer_var_expr(source_file: SourceFile, expr: VarExpr): Type {
+    const decl = value_decls.get(source_file.path)?.get(expr.ident)
+    if (!decl) {
+      diagnostics.push(source_file.path, {
+        message: `Unbound variable ${expr.ident.text}`,
+        span: expr.span,
+        hint: null,
+      })
+      return Type.Error(`Unbound variable ${expr.ident.text}`)
+    }
+    return type_of_decl(expr.ident.text, decl)
+  }
+
   function infer_call_expr(
     source_file: SourceFile,
     expr: Expr & { kind: "Call" },
   ): Type {
     const lhs_type = infer_expr(source_file, expr.callee)
     const arg_types = expr.args.map((arg) => infer_expr(source_file, arg))
+    if (lhs_type.kind === "Error") {
+      return lhs_type
+    }
     if (lhs_type.kind === "UnboxedFunc") {
       diagnostics.push(source_file.path, {
         message: `TODO: match arg types with function parameters`,
@@ -220,11 +239,11 @@ export function typecheck(
       return lhs_type.return_type
     } else {
       diagnostics.push(source_file.path, {
-        message: `Expected a function, got ${lhs_type.toString()}`,
+        message: `Expected a function, got ${type_to_string(lhs_type)}`,
         span: expr.callee.span,
-        hint: `Expected a function type, got ${lhs_type.toString()}`,
+        hint: null,
       })
-      return Type.Error(`Expected a function, got ${lhs_type.toString()}`)
+      return Type.Error(`Expected a function, got ${type_to_string(lhs_type)}`)
     }
   }
   function infer_builtin_expr(
@@ -391,11 +410,13 @@ export function typecheck(
     source_file: SourceFile,
     annotation: TypeAnnotation,
   ): Type {
-    using _ = trace.add(`check_type_annotation(${annotation})`)
     const existing = types.get(annotation)
     if (existing) {
       return existing
     }
+    using _ = trace.add(
+      `check_type_annotation:${source_file.path}:${annotation.span.start}${annotation.span.stop}`,
+    )
 
     const t = annotation_to_type(make_type_var_env(source_file), annotation)
     types.set(annotation, t)
