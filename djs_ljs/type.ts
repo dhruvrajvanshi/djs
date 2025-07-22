@@ -18,6 +18,11 @@ export type Type = ReadonlyUnion<
   | { kind: "MutPtr"; type: Type }
   | { kind: "UnboxedFunc"; params: readonly Type[]; return_type: Type }
   | { kind: "Error"; message: string }
+  /**
+   * typeof @builtin("c_str")
+   * Takes a constant tagged template argument and returns a pointer to a null-terminated C string.
+   */
+  | { kind: "CStringConstructor" }
 >
 export const Type = {
   u8: { kind: "u8" },
@@ -41,6 +46,7 @@ export const Type = {
     params,
     return_type,
   }),
+  CStringConstructor: { kind: "CStringConstructor" },
   Error: (message: string) => ({ kind: "Error", message }),
 } satisfies Record<string, Type | ((...args: readonly never[]) => Type)>
 
