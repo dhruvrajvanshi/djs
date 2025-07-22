@@ -1,8 +1,10 @@
 import {
   BuiltinExpr,
   expr_to_sexpr,
+  LJSExternFunctionStmt,
   PropExpr,
   sexpr_to_string,
+  Span,
   TaggedTemplateLiteralExpr,
   VarExpr,
   type Expr,
@@ -41,7 +43,7 @@ export function typecheck(
   const values = new Map<Expr, Type>()
   const types = new Map<TypeAnnotation, Type>()
   const trace = new Trace()
-  const checked_stmts = new Set<Stmt>()
+  const check_stmt_results = new Map<Stmt, CheckStmtResult>()
 
   for (const file of source_files.values()) {
     check_source_file(file)
@@ -60,12 +62,23 @@ export function typecheck(
       check_stmt(file, stmt)
     }
   }
-  function check_stmt(source_file: SourceFile, stmt: Stmt): void {
-    if (checked_stmts.has(stmt)) return
-    checked_stmts.add(stmt)
-    check_stmt_worker(source_file, stmt)
+
+  type CheckStmtResult = void | {
+    values: Map<string, Type>
+    types: Map<string, Type>
   }
-  function check_stmt_worker(source_file: SourceFile, stmt: Stmt): void {
+
+  function check_stmt(source_file: SourceFile, stmt: Stmt): CheckStmtResult {
+    const existing = check_stmt_results.get(stmt)
+    if (existing) return existing
+    const result = check_stmt_worker(source_file, stmt)
+    check_stmt_results.set(stmt, result)
+    return result
+  }
+  function check_stmt_worker(
+    source_file: SourceFile,
+    stmt: Stmt,
+  ): CheckStmtResult {
     using _ = trace.add(
       `check_stmt\n${source_file.path}:${stmt.span.start}:${stmt.span.stop}`,
     )
@@ -128,11 +141,12 @@ export function typecheck(
   function check_var_decl_stmt(
     source_file: SourceFile,
     stmt: VarDeclStmt,
-  ): void {
+  ): CheckStmtResult {
     using _ = trace.add(
       `check_var_decl_stmt\n${source_file.path}:${stmt.span.start}`,
       short_stmt_name(stmt),
     )
+    const values = new Map<string, Type>()
     for (const decl of flatten_var_decl(stmt)) {
       const annotation = decl.type_annotation
       let type: Type | null = null
@@ -142,20 +156,45 @@ export function typecheck(
       if (decl.init) {
         if (type) {
           check_expr(source_file, decl.init, type)
+          values.set(decl.name, type)
         } else {
-          infer_expr(source_file, decl.init)
+          const ty = infer_expr(source_file, decl.init)
+          values.set(decl.name, ty)
         }
       }
     }
+    return { values, types: new Map() }
   }
 
   function check_ljs_extern_function_stmt(
     source_file: SourceFile,
-    stmt: Stmt,
-  ): void {
+    stmt: LJSExternFunctionStmt,
+  ): CheckStmtResult {
     using _ = trace.add(
       `check_ljs_extern_function_stmt\n${source_file.path}:${stmt.span.start}}`,
     )
+    const param_types: Type[] = []
+    for (const param of stmt.params) {
+      if (!param.type_annotation) {
+        diagnostics.push(source_file.path, {
+          message: "An extern function parameter must have a type annotation",
+          span: param.span,
+          hint: null,
+        })
+        continue
+      } else {
+        param_types.push(
+          check_type_annotation(source_file, param.type_annotation),
+        )
+      }
+    }
+    const return_type = check_type_annotation(source_file, stmt.return_type)
+    return {
+      values: new Map([
+        [stmt.name.text, Type.UnboxedFunc(param_types, return_type)],
+      ]),
+      types: new Map(),
+    }
   }
 
   function check_expr(
@@ -199,24 +238,32 @@ export function typecheck(
       case "Var":
         return infer_var_expr(source_file, expr)
       default: {
-        diagnostics.push(source_file.path, {
+        return emit_error_type(source_file, {
           message: `TODO(${expr.kind})`,
           span: expr.span,
-          hint: null,
         })
-        return Type.Error("TODO")
       }
     }
+  }
+  function emit_error_type(
+    source_file: SourceFile,
+    error: { message: string; span: Span; hint?: string | null },
+  ): Type {
+    diagnostics.push(source_file.path, {
+      message: error.message,
+      span: error.span,
+      hint: error.hint ?? null,
+    })
+    return Type.Error(error.message)
   }
   function infer_var_expr(source_file: SourceFile, expr: VarExpr): Type {
     const decl = value_decls.get(source_file.path)?.get(expr.ident)
     if (!decl) {
-      diagnostics.push(source_file.path, {
+      return emit_error_type(source_file, {
         message: `Unbound variable ${expr.ident.text}`,
         span: expr.span,
         hint: null,
       })
-      return Type.Error(`Unbound variable ${expr.ident.text}`)
     }
     return type_of_decl(expr.ident.text, decl)
   }
@@ -238,12 +285,10 @@ export function typecheck(
       })
       return lhs_type.return_type
     } else {
-      diagnostics.push(source_file.path, {
+      return emit_error_type(source_file, {
         message: `Expected a function, got ${type_to_string(lhs_type)}`,
         span: expr.callee.span,
-        hint: null,
       })
-      return Type.Error(`Expected a function, got ${type_to_string(lhs_type)}`)
     }
   }
   function infer_builtin_expr(
@@ -255,12 +300,10 @@ export function typecheck(
       case "c_str":
         return Type.CStringConstructor
       default: {
-        diagnostics.push(source_file.path, {
+        return emit_error_type(source_file, {
           message: `Unknown builtin: ${builtin_name}`,
           span: expr.span,
-          hint: null,
         })
-        return Type.Error(`Unknown builtin: ${builtin_name}`)
       }
     }
   }
@@ -270,14 +313,13 @@ export function typecheck(
     if (lhs_module_decl) {
       const decl = lhs_module_decl.values.get(expr.property.text)
       if (!decl) {
-        diagnostics.push(source_file.path, {
+        return emit_error_type(source_file, {
           message: `${expr.property.text} was not found in the module`,
           span: expr.property.span,
           hint:
             `Available properties: ` +
             [...lhs_module_decl.values.keys()].slice(5).join(", "),
         })
-        return Type.Error(``)
       }
       return type_of_decl(expr.property.text, decl)
     } else todo("Not a moudle")
@@ -288,19 +330,24 @@ export function typecheck(
       case "VarDecl": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        for (const stmt of flatten_var_decl(decl.stmt)) {
-          if (stmt.name !== name) continue
-          if (stmt.type_annotation) {
-            return check_type_annotation(source_file, stmt.type_annotation)
-          }
-          if (stmt.init) {
-            return infer_expr(source_file, stmt.init)
-          }
-        }
-        assert(false, `Expected to find a var decl for ${name} in ${decl}`)
+        const check_stmt_result = check_stmt(source_file, decl.stmt)
+        const ty = check_stmt_result?.values.get(name)
+        assert(
+          ty,
+          `Expected type for ${name} in ${source_file.path}; ${check_stmt_result}; ${short_stmt_name(decl.stmt)}`,
+        )
+        return ty
+      }
+      case "LJSExternFunction": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const result = check_stmt(source_file, decl.stmt)
+        const ty = result?.values.get(name)
+        assert(ty, `Expected a type for LJSExternFunction ${name}`)
+        return ty
       }
       default: {
-        return Type.Error("TODO: type_of_decl for " + decl.kind)
+        return todo(`type_of_decl for ${decl.kind} with name ${name}`)
       }
     }
   }
@@ -443,5 +490,10 @@ export function typecheck(
 }
 
 function short_stmt_name(stmt: Stmt): string {
+  if (stmt.kind === "VarDecl") {
+    return flatten_var_decl(stmt)
+      .map((decl) => `${stmt.decl.decl_type.toLowerCase()} ${decl.name} = ...`)
+      .join(";")
+  }
   return stmt.kind
 }
