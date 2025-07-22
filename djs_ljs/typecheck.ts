@@ -20,12 +20,7 @@ import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
 import assert from "node:assert"
-import type {
-  TypeDecl,
-  ValueDecl,
-  ValueDeclExcludingKind,
-  ValueDeclOfKind,
-} from "./SymbolTable.ts"
+import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
 
 export interface TypecheckResult {
@@ -167,6 +162,9 @@ export function typecheck(
     expr: Expr,
     expected_type: Type,
   ): void {
+    if (values.has(expr)) {
+      return
+    }
     using _ = trace.add(
       `check_expr\n${source_file.path}:${expr.span.start}`,
       sexpr_to_string(expr_to_sexpr(expr)),
@@ -233,14 +231,17 @@ export function typecheck(
     source_file: SourceFile,
     expr: BuiltinExpr,
   ): Type {
-    switch (expr.text) {
+    const builtin_name = JSON.parse(expr.text)
+    switch (builtin_name) {
+      case "c_str":
+        return Type.CStringConstructor
       default: {
         diagnostics.push(source_file.path, {
-          message: `Unknown builtin: ${expr.text}`,
+          message: `Unknown builtin: ${builtin_name}`,
           span: expr.span,
           hint: null,
         })
-        return Type.Error(`Unknown builtin: ${expr.text}`)
+        return Type.Error(`Unknown builtin: ${builtin_name}`)
       }
     }
   }
@@ -259,22 +260,25 @@ export function typecheck(
         })
         return Type.Error(``)
       }
-      return type_of_decl(decl)
+      return type_of_decl(expr.property.text, decl)
     } else todo("Not a moudle")
   }
 
-  function type_of_decl(decl: ValueDecl): Type {
+  function type_of_decl(name: string, decl: ValueDecl): Type {
     switch (decl.kind) {
       case "VarDecl": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        check_stmt(source_file, decl.stmt)
-        diagnostics.push(source_file.path, {
-          message: `TODO: type_of_decl for VarDecl`,
-          span: decl.stmt.span,
-          hint: `This is a placeholder for type checking variable declarations.`,
-        })
-        return Type.Error("TODO: type_of_decl for VarDecl")
+        for (const stmt of flatten_var_decl(decl.stmt)) {
+          if (stmt.name !== name) continue
+          if (stmt.type_annotation) {
+            return check_type_annotation(source_file, stmt.type_annotation)
+          }
+          if (stmt.init) {
+            return infer_expr(source_file, stmt.init)
+          }
+        }
+        assert(false, `Expected to find a var decl for ${name} in ${decl}`)
       }
       default: {
         return Type.Error("TODO: type_of_decl for " + decl.kind)
@@ -302,6 +306,9 @@ export function typecheck(
   ): Type {
     const callee = expr.tag
     const callee_ty = infer_expr(source_file, expr.tag)
+    if (callee_ty.kind === "CStringConstructor") {
+      return infer_and_check_c_string_expr(source_file, expr)
+    }
     diagnostics.push(source_file.path, {
       message: `TODO: infer_tagged_template_literal_expr for ${callee_ty}`,
       span: callee.span,
@@ -309,6 +316,21 @@ export function typecheck(
     })
 
     return Type.Error("TODO")
+  }
+
+  function infer_and_check_c_string_expr(
+    source_file: SourceFile,
+    expr: TaggedTemplateLiteralExpr,
+  ): Type {
+    if (expr.fragments.length !== 1 || expr.fragments[0].kind !== "Text") {
+      diagnostics.push(source_file.path, {
+        message: `Expected a constant template literal for @builtin("c_str"), got ${expr.fragments.length}`,
+        span: expr.span,
+        hint: `@builtin("c_str") must be used like this @builtin("c_str")\`some constant string without interpolation\``,
+      })
+    }
+
+    return Type.Ptr(Type.c_char)
   }
 
   function make_type_var_env(source_file: SourceFile): TypeVarEnv {
