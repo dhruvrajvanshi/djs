@@ -375,13 +375,11 @@ export function typecheck(
     if (callee_ty.kind === "CStringConstructor") {
       return infer_and_check_c_string_expr(source_file, expr)
     }
-    diagnostics.push(source_file.path, {
+    return emit_error_type(source_file, {
       message: `TODO: infer_tagged_template_literal_expr for ${callee_ty}`,
       span: callee.span,
       hint: null,
     })
-
-    return Type.Error("TODO")
   }
 
   function infer_and_check_c_string_expr(
@@ -414,34 +412,25 @@ export function typecheck(
       const decl = decls.get(module_name)
 
       if (!decl || decl.kind !== "Module") {
-        diagnostics.push(source_file.path, {
+        return emit_error_type(source_file, {
           message: `${module_name.text} is not a module`,
           span: module_name.span,
-          hint: null,
         })
-        return Type.Error(`Unknown module: ${module_name.text}`)
       }
       if (rest.length !== 1) {
-        diagnostics.push(source_file.path, {
+        return emit_error_type(source_file, {
           message: `Expected a single type after module name, got ${rest.length}`,
           span: module_name.span,
           hint: null,
         })
-        return Type.Error(
-          `Expected a single type after module name, got ${rest.length}`,
-        )
       }
 
       const member = decl.types.get(rest[0].text)
       if (!member) {
-        diagnostics.push(source_file.path, {
+        return emit_error_type(source_file, {
           message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
           span: rest[0].span,
-          hint: null,
         })
-        return Type.Error(
-          `Unknown type ${rest[0].text} in module ${module_name.text}`,
-        )
       }
       return type_decl_to_type(member)
     } else {
