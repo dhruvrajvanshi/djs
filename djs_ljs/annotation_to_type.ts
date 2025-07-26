@@ -16,10 +16,10 @@ export function annotation_to_type(
         default:
           return env(annotation.ident)
       }
-    case "LJSConstPtr":
-      return Type.Ptr(annotation_to_type(env, annotation.to))
-    case "LJSPtr":
+    case "LJSMutPtr":
       return Type.MutPtr(annotation_to_type(env, annotation.to))
+    case "LJSPtr":
+      return Type.Ptr(annotation_to_type(env, annotation.to))
     case "Qualified":
       return env([annotation.head, ...annotation.tail])
     case "Builtin":

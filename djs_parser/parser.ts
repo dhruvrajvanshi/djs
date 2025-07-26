@@ -1155,16 +1155,16 @@ function parser_impl(
   function parse_ptr_type_annotation(): TypeAnnotation | Err {
     const start = advance()
     assert(start.kind === t.Star)
-    const is_const = at(t.Const)
-    if (is_const) advance()
+    const is_mut = at(t.Ident) && self.current_token.text === "mut"
+    if (is_mut) advance()
     const type_annotation = parse_type_annotation()
     if (type_annotation === ERR) return ERR
     if (!(flags | PARSER_FLAGS.LJS)) {
       emit_error("Pointer type annotations are only supported in LJS mode")
     }
 
-    if (is_const) {
-      return TypeAnnotation.LJSConstPtr(
+    if (is_mut) {
+      return TypeAnnotation.LJSMutPtr(
         Span.between(start.span, type_annotation.span),
         type_annotation,
       )

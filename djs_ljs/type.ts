@@ -87,6 +87,8 @@ export function type_to_string(type: Type): string {
       return "<Error>"
     case "void":
       return "void"
+    case "CStringConstructor":
+      return "`` => *c_str"
     default:
       return assert_never(type)
   }

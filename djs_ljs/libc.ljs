@@ -1,9 +1,8 @@
-export extern function puts(s: *const u8): void
 
 /**
  * Null terminated C style bytestring
  * @example
- * const msg: *const char = str`Hello` // ['H', 'e', 'l', 'l', '0', '\0']
+ * const msg: *char = str`Hello` // ['H', 'e', 'l', 'l', '0', '\0']
  */
 export const str = @builtin("c_str")
 
@@ -12,3 +11,5 @@ export const str = @builtin("c_str")
  * Can be either i8 or u8, depending on the platform
  */
 export type char = @builtin("c_char")
+
+export extern function puts(s: *char): void

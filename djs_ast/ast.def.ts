@@ -283,7 +283,7 @@ export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
     params: List("FuncTypeParam"),
     returns: TypeAnnotation,
   },
-  LJSConstPtr: {
+  LJSMutPtr: {
     to: TypeAnnotation,
   },
   LJSPtr: {
