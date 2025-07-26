@@ -460,7 +460,7 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(type_annotation.returns)
         break
       }
-      case "LJSConstPtr": {
+      case "LJSMutPtr": {
         this.visit_type_annotation(type_annotation.to)
         break
       }

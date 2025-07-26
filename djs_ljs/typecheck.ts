@@ -18,7 +18,7 @@ import {
 import type { SourceFiles } from "./SourceFiles.ts"
 import { Type, type_to_string } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
-import { is_readonly_array, todo } from "djs_std"
+import { is_readonly_array, todo, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
@@ -221,8 +221,55 @@ export function typecheck(
       sexpr_to_string(expr_to_sexpr(expr)),
     )
 
-    // TODO
-    infer_expr(ctx, expr)
+    const inferred = infer_expr(ctx, expr)
+    if (!is_assignable({ source: inferred, target: expected_type })) {
+      emit_error(
+        ctx,
+        expr.span,
+        `Expected ${type_to_string(expected_type)}, got ${type_to_string(
+          inferred,
+        )}`,
+      )
+    }
+    values.set(expr, expected_type)
+  }
+  function is_assignable({
+    source,
+    target,
+  }: {
+    source: Type
+    target: Type
+  }): boolean {
+    if (source.kind === "Error" || target.kind === "Error") {
+      return true
+    }
+    switch (target.kind) {
+      case "Ptr":
+        return (
+          (source.kind === "Ptr" || source.kind === "MutPtr") &&
+          is_assignable({ source: source.type, target: target.type })
+        )
+      case "MutPtr":
+        return (
+          source.kind === "MutPtr" &&
+          is_assignable({ source: source.type, target: target.type })
+        )
+      case "c_char":
+      case "u8":
+      case "u16":
+      case "u32":
+      case "u64":
+      case "i8":
+      case "i16":
+      case "i32":
+      case "i64":
+      case "f32":
+      case "f64":
+      case "boolean":
+        return target.kind === source.kind
+      default:
+        return false
+    }
   }
   function make_check_ctx(
     source_file: SourceFile,
@@ -260,7 +307,7 @@ export function typecheck(
         return infer_var_expr(ctx, expr)
       default: {
         return emit_error_type(ctx, {
-          message: `TODO(${expr.kind})`,
+          message: `TODO: ${expr.kind} cannot be inferred at the moment`,
           span: expr.span,
         })
       }
@@ -287,20 +334,23 @@ export function typecheck(
 
   function infer_call_expr(ctx: CheckCtx, expr: Expr & { kind: "Call" }): Type {
     const lhs_type = infer_expr(ctx, expr.callee)
-    const arg_types = expr.args.map((arg) => infer_expr(ctx, arg))
     if (lhs_type.kind === "Error") {
       return lhs_type
     }
     if (lhs_type.kind === "UnboxedFunc") {
-      emit_error(
-        ctx,
-
-        expr.callee.span,
-        `TODO: match arg types with function parameters`,
-        `Expected: ${lhs_type.params.map((t) => t.toString()).join(", ")}`,
-      )
+      if (expr.args.length !== lhs_type.params.length) {
+        emit_error(
+          ctx,
+          expr.callee.span,
+          `Expected ${lhs_type.params.length} arguments, got ${expr.args.length}`,
+        )
+      }
+      for (const [arg, expected_type] of zip(expr.args, lhs_type.params)) {
+        check_expr(ctx, arg, expected_type)
+      }
       return lhs_type.return_type
     } else {
+      expr.args.map((arg) => infer_expr(ctx, arg))
       return emit_error_type(ctx, {
         span: expr.callee.span,
         message: `Expected a function, got ${type_to_string(lhs_type)}`,

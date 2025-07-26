@@ -201,3 +201,19 @@ export function map_get_or_insert<K, V>(
     return value
   }
 }
+
+export function* zip<A, B>(
+  a: Iterable<A>,
+  b: Iterable<B>,
+): IterableIterator<[A, B]> {
+  const a_iter = a[Symbol.iterator]()
+  const b_iter = b[Symbol.iterator]()
+  while (true) {
+    const a_result = a_iter.next()
+    const b_result = b_iter.next()
+    if (a_result.done || b_result.done) {
+      return
+    }
+    yield [a_result.value, b_result.value]
+  }
+}

@@ -1591,7 +1591,7 @@ export type TypeAnnotation =
   | ApplicationTypeAnnotation
   | StringTypeAnnotation
   | FuncTypeAnnotation
-  | LJSConstPtrTypeAnnotation
+  | LJSMutPtrTypeAnnotation
   | LJSPtrTypeAnnotation
   | BuiltinTypeAnnotation
   | QualifiedTypeAnnotation
@@ -1705,15 +1705,15 @@ export class FuncTypeAnnotation {
     return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
-export class LJSConstPtrTypeAnnotation {
+export class LJSMutPtrTypeAnnotation {
   constructor(
     readonly span: Span,
 
     readonly to: TypeAnnotation,
   ) {}
 
-  get kind(): "LJSConstPtr" {
-    return "LJSConstPtr"
+  get kind(): "LJSMutPtr" {
+    return "LJSMutPtr"
   }
 
   toString(): string {
@@ -1807,8 +1807,8 @@ export const TypeAnnotation = {
   ): FuncTypeAnnotation =>
     new FuncTypeAnnotation(span, type_params, params, returns),
 
-  LJSConstPtr: (span: Span, to: TypeAnnotation): LJSConstPtrTypeAnnotation =>
-    new LJSConstPtrTypeAnnotation(span, to),
+  LJSMutPtr: (span: Span, to: TypeAnnotation): LJSMutPtrTypeAnnotation =>
+    new LJSMutPtrTypeAnnotation(span, to),
 
   LJSPtr: (span: Span, to: TypeAnnotation): LJSPtrTypeAnnotation =>
     new LJSPtrTypeAnnotation(span, to),
