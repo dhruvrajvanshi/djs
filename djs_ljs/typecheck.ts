@@ -1,5 +1,6 @@
 import {
   BuiltinExpr,
+  DeclType,
   expr_to_sexpr,
   LJSExternFunctionStmt,
   PropExpr,
@@ -29,8 +30,15 @@ import type { ResolveResult } from "./resolve.ts"
 export interface TypecheckResult {
   values: Map<Expr, Type>
   types: Map<TypeAnnotation, Type>
+  var_decls: Map<VarDeclStmt, CheckedVarDecl[]>
   diagnostics: Diagnostics
   trace: Trace
+}
+interface CheckedVarDecl {
+  decl_type: DeclType
+  name: string
+  type: Type
+  init: Expr
 }
 
 export function typecheck(
@@ -49,11 +57,21 @@ export function typecheck(
     check_source_file(file)
   }
 
+  const var_decls = new Map<VarDeclStmt, CheckedVarDecl[]>()
+  for (const [stmt, result] of check_stmt_results.entries()) {
+    if (stmt.kind !== "VarDecl") {
+      continue
+    }
+    assert(result)
+    var_decls.set(stmt, result.var_decls)
+  }
+
   return {
     diagnostics: _diagnostics,
     values,
     types,
     trace,
+    var_decls,
   }
 
   function check_source_file(file: SourceFile): void {
@@ -66,6 +84,7 @@ export function typecheck(
   type CheckStmtResult = void | {
     values: Map<string, Type>
     types: Map<string, Type>
+    var_decls: CheckedVarDecl[]
   }
 
   function check_stmt(source_file: SourceFile, stmt: Stmt): CheckStmtResult {
@@ -152,6 +171,7 @@ export function typecheck(
       short_stmt_name(stmt),
     )
     const values = new Map<string, Type>()
+    const var_decls: CheckedVarDecl[] = []
     for (const decl of flatten_var_decl(stmt)) {
       const annotation = decl.type_annotation
       let type: Type | null = null
@@ -162,13 +182,25 @@ export function typecheck(
         if (type) {
           check_expr(ctx, decl.init, type)
           values.set(decl.name, type)
+          var_decls.push({
+            decl_type: decl.decl_type,
+            name: decl.name,
+            type,
+            init: decl.init,
+          })
         } else {
           const ty = infer_expr(ctx, decl.init)
           values.set(decl.name, ty)
+          var_decls.push({
+            decl_type: decl.decl_type,
+            name: decl.name,
+            type: ty,
+            init: decl.init,
+          })
         }
       }
     }
-    return { values, types: new Map() }
+    return { values, types: new Map(), var_decls }
   }
   function emit_error(
     ctx: CheckCtx,
@@ -209,6 +241,7 @@ export function typecheck(
         [stmt.name.text, Type.UnboxedFunc(param_types, return_type)],
       ]),
       types: new Map(),
+      var_decls: [],
     }
   }
 

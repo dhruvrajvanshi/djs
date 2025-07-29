@@ -1,8 +1,9 @@
 import {
   ASTVisitorBase,
+  Expr,
   FuncStmt,
-  IdentTypeAnnotation,
   LJSExternFunctionStmt,
+  sexpr_to_string,
   Stmt,
   stmt_to_sexpr,
   type_annotation_to_sexpr,
@@ -13,16 +14,19 @@ import {
 import type { SourceFiles } from "./SourceFiles.ts"
 import { todo } from "djs_std"
 import assert from "node:assert"
-import { flatten_var_decl } from "./flatten_var_decl.ts"
+import { type TypecheckResult } from "./typecheck.ts"
+import type { Type } from "./type.ts"
 
-export function emit_c(source_files: SourceFiles) {
-  const emit_decls = new EmitDeclarations()
+export function emit_c(source_files: SourceFiles, tc_result: TypecheckResult) {
+  const emit_decls = new EmitDeclarations(tc_result)
   for (const source_file of source_files.values()) {
     emit_decls.visit_source_file(source_file)
   }
-  console.dir(emit_decls.nodes)
   console.log("---- emit_c ----")
   console.log(emit_decls.nodes.map(pp_c_node).join("\n"))
+  console.log("----------------")
+
+  todo()
 }
 
 export type CNode =
@@ -39,6 +43,7 @@ export type CNode =
   | { kind: "Param"; name: string; type: CNode }
   | { kind: "ConstPtr"; to_type: CNode }
   | { kind: "Ptr"; to_type: CNode }
+  | { kind: "VarDecl"; type: CNode; name: string; init: CNode }
 
 const CNode = {
   Ident: (name: string): CNode => ({ kind: "Ident", name }),
@@ -48,7 +53,7 @@ const CNode = {
     name,
     type,
   }),
-}
+} satisfies Record<string, CNode | ((...args: never[]) => CNode)>
 
 function pp(
   template: TemplateStringsArray,
@@ -86,12 +91,20 @@ function pp_c_node(node: CNode): string {
     case "ConstPtr":
       return pp`const ${pp_c_node(node.to_type)}*`
     case "Ptr":
-      return pp`${pp_c_node(node.to_type)}*`
+      return pp`${node.to_type}*`
+    case "VarDecl":
+      return pp`${node.type} ${node.name} = ${node.init}`
   }
 }
 
 class EmitDeclarations extends ASTVisitorBase {
   nodes: CNode[] = []
+  tc_result: TypecheckResult
+  constructor(tc_result: TypecheckResult) {
+    super()
+    this.tc_result = tc_result
+  }
+
   override visit_source_file(node: SourceFile): void {
     this.nodes.push({
       kind: "LineComment",
@@ -102,24 +115,66 @@ class EmitDeclarations extends ASTVisitorBase {
   override visit_stmt(node: Stmt): void {
     switch (node.kind) {
       case "Func":
-        return emit_func_decl(this.nodes, node)
+        return emit_func_decl(this.nodes, node, this.tc_result)
       case "ImportStarAs":
         break
       case "Import":
         break
       case "LJSExternFunction":
-        return emit_extern_func_decl(this.nodes, node)
+        return emit_extern_func_decl(this.nodes, node, this.tc_result)
       case "VarDecl":
-        return emit_var_decl(this.nodes, node)
+        return emit_var_decl(this.nodes, node, this.tc_result)
+      case "TypeAlias":
+        return
       default:
         return todo`emit_c: unhandled stmt kind: ${node.kind} ${stmt_to_sexpr(node)}`
     }
   }
 }
-function emit_var_decl(to: CNode[], node: VarDeclStmt) {
-  todo`emit_c: unhandled VarDeclStmt: ${stmt_to_sexpr(node)}`
+function emit_var_decl(to: CNode[], node: VarDeclStmt, tc: TypecheckResult) {
+  const decls = tc.var_decls.get(node)
+  assert(decls)
+  for (const decl of decls) {
+    if (decl.type.kind === "CStringConstructor") {
+      // const cstr = @builtin("cstring")
+      continue
+    }
+    const ty = lower_type(decl.type)
+
+    to.push({
+      kind: "VarDecl",
+      type: ty,
+      name: decl.name,
+      init: lower_expr(decl.init),
+    })
+  }
 }
-function emit_extern_func_decl(to: CNode[], node: LJSExternFunctionStmt) {
+function lower_type(ty: Type): CNode {
+  switch (ty.kind) {
+    case "void":
+      return CNode.void
+    case "Ptr":
+      return { kind: "ConstPtr", to_type: lower_type(ty.type) }
+    case "MutPtr":
+      return { kind: "Ptr", to_type: lower_type(ty.type) }
+    case "c_char":
+      return CNode.Ident("char")
+    default:
+      todo(ty.kind)
+  }
+}
+function lower_expr(expr: Expr): CNode {
+  switch (expr.kind) {
+    default:
+      todo(expr.kind)
+  }
+}
+
+function emit_extern_func_decl(
+  to: CNode[],
+  node: LJSExternFunctionStmt,
+  tc: TypecheckResult,
+) {
   assert(node.name, "Function must have a name")
   assert(node.return_type, "Function must have a return type")
   to.push({
@@ -131,13 +186,13 @@ function emit_extern_func_decl(to: CNode[], node: LJSExternFunctionStmt) {
 
       return CNode.Param(
         param.pattern.ident.text,
-        lower_annotation(param.type_annotation),
+        lower_annotation(param.type_annotation, tc),
       )
     }),
-    returns: lower_annotation(node.return_type),
+    returns: lower_annotation(node.return_type, tc),
   })
 }
-function emit_func_decl(to: CNode[], node: FuncStmt) {
+function emit_func_decl(to: CNode[], node: FuncStmt, tc: TypecheckResult) {
   assert(node.func.name, "Function must have a name")
   assert(node.func.return_type, "Function must have a return type")
 
@@ -150,31 +205,20 @@ function emit_func_decl(to: CNode[], node: FuncStmt) {
 
       return CNode.Param(
         param.pattern.ident.text,
-        lower_annotation(param.type_annotation),
+        lower_annotation(param.type_annotation, tc),
       )
     }),
-    returns: lower_annotation(node.func.return_type),
+    returns: lower_annotation(node.func.return_type, tc),
   })
 }
-function lower_annotation(ty: TypeAnnotation): CNode {
-  switch (ty.kind) {
-    case "Ident":
-      return lower_var_annotation(ty)
-    case "LJSConstPtr":
-      return { kind: "ConstPtr", to_type: lower_annotation(ty.to) }
-    case "LJSPtr":
-      return { kind: "Ptr", to_type: lower_annotation(ty.to) }
-    default:
-      return todo`emit_c: unhandled type annotation kind: ${type_annotation_to_sexpr(ty)}`
-  }
-}
-function lower_var_annotation(ty: IdentTypeAnnotation): CNode {
-  switch (ty.ident.text) {
-    case "void":
-      return CNode.Ident("void")
-    case "u8":
-      return CNode.Ident("uint8_t")
-    default:
-      return todo`Unhandled anotation: ${type_annotation_to_sexpr(ty)}`
-  }
+function lower_annotation(
+  annotation: TypeAnnotation,
+  tc: TypecheckResult,
+): CNode {
+  const type = tc.types.get(annotation)
+  assert(
+    type,
+    `Type not found for annotation: ${sexpr_to_string(type_annotation_to_sexpr(annotation))}`,
+  )
+  return lower_type(type)
 }

@@ -88,7 +88,7 @@ async function main() {
       await show_diagnostics(path, d, null)
     }
   }
-  emit_c(source_files)
+  emit_c(source_files, typecheck_result)
 }
 function dump_source_files(source_files: SourceFiles) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}---- ast ----${ANSI_RESET}`)
