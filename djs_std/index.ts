@@ -53,10 +53,11 @@ export function todo(first?: unknown, ...args: unknown[]): never {
   } else {
     message = inspect(first)
   }
-  throw new AssertionError({
-    message: message,
-    stackStartFn: todo,
-  })
+  const e = new Error(message)
+  if (Error.captureStackTrace) {
+    Error.captureStackTrace(e, todo)
+  }
+  throw e
 }
 
 export function assert_todo(
