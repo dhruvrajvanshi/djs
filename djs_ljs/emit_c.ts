@@ -2,6 +2,7 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import { todo } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { Type } from "./type.ts"
+import type { ResolveImportsResult } from "./resolve_imports.ts"
 
 /**
  * @returns C source code
@@ -9,6 +10,7 @@ import type { Type } from "./type.ts"
 export function emit_c(
   source_files: SourceFiles,
   tc_result: TypecheckResult,
+  resolve_result: ResolveImportsResult,
 ): string {
   todo()
 }

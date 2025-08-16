@@ -128,6 +128,9 @@ export function type_to_sexpr(type: Type): string {
     case "UnboxedFunc":
       const params = type.params.map(type_to_sexpr).join(" ")
       return `((${params}) => ${type_to_sexpr(type.return_type)})`
+
+    case "CStringConstructor":
+      return "`` => *c_str"
     case "Error":
       return `<Error: ${type.message}>`
     default:

@@ -92,7 +92,11 @@ async function main() {
       await show_diagnostics(path, d, null)
     }
   }
-  const c_source = emit_c(source_files, typecheck_result)
+  const c_source = emit_c(
+    source_files,
+    typecheck_result,
+    resolve_imports_result,
+  )
   assert(args.output, `Output path is not provided`)
   const output_c_path = args.output + ".c"
   await writeFile(output_c_path, c_source)
