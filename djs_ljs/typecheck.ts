@@ -26,6 +26,7 @@ import { Trace } from "./Trace.ts"
 import assert from "node:assert"
 import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
+import type { ResolveImportsResult } from "./resolve_imports.ts"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -43,7 +44,7 @@ interface CheckedVarDecl {
 
 export function typecheck(
   source_files: SourceFiles,
-  resolution: ResolveResult,
+  resolution: ResolveImportsResult,
 ): TypecheckResult {
   const value_decls = resolution.values
   const type_decls = resolution.types
