@@ -28,6 +28,9 @@ import {
 import { typecheck, type TypecheckResult } from "./typecheck.ts"
 import { type_to_sexpr } from "./type.ts"
 import { exit } from "node:process"
+import { assert } from "node:console"
+import { writeFile } from "node:fs/promises"
+import { execSync } from "node:child_process"
 
 async function main() {
   const { positionals: files, values: args } = parseArgs({
@@ -40,6 +43,7 @@ async function main() {
       "dump-typecheck": { type: "boolean", default: false },
       "tc-trace": { type: "string", default: "" },
       "no-errors": { type: "boolean", default: false },
+      output: { type: "string", short: "o" },
     },
   })
   const dump_ast = args["dump-ast"] || args["dump-phases"]
@@ -88,7 +92,11 @@ async function main() {
       await show_diagnostics(path, d, null)
     }
   }
-  emit_c(source_files, typecheck_result)
+  const c_source = emit_c(source_files, typecheck_result)
+  assert(args.output, `Output path is not provided`)
+  const output_c_path = args.output + ".c"
+  await writeFile(output_c_path, c_source)
+  execSync(`gcc -o ${args.output} ${output_c_path}`, { stdio: "inherit" })
 }
 function dump_source_files(source_files: SourceFiles) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}---- ast ----${ANSI_RESET}`)
