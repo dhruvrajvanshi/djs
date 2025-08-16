@@ -29,7 +29,16 @@ export function assert_never(value: never): never {
     stackStartFn: assert_never,
   })
 }
-
+export function assert(value: unknown): asserts value {
+  if (!value) {
+    throw new AssertionError({
+      message: `Assertion failed`,
+      actual: value,
+      expected: "<truthy>",
+      stackStartFn: assert,
+    })
+  }
+}
 export function todo(template: TemplateStringsArray, ...args: unknown[]): never
 export function todo(): never
 export function todo(message: string): never
