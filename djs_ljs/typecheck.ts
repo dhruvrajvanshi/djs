@@ -4,6 +4,7 @@ import {
   expr_to_sexpr,
   LJSExternFunctionStmt,
   PropExpr,
+  ReturnStmt,
   sexpr_to_string,
   Span,
   TaggedTemplateLiteralExpr,
@@ -116,9 +117,22 @@ export function typecheck(
       case "Expr":
         infer_expr(ctx, stmt.expr)
         return
+      case "Return":
+        return check_return_stmt(ctx, stmt)
       default:
         todo(stmt.kind)
     }
+  }
+  function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt): CheckStmtResult {
+    using _ = trace.add(
+      `check_return_stmt\n${ctx.source_file.path}:${stmt.span.start}`,
+    )
+    if (stmt.value) {
+      // TODO: Check that the return type matches the surrounding function
+      const type = infer_expr(ctx, stmt.value)
+      return { values: new Map(), types: new Map(), var_decls: [] }
+    }
+    return { values: new Map(), types: new Map(), var_decls: [] }
   }
 
   /**
