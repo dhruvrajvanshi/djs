@@ -29,10 +29,10 @@ export function assert_never(value: never): never {
     stackStartFn: assert_never,
   })
 }
-export function assert(value: unknown): asserts value {
+export function assert(value: unknown, message?: string): asserts value {
   if (!value) {
     throw new AssertionError({
-      message: `Assertion failed`,
+      message: message || `Assertion failed`,
       actual: value,
       expected: "<truthy>",
       stackStartFn: assert,
