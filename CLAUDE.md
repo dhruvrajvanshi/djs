@@ -9,6 +9,7 @@
 
 # Code style
 - Use `snake_case`.
+- Avoid using classes. Favour keeping state in objects and having free standing functions.
 
 # Packages
 
