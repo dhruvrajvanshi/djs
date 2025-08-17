@@ -353,6 +353,9 @@ export function typecheck(
         return infer_call_expr(ctx, expr)
       case "Var":
         return infer_var_expr(ctx, expr)
+      case "Number":
+        // TODO: Handle inference for other int types
+        return Type.c_int
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
