@@ -14,8 +14,7 @@
 # Packages
 
 ## djs_ast
-- The AST is generated from a description of the tree in
-`djs_ast/ast.def.ts` into `djs_ast/ast.gen.ts`.
+- The generated AST nodes are in `djs_ast/ast.gen.ts`
 - Important AST nodes are
   - `SourceFile` corresponds to a single source file
   - `Expr`: Expressions that yield a value
