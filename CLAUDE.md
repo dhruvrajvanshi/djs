@@ -4,6 +4,7 @@
 - ./main.ts my_program.ljs --dump-ast: Print the ast
 - ./main.ts my_program.ljs --dump-typecheck: Print typecheck results
 - ./main.ts my_program.ljs --dump-resolve-imports: Print the name resolution
+- pnpm tsc --noEmit: Typecheck the compiler
 
 
 # Code style
