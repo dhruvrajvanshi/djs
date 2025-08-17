@@ -1,7 +1,6 @@
 import type { SourceFiles } from "./SourceFiles.ts"
 import { todo } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
-import type { Type } from "./type.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
 
 /**
@@ -30,3 +29,15 @@ export type CNode =
   | { kind: "ConstPtr"; to_type: CNode }
   | { kind: "Ptr"; to_type: CNode }
   | { kind: "VarDecl"; type: CNode; name: string; init: CNode }
+  | {
+      kind: "FuncDef"
+      name: string
+      params: CNode[]
+      returns: CNode
+      body: CNode
+    }
+  | { kind: "ExternFunc"; name: string; params: CNode[]; returns: CNode }
+  | { kind: "Return"; value: CNode | null }
+  | { kind: "Call"; func: CNode; args: CNode[] }
+  | { kind: "StringLiteral"; value: string }
+  | { kind: "IntLiteral"; value: number }
