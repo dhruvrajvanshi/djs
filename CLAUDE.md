@@ -25,6 +25,7 @@
   - `Pattern`: Things that can appear as parameters and on the lhs of
     assignments.
   - `Ident`: Names. Usually found inside other ast nodes
+- String and template literal nodes contain the raw text specified in the source file including the quotes and backslashes.
 
 
 ## djs_ljs
