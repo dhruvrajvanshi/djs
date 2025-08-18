@@ -4,6 +4,7 @@ import {
   expr_to_sexpr,
   LJSExternFunctionStmt,
   PropExpr,
+  ReturnStmt,
   sexpr_to_string,
   Span,
   TaggedTemplateLiteralExpr,
@@ -116,9 +117,22 @@ export function typecheck(
       case "Expr":
         infer_expr(ctx, stmt.expr)
         return
+      case "Return":
+        return check_return_stmt(ctx, stmt)
       default:
         todo(stmt.kind)
     }
+  }
+  function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt): CheckStmtResult {
+    using _ = trace.add(
+      `check_return_stmt\n${ctx.source_file.path}:${stmt.span.start}`,
+    )
+    if (stmt.value) {
+      // TODO: Check that the return type matches the surrounding function
+      const type = infer_expr(ctx, stmt.value)
+      return { values: new Map(), types: new Map(), var_decls: [] }
+    }
+    return { values: new Map(), types: new Map(), var_decls: [] }
   }
 
   /**
@@ -339,6 +353,9 @@ export function typecheck(
         return infer_call_expr(ctx, expr)
       case "Var":
         return infer_var_expr(ctx, expr)
+      case "Number":
+        // TODO: Handle inference for other int types
+        return Type.c_int
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,

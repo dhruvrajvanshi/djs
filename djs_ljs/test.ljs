@@ -1,6 +1,0 @@
-import * as c from "libc.ljs"
-
-export function main(): void {
-  const msg: *c.char = c.str`Hello, world!`
-  c.puts(msg)
-}

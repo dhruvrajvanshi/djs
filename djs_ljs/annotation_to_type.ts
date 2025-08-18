@@ -26,6 +26,8 @@ export function annotation_to_type(
       switch (annotation.text) {
         case '"c_char"':
           return Type.c_char
+        case '"c_int"':
+          return Type.c_int
         default:
           todo(annotation.text)
       }
