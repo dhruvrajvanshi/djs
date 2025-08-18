@@ -10,6 +10,8 @@ import type {
   PropExpr,
   TypeAnnotation,
   Block,
+  Param,
+  SourceFile,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
@@ -35,7 +37,7 @@ export function emit_c(
   const extern_funcs: CNode[] = []
   const func_defs: CNode[] = []
 
-  for (const [_path, source_file] of source_files.entries()) {
+  for (const source_file of source_files.values()) {
     for (const stmt of source_file.stmts) {
       switch (stmt.kind) {
         case "Func": {
@@ -73,10 +75,10 @@ export function emit_c(
   }
 
   // Phase 2: Emit function definitions
-  for (const [_path, source_file] of source_files.entries()) {
+  for (const source_file of source_files.values()) {
     for (const stmt of source_file.stmts) {
       if (stmt.kind === "Func") {
-        func_defs.push(emit_func_def(ctx, stmt))
+        func_defs.push(emit_func_def(ctx, source_file, stmt))
       }
     }
   }
@@ -86,10 +88,8 @@ export function emit_c(
   return render_c_nodes(c_nodes)
 }
 
-function emit_param(
-  ctx: EmitContext,
-  param: /* FIXME: Claude generated any */ any,
-): CNode {
+function emit_param(ctx: EmitContext, param: Param): CNode {
+  assert(param.pattern.kind === "Var", "Param pattern must be a variable")
   const param_name = param.pattern.ident.text
   const param_type = param.type_annotation
     ? emit_type_annotation(ctx, param.type_annotation)
@@ -133,7 +133,11 @@ function emit_type(type: Type): CNode {
   }
 }
 
-function emit_func_def(ctx: EmitContext, func_stmt: FuncStmt): CNode {
+function emit_func_def(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  func_stmt: FuncStmt,
+): CNode {
   const func_name = func_stmt.func.name?.text
   assert(func_name, "Function must have a name")
 
@@ -141,7 +145,7 @@ function emit_func_def(ctx: EmitContext, func_stmt: FuncStmt): CNode {
   const return_type = func_stmt.func.return_type
     ? emit_type_annotation(ctx, func_stmt.func.return_type)
     : ({ kind: "Ident", name: "void" } as CNode)
-  const body = emit_block(ctx, func_stmt.func.body)
+  const body = emit_block(ctx, source_file, func_stmt.func.body)
 
   return {
     kind: "FuncDef",
@@ -152,15 +156,23 @@ function emit_func_def(ctx: EmitContext, func_stmt: FuncStmt): CNode {
   }
 }
 
-function emit_block(ctx: EmitContext, block: Block): CNode {
-  const body = block.stmts.map((s: Stmt) => emit_stmt(ctx, s))
+function emit_block(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  block: Block,
+): CNode {
+  const body = block.stmts.map((s: Stmt) => emit_stmt(ctx, source_file, s))
   return { kind: "Block", body }
 }
 
-function emit_stmt(ctx: EmitContext, stmt: Stmt): CNode {
+function emit_stmt(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: Stmt,
+): CNode {
   switch (stmt.kind) {
     case "Block": {
-      const body = stmt.block.stmts.map((s) => emit_stmt(ctx, s))
+      const body = stmt.block.stmts.map((s) => emit_stmt(ctx, source_file, s))
       return { kind: "Block", body }
     }
     case "VarDecl": {
@@ -170,7 +182,7 @@ function emit_stmt(ctx: EmitContext, stmt: Stmt): CNode {
       if (var_decls.length === 1) {
         const decl = var_decls[0]
         const var_type = emit_type(decl.type)
-        const init_expr = emit_expr(ctx, decl.init)
+        const init_expr = emit_expr(ctx, source_file, decl.init)
 
         return {
           kind: "VarDecl",
@@ -181,7 +193,7 @@ function emit_stmt(ctx: EmitContext, stmt: Stmt): CNode {
       } else {
         const decl_nodes = var_decls.map((decl) => {
           const var_type = emit_type(decl.type)
-          const init_expr = emit_expr(ctx, decl.init)
+          const init_expr = emit_expr(ctx, source_file, decl.init)
 
           return {
             kind: "VarDecl",
@@ -195,11 +207,11 @@ function emit_stmt(ctx: EmitContext, stmt: Stmt): CNode {
       }
     }
     case "Return": {
-      const value = stmt.value ? emit_expr(ctx, stmt.value) : null
+      const value = stmt.value ? emit_expr(ctx, source_file, stmt.value) : null
       return { kind: "Return", value }
     }
     case "Expr": {
-      const expr = emit_expr(ctx, stmt.expr)
+      const expr = emit_expr(ctx, source_file, stmt.expr)
       return { kind: "ExprStmt", expr }
     }
     default:
@@ -207,14 +219,18 @@ function emit_stmt(ctx: EmitContext, stmt: Stmt): CNode {
   }
 }
 
-function emit_expr(ctx: EmitContext, expr: Expr): CNode {
+function emit_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: Expr,
+): CNode {
   switch (expr.kind) {
     case "Var": {
       return { kind: "Ident", name: expr.ident.text }
     }
     case "Call": {
-      const func = emit_expr(ctx, expr.callee)
-      const args = expr.args.map((arg) => emit_expr(ctx, arg))
+      const func = emit_expr(ctx, source_file, expr.callee)
+      const args = expr.args.map((arg) => emit_expr(ctx, source_file, arg))
       return { kind: "Call", func, args }
     }
     case "String": {
@@ -229,26 +245,23 @@ function emit_expr(ctx: EmitContext, expr: Expr): CNode {
       return emit_tagged_template_literal_expr(ctx, expr)
     }
     case "Prop": {
-      return emit_prop_expr(ctx, expr)
+      return emit_prop_expr(ctx, source_file, expr)
     }
     default:
       todo(`Unhandled expression: ${expr.kind}`)
   }
 }
 
-function emit_prop_expr(ctx: EmitContext, expr: PropExpr): CNode {
+function emit_prop_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: PropExpr,
+): CNode {
   assert(expr.lhs.kind === "Var", "Property access lhs must be a variable")
 
-  // Find the declaration of the lhs variable across all files
-  // FIXME: Claude generated any
-  let lhs_decl: any = null
-  for (const [_path, values_map] of ctx.resolve_result.values.entries()) {
-    const decl = values_map.get(expr.lhs.ident)
-    if (decl) {
-      lhs_decl = decl
-      break
-    }
-  }
+  const lhs_decl = ctx.resolve_result.values
+    .get(source_file.path)
+    ?.get(expr.lhs.ident)
 
   assert(lhs_decl?.kind === "Module", "Property access lhs must be a Module")
 
