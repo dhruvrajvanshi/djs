@@ -22,9 +22,34 @@ test.each(files)("%s", async (file) => {
     },
   })
   assert(existsSync(output))
-  exec(output, (e, stdout, stderr) => {
-    if (e) throw e
-    assert.equal(stdout, expected_stdout)
-    assert.equal(stderr, "")
+  const result = await new Promise<{
+    stdout: string
+    stderr: string
+    code: number
+  }>((resolve, reject) => {
+    let stdout = ""
+    let stderr = ""
+    const child = spawn(output)
+    child.stdout.setEncoding("utf-8")
+    child.stderr.setEncoding("utf-8")
+    child.stdout.on("data", (data) => {
+      console.log("Stdout", data.toString())
+      stdout += data.toString()
+    })
+    child.stderr.on("data", (data) => {
+      stderr += data.toString()
+    })
+    child.on("exit", (code) => {
+      console.log("Exit code", code, stdout)
+      if (code !== 0) {
+        reject(new Error("Process exited with code " + code + "\n" + stderr))
+      } else {
+        resolve({ stdout, stderr, code })
+      }
+    })
   })
+  console.log(result)
+  assert.equal(result.code, 0)
+  assert.equal(result.stderr, "")
+  assert.equal(result.stdout, expected_stdout)
 })
