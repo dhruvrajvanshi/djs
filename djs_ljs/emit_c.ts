@@ -125,7 +125,7 @@ function emit_type(type: Type): CNode {
     case "u32":
       return { kind: "Ident", name: "uint32_t" }
     case "Ptr":
-      return { kind: "Ptr", to_type: emit_type(type.type) }
+      return { kind: "ConstPtr", to_type: emit_type(type.type) }
     case "MutPtr":
       return { kind: "Ptr", to_type: emit_type(type.type) }
     default:
