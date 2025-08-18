@@ -12,6 +12,7 @@ export type Type = ReadonlyUnion<
   | { kind: "f32" }
   | { kind: "f64" }
   | { kind: "c_char" }
+  | { kind: "c_int" }
   | { kind: "void" }
   | { kind: "boolean" }
   | { kind: "Ptr"; type: Type }
@@ -37,6 +38,7 @@ export const Type = {
   f64: { kind: "f64" },
   void: { kind: "void" },
   c_char: { kind: "c_char" },
+  c_int: { kind: "c_int" },
   boolean: { kind: "boolean" },
 
   Ptr: (type: Type) => ({ kind: "Ptr", type }),
@@ -89,6 +91,8 @@ export function type_to_string(type: Type): string {
       return "void"
     case "CStringConstructor":
       return "`` => *c_str"
+    case "c_int":
+      return "c_int"
     default:
       return assert_never(type)
   }
@@ -128,6 +132,11 @@ export function type_to_sexpr(type: Type): string {
     case "UnboxedFunc":
       const params = type.params.map(type_to_sexpr).join(" ")
       return `((${params}) => ${type_to_sexpr(type.return_type)})`
+
+    case "CStringConstructor":
+      return "`` => *c_str"
+    case "c_int":
+      return "c_int"
     case "Error":
       return `<Error: ${type.message}>`
     default:

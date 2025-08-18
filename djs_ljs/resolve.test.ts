@@ -1,7 +1,7 @@
 import { expect, test } from "vitest"
 import { FS } from "./FS.ts"
 import { collect_source_files } from "./collect_source_files.ts"
-import assert from "node:assert"
+import assert from "node:assert/strict"
 import { resolve_source_file } from "./resolve.ts"
 import { VarDeclStmt } from "djs_ast"
 import { rx } from "djs_std"
@@ -63,21 +63,21 @@ test("resolve smoke test", async () => {
     x1: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
-        decl,
+        decl.stmt,
         find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")),
       )
     },
     y1: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
-        decl,
+        decl.stmt,
         find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "y")),
       )
     },
     x2: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
-        decl,
+        decl.stmt,
         find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")),
       )
     },
@@ -100,7 +100,7 @@ test("resolve smoke test", async () => {
     Foo1: (decl) => {
       assert(decl.kind === "TypeAlias")
       assert.equal(
-        decl,
+        decl.stmt,
         find_stmt(main, "TypeAlias", (s) => s.name.text === "Foo"),
       )
     },
@@ -114,14 +114,14 @@ test("resolve smoke test", async () => {
     Bar1: (decl) => {
       assert(decl.kind === "TypeAlias")
       assert.equal(
-        decl,
+        decl.stmt,
         find_stmt(main, "TypeAlias", (s) => s.name.text === "Bar"),
       )
     },
     Bar2: (decl) => {
       assert(decl.kind === "TypeAlias")
       assert.equal(
-        decl,
+        decl.stmt,
         find_stmt(main, "TypeAlias", (s) => s.name.text === "Bar"),
       )
     },
@@ -200,24 +200,24 @@ test("reports unbound variables", async () => {
   const diagnostics = resolve_result.diagnostics
   expect(await diagnostics.prettify(fs, /* colors */ false))
     .toMatchInlineSnapshot(`
-    "ERROR: /main.ljs:4: Unbound variable "b"
-    4|            return a(b)
+      "ERROR: /main.ljs:4: Unbound variable "b"
+      4|            return a(b)
+                             ^~~
+      5|          }
+      6|      
+
+      ERROR: /main.ljs:4: Unbound variable "a"
+      4|            return a(b)
                            ^~~
-    5|          }
-    6|      
+      5|          }
+      6|      
 
-    ERROR: /main.ljs:4: Unbound variable "a"
-    4|            return a(b)
-                         ^~~
-    5|          }
-    6|      
-
-    ERROR: /main.ljs:2: Unbound variable "y"
-    2|          let x = y
-                        ^~~
-    3|          function foo() {
-    4|            return a(b)"
-  `)
+      ERROR: /main.ljs:2: Unbound variable "y"
+      2|          let x = y
+                          ^~~
+      3|          function foo() {
+      4|            return a(b)"
+    `)
 })
 
 function var_decl_binds(stmt: VarDeclStmt, name: string): boolean {

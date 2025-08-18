@@ -5,7 +5,8 @@ import { prettify_diagnostics } from "../djs_ast/Diagnostic.ts"
 
 test("smoke test", async () => {
   const source = `
-     extern function puts(s: *const u8): void
+     const c = @builtin("c_str")
+     extern function puts(s: *u8): void
 
      export function main(): void {
         puts(c\`Hello, world!\`)
