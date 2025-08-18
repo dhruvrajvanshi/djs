@@ -3,7 +3,7 @@ import Path from "node:path"
 import { parseArgs, type ParseArgsConfig } from "node:util"
 import {
   expr_to_sexpr,
-  show_diagnostics,
+  prettify_diagnostics,
   source_file_to_sexpr,
   type_annotation_to_sexpr,
 } from "djs_ast"
@@ -42,12 +42,33 @@ const argsConfig = {
     "dump-typecheck": { type: "boolean" },
     "tc-trace": { type: "string" },
     "no-errors": { type: "boolean" },
+    "no-colors": { type: "boolean" },
     output: { type: "string", short: "o" },
   },
 } satisfies ParseArgsConfig
 
+interface MainIO {
+  /**
+   * Diagnostics are returned to this callback.
+   */
+  show_diagnostics: (diagnostics: string) => void
+  /**
+   * Called when the compilation has diagnostics
+   */
+  error_exit: () => void
+}
+const DEFAULT_MAIN_IO: MainIO = {
+  show_diagnostics: (diagnostics: string) => {
+    console.log(diagnostics)
+  },
+  error_exit: () => {
+    process.exit(1)
+  },
+}
+
 export async function main(
   { positionals: files, values: args } = parseArgs(argsConfig),
+  io: MainIO = DEFAULT_MAIN_IO,
 ) {
   const dump_ast = args["dump-ast"] || args["dump-phases"]
   const dump_resolve = args["dump-resolve"] || args["dump-phases"]
@@ -90,10 +111,19 @@ export async function main(
     typecheck_result.diagnostics,
   )
 
-  if (!args["no-errors"]) {
+  if (!args["no-errors"] && diagnostics.size > 0) {
     for (const [path, d] of diagnostics.entries()) {
-      await show_diagnostics(path, d, null)
+      const diagnostics = await prettify_diagnostics(
+        path,
+        d,
+        null,
+        !args["no-colors"],
+      )
+      io.show_diagnostics(diagnostics)
     }
+  }
+  if (diagnostics.size > 0) {
+    return io.error_exit()
   }
   const c_source = emit_c(
     source_files,
