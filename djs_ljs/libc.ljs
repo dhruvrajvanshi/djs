@@ -15,4 +15,4 @@ export type char = @builtin("c_char")
 
 export type int = @builtin("c_int")
 
-export extern function puts(s: *char): void
+export extern function puts(s: *char): int
