@@ -1,7 +1,8 @@
-import * as c from "libc.ljs"
+import * as c from "./libs/libc.ljs"
 
 export function main(): c.int {
   const msg: *c.char = c.str`Hello, world!`
   c.puts(msg)
   return 0
 }
+

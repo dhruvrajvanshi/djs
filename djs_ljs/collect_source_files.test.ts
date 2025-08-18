@@ -13,7 +13,7 @@ test("collect_source_files smoke test", async () => {
       `,
     "imported.ljs": `
           import { do_nothing } from "./transitive.ljs"
-          extern function puts(s: *const u8): void
+          extern function puts(s: *u8): void
           export function print_hello(): void {
             puts(c\`Hello, world!\`)
             do_nothing()
@@ -37,7 +37,7 @@ test("should report errors if imported file can't be read", async () => {
     `,
     "correct_import.ljs": `
         import { missing_import } from "./missing_import.ljs"
-        extern function puts(s: *const u8): void
+        extern function puts(s: *u8): void
         export function correct_import(): void {
             puts(c\`Hello, world!\`)
             missing_import()

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest"
 import { FS } from "./FS.ts"
 import { collect_source_files } from "./collect_source_files.ts"
-import assert from "node:assert"
+import assert from "node:assert/strict"
 import { resolve_source_file } from "./resolve.ts"
 import { VarDeclStmt } from "djs_ast"
 import { rx } from "djs_std"
@@ -204,13 +204,13 @@ test("reports unbound variables", async () => {
     4|            return a(b)
                            ^~~
     5|          }
-    6|      
+    6|
 
     ERROR: /main.ljs:4: Unbound variable "a"
     4|            return a(b)
                          ^~~
     5|          }
-    6|      
+    6|
 
     ERROR: /main.ljs:2: Unbound variable "y"
     2|          let x = y

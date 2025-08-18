@@ -1,6 +1,6 @@
 #!/usr/bin/env -S node
-
-import { parseArgs } from "node:util"
+import Path from "node:path"
+import { parseArgs, type ParseArgsConfig } from "node:util"
 import {
   expr_to_sexpr,
   show_diagnostics,
@@ -32,20 +32,23 @@ import { assert } from "node:console"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { execSync } from "node:child_process"
 
-async function main() {
-  const { positionals: files, values: args } = parseArgs({
-    allowPositionals: true,
-    options: {
-      "dump-phases": { type: "boolean", default: false },
-      "dump-ast": { type: "boolean", default: false },
-      "dump-resolve": { type: "boolean", default: false },
-      "dump-resolve-imports": { type: "boolean", default: false },
-      "dump-typecheck": { type: "boolean", default: false },
-      "tc-trace": { type: "string", default: "" },
-      "no-errors": { type: "boolean", default: false },
-      output: { type: "string", short: "o" },
-    },
-  })
+const argsConfig = {
+  allowPositionals: true,
+  options: {
+    "dump-phases": { type: "boolean" },
+    "dump-ast": { type: "boolean" },
+    "dump-resolve": { type: "boolean" },
+    "dump-resolve-imports": { type: "boolean" },
+    "dump-typecheck": { type: "boolean" },
+    "tc-trace": { type: "string" },
+    "no-errors": { type: "boolean" },
+    output: { type: "string", short: "o" },
+  },
+} satisfies ParseArgsConfig
+
+export async function main(
+  { positionals: files, values: args } = parseArgs(argsConfig),
+) {
   const dump_ast = args["dump-ast"] || args["dump-phases"]
   const dump_resolve = args["dump-resolve"] || args["dump-phases"]
   const dump_resolve_imports =
@@ -98,8 +101,8 @@ async function main() {
     resolve_imports_result,
   )
   assert(args.output, `Output path is not provided`)
-  await mkdir(".ljs")
-  const output_c_path = ".ljs/" + args.output + ".c"
+  const output_c_path = Path.join(".ljs", args.output + ".c")
+  await mkdir(Path.dirname(output_c_path), { recursive: true })
   await writeFile(output_c_path, c_source)
   execSync(`gcc -o ${args.output} ${output_c_path}`, { stdio: "inherit" })
   await rm(output_c_path)
@@ -177,10 +180,16 @@ function dump_typecheck_result(typecheck_result: TypecheckResult) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}/typecheck${ANSI_RESET}`)
   console.log("")
 }
-
-try {
-  await main()
-} catch (error) {
-  console.error(error)
-  exit(1)
+declare global {
+  interface ImportMeta {
+    main: boolean
+  }
+}
+if (import.meta.main) {
+  try {
+    await main()
+  } catch (error) {
+    console.error(error)
+    exit(1)
+  }
 }
