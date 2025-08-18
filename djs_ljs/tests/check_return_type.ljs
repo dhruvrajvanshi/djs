@@ -1,0 +1,19 @@
+
+function returns_bool(): boolean {
+    // EXPECTED ERROR
+    return 1
+}
+
+function returns_u32(): u32 {
+    return 1
+}
+function returns_u8(): u8 {
+    return 1
+}
+function returns_cint(): @builtin("c_int") {
+    return 1
+}
+function returns_int_error(): u8 {
+    // EXPECTED ERROR
+    return true
+}
