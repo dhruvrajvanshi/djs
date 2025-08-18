@@ -32,7 +32,7 @@ export function assert_never(value: never): never {
 export function assert(value: unknown, message?: string): asserts value {
   if (!value) {
     throw new AssertionError({
-      message: message || `Assertion failed`,
+      message: message ? `Assertion failed: ${message}` : "Assertion failed",
       actual: value,
       expected: "<truthy>",
       stackStartFn: assert,
