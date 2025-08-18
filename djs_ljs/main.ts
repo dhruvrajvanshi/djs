@@ -29,7 +29,7 @@ import { typecheck, type TypecheckResult } from "./typecheck.ts"
 import { type_to_sexpr } from "./type.ts"
 import { exit } from "node:process"
 import { assert } from "node:console"
-import { writeFile } from "node:fs/promises"
+import { mkdir, rm, writeFile } from "node:fs/promises"
 import { execSync } from "node:child_process"
 
 async function main() {
@@ -98,9 +98,11 @@ async function main() {
     resolve_imports_result,
   )
   assert(args.output, `Output path is not provided`)
-  const output_c_path = args.output + ".c"
+  await mkdir(".ljs")
+  const output_c_path = ".ljs/" + args.output + ".c"
   await writeFile(output_c_path, c_source)
   execSync(`gcc -o ${args.output} ${output_c_path}`, { stdio: "inherit" })
+  await rm(output_c_path)
 }
 function dump_source_files(source_files: SourceFiles) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}---- ast ----${ANSI_RESET}`)
