@@ -154,7 +154,7 @@ export const DPattern = Enum(Pattern, ["span", "visit"], {
 export const DStmt = Enum(Stmt, ["span", "visit"], {
   Expr: { expr: Expr },
   Block: { block: Block },
-  Return: { value: Option(Expr) },
+  Return: { leading_trivia: Text, value: Option(Expr) },
   VarDecl: { decl: VarDecl },
   If: { condition: Expr, if_true: Stmt, if_false: Option(Stmt) },
   Switch: { condition: Expr, cases: List(SwitchCase) },
