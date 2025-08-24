@@ -94,12 +94,7 @@ export async function main(
   const resolve_result = resolve(fs, source_files)
   if (dump_resolve) dump_resolve_results(resolve_result)
 
-  const resolve_imports_result = resolve_imports(source_files, resolve_result)
-  if (dump_resolve_imports) {
-    return dump_resolve_imports_results(resolve_imports_result)
-  }
-
-  const typecheck_result = typecheck(source_files, resolve_imports_result)
+  const typecheck_result = typecheck(source_files, resolve_result)
   if (dump_typecheck) dump_typecheck_result(typecheck_result)
   if (args["tc-trace"]) {
     await typecheck_result.trace.write(args["tc-trace"])
@@ -125,11 +120,7 @@ export async function main(
   if (diagnostics.size > 0) {
     return io.error_exit()
   }
-  const c_source = emit_c(
-    source_files,
-    typecheck_result,
-    resolve_imports_result,
-  )
+  const c_source = emit_c(source_files, typecheck_result, resolve_result)
   assert(args.output, `Output path is not provided`)
   const output_c_path = Path.join(".ljs", args.output + ".c")
   await mkdir(Path.dirname(output_c_path), { recursive: true })

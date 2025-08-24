@@ -15,10 +15,14 @@ export interface ResolveImportsResult {
   values: PathMap<Map<Ident, ValueDeclExcludingKind<"Import" | "ImportStarAs">>>
   types: PathMap<Map<Ident, TypeDeclExcludingKind<"Import" | "ImportStarAs">>>
 }
+interface ResolveImportsArgs {
+  types: PathMap<Map<Ident, TypeDecl>>
+  values: PathMap<Map<Ident, ValueDecl>>
+}
 
 export function resolve_imports(
   source_files: SourceFiles,
-  { types, values }: Omit<ResolveResult, "diagnostics">,
+  { types, values }: ResolveImportsArgs,
 ): ResolveImportsResult {
   const resolved_values = values.map_values((file_values) =>
     MapUtils.map_values(file_values, (decl, name) =>
