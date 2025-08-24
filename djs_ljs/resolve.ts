@@ -7,7 +7,13 @@ import {
   type Ident,
   type SourceFile,
 } from "djs_ast"
-import { SymbolTable, type TypeDecl, type ValueDecl } from "./SymbolTable.ts"
+import {
+  SymbolTable,
+  type TypeDecl,
+  type TypeDeclExcludingKind,
+  type ValueDecl,
+  type ValueDeclExcludingKind,
+} from "./SymbolTable.ts"
 import {
   build_block_symbol_table,
   build_function_symbol_table,
@@ -18,10 +24,11 @@ import { Diagnostics } from "./diagnostics.ts"
 import type { FS } from "./FS.ts"
 import type { SourceFiles } from "./SourceFiles.ts"
 import { PathMap } from "./PathMap.ts"
+import { resolve_imports } from "./resolve_imports.ts"
 
 export interface ResolveResult {
-  values: PathMap<Map<Ident, ValueDecl>>
-  types: PathMap<Map<Ident, TypeDecl>>
+  values: PathMap<Map<Ident, ValueDeclExcludingKind<"Import" | "ImportStarAs">>>
+  types: PathMap<Map<Ident, TypeDeclExcludingKind<"Import" | "ImportStarAs">>>
   diagnostics: Diagnostics
 }
 export function resolve(fs: FS, source_files: SourceFiles): ResolveResult {
@@ -34,10 +41,14 @@ export function resolve(fs: FS, source_files: SourceFiles): ResolveResult {
     types.set(source_file.path, result.types)
     values.set(source_file.path, result.values)
   }
-
-  return {
+  const resolved_imports = resolve_imports(source_files, {
     values,
     types,
+  })
+
+  return {
+    values: resolved_imports.values,
+    types: resolved_imports.types,
     diagnostics: Diagnostics.merge(...diagnostics),
   }
 }
