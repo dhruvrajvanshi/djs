@@ -60,7 +60,7 @@ export function preview_lines(
     .map((line, idx) => {
       const line_number = start_line + idx
       const prefix = `${line_number}|  `
-      const first = `${color_dimmed}${prefix}${color_reset}${line}`
+      const first = `${color_dimmed}${prefix}${color_reset}${line.trimEnd()}`
       if (idx === 0) {
         return (
           first +

@@ -2,12 +2,51 @@ import { expect, test } from "vitest"
 import { FS } from "./FS.ts"
 import { collect_source_files } from "./collect_source_files.ts"
 import assert from "node:assert/strict"
-import { resolve_source_file } from "./resolve.ts"
+import { resolve, resolve_source_file } from "./resolve.ts"
 import { VarDeclStmt } from "djs_ast"
 import { rx } from "djs_std"
 import { find_expr, find_stmt, find_type } from "./ast_query.ts"
 import { type TypeDecl, type ValueDecl } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
+import { Diagnostics } from "./diagnostics.ts"
+
+test("should attach enclosing functions to return stmts", async () => {
+  const fs = FS.fake({
+    "main.ljs": `
+        function foo() {
+          /* foo_return_42 */ return 42
+        }
+        function another_stmt() {}
+    `,
+  })
+  const { source_files, diagnostics } = await collect_source_files(
+    "main.ljs",
+    fs,
+  )
+  const main = source_files.get("main.ljs")
+  assert(main, "main.ljs file not found in source_files")
+
+  const { return_stmt_enclosing_func, diagnostics: resolve_diagnostics } =
+    resolve(fs, source_files)
+
+  const return_stmt = find_stmt(main, "Return", (it) =>
+    has_marker(it, "foo_return_42"),
+  )
+
+  const func = find_stmt(
+    main,
+    "Func",
+    (it) => it.func.name?.text === "foo",
+  ).func
+  assert(return_stmt, "return stmt not found")
+  assert.equal(return_stmt_enclosing_func.get(return_stmt), func)
+
+  const all_diagnostics = await Diagnostics.merge(
+    diagnostics,
+    resolve_diagnostics,
+  )
+  assert.equal(await all_diagnostics.prettify(fs), "")
+})
 
 test("resolve smoke test", async () => {
   const fs = FS.fake({
@@ -41,7 +80,7 @@ test("resolve smoke test", async () => {
 
   const main = source_files.get("main.ljs")
   assert(main, "main.ljs file not found in source_files")
-  const resolve_result = resolve_source_file(fs, main)
+  const resolve_result = resolve_source_file(fs, main, new Map())
   assert.equal(await resolve_result.diagnostics.prettify(fs), "")
 
   const expected_values: Record<string, (decl: ValueDecl) => void> = {
@@ -152,7 +191,7 @@ test("resolve import * as foo from 'bar'", async () => {
   assert.equal(await source_files_result.diagnostics.prettify(fs), "")
   const main = source_files.get("main.ljs")
   assert(main, "main.ljs file not found in source_files")
-  const resolve_result = resolve_source_file(fs, main)
+  const resolve_result = resolve_source_file(fs, main, new Map())
   assert.equal(await resolve_result.diagnostics.prettify(fs), "")
 
   const const_x_stmt = find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x"))
@@ -196,7 +235,7 @@ test("reports unbound variables", async () => {
   assert.equal(await source_files_result.diagnostics.prettify(fs), "")
   const main = source_files.get("main.ljs")
   assert(main, "main.ljs file not found in source_files")
-  const resolve_result = resolve_source_file(fs, main)
+  const resolve_result = resolve_source_file(fs, main, new Map())
   const diagnostics = resolve_result.diagnostics
   expect(await diagnostics.prettify(fs, /* colors */ false))
     .toMatchInlineSnapshot(`
@@ -204,19 +243,19 @@ test("reports unbound variables", async () => {
       4|            return a(b)
                              ^~~
       5|          }
-      6|      
+      6|
 
       ERROR: /main.ljs:4: Unbound variable "a"
       4|            return a(b)
                            ^~~
       5|          }
-      6|      
+      6|
 
       ERROR: /main.ljs:2: Unbound variable "y"
       2|          let x = y
                           ^~~
       3|          function foo() {
-      4|            return a(b)"
+      4|            return a(b)
     `)
 })
 

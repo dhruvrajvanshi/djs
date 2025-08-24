@@ -83,6 +83,7 @@ export class ReturnStmt {
   constructor(
     readonly span: Span,
 
+    readonly leading_trivia: Text,
     readonly value: Expr | null,
   ) {}
 
@@ -433,8 +434,8 @@ export const Stmt = {
 
   Block: (span: Span, block: Block): BlockStmt => new BlockStmt(span, block),
 
-  Return: (span: Span, value: Expr | null): ReturnStmt =>
-    new ReturnStmt(span, value),
+  Return: (span: Span, leading_trivia: Text, value: Expr | null): ReturnStmt =>
+    new ReturnStmt(span, leading_trivia, value),
 
   VarDecl: (span: Span, decl: VarDecl): VarDeclStmt =>
     new VarDeclStmt(span, decl),

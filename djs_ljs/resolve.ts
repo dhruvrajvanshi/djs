@@ -5,7 +5,9 @@ import {
   type Block,
   type Func,
   type Ident,
+  type ReturnStmt,
   type SourceFile,
+  type Stmt,
 } from "djs_ast"
 import {
   SymbolTable,
@@ -25,18 +27,21 @@ import type { FS } from "./FS.ts"
 import type { SourceFiles } from "./SourceFiles.ts"
 import { PathMap } from "./PathMap.ts"
 import { resolve_imports } from "./resolve_imports.ts"
+import { todo } from "djs_std"
 
 export interface ResolveResult {
   values: PathMap<Map<Ident, ValueDeclExcludingKind<"Import" | "ImportStarAs">>>
   types: PathMap<Map<Ident, TypeDeclExcludingKind<"Import" | "ImportStarAs">>>
+  return_stmt_enclosing_func: Map<ReturnStmt, Func>
   diagnostics: Diagnostics
 }
 export function resolve(fs: FS, source_files: SourceFiles): ResolveResult {
   const values = new PathMap<Map<Ident, ValueDecl>>(fs)
   const types = new PathMap<Map<Ident, TypeDecl>>(fs)
+  const return_stmt_enclosing_func = new Map<ReturnStmt, Func>()
   const diagnostics: Diagnostics[] = []
   for (const source_file of source_files.values()) {
-    const result = resolve_source_file(fs, source_file)
+    const result = resolve_source_file(fs, source_file, return_stmt_enclosing_func)
     diagnostics.push(result.diagnostics)
     types.set(source_file.path, result.types)
     values.set(source_file.path, result.values)
@@ -49,11 +54,12 @@ export function resolve(fs: FS, source_files: SourceFiles): ResolveResult {
   return {
     values: resolved_imports.values,
     types: resolved_imports.types,
+    return_stmt_enclosing_func,
     diagnostics: Diagnostics.merge(...diagnostics),
   }
 }
 
-export interface ResolveSourceFileResult {
+interface ResolveSourceFileResult {
   values: Map<Ident, ValueDecl>
   types: Map<Ident, TypeDecl>
   diagnostics: Diagnostics
@@ -62,8 +68,9 @@ export interface ResolveSourceFileResult {
 export function resolve_source_file(
   fs: FS,
   source_file: SourceFile,
+  return_stmt_enclosing_func: Map<ReturnStmt, Func>,
 ): ResolveSourceFileResult {
-  const resolver = new Resolver(fs, source_file)
+  const resolver = new Resolver(fs, source_file, return_stmt_enclosing_func)
   resolver.visit_source_file(source_file)
 
   return {
@@ -78,8 +85,14 @@ class Resolver extends ASTVisitorBase {
   types: Map<Ident, TypeDecl>
   diagnostics: Diagnostics
   source_file: SourceFile
+  return_stmt_enclosing_func: Map<ReturnStmt, Func>
+  current_func: Func | null = null
 
-  constructor(fs: FS, source_file: SourceFile) {
+  constructor(
+    fs: FS,
+    source_file: SourceFile,
+    return_stmt_enclosing_func: Map<ReturnStmt, Func>,
+  ) {
     super()
     this.source_file = source_file
     this.diagnostics = new Diagnostics(fs)
@@ -87,6 +100,7 @@ class Resolver extends ASTVisitorBase {
     this.scope.push(SymbolTable.Global)
     this.values = new Map<Ident, ValueDecl>()
     this.types = new Map<Ident, TypeDecl>()
+    this.return_stmt_enclosing_func = return_stmt_enclosing_func
   }
 
   override visit_source_file(source_file: SourceFile): void {
@@ -108,6 +122,9 @@ class Resolver extends ASTVisitorBase {
     )
     this.scope.push(func_symbol_table)
 
+    const prev_func = this.current_func
+    this.current_func = node
+
     // The default visit_func implementation calls visit_block,
     // which will push a new scope, however, the function's scope is the
     // same as the block's scope, so can't call super.visit_func here
@@ -125,6 +142,7 @@ class Resolver extends ASTVisitorBase {
       this.visit_type_annotation(node.return_type)
     }
 
+    this.current_func = prev_func
     assert(
       this.scope.pop() === func_symbol_table,
       "Expected to pop the current function's symbol table",
@@ -142,6 +160,24 @@ class Resolver extends ASTVisitorBase {
       this.scope.pop() === block_symbol_table,
       "Expected to pop the current block's symbol table",
     )
+  }
+
+  override visit_stmt(stmt: Stmt): void {
+    switch (stmt.kind) {
+      case "Return":
+        if (this.current_func === null) {
+          todo()
+        }
+        assert(
+          !this.return_stmt_enclosing_func.has(stmt),
+          "Return statement already tracked",
+        )
+        this.return_stmt_enclosing_func.set(stmt, this.current_func)
+        super.visit_stmt(stmt)
+        break
+      default:
+        super.visit_stmt(stmt)
+    }
   }
 
   override visit_expr(expr: Expr): void {

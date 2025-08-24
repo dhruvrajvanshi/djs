@@ -2336,7 +2336,11 @@ function parser_impl(
     const end_span = expr ? expr.span : start.span
     expect_semi()
 
-    return Stmt.Return(Span.between(start.span, end_span), expr)
+    return Stmt.Return(
+      Span.between(start.span, end_span),
+      start.leading_trivia,
+      expr,
+    )
   }
 
   function parse_function(): Func | Err {
