@@ -7,6 +7,7 @@ import {
   ReturnStmt,
   sexpr_to_string,
   Span,
+  StructDeclStmt,
   TaggedTemplateLiteralExpr,
   VarExpr,
   type Expr,
@@ -20,7 +21,7 @@ import {
 import type { SourceFiles } from "./SourceFiles.ts"
 import { Type, type_to_string } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
-import { is_readonly_array, todo, zip } from "djs_std"
+import { assert_never, is_readonly_array, todo, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import { Trace } from "./Trace.ts"
@@ -118,8 +119,27 @@ export function typecheck(
         return
       case "Return":
         return check_return_stmt(ctx, stmt)
+      case "StructDecl":
+        return check_struct_decl_stmt(ctx, stmt)
       default:
         todo(stmt.kind)
+    }
+  }
+  function check_struct_decl_stmt(
+    ctx: CheckCtx,
+    stmt: StructDeclStmt,
+  ): CheckStmtResult {
+    using _ = trace.add(
+      `check_struct_decl_stmt\n${ctx.source_file.path}:${stmt.span.start}}`,
+    )
+    for (const member of stmt.struct_def.members) {
+      switch (member.kind) {
+        case "FieldDef":
+          check_type_annotation(ctx, member.type_annotation)
+          break
+        default:
+          assert_never(member.kind)
+      }
     }
   }
   function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt): CheckStmtResult {
