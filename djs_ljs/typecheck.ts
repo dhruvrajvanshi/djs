@@ -455,7 +455,13 @@ export function typecheck(
         })
       }
       return type_of_decl(expr.property.text, decl)
-    } else todo("Not a moudle")
+    } else {
+      return emit_error_type(ctx, {
+        message: `Expected a module or a struct on the left-hand side of the property access`,
+        span: expr.lhs.span,
+        hint: null,
+      })
+    }
   }
 
   function type_of_decl(name: string, decl: ValueDecl): Type {
@@ -567,7 +573,12 @@ export function typecheck(
       const decls = type_decls.get(ctx.source_file.path)
       if (!decls) todo()
       const decl = decls.get(t)
-      if (!decl) todo(`Unknown type: ${t.text} in ${ctx.source_file.path}`)
+      if (!decl) {
+        return emit_error_type(ctx, {
+          span: t.span,
+          message: `Unbound type variable ${t.text}`,
+        })
+      }
       return type_decl_to_type(ctx, decl)
     }
   }
