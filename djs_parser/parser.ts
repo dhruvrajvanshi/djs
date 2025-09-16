@@ -422,7 +422,7 @@ function parser_impl(
             if (items === ERR) return ERR
             const end = expect(t.RBrace)
             if (end === ERR) return ERR
-            const span = Span.between(start.span, end.span)
+            const span = Span.between(lhs.span, end.span)
             lhs = Expr.StructInit(span, lhs, items)
 
             break
