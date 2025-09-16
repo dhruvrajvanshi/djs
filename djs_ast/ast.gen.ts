@@ -578,7 +578,10 @@ export interface StructDef {
 
 export type StructMember = FieldDefStructMember
 export class FieldDefStructMember {
-  constructor(readonly field: FieldDef) {}
+  constructor(
+    readonly name: Ident,
+    readonly type_annotation: TypeAnnotation,
+  ) {}
 
   get kind(): "FieldDef" {
     return "FieldDef"
@@ -586,8 +589,10 @@ export class FieldDefStructMember {
 }
 
 export const StructMember = {
-  FieldDef: (field: FieldDef): FieldDefStructMember =>
-    new FieldDefStructMember(field),
+  FieldDef: (
+    name: Ident,
+    type_annotation: TypeAnnotation,
+  ): FieldDefStructMember => new FieldDefStructMember(name, type_annotation),
 } as const
 
 export interface Block {

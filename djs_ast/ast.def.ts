@@ -327,8 +327,9 @@ const DClassMember = Enum(ClassMember, [], {
   MethodDef: { method: MethodDef },
   FieldDef: { field: FieldDef },
 })
+
 const DStructMember = Enum(StructMember, [], {
-  FieldDef: { field: FieldDef },
+  FieldDef: { name: Ident, type_annotation: TypeAnnotation },
 })
 const DFieldDef = Struct("FieldDef", ["span"], {
   name: Ident,

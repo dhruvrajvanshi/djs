@@ -661,7 +661,8 @@ export class ASTVisitorBase implements ASTVisitor {
   visit_struct_member(struct_member: ast.StructMember): void {
     switch (struct_member.kind) {
       case "FieldDef": {
-        this.visit_field_def(struct_member.field)
+        this.visit_ident(struct_member.name)
+        this.visit_type_annotation(struct_member.type_annotation)
         break
       }
     }
