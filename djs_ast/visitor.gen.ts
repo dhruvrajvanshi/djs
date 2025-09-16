@@ -208,6 +208,13 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
+      case "StructInit": {
+        this.visit_expr(expr.lhs)
+        for (const field of expr.fields) {
+          this.visit_struct_init_item(field)
+        }
+        break
+      }
       case "Index": {
         this.visit_expr(expr.lhs)
         this.visit_expr(expr.property)
@@ -522,6 +529,10 @@ export class ASTVisitorBase implements ASTVisitor {
     if (node.return_type !== null) {
       this.visit_type_annotation(node.return_type)
     }
+  }
+  visit_struct_init_item(node: ast.StructInitItem): void {
+    this.visit_ident(node.Key)
+    this.visit_expr(node.value)
   }
   visit_object_literal_entry(
     object_literal_entry: ast.ObjectLiteralEntry,
