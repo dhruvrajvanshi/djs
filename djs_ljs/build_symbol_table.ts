@@ -94,6 +94,9 @@ function initialize_symbol_table(
         if (!stmt.class_def.name) break
         symbol_table.add_value(stmt.class_def.name.text, stmt)
         break
+      case "StructDecl":
+        symbol_table.add_value(stmt.struct_def.name.text, stmt)
+        break
       case "LJSExternFunction": {
         if (!stmt.name) break
         symbol_table.add_value(stmt.name.text, {
