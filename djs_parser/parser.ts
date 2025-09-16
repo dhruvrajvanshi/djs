@@ -1771,6 +1771,11 @@ function parser_impl(
           )
         } else if (self.current_token.text === "type") {
           return parse_type_decl()
+        } else if (
+          flags | PARSER_FLAGS.LJS &&
+          self.current_token.text === "struct"
+        ) {
+          return parse_struct_decl()
         } else {
           return parse_expr_stmt()
         }
@@ -1860,14 +1865,6 @@ function parser_impl(
       case t.Import:
         return parse_import_stmt()
       default:
-        if (flags | PARSER_FLAGS.LJS) {
-          switch (self.current_token.text) {
-            case "struct":
-              return parse_struct_decl()
-            default:
-              return parse_expr_stmt()
-          }
-        }
         return parse_expr_stmt()
     }
   }
