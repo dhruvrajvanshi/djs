@@ -122,6 +122,10 @@ const ObjectLiteralEntry = "ObjectLiteralEntry"
  */
 const Class = "Class"
 /**
+ * {@link DStruct}
+ */
+const StructDef = "StructDef"
+/**
  * {@link DFieldDef}
  */
 const FieldDef = "FieldDef"
@@ -129,6 +133,10 @@ const FieldDef = "FieldDef"
  * {@link DClassMember}
  */
 const ClassMember = "ClassMember"
+/**
+ * {@link DStructMember}
+ */
+const StructMember = "StructMember"
 /**
  * {@link DClassBody}
  */
@@ -180,6 +188,7 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   With: { expr: Expr, body: Stmt },
   Func: { func: Func, is_exported: "boolean" },
   ClassDecl: { class_def: Class },
+  StructDecl: { struct_def: StructDef },
   Import: {
     default_import: Option(Ident),
     named_imports: List("ImportSpecifier"),
@@ -307,11 +316,18 @@ const DClass = Struct(Class, ["span"], {
   superclass: Option(Expr),
   body: ClassBody,
 })
+const DStructDef = Struct("StructDef", ["span"], {
+  name: Ident,
+  members: List(StructMember),
+})
 const DClassBody = Struct(ClassBody, ["span"], {
   members: List(ClassMember),
 })
 const DClassMember = Enum(ClassMember, [], {
   MethodDef: { method: MethodDef },
+  FieldDef: { field: FieldDef },
+})
+const DStructMember = Enum(StructMember, [], {
   FieldDef: { field: FieldDef },
 })
 const DFieldDef = Struct("FieldDef", ["span"], {
@@ -476,6 +492,8 @@ const ast_items = [
   DSourceFile,
   DStmt,
   DClass,
+  DStructDef,
+  DStructMember,
   DBlock,
   DClassBody,
   DMethodDef,

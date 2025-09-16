@@ -122,6 +122,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_class(stmt.class_def)
         break
       }
+      case "StructDecl": {
+        this.visit_struct_def(stmt.struct_def)
+        break
+      }
       case "Import": {
         if (stmt.default_import !== null) {
           this.visit_ident(stmt.default_import)
@@ -648,6 +652,20 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_label(node: ast.Label): void {}
+  visit_struct_def(node: ast.StructDef): void {
+    this.visit_ident(node.name)
+    for (const member of node.members) {
+      this.visit_struct_member(member)
+    }
+  }
+  visit_struct_member(struct_member: ast.StructMember): void {
+    switch (struct_member.kind) {
+      case "FieldDef": {
+        this.visit_field_def(struct_member.field)
+        break
+      }
+    }
+  }
   visit_import_specifier(node: ast.ImportSpecifier): void {
     if (node.as_name !== null) {
       this.visit_ident(node.as_name)
