@@ -35,6 +35,7 @@ import {
   Span,
   Token,
   TokenKind,
+  StructMember,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -1859,9 +1860,47 @@ function parser_impl(
       case t.Import:
         return parse_import_stmt()
       default:
+        if (flags | PARSER_FLAGS.LJS) {
+          switch (self.current_token.text) {
+            case "struct":
+              return parse_struct_decl()
+            default:
+              return parse_expr_stmt()
+          }
+        }
         return parse_expr_stmt()
     }
   }
+  function parse_struct_decl(): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "struct")
+    const name = parse_ident()
+    if (name === ERR) return ERR
+    if (expect(t.LBrace) === ERR) return ERR
+    const members = parse_comma_semi_or_newline_separated_list(
+      t.RBrace,
+      parse_struct_member,
+    )
+    if (members === ERR) return ERR
+    const last = expect(t.RBrace)
+    if (last === ERR) return ERR
+    return Stmt.StructDecl(Span.between(start, last), {
+      span: Span.between(start, last),
+      name,
+      members,
+    })
+  }
+  function parse_struct_member(): StructMember | Err {
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return type_annotation
+    if (expect_semi() === ERR) return ERR
+    return StructMember.FieldDef(name, type_annotation)
+  }
+
   function parse_extern_function(export_token: Token | null): Stmt | Err {
     const start = advance()
     assert.equal(t.Ident, start.kind)
