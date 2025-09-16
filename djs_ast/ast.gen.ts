@@ -42,6 +42,7 @@ export type Stmt =
   | WithStmt
   | FuncStmt
   | ClassDeclStmt
+  | StructDeclStmt
   | ImportStmt
   | ImportStarAsStmt
   | LabeledStmt
@@ -318,6 +319,21 @@ export class ClassDeclStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class StructDeclStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly struct_def: StructDef,
+  ) {}
+
+  get kind(): "StructDecl" {
+    return "StructDecl"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class ImportStmt {
   constructor(
     readonly span: Span,
@@ -503,6 +519,9 @@ export const Stmt = {
   ClassDecl: (span: Span, class_def: Class): ClassDeclStmt =>
     new ClassDeclStmt(span, class_def),
 
+  StructDecl: (span: Span, struct_def: StructDef): StructDeclStmt =>
+    new StructDeclStmt(span, struct_def),
+
   Import: (
     span: Span,
     default_import: Ident | null,
@@ -550,6 +569,26 @@ export interface Class {
   readonly superclass: Expr | null
   readonly body: ClassBody
 }
+
+export interface StructDef {
+  readonly span: Span
+  readonly name: Ident
+  readonly members: readonly StructMember[]
+}
+
+export type StructMember = FieldDefStructMember
+export class FieldDefStructMember {
+  constructor(readonly field: FieldDef) {}
+
+  get kind(): "FieldDef" {
+    return "FieldDef"
+  }
+}
+
+export const StructMember = {
+  FieldDef: (field: FieldDef): FieldDefStructMember =>
+    new FieldDefStructMember(field),
+} as const
 
 export interface Block {
   readonly span: Span
