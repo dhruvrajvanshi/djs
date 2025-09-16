@@ -36,6 +36,7 @@ import {
   Token,
   TokenKind,
   StructMember,
+  type StructInitItem,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -411,11 +412,36 @@ function parser_impl(
             lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
             break
           }
-        // Fallthrought
+        case t.LBrace:
+          if (flags | PARSER_FLAGS.LJS) {
+            const start = advance()
+            const items = parse_comma_separated_list(
+              t.RBrace,
+              parse_struct_init_item,
+            )
+            if (items === ERR) return ERR
+            const end = expect(t.RBrace)
+            if (end === ERR) return ERR
+            const span = Span.between(start.span, end.span)
+            lhs = Expr.StructInit(span, lhs, items)
+
+            break
+          } else {
+            // Fallthrough
+          }
+        // Fallthrough
         default:
           return lhs
       }
     }
+  }
+  function parse_struct_init_item(): StructInitItem | Err {
+    const key = parse_ident()
+    if (key === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const value = parse_assignment_expr()
+    if (value === ERR) return ERR
+    return { span: Span.between(key.span, value.span), Key: key, value }
   }
 
   function parse_left_hand_side_expr(): Expr | Err {
