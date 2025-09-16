@@ -8,6 +8,7 @@ import {
   sexpr_to_string,
   Span,
   StructDeclStmt,
+  StructInitExpr,
   TaggedTemplateLiteralExpr,
   VarExpr,
   type Expr,
@@ -132,14 +133,35 @@ export function typecheck(
     using _ = trace.add(
       `check_struct_decl_stmt\n${ctx.source_file.path}:${stmt.span.start}}`,
     )
+    const members: Record<string, Type> = {}
     for (const member of stmt.struct_def.members) {
       switch (member.kind) {
         case "FieldDef":
-          check_type_annotation(ctx, member.type_annotation)
+          if (member.name.text in members) {
+            emit_error(
+              ctx,
+              member.name.span,
+              `Duplicate field name ${member.name.text} in struct ${stmt.struct_def.name.text}`,
+            )
+          }
+          members[member.name.text] = check_type_annotation(
+            ctx,
+            member.type_annotation,
+          )
           break
         default:
           assert_never(member.kind)
       }
+    }
+    return {
+      values: new Map<string, Type>([
+        [
+          stmt.struct_def.name.text,
+          Type.StructConstructor(stmt.struct_def.name.text, members),
+        ],
+      ]),
+      types: new Map(),
+      var_decls: [],
     }
   }
   function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt): CheckStmtResult {
@@ -375,6 +397,9 @@ export function typecheck(
       case "Number":
         // TODO: Handle inference for other int types
         return Type.c_int
+      case "StructInit": {
+        return infer_struct_init_expr(ctx, expr)
+      }
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
@@ -382,6 +407,33 @@ export function typecheck(
         })
       }
     }
+  }
+  function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
+    const lhs_type = infer_expr(ctx, expr.lhs)
+    if (lhs_type.kind !== "StructConstructor") {
+      return emit_error_type(ctx, {
+        message:
+          "Expected a struct constructor on the left-hand side of struct initialization",
+        span: expr.lhs.span,
+        hint: `Got ${type_to_string(lhs_type)}`,
+      })
+    }
+
+    // TODO: Check for extra and duplicate fields in the initializer
+
+    for (const [name, expected_type] of Object.entries(lhs_type.fields)) {
+      const field = expr.fields.find((f) => f.Key.text === name)
+      if (!field) {
+        emit_error(ctx, expr.lhs.span, `Missing field ${name} in struct init`)
+        continue
+      }
+      check_expr(ctx, field.value, expected_type)
+    }
+    return emit_error_type(ctx, {
+      message: `TODO: infer_struct_init_expr for ${lhs_type.name}`,
+      span: expr.span,
+      hint: null,
+    })
   }
   function emit_error_type(
     ctx: CheckCtx,
@@ -456,6 +508,8 @@ export function typecheck(
       }
       return type_of_decl(expr.property.text, decl)
     } else {
+      const lhs = infer_expr(ctx, expr.lhs)
+      todo(lhs)
       return emit_error_type(ctx, {
         message: `Expected a module or a struct on the left-hand side of the property access`,
         span: expr.lhs.span,
@@ -484,6 +538,15 @@ export function typecheck(
         const ty = result?.values.get(name)
         assert(ty, `Expected a type for LJSExternFunction ${name}`)
         return ty
+      }
+      case "Struct": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const result = check_stmt(source_file, decl.decl)
+        assert(result, `Expected a result for check_stmt(StructDecl) ${name}`)
+        const type = result.values.get(decl.decl.struct_def.name.text)
+        assert(type, "Expected check_stmt to set the struct constructor's type")
+        return type
       }
       default: {
         return todo(`type_of_decl for ${decl.kind} with name ${name}`)

@@ -1,0 +1,8 @@
+import * as Imported from "./modules/CStringBox.ljs"
+
+function main(): void {
+    puts(Imported.CStringBox { value: ffi.c_str`` }.value)
+}
+
+extern function puts(s: *ffi.c_char): ffi.c_int
+

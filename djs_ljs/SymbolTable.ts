@@ -31,7 +31,7 @@ export type ValueDecl =
   | { kind: "Func"; func: Func }
   | { kind: "Param"; func: Func; param_index: number }
   | ClassDeclStmt
-  | StructDeclStmt
+  | { kind: "Struct"; decl: StructDeclStmt; source_file: string }
   | {
       kind: "LJSExternFunction"
       stmt: LJSExternFunctionStmt
