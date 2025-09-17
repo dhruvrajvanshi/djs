@@ -12,6 +12,7 @@ import type {
   Block,
   Param,
   SourceFile,
+  StructInitExpr,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
@@ -248,9 +249,41 @@ function emit_expr(
     case "Prop": {
       return emit_prop_expr(ctx, source_file, expr)
     }
+    case "StructInit":
+      return emit_struct_init_expr(ctx, source_file, expr)
     default:
       todo(`Unhandled expression: ${expr.kind}`)
   }
+}
+function emit_struct_init_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: StructInitExpr,
+): CNode {
+  const instance_type = ctx.tc_result.values.get(expr)
+  const lhs_type = ctx.tc_result.values.get(expr.lhs)
+  assert(instance_type?.kind === "StructInstance")
+  assert(lhs_type?.kind === "StructConstructor")
+  return {
+    kind: "Cast",
+    to: {
+      kind: "StructTypeRef",
+      name: mangle_struct_name(lhs_type.qualified_name),
+    },
+    expr: {
+      kind: "StructInit",
+      fields: expr.fields.map((field) => ({
+        key: field.Key.text,
+        value: emit_expr(ctx, source_file, field.value),
+      })),
+    },
+  }
+}
+function mangle_struct_name(qualified_name: readonly string[]): string {
+  if (qualified_name.length !== 1) {
+    todo()
+  }
+  return qualified_name[0]
 }
 
 function get_module_of_expr(
@@ -288,8 +321,11 @@ function emit_prop_expr(
     assert(lhs_ty)
     assert(lhs_ty.kind === "StructInstance")
     const prop_ty = lhs_ty.fields[expr.property.text]
-    assert(prop_ty)
-    todo()
+    return {
+      kind: "Prop",
+      lhs: emit_expr(ctx, source_file, expr.lhs),
+      rhs: expr.property.text,
+    }
   }
 }
 
@@ -398,6 +434,22 @@ function render_c_node(node: CNode): string {
       return node.value.toString()
     case "ExprStmt":
       return `${render_c_node(node.expr)};`
+    case "Prop":
+      return `${render_c_node(node.lhs)}.${node.rhs}`
+    case "Cast":
+      return `((${render_c_node(node.to)})${render_c_node(node.expr)})`
+    case "StructInit":
+      return `{ ${node.fields
+        .map((f) => `.${f.key} = ${render_c_node(f.value)}`)
+        .join(", ")} }`
+    case "StructTypeRef":
+      return `struct ${node.name}`
+    case "Typedef":
+      return `typedef ${render_c_node(node.to)} ${node.name};`
+    case "StructDef":
+      return `struct ${node.name} {\n${node.fields
+        .map((f) => `  ${render_c_node(f.type)} ${f.name};`)
+        .join("\n")}\n};`
     default:
       assert_never(node)
   }
@@ -431,3 +483,14 @@ export type CNode =
   | { kind: "StringLiteral"; value: string }
   | { kind: "IntLiteral"; value: number }
   | { kind: "ExprStmt"; expr: CNode }
+  | { kind: "Prop"; lhs: CNode; rhs: string }
+  | { kind: "StructInit"; fields: { key: string; value: CNode }[] }
+  | { kind: "Cast"; to: CNode; expr: CNode }
+  /**
+   * The type `struct Foo`
+   * in the following stmt
+   * struct Foo foo;
+   */
+  | { kind: "StructTypeRef"; name: string }
+  | { kind: "Typedef"; name: string; to: CNode }
+  | { kind: "StructDef"; name: string; fields: { name: string; type: CNode }[] }
