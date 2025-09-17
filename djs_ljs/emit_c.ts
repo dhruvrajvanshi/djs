@@ -38,54 +38,53 @@ export function emit_c(
   const forward_decls: CNode[] = []
   const defs: CNode[] = []
 
-  for (const source_file of source_files.values()) {
-    for (const stmt of [...source_file.stmts].sort(types_first)) {
-      switch (stmt.kind) {
-        case "Func": {
-          const func_name = stmt.func.name?.text
-          assert(func_name, "Function must have a name")
+  const all_stmts = [...source_files.values()].flatMap((sf) =>
+    sf.stmts.map((stmt) => ({ stmt, source_file: sf })),
+  )
+  for (const { stmt } of [...all_stmts].sort(types_first)) {
+    switch (stmt.kind) {
+      case "Func": {
+        const func_name = stmt.func.name?.text
+        assert(func_name, "Function must have a name")
 
-          const params = stmt.func.params.map((param) => emit_param(ctx, param))
-          const return_type = stmt.func.return_type
-            ? emit_type_annotation(ctx, stmt.func.return_type)
-            : ({ kind: "Ident", name: "void" } as CNode)
+        const params = stmt.func.params.map((param) => emit_param(ctx, param))
+        const return_type = stmt.func.return_type
+          ? emit_type_annotation(ctx, stmt.func.return_type)
+          : ({ kind: "Ident", name: "void" } as CNode)
 
-          forward_decls.push({
-            kind: "FuncForwardDecl",
-            name: func_name,
-            params,
-            returns: return_type,
-          })
-          break
-        }
-        case "LJSExternFunction": {
-          const func_name = stmt.name.text
-          const params = stmt.params.map((param) => emit_param(ctx, param))
-          const return_type = emit_type_annotation(ctx, stmt.return_type)
+        forward_decls.push({
+          kind: "FuncForwardDecl",
+          name: func_name,
+          params,
+          returns: return_type,
+        })
+        break
+      }
+      case "LJSExternFunction": {
+        const func_name = stmt.name.text
+        const params = stmt.params.map((param) => emit_param(ctx, param))
+        const return_type = emit_type_annotation(ctx, stmt.return_type)
 
-          forward_decls.push({
-            kind: "ExternFunc",
-            name: func_name,
-            params,
-            returns: return_type,
-          })
-          break
-        }
-        case "StructDecl": {
-          forward_decls.push(emit_struct_decl(ctx, stmt))
-        }
+        forward_decls.push({
+          kind: "ExternFunc",
+          name: func_name,
+          params,
+          returns: return_type,
+        })
+        break
+      }
+      case "StructDecl": {
+        forward_decls.push(emit_struct_decl(stmt))
       }
     }
   }
 
   // Phase 2: Emit function definitions
-  for (const source_file of source_files.values()) {
-    for (const stmt of source_file.stmts) {
-      if (stmt.kind === "Func") {
-        defs.push(emit_func_def(ctx, source_file, stmt))
-      } else if (stmt.kind === "StructDecl") {
-        defs.push(emit_struct_def(ctx, stmt))
-      }
+  for (const { stmt, source_file } of [...all_stmts].sort(types_first)) {
+    if (stmt.kind === "Func") {
+      defs.push(emit_func_def(ctx, source_file, stmt))
+    } else if (stmt.kind === "StructDecl") {
+      defs.push(emit_struct_def(ctx, stmt))
     }
   }
 
@@ -93,15 +92,11 @@ export function emit_c(
 
   return render_c_nodes(c_nodes)
 }
-function emit_struct_decl(ctx: EmitContext, stmt: Stmt): CNode {
+function emit_struct_decl(stmt: Stmt): CNode {
   assert(stmt.kind === "StructDecl")
   return {
-    kind: "Typedef",
+    kind: "StructDecl",
     name: mangle_struct_name([stmt.struct_def.name.text]),
-    to: {
-      kind: "StructTypeRef",
-      name: mangle_struct_name([stmt.struct_def.name.text]),
-    },
   }
 }
 function emit_struct_def(ctx: EmitContext, stmt: Stmt): CNode {
@@ -119,7 +114,10 @@ function emit_struct_def(ctx: EmitContext, stmt: Stmt): CNode {
   }
 }
 
-function types_first(a: Stmt, b: Stmt): number {
+function types_first(
+  { stmt: a }: { stmt: Stmt },
+  { stmt: b }: { stmt: Stmt },
+): number {
   if (a.kind === "StructDecl" && b.kind !== "StructDecl") return -1
   if (a.kind !== "StructDecl" && b.kind === "StructDecl") return 1
   return 0
@@ -485,6 +483,8 @@ function render_c_node(node: CNode): string {
       return `struct ${node.name} {\n${node.fields
         .map((f) => `  ${render_c_node(f.type)} ${f.name};`)
         .join("\n")}\n};`
+    case "StructDecl":
+      return `struct ${node.name};`
     default:
       assert_never(node)
   }
@@ -528,4 +528,5 @@ export type CNode =
    */
   | { kind: "StructTypeRef"; name: string }
   | { kind: "Typedef"; name: string; to: CNode }
+  | { kind: "StructDecl"; name: string }
   | { kind: "StructDef"; name: string; fields: { name: string; type: CNode }[] }
