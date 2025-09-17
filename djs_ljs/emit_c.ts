@@ -15,6 +15,7 @@ import type {
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
+import type { ValueDeclOfKind } from "./SymbolTable.ts"
 
 interface EmitContext {
   source_files: SourceFiles
@@ -252,26 +253,44 @@ function emit_expr(
   }
 }
 
+function get_module_of_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: Expr,
+): ValueDeclOfKind<"Module"> | null {
+  if (expr.kind !== "Var") return null
+  assert(expr.kind === "Var", "Property access lhs must be a variable")
+
+  const lhs_decl = ctx.resolve_result.values
+    .get(source_file.path)
+    ?.get(expr.ident)
+  if (!lhs_decl) return null
+
+  if (lhs_decl.kind === "Module") return lhs_decl
+  else return null
+}
 function emit_prop_expr(
   ctx: EmitContext,
   source_file: SourceFile,
   expr: PropExpr,
 ): CNode {
-  assert(expr.lhs.kind === "Var", "Property access lhs must be a variable")
+  const lhs_module = get_module_of_expr(ctx, source_file, expr.lhs)
+  if (lhs_module) {
+    const prop_decl = lhs_module.values.get(expr.property.text)
+    assert(
+      prop_decl?.kind === "LJSExternFunction",
+      "Property must be an extern function",
+    )
 
-  const lhs_decl = ctx.resolve_result.values
-    .get(source_file.path)
-    ?.get(expr.lhs.ident)
-
-  assert(lhs_decl?.kind === "Module", "Property access lhs must be a Module")
-
-  const prop_decl = lhs_decl.values.get(expr.property.text)
-  assert(
-    prop_decl?.kind === "LJSExternFunction",
-    "Property must be an extern function",
-  )
-
-  return { kind: "Ident", name: prop_decl.stmt.name.text }
+    return { kind: "Ident", name: prop_decl.stmt.name.text }
+  } else {
+    const lhs_ty = ctx.tc_result.values.get(expr.lhs)
+    assert(lhs_ty)
+    assert(lhs_ty.kind === "StructInstance")
+    const prop_ty = lhs_ty.fields[expr.property.text]
+    assert(prop_ty)
+    todo()
+  }
 }
 
 function emit_tagged_template_literal_expr(
