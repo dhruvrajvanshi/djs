@@ -155,15 +155,23 @@ export function typecheck(
           assert_never(member.kind)
       }
     }
+    const qualified_name = qualified_name_of_decl(
+      stmt.struct_def.name,
+      ctx.source_file.path,
+    )
     return {
       values: new Map<string, Type>([
         [
           stmt.struct_def.name.text,
-          // FIXME: Use a qualified name here
-          Type.StructConstructor([stmt.struct_def.name.text], members),
+          Type.StructConstructor(qualified_name, members),
         ],
       ]),
-      types: new Map(),
+      types: new Map<string, Type>([
+        [
+          stmt.struct_def.name.text,
+          Type.StructInstance(qualified_name, members),
+        ],
+      ]),
       var_decls: [],
     }
   }
@@ -401,6 +409,12 @@ export function typecheck(
       case "f64":
       case "boolean":
         return target.kind === source.kind
+      case "StructInstance":
+        return (
+          source.kind === "StructInstance" &&
+          qualified_name_eq(target.qualified_name, source.qualified_name)
+        )
+
       default:
         return false
     }
@@ -752,7 +766,32 @@ export function typecheck(
         return todo("ImportStarAs")
       case "Import":
         return todo("Import")
+      case "Struct": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const result = check_stmt(source_file, decl.decl)
+        assert(
+          result,
+          `Expected a result for check_stmt(StructDecl) ${decl.decl}`,
+        )
+        const type = result.types.get(decl.decl.struct_def.name.text)
+        assert(type, "Expected check_stmt to set the struct instance's type")
+
+        return type
+      }
+      default:
+        return assert_never(decl)
     }
+  }
+
+  function qualified_name_of_decl(
+    ident: Ident,
+    source_file_path: string,
+  ): string[] {
+    const source_file = source_files.get(source_file_path)
+    assert(source_file, `Unknown source file: ${source_file_path}`)
+    // TODO: Convert the source path into a qualified module name
+    return [ident.text]
   }
 }
 
@@ -763,4 +802,12 @@ function short_stmt_name(stmt: Stmt): string {
       .join(";")
   }
   return stmt.kind
+}
+
+function qualified_name_eq(left: readonly string[], right: readonly string[]) {
+  if (left.length !== right.length) return false
+  for (let i = 0; i < left.length; i++) {
+    if (left[i] !== right[i]) return false
+  }
+  return true
 }

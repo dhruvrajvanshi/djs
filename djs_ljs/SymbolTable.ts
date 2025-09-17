@@ -130,6 +130,11 @@ export type TypeDecl =
       imported_file: string
     }
   | { kind: "Builtin"; type: Type }
+  | {
+      kind: "Struct"
+      decl: StructDeclStmt
+      source_file: string
+    }
   /**
    * Introduced after resolving imports
    * See the comment in ValueDecl for more details.
