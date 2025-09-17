@@ -1,4 +1,4 @@
-ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/check_return_type.ljs:18: TODO: Boolean cannot be inferred at the moment
+ERROR: ./tests/check_return_type.ljs:18: TODO: Boolean cannot be inferred at the moment
 18|      return true
                 ^~~
 19|  }

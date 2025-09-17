@@ -1,28 +1,28 @@
-ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/unbound_variables.ljs:3: Unbound variable "b"
+ERROR: ./tests/unbound_variables.ljs:3: Unbound variable "b"
 3|      return a(b)
                  ^~~
 4|  }
 5|  
 
-ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/unbound_variables.ljs:3: Unbound variable "a"
+ERROR: ./tests/unbound_variables.ljs:3: Unbound variable "a"
 3|      return a(b)
                ^~~
 4|  }
 5|  
 
-ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/unbound_variables.ljs:3: Unbound variable a
+ERROR: ./tests/unbound_variables.ljs:3: Unbound variable a
 3|      return a(b)
                ^~~
 4|  }
 5|  
 
-ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/unbound_variables.ljs:1: Unbound variable "y"
+ERROR: ./tests/unbound_variables.ljs:1: Unbound variable "y"
 1|  let x = y
             ^~~
 2|  function foo() {
 3|      return a(b)
 
-ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/unbound_variables.ljs:1: Unbound variable y
+ERROR: ./tests/unbound_variables.ljs:1: Unbound variable y
 1|  let x = y
             ^~~
 2|  function foo() {
