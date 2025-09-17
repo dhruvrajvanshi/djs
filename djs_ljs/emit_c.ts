@@ -163,6 +163,11 @@ function emit_type(type: Type): CNode {
       return { kind: "ConstPtr", to_type: emit_type(type.type) }
     case "MutPtr":
       return { kind: "Ptr", to_type: emit_type(type.type) }
+    case "StructInstance":
+      return {
+        kind: "StructTypeRef",
+        name: mangle_struct_name(type.qualified_name),
+      }
     default:
       todo(`Unhandled type: ${type.kind}`)
   }
