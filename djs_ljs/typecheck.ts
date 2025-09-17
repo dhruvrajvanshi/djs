@@ -612,6 +612,15 @@ export function typecheck(
         assert(param, `Expected parameter ${decl.param_index} in function`)
         return param[1]
       }
+      case "Func": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const result = check_func(source_file, decl.func)
+        return Type.UnboxedFunc(
+          result.params.map(([, t]) => t),
+          result.return_type,
+        )
+      }
       default: {
         return todo(`type_of_decl for ${decl.kind} with name ${name}`)
       }

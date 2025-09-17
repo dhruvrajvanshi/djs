@@ -89,6 +89,7 @@ function initialize_symbol_table(
         symbol_table.add_value(stmt.func.name.text, {
           kind: "Func",
           func: stmt.func,
+          source_file: source_file.path,
         })
         break
       case "ClassDecl":
