@@ -23,7 +23,16 @@ export type Type = ReadonlyUnion<
    * In an expression SomeStruct { field: value, ...}
    * this represents the type of SomeStruct
    */
-  | { kind: "StructConstructor"; name: string; fields: Record<string, Type> }
+  | {
+      kind: "StructConstructor"
+      qualified_name: readonly string[]
+      fields: Record<string, Type>
+    }
+  | {
+      kind: "StructInstance"
+      qualified_name: readonly string[]
+      fields: Record<string, Type>
+    }
   | { kind: "Error"; message: string }
   /**
    * typeof @builtin("c_str")
@@ -55,9 +64,17 @@ export const Type = {
     return_type,
   }),
   CStringConstructor: { kind: "CStringConstructor" },
-  StructConstructor: (name: string, fields: Record<string, Type>) => ({
+  StructConstructor: (
+    name: readonly string[],
+    fields: Record<string, Type>,
+  ) => ({
     kind: "StructConstructor",
-    name,
+    qualified_name: name,
+    fields,
+  }),
+  StructInstance: (name: readonly string[], fields: Record<string, Type>) => ({
+    kind: "StructInstance",
+    qualified_name: name,
     fields,
   }),
   Error: (message: string) => ({ kind: "Error", message }),
@@ -105,7 +122,13 @@ export function type_to_string(type: Type): string {
     case "c_int":
       return "c_int"
     case "StructConstructor":
-      return type.name
+      return (
+        `{ ${Object.entries(type.fields)
+          .map((it) => `${it[0]}: ${type_to_string(it[1])}`)
+          .join(", ")} } =>` + type.qualified_name.join(".")
+      )
+    case "StructInstance":
+      return type.qualified_name.join(".")
     default:
       return assert_never(type)
   }
@@ -151,7 +174,18 @@ export function type_to_sexpr(type: Type): string {
     case "c_int":
       return "c_int"
     case "StructConstructor": {
-      return `(StructConstructor ${type.name} { ${Object.entries(type.fields)
+      return `(StructConstructor ${type.qualified_name.join(".")} { ${Object.entries(
+        type.fields,
+      )
+        .map(
+          ([field, field_type]) => `(${field} . ${type_to_sexpr(field_type)})`,
+        )
+        .join(" ")} })`
+    }
+    case "StructInstance": {
+      return `(StructInstance ${type.qualified_name.join(".")} { ${Object.entries(
+        type.fields,
+      )
         .map(
           ([field, field_type]) => `(${field} . ${type_to_sexpr(field_type)})`,
         )

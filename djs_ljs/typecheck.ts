@@ -157,7 +157,8 @@ export function typecheck(
       values: new Map<string, Type>([
         [
           stmt.struct_def.name.text,
-          Type.StructConstructor(stmt.struct_def.name.text, members),
+          // FIXME: Use a qualified name here
+          Type.StructConstructor([stmt.struct_def.name.text], members),
         ],
       ]),
       types: new Map(),
@@ -429,11 +430,12 @@ export function typecheck(
       }
       check_expr(ctx, field.value, expected_type)
     }
-    return emit_error_type(ctx, {
-      message: `TODO: infer_struct_init_expr for ${lhs_type.name}`,
-      span: expr.span,
-      hint: null,
-    })
+
+    return {
+      kind: "StructInstance",
+      qualified_name: lhs_type.qualified_name,
+      fields: lhs_type.fields,
+    }
   }
   function emit_error_type(
     ctx: CheckCtx,
@@ -509,12 +511,22 @@ export function typecheck(
       return type_of_decl(expr.property.text, decl)
     } else {
       const lhs = infer_expr(ctx, expr.lhs)
-      todo(lhs)
-      return emit_error_type(ctx, {
-        message: `Expected a module or a struct on the left-hand side of the property access`,
-        span: expr.lhs.span,
-        hint: null,
-      })
+      if (lhs.kind === "StructInstance") {
+        return (
+          lhs.fields[expr.property.text] ??
+          emit_error_type(ctx, {
+            message: `Property ${expr.property.text} does not exist on type ${type_to_string(lhs)}`,
+            span: expr.property.span,
+            hint: `Available properties: ` + Object.keys(lhs.fields).join(", "),
+          })
+        )
+      } else {
+        return emit_error_type(ctx, {
+          message: `Expected a module or a struct on the left-hand side of the property access`,
+          span: expr.lhs.span,
+          hint: null,
+        })
+      }
     }
   }
 
