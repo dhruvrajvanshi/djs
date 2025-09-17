@@ -8,7 +8,7 @@ import {
   sexpr_to_string,
   Span,
   StructDeclStmt,
-  StructInitExpr,
+  type StructInitExpr,
   TaggedTemplateLiteralExpr,
   VarExpr,
   type Expr,
