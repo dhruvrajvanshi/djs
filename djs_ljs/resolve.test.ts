@@ -219,46 +219,6 @@ test("resolve import * as foo from 'bar'", async () => {
   )
 })
 
-test("reports unbound variables", async () => {
-  const fs = FS.fake({
-    "main.ljs": `
-        let x = y
-        function foo() {
-          return a(b)
-        }
-    `,
-  })
-  const { source_files, ...source_files_result } = await collect_source_files(
-    "main.ljs",
-    fs,
-  )
-  assert.equal(await source_files_result.diagnostics.prettify(fs), "")
-  const main = source_files.get("main.ljs")
-  assert(main, "main.ljs file not found in source_files")
-  const resolve_result = resolve_source_file(fs, main, new Map())
-  const diagnostics = resolve_result.diagnostics
-  expect(await diagnostics.prettify(fs, /* colors */ false))
-    .toMatchInlineSnapshot(`
-      "ERROR: /main.ljs:4: Unbound variable "b"
-      4|            return a(b)
-                             ^~~
-      5|          }
-      6|
-
-      ERROR: /main.ljs:4: Unbound variable "a"
-      4|            return a(b)
-                           ^~~
-      5|          }
-      6|
-
-      ERROR: /main.ljs:2: Unbound variable "y"
-      2|          let x = y
-                          ^~~
-      3|          function foo() {
-      4|            return a(b)
-    `)
-})
-
 function var_decl_binds(stmt: VarDeclStmt, name: string): boolean {
   for (const s of flatten_var_decl(stmt)) {
     if (s.name === name) {

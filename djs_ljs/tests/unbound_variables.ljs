@@ -1,0 +1,4 @@
+let x = y
+function foo() {
+    return a(b)
+}
