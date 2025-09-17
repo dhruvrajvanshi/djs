@@ -36,11 +36,10 @@ export function emit_c(
 
   // Phase 1: Collect forward declarations
   const forward_decls: CNode[] = []
-  const extern_funcs: CNode[] = []
-  const func_defs: CNode[] = []
+  const defs: CNode[] = []
 
   for (const source_file of source_files.values()) {
-    for (const stmt of source_file.stmts) {
+    for (const stmt of [...source_file.stmts].sort(types_first)) {
       switch (stmt.kind) {
         case "Func": {
           const func_name = stmt.func.name?.text
@@ -64,13 +63,16 @@ export function emit_c(
           const params = stmt.params.map((param) => emit_param(ctx, param))
           const return_type = emit_type_annotation(ctx, stmt.return_type)
 
-          extern_funcs.push({
+          forward_decls.push({
             kind: "ExternFunc",
             name: func_name,
             params,
             returns: return_type,
           })
           break
+        }
+        case "StructDecl": {
+          forward_decls.push(emit_struct_decl(ctx, stmt))
         }
       }
     }
@@ -80,14 +82,47 @@ export function emit_c(
   for (const source_file of source_files.values()) {
     for (const stmt of source_file.stmts) {
       if (stmt.kind === "Func") {
-        func_defs.push(emit_func_def(ctx, source_file, stmt))
+        defs.push(emit_func_def(ctx, source_file, stmt))
+      } else if (stmt.kind === "StructDecl") {
+        defs.push(emit_struct_def(ctx, stmt))
       }
     }
   }
 
-  const c_nodes: CNode[] = [...extern_funcs, ...forward_decls, ...func_defs]
+  const c_nodes: CNode[] = [...forward_decls, ...defs]
 
   return render_c_nodes(c_nodes)
+}
+function emit_struct_decl(ctx: EmitContext, stmt: Stmt): CNode {
+  assert(stmt.kind === "StructDecl")
+  return {
+    kind: "Typedef",
+    name: mangle_struct_name([stmt.struct_def.name.text]),
+    to: {
+      kind: "StructTypeRef",
+      name: mangle_struct_name([stmt.struct_def.name.text]),
+    },
+  }
+}
+function emit_struct_def(ctx: EmitContext, stmt: Stmt): CNode {
+  assert(stmt.kind === "StructDecl")
+  const fields = stmt.struct_def.members.map((member) => {
+    return {
+      name: member.name.text,
+      type: emit_type_annotation(ctx, member.type_annotation),
+    }
+  })
+  return {
+    kind: "StructDef",
+    name: mangle_struct_name([stmt.struct_def.name.text]),
+    fields,
+  }
+}
+
+function types_first(a: Stmt, b: Stmt): number {
+  if (a.kind === "StructDecl" && b.kind !== "StructDecl") return -1
+  if (a.kind !== "StructDecl" && b.kind === "StructDecl") return 1
+  return 0
 }
 
 function emit_param(ctx: EmitContext, param: Param): CNode {

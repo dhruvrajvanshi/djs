@@ -5,8 +5,8 @@ struct CStringBox {
     value: *ffi.c_char
 }
 
-function main(): void {
-    puts(CStringBox { value: ffi.c_str`` }.value)
+function main(): ffi.c_int {
+    puts(CStringBox { value: ffi.c_str`Hello world` }.value)
 }
 
 extern function puts(s: *ffi.c_char): ffi.c_int
