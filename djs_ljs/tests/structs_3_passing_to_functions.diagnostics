@@ -1,0 +1,35 @@
+ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/structs_3_passing_to_functions.ljs:13: Unbound variable "puts"
+13|      puts(str_box_value(StrBox { value: ffi.c_str`PASS` }))
+         ^~~
+14|      return 0
+15|  }
+
+ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/structs_3_passing_to_functions.ljs:13: Unbound variable puts
+13|      puts(str_box_value(StrBox { value: ffi.c_str`PASS` }))
+         ^~~
+14|      return 0
+15|  }
+
+ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/structs_3_passing_to_functions.ljs:10: Expected a pattern, got Star
+10|  extern function puts(*ffi.c_int): ffi.c_int
+                          ^~~
+11|  
+12|  function main(): ffi.c_int {
+
+ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/structs_3_passing_to_functions.ljs:4: Expected a module or a struct on the left-hand side of the property access
+4|      return i.value
+               ^~~
+5|  }
+6|  
+
+ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/structs_3_passing_to_functions.ljs:3: Unbound type "StrBox"
+3|  function str_box_value(i: StrBox): *ffi.c_char {
+                              ^~~
+4|      return i.value
+5|  }
+
+ERROR: /Users/dhruv/projects/djs/djs_ljs/tests/structs_3_passing_to_functions.ljs:3: Unbound type variable StrBox
+3|  function str_box_value(i: StrBox): *ffi.c_char {
+                              ^~~
+4|      return i.value
+5|  }

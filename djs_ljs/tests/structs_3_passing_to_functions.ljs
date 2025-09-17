@@ -7,7 +7,7 @@ function str_box_value(i: StrBox): *ffi.c_char {
 struct StrBox {
     value: *ffi.c_char
 }
-extern function puts(*ffi.c_int): ffi.c_int
+extern function puts(message: *ffi.c_int): ffi.c_int
 
 function main(): ffi.c_int {
     puts(str_box_value(StrBox { value: ffi.c_str`PASS` }))

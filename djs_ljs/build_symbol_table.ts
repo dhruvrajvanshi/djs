@@ -31,6 +31,7 @@ export function build_function_symbol_table(
       kind: "Param",
       func,
       param_index: index,
+      source_file: source_file.path,
     })
   }
   initialize_symbol_table(source_file, symbol_table, func.body.stmts)

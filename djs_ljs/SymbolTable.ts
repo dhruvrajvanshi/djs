@@ -29,7 +29,7 @@ export type ValueDecl =
       source_file: string
     }
   | { kind: "Func"; func: Func }
-  | { kind: "Param"; func: Func; param_index: number }
+  | { kind: "Param"; func: Func; param_index: number; source_file: string }
   | ClassDeclStmt
   | { kind: "Struct"; decl: StructDeclStmt; source_file: string }
   | {

@@ -12,6 +12,7 @@ import {
   TaggedTemplateLiteralExpr,
   VarExpr,
   type Expr,
+  type Func,
   type FuncStmt,
   type Ident,
   type SourceFile,
@@ -55,6 +56,7 @@ export function typecheck(
   const types = new Map<TypeAnnotation, Type>()
   const trace = new Trace()
   const check_stmt_results = new Map<Stmt, CheckStmtResult>()
+  const check_func_results = new Map<Func, CheckFuncResult>()
 
   for (const file of source_files.values()) {
     check_source_file(file)
@@ -207,17 +209,59 @@ export function typecheck(
     using _ = trace.add(
       `check_func_stmt\n${ctx.source_file.path}:${span.start}`,
     )
+    check_func(ctx.source_file, func)
+  }
+  interface CheckFuncResult {
+    params: [name: Ident, type: Type][]
+    return_type: Type
+  }
+  function check_func(source_file: SourceFile, func: Func): CheckFuncResult {
+    const existing = check_func_results.get(func)
+    if (existing) {
+      return existing
+    }
+    // Temporary result to break the cycle
+    check_func_results.set(func, { params: [], return_type: Type.void })
+    const ctx = make_check_ctx(source_file, check_func_results)
+    const params: [name: Ident, type: Type][] = []
     for (const param of func.params) {
-      if (param.type_annotation) {
-        check_type_annotation(ctx, param.type_annotation)
+      if (!param.type_annotation) {
+        emit_error(
+          ctx,
+          param.pattern.span,
+          "A function parameter must have a type annotation",
+        )
+        continue
       }
+      const type = check_type_annotation(ctx, param.type_annotation)
+      if (param.pattern.kind !== "Var") {
+        emit_error(
+          ctx,
+          param.pattern.span,
+          "Destructuring not supported in function parameters",
+        )
+        continue
+      }
+      params.push([param.pattern.ident, type])
     }
+    let return_type: Type | null = null
     if (func.return_type) {
-      check_type_annotation(ctx, func.return_type)
+      return_type = check_type_annotation(ctx, func.return_type)
+    } else {
+      return_type = emit_error_type(ctx, {
+        span: func.name?.span ?? func.params[0].span ?? func.span,
+        message: "Function must have a return type",
+      })
     }
+    const result: CheckFuncResult = {
+      params,
+      return_type,
+    }
+    check_func_results.set(func, result)
     for (const stmt of func.body.stmts) {
       check_stmt(ctx.source_file, stmt)
     }
+    return result
   }
   function check_var_decl_stmt(
     ctx: CheckCtx,
@@ -559,6 +603,14 @@ export function typecheck(
         const type = result.values.get(decl.decl.struct_def.name.text)
         assert(type, "Expected check_stmt to set the struct constructor's type")
         return type
+      }
+      case "Param": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const result = check_func(source_file, decl.func)
+        const param = result.params[decl.param_index]
+        assert(param, `Expected parameter ${decl.param_index} in function`)
+        return param[1]
       }
       default: {
         return todo(`type_of_decl for ${decl.kind} with name ${name}`)

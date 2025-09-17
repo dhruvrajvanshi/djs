@@ -1,0 +1,9 @@
+ERROR: ./tests/structs_2_imported.ljs:5: Expected a comma or RParen
+5|      puts(Imported.CStringBox { value: ffi.c_str`Hello world` }.value)
+                                 ^~~
+6|      return 0
+7|  }ERROR: ./tests/modules/CStringBox.ljs:3: Missing semicolon
+3|  struct CStringBox {
+           ^~~
+4|      value: *ffi.c_char
+5|  }
