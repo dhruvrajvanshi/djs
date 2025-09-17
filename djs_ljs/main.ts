@@ -109,7 +109,7 @@ export async function main(
   if (!args["no-errors"] && diagnostics.size > 0) {
     for (const [path, d] of diagnostics.entries()) {
       const diagnostics = await prettify_diagnostics(
-        path,
+        path.replace(fs.cwd(), "."),
         d,
         null,
         !args["no-colors"],

@@ -4,11 +4,13 @@ import Path from "node:path"
 export interface FS {
   read_file(path: string, encoding: "utf-8"): Promise<string>
   to_absolute(path: string): string
+  cwd(): string
 }
 
 const real_fs: FS = {
   read_file: async (path, encoding) => node_fs.readFile(path, encoding),
   to_absolute: (path) => Path.resolve(path),
+  cwd: () => process.cwd(),
 }
 
 export const FS = {
@@ -37,5 +39,6 @@ function fake_fs(_files: Record<string, string>): FS {
       return files[path]
     },
     to_absolute,
+    cwd: () => cwd,
   }
 }

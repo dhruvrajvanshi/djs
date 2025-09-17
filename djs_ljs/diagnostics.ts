@@ -41,7 +41,7 @@ export class Diagnostics {
     let errors: string = ""
     for (const [path, diagnostics] of this.by_path.entries()) {
       const pretty_diagnostics = await prettify_diagnostics(
-        path,
+        path.replace(fs.cwd(), "."),
         diagnostics,
         await fs.read_file(path, "utf-8"),
         colors,
