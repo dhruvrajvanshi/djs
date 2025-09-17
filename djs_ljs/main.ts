@@ -40,6 +40,7 @@ const argsConfig = {
     "dump-resolve": { type: "boolean" },
     "dump-resolve-imports": { type: "boolean" },
     "dump-typecheck": { type: "boolean" },
+    "preserve-c-output": { type: "boolean" },
     "tc-trace": { type: "string" },
     "no-errors": { type: "boolean" },
     "no-colors": { type: "boolean" },
@@ -126,7 +127,9 @@ export async function main(
   await mkdir(Path.dirname(output_c_path), { recursive: true })
   await writeFile(output_c_path, c_source)
   execSync(`gcc -o ${args.output} ${output_c_path}`, { stdio: "inherit" })
-  await rm(output_c_path)
+  if (!args["preserve-c-output"]) {
+    await rm(output_c_path)
+  }
 }
 function dump_source_files(source_files: SourceFiles) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}---- ast ----${ANSI_RESET}`)
