@@ -18,7 +18,7 @@ test("Simple var decls", () => {
   assert(source.errors.length === 0)
   const stmts = source.stmts.filter((it) => it instanceof VarDeclStmt)
   assert(stmts.length === 4)
-  const flattened = stmts.flatMap(flatten_var_decl)
+  const flattened = stmts.flatMap((it) => flatten_var_decl(it.decl))
   assert.deepEqual(flattened.map(flat_var_decl_to_sexpr), [
     [
       "let",

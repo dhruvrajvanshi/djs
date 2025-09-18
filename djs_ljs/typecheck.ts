@@ -19,6 +19,9 @@ import {
   type Stmt,
   type TypeAnnotation,
   type VarDeclStmt,
+  ForInOrOfStmt,
+  ForStmt,
+  type VarDecl,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -60,6 +63,7 @@ export function typecheck(
   const types = new Map<TypeAnnotation, Type>()
   const trace = new Trace()
   const check_stmt_results = new Map<Stmt, CheckStmtResult>()
+  const check_var_decl_results = new Map<VarDecl, CheckStmtResult>()
   const check_func_signature_results = new Map<Func, CheckFuncSignatureResult>()
   const source_file_check_results = new Map<SourceFile, null>()
 
@@ -131,7 +135,7 @@ export function typecheck(
       case "Func":
         return check_func_stmt(ctx, stmt)
       case "VarDecl":
-        return check_var_decl_stmt(ctx, stmt)
+        return check_var_decl(ctx.source_file, stmt.decl)
       case "LJSExternFunction":
         return check_ljs_extern_function_stmt(ctx, stmt)
       case "Expr":
@@ -141,9 +145,16 @@ export function typecheck(
         return check_return_stmt(ctx, stmt)
       case "StructDecl":
         return check_struct_decl_stmt(ctx, stmt)
+      case "For":
+        return check_for_stmt(ctx, stmt)
       default:
         todo(stmt.kind)
     }
+  }
+  function check_for_stmt(ctx: CheckCtx, stmt: ForStmt): CheckStmtResult {
+    using _ = trace.add(
+      `check_for_stmt\n${ctx.source_file.path}:${stmt.span.start}`,
+    )
   }
   function check_struct_decl_stmt(
     ctx: CheckCtx,
@@ -299,16 +310,20 @@ export function typecheck(
     check_func_signature_results.set(func, result)
     return result
   }
-  function check_var_decl_stmt(
-    ctx: CheckCtx,
-    stmt: VarDeclStmt,
-  ): CheckStmtResult {
-    using _ = trace.add(
-      `check_var_decl_stmt\n${ctx.source_file.path}:${stmt.span.start}`,
-      short_stmt_name(stmt),
-    )
+  function check_var_decl(
+    source_file: SourceFile,
+    stmt: VarDecl,
+  ): NonNullable<CheckStmtResult> {
+    const existing = check_var_decl_results.get(stmt)
+    if (existing) {
+      return existing
+    }
+
+    const ctx = make_check_ctx(source_file, check_var_decl_results)
+
     const values = new Map<string, Type>()
     const var_decls: CheckedVarDecl[] = []
+    const result: CheckStmtResult = { values, types: new Map(), var_decls }
     for (const decl of flatten_var_decl(stmt)) {
       const annotation = decl.type_annotation
       let type: Type | null = null
@@ -337,7 +352,7 @@ export function typecheck(
         }
       }
     }
-    return { values, types: new Map(), var_decls }
+    return result
   }
   function emit_error(
     ctx: CheckCtx,
@@ -640,11 +655,11 @@ export function typecheck(
       case "VarDecl": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const check_stmt_result = check_stmt(source_file, decl.stmt)
+        const check_stmt_result = check_var_decl(source_file, decl.stmt)
         const ty = check_stmt_result?.values.get(name)
         assert(
           ty,
-          `Expected type for ${name} in ${source_file.path}; ${check_stmt_result}; ${short_stmt_name(decl.stmt)}`,
+          `Expected type for ${name} in ${source_file.path}; ${check_stmt_result};`,
         )
         return ty
       }
@@ -840,15 +855,6 @@ export function typecheck(
     // TODO: Convert the source path into a qualified module name
     return [ident.text]
   }
-}
-
-function short_stmt_name(stmt: Stmt): string {
-  if (stmt.kind === "VarDecl") {
-    return flatten_var_decl(stmt)
-      .map((decl) => `${stmt.decl.decl_type.toLowerCase()} ${decl.name} = ...`)
-      .join(";")
-  }
-  return stmt.kind
 }
 
 function qualified_name_eq(left: readonly string[], right: readonly string[]) {

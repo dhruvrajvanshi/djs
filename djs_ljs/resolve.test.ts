@@ -103,21 +103,21 @@ test("resolve smoke test", async () => {
       assert(decl.kind === "VarDecl")
       assert.equal(
         decl.stmt,
-        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")),
+        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x"))?.decl,
       )
     },
     y1: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
         decl.stmt,
-        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "y")),
+        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "y"))?.decl,
       )
     },
     x2: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
         decl.stmt,
-        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")),
+        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x"))?.decl,
       )
     },
   }
@@ -220,7 +220,7 @@ test("resolve import * as foo from 'bar'", async () => {
 })
 
 function var_decl_binds(stmt: VarDeclStmt, name: string): boolean {
-  for (const s of flatten_var_decl(stmt)) {
+  for (const s of flatten_var_decl(stmt.decl)) {
     if (s.name === name) {
       return true
     }
