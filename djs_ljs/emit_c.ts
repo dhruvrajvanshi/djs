@@ -12,9 +12,11 @@ import type {
   Block,
   Param,
   SourceFile,
+  StructInitExpr,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
+import type { ValueDeclOfKind } from "./SymbolTable.ts"
 
 interface EmitContext {
   source_files: SourceFiles
@@ -34,58 +36,91 @@ export function emit_c(
 
   // Phase 1: Collect forward declarations
   const forward_decls: CNode[] = []
-  const extern_funcs: CNode[] = []
-  const func_defs: CNode[] = []
+  const defs: CNode[] = []
 
-  for (const source_file of source_files.values()) {
-    for (const stmt of source_file.stmts) {
-      switch (stmt.kind) {
-        case "Func": {
-          const func_name = stmt.func.name?.text
-          assert(func_name, "Function must have a name")
+  const all_stmts = [...source_files.values()].flatMap((sf) =>
+    sf.stmts.map((stmt) => ({ stmt, source_file: sf })),
+  )
+  for (const { stmt } of [...all_stmts].sort(types_first)) {
+    switch (stmt.kind) {
+      case "Func": {
+        const func_name = stmt.func.name?.text
+        assert(func_name, "Function must have a name")
 
-          const params = stmt.func.params.map((param) => emit_param(ctx, param))
-          const return_type = stmt.func.return_type
-            ? emit_type_annotation(ctx, stmt.func.return_type)
-            : ({ kind: "Ident", name: "void" } as CNode)
+        const params = stmt.func.params.map((param) => emit_param(ctx, param))
+        const return_type = stmt.func.return_type
+          ? emit_type_annotation(ctx, stmt.func.return_type)
+          : ({ kind: "Ident", name: "void" } as CNode)
 
-          forward_decls.push({
-            kind: "FuncForwardDecl",
-            name: func_name,
-            params,
-            returns: return_type,
-          })
-          break
-        }
-        case "LJSExternFunction": {
-          const func_name = stmt.name.text
-          const params = stmt.params.map((param) => emit_param(ctx, param))
-          const return_type = emit_type_annotation(ctx, stmt.return_type)
+        forward_decls.push({
+          kind: "FuncForwardDecl",
+          name: func_name,
+          params,
+          returns: return_type,
+        })
+        break
+      }
+      case "LJSExternFunction": {
+        const func_name = stmt.name.text
+        const params = stmt.params.map((param) => emit_param(ctx, param))
+        const return_type = emit_type_annotation(ctx, stmt.return_type)
 
-          extern_funcs.push({
-            kind: "ExternFunc",
-            name: func_name,
-            params,
-            returns: return_type,
-          })
-          break
-        }
+        forward_decls.push({
+          kind: "ExternFunc",
+          name: func_name,
+          params,
+          returns: return_type,
+        })
+        break
+      }
+      case "StructDecl": {
+        forward_decls.push(emit_struct_decl(stmt))
       }
     }
   }
 
   // Phase 2: Emit function definitions
-  for (const source_file of source_files.values()) {
-    for (const stmt of source_file.stmts) {
-      if (stmt.kind === "Func") {
-        func_defs.push(emit_func_def(ctx, source_file, stmt))
-      }
+  for (const { stmt, source_file } of [...all_stmts].sort(types_first)) {
+    if (stmt.kind === "Func") {
+      defs.push(emit_func_def(ctx, source_file, stmt))
+    } else if (stmt.kind === "StructDecl") {
+      defs.push(emit_struct_def(ctx, stmt))
     }
   }
 
-  const c_nodes: CNode[] = [...extern_funcs, ...forward_decls, ...func_defs]
+  const c_nodes: CNode[] = [...forward_decls, ...defs]
 
   return render_c_nodes(c_nodes)
+}
+function emit_struct_decl(stmt: Stmt): CNode {
+  assert(stmt.kind === "StructDecl")
+  return {
+    kind: "StructDecl",
+    name: mangle_struct_name([stmt.struct_def.name.text]),
+  }
+}
+function emit_struct_def(ctx: EmitContext, stmt: Stmt): CNode {
+  assert(stmt.kind === "StructDecl")
+  const fields = stmt.struct_def.members.map((member) => {
+    return {
+      name: member.name.text,
+      type: emit_type_annotation(ctx, member.type_annotation),
+    }
+  })
+  return {
+    kind: "StructDef",
+    name: mangle_struct_name([stmt.struct_def.name.text]),
+    fields,
+  }
+}
+
+function types_first(
+  { stmt: a }: { stmt: Stmt },
+  { stmt: b }: { stmt: Stmt },
+): number {
+  if (a.kind === "StructDecl" && b.kind !== "StructDecl") return -1
+  if (a.kind !== "StructDecl" && b.kind === "StructDecl") return 1
+  return 0
 }
 
 function emit_param(ctx: EmitContext, param: Param): CNode {
@@ -128,6 +163,11 @@ function emit_type(type: Type): CNode {
       return { kind: "ConstPtr", to_type: emit_type(type.type) }
     case "MutPtr":
       return { kind: "Ptr", to_type: emit_type(type.type) }
+    case "StructInstance":
+      return {
+        kind: "StructTypeRef",
+        name: mangle_struct_name(type.qualified_name),
+      }
     default:
       todo(`Unhandled type: ${type.kind}`)
   }
@@ -247,31 +287,84 @@ function emit_expr(
     case "Prop": {
       return emit_prop_expr(ctx, source_file, expr)
     }
+    case "StructInit":
+      return emit_struct_init_expr(ctx, source_file, expr)
     default:
       todo(`Unhandled expression: ${expr.kind}`)
   }
 }
+function emit_struct_init_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: StructInitExpr,
+): CNode {
+  const instance_type = ctx.tc_result.values.get(expr)
+  const lhs_type = ctx.tc_result.values.get(expr.lhs)
+  assert(instance_type?.kind === "StructInstance")
+  assert(lhs_type?.kind === "StructConstructor")
+  return {
+    kind: "Cast",
+    to: {
+      kind: "StructTypeRef",
+      name: mangle_struct_name(lhs_type.qualified_name),
+    },
+    expr: {
+      kind: "StructInit",
+      fields: expr.fields.map((field) => ({
+        key: field.Key.text,
+        value: emit_expr(ctx, source_file, field.value),
+      })),
+    },
+  }
+}
+function mangle_struct_name(qualified_name: readonly string[]): string {
+  if (qualified_name.length !== 1) {
+    todo()
+  }
+  return qualified_name[0]
+}
 
+function get_module_of_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: Expr,
+): ValueDeclOfKind<"Module"> | null {
+  if (expr.kind !== "Var") return null
+  assert(expr.kind === "Var", "Property access lhs must be a variable")
+
+  const lhs_decl = ctx.resolve_result.values
+    .get(source_file.path)
+    ?.get(expr.ident)
+  if (!lhs_decl) return null
+
+  if (lhs_decl.kind === "Module") return lhs_decl
+  else return null
+}
 function emit_prop_expr(
   ctx: EmitContext,
   source_file: SourceFile,
   expr: PropExpr,
 ): CNode {
-  assert(expr.lhs.kind === "Var", "Property access lhs must be a variable")
+  const lhs_module = get_module_of_expr(ctx, source_file, expr.lhs)
+  if (lhs_module) {
+    const prop_decl = lhs_module.values.get(expr.property.text)
+    assert(
+      prop_decl?.kind === "LJSExternFunction",
+      "Property must be an extern function",
+    )
 
-  const lhs_decl = ctx.resolve_result.values
-    .get(source_file.path)
-    ?.get(expr.lhs.ident)
-
-  assert(lhs_decl?.kind === "Module", "Property access lhs must be a Module")
-
-  const prop_decl = lhs_decl.values.get(expr.property.text)
-  assert(
-    prop_decl?.kind === "LJSExternFunction",
-    "Property must be an extern function",
-  )
-
-  return { kind: "Ident", name: prop_decl.stmt.name.text }
+    return { kind: "Ident", name: prop_decl.stmt.name.text }
+  } else {
+    const lhs_ty = ctx.tc_result.values.get(expr.lhs)
+    assert(lhs_ty)
+    assert(lhs_ty.kind === "StructInstance")
+    const prop_ty = lhs_ty.fields[expr.property.text]
+    return {
+      kind: "Prop",
+      lhs: emit_expr(ctx, source_file, expr.lhs),
+      rhs: expr.property.text,
+    }
+  }
 }
 
 function emit_tagged_template_literal_expr(
@@ -379,6 +472,24 @@ function render_c_node(node: CNode): string {
       return node.value.toString()
     case "ExprStmt":
       return `${render_c_node(node.expr)};`
+    case "Prop":
+      return `${render_c_node(node.lhs)}.${node.rhs}`
+    case "Cast":
+      return `((${render_c_node(node.to)})${render_c_node(node.expr)})`
+    case "StructInit":
+      return `{ ${node.fields
+        .map((f) => `.${f.key} = ${render_c_node(f.value)}`)
+        .join(", ")} }`
+    case "StructTypeRef":
+      return `struct ${node.name}`
+    case "Typedef":
+      return `typedef ${render_c_node(node.to)} ${node.name};`
+    case "StructDef":
+      return `struct ${node.name} {\n${node.fields
+        .map((f) => `  ${render_c_node(f.type)} ${f.name};`)
+        .join("\n")}\n};`
+    case "StructDecl":
+      return `struct ${node.name};`
     default:
       assert_never(node)
   }
@@ -412,3 +523,15 @@ export type CNode =
   | { kind: "StringLiteral"; value: string }
   | { kind: "IntLiteral"; value: number }
   | { kind: "ExprStmt"; expr: CNode }
+  | { kind: "Prop"; lhs: CNode; rhs: string }
+  | { kind: "StructInit"; fields: { key: string; value: CNode }[] }
+  | { kind: "Cast"; to: CNode; expr: CNode }
+  /**
+   * The type `struct Foo`
+   * in the following stmt
+   * struct Foo foo;
+   */
+  | { kind: "StructTypeRef"; name: string }
+  | { kind: "Typedef"; name: string; to: CNode }
+  | { kind: "StructDecl"; name: string }
+  | { kind: "StructDef"; name: string; fields: { name: string; type: CNode }[] }

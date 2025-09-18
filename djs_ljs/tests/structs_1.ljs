@@ -1,0 +1,14 @@
+import * as ffi from "../ffi.ljs"
+
+
+struct CStringBox {
+    value: *ffi.c_char
+}
+
+function main(): ffi.c_int {
+    puts(CStringBox { value: ffi.c_str`Hello world` }.value)
+    return 0
+}
+
+extern function puts(s: *ffi.c_char): ffi.c_int
+

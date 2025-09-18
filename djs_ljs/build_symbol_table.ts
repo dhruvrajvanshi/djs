@@ -31,6 +31,7 @@ export function build_function_symbol_table(
       kind: "Param",
       func,
       param_index: index,
+      source_file: source_file.path,
     })
   }
   initialize_symbol_table(source_file, symbol_table, func.body.stmts)
@@ -88,11 +89,24 @@ function initialize_symbol_table(
         symbol_table.add_value(stmt.func.name.text, {
           kind: "Func",
           func: stmt.func,
+          source_file: source_file.path,
         })
         break
       case "ClassDecl":
         if (!stmt.class_def.name) break
         symbol_table.add_value(stmt.class_def.name.text, stmt)
+        break
+      case "StructDecl":
+        symbol_table.add_value(stmt.struct_def.name.text, {
+          kind: "Struct",
+          decl: stmt,
+          source_file: source_file.path,
+        })
+        symbol_table.add_type(stmt.struct_def.name.text, {
+          kind: "Struct",
+          decl: stmt,
+          source_file: source_file.path,
+        })
         break
       case "LJSExternFunction": {
         if (!stmt.name) break

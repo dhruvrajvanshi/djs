@@ -224,6 +224,11 @@ const DObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
   type_annotation: TypeAnnotation,
 })
 
+export const DStructInitItem = Struct("StructInitItem", ["span"], {
+  Key: Ident,
+  value: Expr,
+})
+
 export const DExpr = Enum(Expr, ["span", "visit"], {
   Var: { leading_trivia: Text, ident: Ident },
   Paren: { expr: Expr },
@@ -239,6 +244,10 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
     args: List(Expr),
     spread: Option(Expr),
     is_optional: "boolean",
+  },
+  StructInit: {
+    lhs: Expr,
+    fields: List("StructInitItem"),
   },
   Index: { lhs: Expr, property: Expr, is_optional: "boolean" },
   Prop: { lhs: Expr, property: Ident, is_optional: "boolean" },
@@ -327,8 +336,9 @@ const DClassMember = Enum(ClassMember, [], {
   MethodDef: { method: MethodDef },
   FieldDef: { field: FieldDef },
 })
+
 const DStructMember = Enum(StructMember, [], {
-  FieldDef: { field: FieldDef },
+  FieldDef: { name: Ident, type_annotation: TypeAnnotation },
 })
 const DFieldDef = Struct("FieldDef", ["span"], {
   name: Ident,
@@ -508,6 +518,7 @@ const ast_items = [
   DVarDeclarator,
   DForInit,
   DExpr,
+  DStructInitItem,
   DObjectTypeDeclField,
   DTypeAnnotation,
   DFuncTypeParam,

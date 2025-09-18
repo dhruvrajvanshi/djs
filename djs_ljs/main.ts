@@ -28,7 +28,7 @@ import {
 import { typecheck, type TypecheckResult } from "./typecheck.ts"
 import { type_to_sexpr } from "./type.ts"
 import { exit } from "node:process"
-import { assert } from "node:console"
+import assert from "node:assert/strict"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { execSync } from "node:child_process"
 
@@ -40,6 +40,7 @@ const argsConfig = {
     "dump-resolve": { type: "boolean" },
     "dump-resolve-imports": { type: "boolean" },
     "dump-typecheck": { type: "boolean" },
+    "preserve-c-output": { type: "boolean" },
     "tc-trace": { type: "string" },
     "no-errors": { type: "boolean" },
     "no-colors": { type: "boolean" },
@@ -120,13 +121,15 @@ export async function main(
   if (diagnostics.size > 0) {
     return io.error_exit()
   }
-  const c_source = emit_c(source_files, typecheck_result, resolve_result)
   assert(args.output, `Output path is not provided`)
+  const c_source = emit_c(source_files, typecheck_result, resolve_result)
   const output_c_path = Path.join(".ljs", args.output + ".c")
   await mkdir(Path.dirname(output_c_path), { recursive: true })
   await writeFile(output_c_path, c_source)
   execSync(`gcc -o ${args.output} ${output_c_path}`, { stdio: "inherit" })
-  await rm(output_c_path)
+  if (!args["preserve-c-output"]) {
+    await rm(output_c_path)
+  }
 }
 function dump_source_files(source_files: SourceFiles) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}---- ast ----${ANSI_RESET}`)
