@@ -56,7 +56,7 @@ export function typecheck(
   const types = new Map<TypeAnnotation, Type>()
   const trace = new Trace()
   const check_stmt_results = new Map<Stmt, CheckStmtResult>()
-  const check_func_results = new Map<Func, CheckFuncResult>()
+  const check_func_signature_results = new Map<Func, CheckFuncSignatureResult>()
 
   for (const file of source_files.values()) {
     check_source_file(file)
@@ -217,20 +217,29 @@ export function typecheck(
     using _ = trace.add(
       `check_func_stmt\n${ctx.source_file.path}:${span.start}`,
     )
-    check_func(ctx.source_file, func)
+    check_func_signature(ctx.source_file, func)
+    for (const stmt of func.body.stmts) {
+      check_stmt(ctx.source_file, stmt)
+    }
   }
-  interface CheckFuncResult {
+  interface CheckFuncSignatureResult {
     params: [name: Ident, type: Type][]
     return_type: Type
   }
-  function check_func(source_file: SourceFile, func: Func): CheckFuncResult {
-    const existing = check_func_results.get(func)
+  function check_func_signature(
+    source_file: SourceFile,
+    func: Func,
+  ): CheckFuncSignatureResult {
+    const existing = check_func_signature_results.get(func)
     if (existing) {
       return existing
     }
     // Temporary result to break the cycle
-    check_func_results.set(func, { params: [], return_type: Type.void })
-    const ctx = make_check_ctx(source_file, check_func_results)
+    check_func_signature_results.set(func, {
+      params: [],
+      return_type: Type.void,
+    })
+    const ctx = make_check_ctx(source_file, check_func_signature_results)
     const params: [name: Ident, type: Type][] = []
     for (const param of func.params) {
       if (!param.type_annotation) {
@@ -261,14 +270,11 @@ export function typecheck(
         message: "Function must have a return type",
       })
     }
-    const result: CheckFuncResult = {
+    const result: CheckFuncSignatureResult = {
       params,
       return_type,
     }
-    check_func_results.set(func, result)
-    for (const stmt of func.body.stmts) {
-      check_stmt(ctx.source_file, stmt)
-    }
+    check_func_signature_results.set(func, result)
     return result
   }
   function check_var_decl_stmt(
@@ -621,7 +627,7 @@ export function typecheck(
       case "Param": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_func(source_file, decl.func)
+        const result = check_func_signature(source_file, decl.func)
         const param = result.params[decl.param_index]
         assert(param, `Expected parameter ${decl.param_index} in function`)
         return param[1]
@@ -629,7 +635,7 @@ export function typecheck(
       case "Func": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_func(source_file, decl.func)
+        const result = check_func_signature(source_file, decl.func)
         return Type.UnboxedFunc(
           result.params.map(([, t]) => t),
           result.return_type,
