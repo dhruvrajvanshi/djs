@@ -7,6 +7,7 @@ import {
   type ImportStmt,
   type LJSExternFunctionStmt,
   type TypeAliasStmt,
+  type VarDecl,
   type VarDeclStmt,
 } from "djs_ast"
 import { MapUtils } from "djs_std"
@@ -24,7 +25,7 @@ export type ValueDeclExcludingKind<K extends ValueDecl["kind"]> = Exclude<
 export type ValueDecl =
   | {
       kind: "VarDecl"
-      stmt: VarDeclStmt
+      stmt: VarDecl
       name: string
       source_file: string
     }

@@ -1,4 +1,4 @@
-import type { Func, Pattern, SourceFile, Stmt } from "djs_ast"
+import type { ForStmt, Func, Pattern, SourceFile, Stmt } from "djs_ast"
 import { SymbolTable, type ValueDecl } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { assert_never, todo } from "djs_std"
@@ -35,6 +35,23 @@ export function build_function_symbol_table(
     })
   }
   initialize_symbol_table(source_file, symbol_table, func.body.stmts)
+  return symbol_table
+}
+export function build_for_stmt_symbol_table(
+  source_file: SourceFile,
+  stmt: ForStmt,
+): SymbolTable {
+  const symbol_table = new SymbolTable()
+  if (stmt.init.kind === "VarDecl") {
+    for (const decl of flatten_var_decl(stmt.init.decl)) {
+      symbol_table.add_value(decl.name, {
+        kind: "VarDecl",
+        stmt: stmt.init.decl,
+        name: decl.name,
+        source_file: source_file.path,
+      })
+    }
+  }
   return symbol_table
 }
 function add_pattern_bindings_to_symbol_table(
@@ -75,10 +92,10 @@ function initialize_symbol_table(
   for (const stmt of stmts) {
     switch (stmt.kind) {
       case "VarDecl":
-        for (const decl of flatten_var_decl(stmt)) {
+        for (const decl of flatten_var_decl(stmt.decl)) {
           symbol_table.add_value(decl.name, {
             kind: "VarDecl",
-            stmt,
+            stmt: stmt.decl,
             name: decl.name,
             source_file: source_file.path,
           })
