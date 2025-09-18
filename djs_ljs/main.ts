@@ -41,7 +41,6 @@ const argsConfig = {
     "dump-resolve-imports": { type: "boolean" },
     "dump-typecheck": { type: "boolean" },
     "preserve-c-output": { type: "boolean" },
-    "tc-trace": { type: "string" },
     "no-errors": { type: "boolean" },
     "no-colors": { type: "boolean" },
     output: { type: "string", short: "o" },
@@ -97,9 +96,6 @@ export async function main(
 
   const typecheck_result = typecheck(source_files, resolve_result)
   if (dump_typecheck) dump_typecheck_result(typecheck_result)
-  if (args["tc-trace"]) {
-    await typecheck_result.trace.write(args["tc-trace"])
-  }
 
   const diagnostics = Diagnostics.merge(
     collect_source_files_result.diagnostics,

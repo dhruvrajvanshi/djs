@@ -19,6 +19,7 @@ import {
   type Stmt,
   type TypeAnnotation,
   type VarDeclStmt,
+  TypeAliasStmt,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -30,7 +31,6 @@ import { Diagnostics } from "./diagnostics.ts"
 import { assert_never, is_readonly_array, todo, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
-import { Trace } from "./Trace.ts"
 import assert from "node:assert"
 import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
@@ -40,7 +40,6 @@ export interface TypecheckResult {
   types: Map<TypeAnnotation, Type>
   var_decls: Map<VarDeclStmt, CheckedVarDecl[]>
   diagnostics: Diagnostics
-  trace: Trace
 }
 interface CheckedVarDecl {
   decl_type: DeclType
@@ -58,7 +57,6 @@ export function typecheck(
   const _diagnostics = new Diagnostics(source_files.fs)
   const values = new Map<Expr, Type>()
   const types = new Map<TypeAnnotation, Type>()
-  const trace = new Trace()
   const check_stmt_results = new Map<Stmt, CheckStmtResult>()
   const check_func_signature_results = new Map<Func, CheckFuncSignatureResult>()
   const source_file_check_results = new Map<SourceFile, null>()
@@ -80,12 +78,10 @@ export function typecheck(
     diagnostics: _diagnostics,
     values,
     types,
-    trace,
     var_decls,
   }
 
   function check_source_file(file: SourceFile): void {
-    using _ = trace.add(`check_source_file\n${file.path}`)
     if (source_file_check_results.has(file)) {
       return
     }
@@ -118,9 +114,6 @@ export function typecheck(
     return result
   }
   function check_stmt_worker(ctx: CheckCtx, stmt: Stmt): CheckStmtResult {
-    using _ = trace.add(
-      `check_stmt\n${ctx.source_file.path}:${stmt.span.start}:${stmt.span.stop}`,
-    )
     switch (stmt.kind) {
       case "Import":
         return check_import_stmt(ctx, stmt)
@@ -149,9 +142,6 @@ export function typecheck(
     ctx: CheckCtx,
     stmt: StructDeclStmt,
   ): CheckStmtResult {
-    using _ = trace.add(
-      `check_struct_decl_stmt\n${ctx.source_file.path}:${stmt.span.start}}`,
-    )
     const members: Record<string, Type> = {}
     for (const member of stmt.struct_def.members) {
       switch (member.kind) {
@@ -193,9 +183,6 @@ export function typecheck(
     }
   }
   function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt): CheckStmtResult {
-    using _ = trace.add(
-      `check_return_stmt\n${ctx.source_file.path}:${stmt.span.start}`,
-    )
     if (stmt.value) {
       const func = resolution.return_stmt_enclosing_func.get(stmt)
       if (func) {
@@ -220,25 +207,12 @@ export function typecheck(
     diagnostics: Diagnostics
     __proof: "__check_ctx__"
   }
-  function check_import_stmt({ source_file }: CheckCtx, stmt: Stmt): void {
-    using _ = trace.add(
-      `check_import_stmt\n${source_file.path}:${stmt.span.start}`,
-    )
-  }
-  function check_import_star_as_stmt(ctx: CheckCtx, stmt: Stmt): void {
-    using _ = trace.add(
-      `check_import_star_as_stmt\n${ctx.source_file.path}:${stmt.span.start}}`,
-    )
-  }
-  function check_type_alias_stmt(ctx: CheckCtx, stmt: Stmt): void {
-    using _ = trace.add(
-      `check_type_alias_stmt\n${ctx.source_file.path}:${stmt.span.start}}`,
-    )
+  function check_import_stmt(_: CheckCtx, __: Stmt): void {}
+  function check_import_star_as_stmt(_: CheckCtx, __: Stmt): void {}
+  function check_type_alias_stmt(ctx: CheckCtx, stmt: TypeAliasStmt): void {
+    check_type_annotation(ctx, stmt.type_annotation)
   }
   function check_func_stmt(ctx: CheckCtx, { func, span }: FuncStmt): void {
-    using _ = trace.add(
-      `check_func_stmt\n${ctx.source_file.path}:${span.start}`,
-    )
     check_func_signature(ctx.source_file, func)
     for (const stmt of func.body.stmts) {
       check_stmt(ctx.source_file, stmt)
@@ -303,10 +277,6 @@ export function typecheck(
     ctx: CheckCtx,
     stmt: VarDeclStmt,
   ): CheckStmtResult {
-    using _ = trace.add(
-      `check_var_decl_stmt\n${ctx.source_file.path}:${stmt.span.start}`,
-      short_stmt_name(stmt),
-    )
     const values = new Map<string, Type>()
     const var_decls: CheckedVarDecl[] = []
     for (const decl of flatten_var_decl(stmt)) {
@@ -356,9 +326,6 @@ export function typecheck(
     ctx: CheckCtx,
     stmt: LJSExternFunctionStmt,
   ): CheckStmtResult {
-    using _ = trace.add(
-      `check_ljs_extern_function_stmt\n${ctx.source_file.path}:${stmt.span.start}}`,
-    )
     const param_types: Type[] = []
     for (const param of stmt.params) {
       if (!param.type_annotation) {
@@ -386,10 +353,6 @@ export function typecheck(
     if (values.has(expr)) {
       return
     }
-    using _ = trace.add(
-      `check_expr\n${ctx.source_file.path}:${expr.span.start}`,
-      sexpr_to_string(expr_to_sexpr(expr)),
-    )
 
     switch (expr.kind) {
       case "Number":
@@ -483,10 +446,6 @@ export function typecheck(
     return ty
   }
   function infer_expr_worker(ctx: CheckCtx, expr: Expr): Type {
-    using _ = trace.add(
-      `infer_expr\n${ctx.source_file.path}:${expr.span.start}:${expr.span.stop}`,
-      sexpr_to_string(expr_to_sexpr(expr)),
-    )
     switch (expr.kind) {
       case "TaggedTemplateLiteral":
         return infer_tagged_template_literal_expr(ctx, expr)
@@ -789,10 +748,6 @@ export function typecheck(
     if (existing) {
       return existing
     }
-    using _ = trace.add(
-      `check_type_annotation:${source_file.path}:${annotation.span.start}${annotation.span.stop}`,
-    )
-
     const t = annotation_to_type(make_type_var_env(ctx), annotation)
     types.set(annotation, t)
     return t
