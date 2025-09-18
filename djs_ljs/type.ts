@@ -11,8 +11,8 @@ export type Type = ReadonlyUnion<
   | { kind: "i64" }
   | { kind: "f32" }
   | { kind: "f64" }
-  | { kind: "c_char" }
   | { kind: "c_int" }
+  | { kind: "c_char" }
   | { kind: "void" }
   | { kind: "boolean" }
   | { kind: "Ptr"; type: Type }
@@ -196,4 +196,32 @@ export function type_to_sexpr(type: Type): string {
     default:
       return assert_never(type)
   }
+}
+function type_is_integral(type: Type): boolean {
+  return (
+    type.kind === "u8" ||
+    type.kind === "u16" ||
+    type.kind === "u32" ||
+    type.kind === "u64" ||
+    type.kind === "i8" ||
+    type.kind === "i16" ||
+    type.kind === "i32" ||
+    type.kind === "i64" ||
+    type.kind === "c_int"
+  )
+}
+function type_is_floating_point(type: Type): boolean {
+  return type.kind === "f32" || type.kind === "f64"
+}
+export function type_is_convertible_from_numeric_literal(
+  type: Type,
+  literal: string,
+): boolean {
+  if (type_is_integral(type)) {
+    return parseInt(literal) === parseFloat(literal)
+  }
+  if (type_is_floating_point(type)) {
+    return !Number.isNaN(parseFloat(literal))
+  }
+  return false
 }

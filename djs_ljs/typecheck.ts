@@ -21,7 +21,11 @@ import {
   type VarDeclStmt,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
-import { Type, type_to_string } from "./type.ts"
+import {
+  Type,
+  type_is_convertible_from_numeric_literal,
+  type_to_string,
+} from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { assert_never, is_readonly_array, todo, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
@@ -180,11 +184,16 @@ export function typecheck(
       `check_return_stmt\n${ctx.source_file.path}:${stmt.span.start}`,
     )
     if (stmt.value) {
-      // TODO: Check that the return type matches the surrounding function
-      const type = infer_expr(ctx, stmt.value)
+      const func = resolution.return_stmt_enclosing_func.get(stmt)
+      if (func) {
+        const { return_type } = check_func_signature(ctx.source_file, func)
+        check_expr(ctx, stmt.value, return_type)
+      }
+      return { values: new Map(), types: new Map(), var_decls: [] }
+    } else {
+      emit_error(ctx, stmt.span, "Return statement must have a value")
       return { values: new Map(), types: new Map(), var_decls: [] }
     }
-    return { values: new Map(), types: new Map(), var_decls: [] }
   }
 
   /**
@@ -369,17 +378,33 @@ export function typecheck(
       sexpr_to_string(expr_to_sexpr(expr)),
     )
 
-    const inferred = infer_expr(ctx, expr)
-    if (!is_assignable({ source: inferred, target: expected_type })) {
-      emit_error(
-        ctx,
-        expr.span,
-        `Expected ${type_to_string(expected_type)}, got ${type_to_string(
-          inferred,
-        )}`,
-      )
+    switch (expr.kind) {
+      case "Number":
+        if (
+          !type_is_convertible_from_numeric_literal(expected_type, expr.text)
+        ) {
+          emit_error(
+            ctx,
+            expr.span,
+            `Expected a ${type_to_string(expected_type)}`,
+          )
+        }
+        values.set(expr, expected_type)
+        return
+      default: {
+        const inferred = infer_expr(ctx, expr)
+        if (!is_assignable({ source: inferred, target: expected_type })) {
+          emit_error(
+            ctx,
+            expr.span,
+            `Expected ${type_to_string(expected_type)}, got ${type_to_string(
+              inferred,
+            )}`,
+          )
+        }
+        values.set(expr, expected_type)
+      }
     }
-    values.set(expr, expected_type)
   }
   function is_assignable({
     source,
@@ -403,6 +428,7 @@ export function typecheck(
           is_assignable({ source: source.type, target: target.type })
         )
       case "c_char":
+      case "c_int":
       case "u8":
       case "u16":
       case "u32":
@@ -465,6 +491,8 @@ export function typecheck(
       case "StructInit": {
         return infer_struct_init_expr(ctx, expr)
       }
+      case "Boolean":
+        return Type.boolean
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
