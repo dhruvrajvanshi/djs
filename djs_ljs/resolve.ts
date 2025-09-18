@@ -1,6 +1,7 @@
 import {
   ASTVisitorBase,
   Expr,
+  ForStmt,
   TypeAnnotation,
   type Block,
   type Func,
@@ -18,6 +19,7 @@ import {
 } from "./SymbolTable.ts"
 import {
   build_block_symbol_table,
+  build_for_stmt_symbol_table,
   build_function_symbol_table,
   build_source_file_symbol_table,
 } from "./build_symbol_table.ts"
@@ -153,6 +155,25 @@ class Resolver extends ASTVisitorBase {
     )
   }
 
+  private visit_for_stmt(stmt: ForStmt): void {
+    const for_symbol_table = build_for_stmt_symbol_table(this.source_file, stmt)
+    this.scope.push(for_symbol_table)
+    if (stmt.init.kind === "VarDecl") {
+      this.visit_var_decl(stmt.init.decl)
+    }
+    if (stmt.test !== null) {
+      this.visit_expr(stmt.test)
+    }
+    if (stmt.update !== null) {
+      this.visit_expr(stmt.update)
+    }
+    this.visit_stmt(stmt.body)
+    assert(
+      this.scope.pop() === for_symbol_table,
+      "Expected to pop the current for statement's symbol table",
+    )
+  }
+
   override visit_block(block: Block): void {
     const block_symbol_table = build_block_symbol_table(
       this.source_file,
@@ -168,6 +189,10 @@ class Resolver extends ASTVisitorBase {
 
   override visit_stmt(stmt: Stmt): void {
     switch (stmt.kind) {
+      case "For": {
+        this.visit_for_stmt(stmt)
+        break
+      }
       case "Return":
         if (this.current_func === null) return
         assert(
