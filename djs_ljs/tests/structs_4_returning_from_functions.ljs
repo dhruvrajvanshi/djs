@@ -1,0 +1,18 @@
+
+import * as ffi from "../ffi.ljs"
+
+struct StrBox {
+    value: *ffi.c_char
+}
+
+function get_message_box(): StrBox {
+    return StrBox {
+        value: ffi.c_str`PASS`
+    }
+}
+
+extern function puts(message: *ffi.c_char): *ffi.c_int
+
+function main(): ffi.c_int {
+    puts(get_message_box().value)
+}
