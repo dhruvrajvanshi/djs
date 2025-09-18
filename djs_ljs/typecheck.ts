@@ -21,6 +21,7 @@ import {
   ForStmt,
   type Block,
   BinOpExpr,
+  PostIncrementExpr,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -481,8 +482,7 @@ export function typecheck(
       case "Var":
         return infer_var_expr(ctx, expr)
       case "Number":
-        // TODO: Handle inference for other int types
-        return Type.c_int
+        return Type.i64
       case "StructInit": {
         return infer_struct_init_expr(ctx, expr)
       }
@@ -490,6 +490,8 @@ export function typecheck(
         return Type.boolean
       case "BinOp":
         return infer_binop_expr(ctx, expr)
+      case "PostIncrement":
+        return infer_post_increment_expr(ctx, expr)
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
@@ -497,6 +499,20 @@ export function typecheck(
         })
       }
     }
+  }
+  function infer_post_increment_expr(
+    ctx: CheckCtx,
+    expr: PostIncrementExpr,
+  ): Type {
+    const inner_type = infer_expr(ctx.source_file, expr.value)
+    if (!type_is_integral(inner_type)) {
+      return emit_error_type(ctx, {
+        message: `The operand of a post-increment must be an integral type`,
+        span: expr.value.span,
+        hint: `Got ${type_to_string(inner_type)}`,
+      })
+    }
+    return inner_type
   }
   function infer_binop_expr(ctx: CheckCtx, expr: BinOpExpr): Type {
     switch (expr.operator) {
