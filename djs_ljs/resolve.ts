@@ -169,9 +169,7 @@ class Resolver extends ASTVisitorBase {
   override visit_stmt(stmt: Stmt): void {
     switch (stmt.kind) {
       case "Return":
-        if (this.current_func === null) {
-          todo()
-        }
+        if (this.current_func === null) return
         assert(
           !this.return_stmt_enclosing_func.has(stmt),
           "Return statement already tracked",
