@@ -578,7 +578,10 @@ export interface StructDef {
 
 export type StructMember = FieldDefStructMember
 export class FieldDefStructMember {
-  constructor(readonly field: FieldDef) {}
+  constructor(
+    readonly name: Ident,
+    readonly type_annotation: TypeAnnotation,
+  ) {}
 
   get kind(): "FieldDef" {
     return "FieldDef"
@@ -586,8 +589,10 @@ export class FieldDefStructMember {
 }
 
 export const StructMember = {
-  FieldDef: (field: FieldDef): FieldDefStructMember =>
-    new FieldDefStructMember(field),
+  FieldDef: (
+    name: Ident,
+    type_annotation: TypeAnnotation,
+  ): FieldDefStructMember => new FieldDefStructMember(name, type_annotation),
 } as const
 
 export interface Block {
@@ -841,6 +846,7 @@ export type Expr =
   | ArrowFnExpr
   | FuncExpr
   | CallExpr
+  | StructInitExpr
   | IndexExpr
   | PropExpr
   | StringExpr
@@ -967,6 +973,22 @@ export class CallExpr {
 
   get kind(): "Call" {
     return "Call"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
+export class StructInitExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly lhs: Expr,
+    readonly fields: readonly StructInitItem[],
+  ) {}
+
+  get kind(): "StructInit" {
+    return "StructInit"
   }
 
   toString(): string {
@@ -1507,6 +1529,12 @@ export const Expr = {
     is_optional: boolean,
   ): CallExpr => new CallExpr(span, callee, args, spread, is_optional),
 
+  StructInit: (
+    span: Span,
+    lhs: Expr,
+    fields: readonly StructInitItem[],
+  ): StructInitExpr => new StructInitExpr(span, lhs, fields),
+
   Index: (
     span: Span,
     lhs: Expr,
@@ -1616,6 +1644,12 @@ export const Expr = {
 
   Builtin: (span: Span, text: Text): BuiltinExpr => new BuiltinExpr(span, text),
 } as const
+
+export interface StructInitItem {
+  readonly span: Span
+  readonly Key: Ident
+  readonly value: Expr
+}
 
 export interface ObjectTypeDeclField {
   readonly is_readonly: boolean

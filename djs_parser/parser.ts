@@ -35,6 +35,8 @@ import {
   Span,
   Token,
   TokenKind,
+  StructMember,
+  type StructInitItem,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -410,11 +412,36 @@ function parser_impl(
             lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
             break
           }
-        // Fallthrought
+        case t.LBrace:
+          if (flags | PARSER_FLAGS.LJS) {
+            const start = advance()
+            const items = parse_comma_separated_list(
+              t.RBrace,
+              parse_struct_init_item,
+            )
+            if (items === ERR) return ERR
+            const end = expect(t.RBrace)
+            if (end === ERR) return ERR
+            const span = Span.between(lhs.span, end.span)
+            lhs = Expr.StructInit(span, lhs, items)
+
+            break
+          } else {
+            // Fallthrough
+          }
+        // Fallthrough
         default:
           return lhs
       }
     }
+  }
+  function parse_struct_init_item(): StructInitItem | Err {
+    const key = parse_ident()
+    if (key === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const value = parse_assignment_expr()
+    if (value === ERR) return ERR
+    return { span: Span.between(key.span, value.span), Key: key, value }
   }
 
   function parse_left_hand_side_expr(): Expr | Err {
@@ -1770,6 +1797,11 @@ function parser_impl(
           )
         } else if (self.current_token.text === "type") {
           return parse_type_decl()
+        } else if (
+          flags | PARSER_FLAGS.LJS &&
+          self.current_token.text === "struct"
+        ) {
+          return parse_struct_decl()
         } else {
           return parse_expr_stmt()
         }
@@ -1862,6 +1894,36 @@ function parser_impl(
         return parse_expr_stmt()
     }
   }
+  function parse_struct_decl(): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "struct")
+    const name = parse_ident()
+    if (name === ERR) return ERR
+    if (expect(t.LBrace) === ERR) return ERR
+    const members = parse_comma_semi_or_newline_separated_list(
+      t.RBrace,
+      parse_struct_member,
+    )
+    if (members === ERR) return ERR
+    const last = expect(t.RBrace)
+    if (last === ERR) return ERR
+    return Stmt.StructDecl(Span.between(start, last), {
+      span: Span.between(start, last),
+      name,
+      members,
+    })
+  }
+  function parse_struct_member(): StructMember | Err {
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return type_annotation
+    if (expect_semi() === ERR) return ERR
+    return StructMember.FieldDef(name, type_annotation)
+  }
+
   function parse_extern_function(export_token: Token | null): Stmt | Err {
     const start = advance()
     assert.equal(t.Ident, start.kind)

@@ -1,5 +1,6 @@
 import {
   ImportStarAsStmt,
+  StructDeclStmt,
   type ClassDeclStmt,
   type Func,
   type Ident,
@@ -27,9 +28,10 @@ export type ValueDecl =
       name: string
       source_file: string
     }
-  | { kind: "Func"; func: Func }
-  | { kind: "Param"; func: Func; param_index: number }
+  | { kind: "Func"; func: Func; source_file: string }
+  | { kind: "Param"; func: Func; param_index: number; source_file: string }
   | ClassDeclStmt
+  | { kind: "Struct"; decl: StructDeclStmt; source_file: string }
   | {
       kind: "LJSExternFunction"
       stmt: LJSExternFunctionStmt
@@ -128,6 +130,11 @@ export type TypeDecl =
       imported_file: string
     }
   | { kind: "Builtin"; type: Type }
+  | {
+      kind: "Struct"
+      decl: StructDeclStmt
+      source_file: string
+    }
   /**
    * Introduced after resolving imports
    * See the comment in ValueDecl for more details.

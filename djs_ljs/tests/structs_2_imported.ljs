@@ -1,0 +1,10 @@
+import * as Imported from "./modules/CStringBox.ljs"
+import * as ffi from "../ffi.ljs"
+
+function main(): ffi.c_int {
+    puts(Imported.CStringBox { value: ffi.c_str`Hello world` }.value)
+    return 0
+}
+
+extern function puts(s: *ffi.c_char): ffi.c_int
+

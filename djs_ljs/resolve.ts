@@ -41,7 +41,11 @@ export function resolve(fs: FS, source_files: SourceFiles): ResolveResult {
   const return_stmt_enclosing_func = new Map<ReturnStmt, Func>()
   const diagnostics: Diagnostics[] = []
   for (const source_file of source_files.values()) {
-    const result = resolve_source_file(fs, source_file, return_stmt_enclosing_func)
+    const result = resolve_source_file(
+      fs,
+      source_file,
+      return_stmt_enclosing_func,
+    )
     diagnostics.push(result.diagnostics)
     types.set(source_file.path, result.types)
     values.set(source_file.path, result.values)
