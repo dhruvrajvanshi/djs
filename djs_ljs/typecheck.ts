@@ -61,6 +61,7 @@ export function typecheck(
   const trace = new Trace()
   const check_stmt_results = new Map<Stmt, CheckStmtResult>()
   const check_func_signature_results = new Map<Func, CheckFuncSignatureResult>()
+  const source_file_check_results = new Map<SourceFile, null>()
 
   for (const file of source_files.values()) {
     check_source_file(file)
@@ -85,8 +86,20 @@ export function typecheck(
 
   function check_source_file(file: SourceFile): void {
     using _ = trace.add(`check_source_file\n${file.path}`)
+    if (source_file_check_results.has(file)) {
+      return
+    }
+    source_file_check_results.set(file, null)
+    const ctx = make_check_ctx(file, source_file_check_results)
     for (const stmt of file.stmts) {
       check_stmt(file, stmt)
+      if (stmt.kind === "Return") {
+        emit_error(
+          ctx,
+          stmt.span,
+          "Return statements are only allowed inside functions",
+        )
+      }
     }
   }
 
