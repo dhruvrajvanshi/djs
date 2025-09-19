@@ -55,7 +55,7 @@ function collect_module_values_decls(
     for (const stmt of source_file.stmts) {
       switch (stmt.kind) {
         case "VarDecl": {
-          const flattened = flatten_var_decl(stmt)
+          const flattened = flatten_var_decl(stmt.decl)
           for (const decl of flattened) {
             assert_todo(
               !module_values_decls.has(decl.name),

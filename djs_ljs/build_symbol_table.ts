@@ -75,7 +75,7 @@ function initialize_symbol_table(
   for (const stmt of stmts) {
     switch (stmt.kind) {
       case "VarDecl":
-        for (const decl of flatten_var_decl(stmt)) {
+        for (const decl of flatten_var_decl(stmt.decl)) {
           symbol_table.add_value(decl.name, {
             kind: "VarDecl",
             stmt,
