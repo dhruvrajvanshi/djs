@@ -46,7 +46,7 @@ export function build_for_stmt_symbol_table(
     for (const decl of flatten_var_decl(stmt.init.decl)) {
       symbol_table.add_value(decl.name, {
         kind: "VarDecl",
-        stmt: stmt.init.decl,
+        decl: stmt.init.decl,
         name: decl.name,
         source_file: source_file.path,
       })
