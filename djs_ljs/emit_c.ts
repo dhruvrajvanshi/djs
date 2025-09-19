@@ -1,5 +1,5 @@
 import type { SourceFiles } from "./SourceFiles.ts"
-import { assert_never, todo } from "djs_std"
+import { assert_never, defer, todo } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
 import type {
@@ -15,6 +15,12 @@ import type {
   StructInitExpr,
   ForStmt,
   BinOp,
+  IfStmt,
+  WhileStmt,
+  DoWhileStmt,
+  ForInOrOfStmt,
+  ReturnStmt,
+  ContinueStmt,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
@@ -24,7 +30,11 @@ interface EmitContext {
   source_files: SourceFiles
   tc_result: TypecheckResult
   resolve_result: ResolveImportsResult
+  loop_stack: LoopStackEntry[]
 }
+
+type LoopStackEntry = { stmt: LoopStmt; source_file: SourceFile }
+type LoopStmt = ForStmt | WhileStmt | DoWhileStmt | ForInOrOfStmt
 
 /**
  * @returns C source code
@@ -34,7 +44,12 @@ export function emit_c(
   tc_result: TypecheckResult,
   resolve_result: ResolveImportsResult,
 ): string {
-  const ctx: EmitContext = { source_files, tc_result, resolve_result }
+  const ctx: EmitContext = {
+    source_files,
+    tc_result,
+    resolve_result,
+    loop_stack: [],
+  }
 
   // Phase 1: Collect forward declarations
   const forward_decls: CNode[] = []
@@ -244,19 +259,65 @@ function emit_stmt(
         nodes: decl_nodes,
       }
     }
-    case "Return": {
-      const value = stmt.value ? emit_expr(ctx, source_file, stmt.value) : null
-      return { kind: "Return", value }
-    }
     case "Expr": {
       const expr = emit_expr(ctx, source_file, stmt.expr)
       return { kind: "ExprStmt", expr }
     }
     case "For":
       return emit_for_stmt(ctx, source_file, stmt)
+    case "If":
+      return emit_if_stmt(ctx, source_file, stmt)
+    case "Continue":
+      return emit_continue_stmt(ctx, source_file, stmt)
+    case "Break":
+      return { kind: "Break" }
+    case "Return": {
+      return emit_return_stmt(ctx, source_file, stmt)
+    }
     default:
       todo(`Unhandled statement: ${stmt.kind}`)
   }
+}
+function emit_return_stmt(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: ReturnStmt,
+): CNode {
+  const value = stmt.value ? emit_expr(ctx, source_file, stmt.value) : null
+  return { kind: "Return", value }
+}
+
+function emit_continue_stmt(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: ContinueStmt,
+): CNode {
+  const stmts: CNode[] = []
+  const loop_stack = [...ctx.loop_stack].reverse()
+  for (const loop of loop_stack) {
+    switch (loop.stmt.kind) {
+      case "For":
+        if (loop.stmt.update) {
+          stmts.push(emit_expr(ctx, source_file, loop.stmt.update))
+          stmts.push({ kind: "EmptyStmt" })
+        }
+    }
+  }
+  stmts.push({ kind: "Continue" })
+  return { kind: "Many", nodes: stmts }
+}
+
+function emit_if_stmt(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: IfStmt,
+): CNode {
+  const condition = emit_expr(ctx, source_file, stmt.condition)
+  const if_true = emit_stmt(ctx, source_file, stmt.if_true)
+  const if_false = stmt.if_false
+    ? emit_stmt(ctx, source_file, stmt.if_false)
+    : null
+  return { kind: "If", condition, if_true, if_false }
 }
 
 function emit_for_stmt(
@@ -264,6 +325,11 @@ function emit_for_stmt(
   source_file: SourceFile,
   stmt: ForStmt,
 ): CNode {
+  const loop_stack_entry: LoopStackEntry = { stmt, source_file }
+  ctx.loop_stack.push(loop_stack_entry)
+  using _ = defer(() => {
+    ctx.loop_stack.pop()
+  })
   const stmts: CNode[] = []
   assert(stmt.init.kind === "VarDecl")
   const init_var_decls = ctx.tc_result.var_decls.get(stmt.init.decl)
@@ -299,7 +365,6 @@ function emit_for_stmt(
     },
   })
   if (stmt.update) {
-    body.push({ kind: "Label", text: "update" })
     body.push(emit_expr(ctx, source_file, stmt.update))
     body.push({ kind: "EmptyStmt" })
   }
@@ -345,6 +410,8 @@ function emit_expr(
         Gt: ">",
         Lte: "<=",
         Gte: ">=",
+        Add: "+",
+        Sub: "-",
       }
       const op = ops[expr.operator]
       assert(op, `Unhandled binary operator: ${expr.operator}`)
@@ -584,6 +651,14 @@ function render_c_node(node: CNode): string {
       return `(${render_c_node(node.expr)}--)`
     case "EmptyStmt":
       return ";"
+    case "If":
+      return `if (${render_c_node(node.condition)}) ${render_c_node(
+        node.if_true,
+      )}${node.if_false ? ` else ${render_c_node(node.if_false)}` : ""}`
+    case "Break":
+      return "break;"
+    case "Continue":
+      return "continue;"
     default:
       assert_never(node)
   }
@@ -636,3 +711,6 @@ export type CNode =
   | { kind: "PostIncrement"; expr: CNode }
   | { kind: "PostDeclrement"; expr: CNode }
   | { kind: "EmptyStmt" }
+  | { kind: "If"; condition: CNode; if_true: CNode; if_false: CNode | null }
+  | { kind: "Break" }
+  | { kind: "Continue" }

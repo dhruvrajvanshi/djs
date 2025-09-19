@@ -227,3 +227,6 @@ export function* zip<A, B>(
     yield [a_result.value, b_result.value]
   }
 }
+export function defer(cb: () => void) {
+  return { [Symbol.dispose]: cb }
+}
