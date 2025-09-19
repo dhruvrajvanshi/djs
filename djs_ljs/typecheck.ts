@@ -22,6 +22,10 @@ import {
   type Block,
   BinOpExpr,
   PostIncrementExpr,
+  IfStmt,
+  ForInOrOfStmt,
+  WhileStmt,
+  DoWhileStmt,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -52,6 +56,8 @@ interface CheckedVarDecl {
   init: Expr
 }
 
+type LoopStmt = ForStmt | ForInOrOfStmt | WhileStmt | DoWhileStmt
+
 export function typecheck(
   source_files: SourceFiles,
   resolution: ResolveResult,
@@ -63,9 +69,9 @@ export function typecheck(
   const types = new Map<TypeAnnotation, Type>()
   const check_func_signature_results = new Map<Func, CheckFuncSignatureResult>()
   const source_file_check_results = new Map<SourceFile, null>()
-  const checked_stmt_set: Set<Stmt> = new Set()
   const check_var_decl_result = new Map<VarDecl, CheckedVarDecl[]>()
   const check_extern_function_results = new Map<LJSExternFunctionStmt, Type>()
+  const loop_stack: LoopStmt[] = []
 
   interface CheckStructDeclResult {
     constructor_type: Extract<Type, { kind: "StructConstructor" }>
@@ -131,9 +137,40 @@ export function typecheck(
         return check_for_stmt(ctx, stmt)
       case "Block":
         return check_block(ctx, stmt.block)
+      case "If":
+        return check_if_stmt(ctx, stmt)
+      case "While":
+        return check_while_stmt(ctx, stmt)
+
+      case "Break":
+      case "Continue":
+        if (loop_stack.length === 0) {
+          emit_error(
+            ctx,
+            stmt.span,
+            `${stmt.kind} statement not inside a loop`,
+            null,
+          )
+        }
+        break
       default:
         todo(stmt.kind)
     }
+  }
+  function check_if_stmt(ctx: CheckCtx, stmt: IfStmt) {
+    check_expr(ctx, stmt.condition, Type.boolean)
+    check_stmt(ctx, stmt.if_true)
+    if (stmt.if_false) {
+      check_stmt(ctx, stmt.if_false)
+    }
+  }
+  function check_while_stmt(ctx: CheckCtx, stmt: WhileStmt) {
+    loop_stack.push(stmt)
+    using _ = defer(() => {
+      assert(loop_stack.pop() === stmt)
+    })
+    check_expr(ctx, stmt.condition, Type.boolean)
+    check_stmt(ctx, stmt.body)
   }
   function check_block(ctx: CheckCtx, block: Block): void {
     for (const s of block.stmts) {
@@ -142,6 +179,10 @@ export function typecheck(
   }
 
   function check_for_stmt(ctx: CheckCtx, stmt: ForStmt) {
+    loop_stack.push(stmt)
+    using _ = defer(() => {
+      assert(loop_stack.pop() === stmt)
+    })
     switch (stmt.init.kind) {
       case "VarDecl":
         check_var_decl(ctx.source_file, stmt.init.decl)
@@ -855,4 +896,7 @@ function qualified_name_eq(left: readonly string[], right: readonly string[]) {
     if (left[i] !== right[i]) return false
   }
   return true
+}
+function defer(cb: () => void) {
+  return { [Symbol.dispose]: cb }
 }
