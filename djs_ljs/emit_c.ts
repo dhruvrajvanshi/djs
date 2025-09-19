@@ -216,7 +216,7 @@ function emit_stmt(
       return { kind: "Block", body }
     }
     case "VarDecl": {
-      const var_decls = ctx.tc_result.var_decls.get(stmt)
+      const var_decls = ctx.tc_result.var_decls.get(stmt.decl)
       assert(var_decls, "VarDeclStmt must have checked declarations")
 
       if (var_decls.length === 1) {

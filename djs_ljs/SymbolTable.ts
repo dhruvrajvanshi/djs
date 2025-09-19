@@ -3,11 +3,10 @@ import {
   StructDeclStmt,
   type ClassDeclStmt,
   type Func,
-  type Ident,
   type ImportStmt,
   type LJSExternFunctionStmt,
   type TypeAliasStmt,
-  type VarDeclStmt,
+  type VarDecl,
 } from "djs_ast"
 import { MapUtils } from "djs_std"
 import assert from "node:assert"
@@ -24,7 +23,7 @@ export type ValueDeclExcludingKind<K extends ValueDecl["kind"]> = Exclude<
 export type ValueDecl =
   | {
       kind: "VarDecl"
-      stmt: VarDeclStmt
+      decl: VarDecl
       name: string
       source_file: string
     }

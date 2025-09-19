@@ -1,11 +1,9 @@
 import {
   BuiltinExpr,
   DeclType,
-  expr_to_sexpr,
   LJSExternFunctionStmt,
   PropExpr,
   ReturnStmt,
-  sexpr_to_string,
   Span,
   StructDeclStmt,
   type StructInitExpr,
@@ -18,8 +16,8 @@ import {
   type SourceFile,
   type Stmt,
   type TypeAnnotation,
-  type VarDeclStmt,
   TypeAliasStmt,
+  type VarDecl,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -38,7 +36,7 @@ import type { ResolveResult } from "./resolve.ts"
 export interface TypecheckResult {
   values: Map<Expr, Type>
   types: Map<TypeAnnotation, Type>
-  var_decls: Map<VarDeclStmt, CheckedVarDecl[]>
+  var_decls: Map<VarDecl, CheckedVarDecl[]>
   diagnostics: Diagnostics
 }
 interface CheckedVarDecl {
@@ -57,28 +55,30 @@ export function typecheck(
   const _diagnostics = new Diagnostics(source_files.fs)
   const values = new Map<Expr, Type>()
   const types = new Map<TypeAnnotation, Type>()
-  const check_stmt_results = new Map<Stmt, CheckStmtResult>()
   const check_func_signature_results = new Map<Func, CheckFuncSignatureResult>()
   const source_file_check_results = new Map<SourceFile, null>()
+  const checked_stmt_set: Set<Stmt> = new Set()
+  const check_var_decl_result = new Map<VarDecl, CheckedVarDecl[]>()
+  const check_extern_function_results = new Map<LJSExternFunctionStmt, Type>()
+
+  interface CheckStructDeclResult {
+    constructor_type: Extract<Type, { kind: "StructConstructor" }>
+    instance_type: Extract<Type, { kind: "StructInstance" }>
+  }
+  const check_struct_decl_stmt_results = new Map<
+    StructDeclStmt,
+    CheckStructDeclResult
+  >()
 
   for (const file of source_files.values()) {
     check_source_file(file)
-  }
-
-  const var_decls = new Map<VarDeclStmt, CheckedVarDecl[]>()
-  for (const [stmt, result] of check_stmt_results.entries()) {
-    if (stmt.kind !== "VarDecl") {
-      continue
-    }
-    assert(result)
-    var_decls.set(stmt, result.var_decls)
   }
 
   return {
     diagnostics: _diagnostics,
     values,
     types,
-    var_decls,
+    var_decls: check_var_decl_result,
   }
 
   function check_source_file(file: SourceFile): void {
@@ -88,7 +88,7 @@ export function typecheck(
     source_file_check_results.set(file, null)
     const ctx = make_check_ctx(file, source_file_check_results)
     for (const stmt of file.stmts) {
-      check_stmt(file, stmt)
+      check_stmt(ctx, stmt)
       if (stmt.kind === "Return") {
         emit_error(
           ctx,
@@ -98,22 +98,7 @@ export function typecheck(
       }
     }
   }
-
-  type CheckStmtResult = void | {
-    values: Map<string, Type>
-    types: Map<string, Type>
-    var_decls: CheckedVarDecl[]
-  }
-
-  function check_stmt(source_file: SourceFile, stmt: Stmt): CheckStmtResult {
-    const existing = check_stmt_results.get(stmt)
-    if (existing) return existing
-    const ctx = make_check_ctx(source_file, check_stmt_results)
-    const result = check_stmt_worker(ctx, stmt)
-    check_stmt_results.set(stmt, result)
-    return result
-  }
-  function check_stmt_worker(ctx: CheckCtx, stmt: Stmt): CheckStmtResult {
+  function check_stmt(ctx: CheckCtx, stmt: Stmt) {
     switch (stmt.kind) {
       case "Import":
         return check_import_stmt(ctx, stmt)
@@ -124,24 +109,30 @@ export function typecheck(
       case "Func":
         return check_func_stmt(ctx, stmt)
       case "VarDecl":
-        return check_var_decl_stmt(ctx, stmt)
+        check_var_decl(ctx.source_file, stmt.decl)
+        return
       case "LJSExternFunction":
-        return check_ljs_extern_function_stmt(ctx, stmt)
+        check_ljs_extern_function_stmt(ctx.source_file, stmt)
+        return
       case "Expr":
-        infer_expr(ctx, stmt.expr)
+        infer_expr(ctx.source_file, stmt.expr)
         return
       case "Return":
         return check_return_stmt(ctx, stmt)
       case "StructDecl":
-        return check_struct_decl_stmt(ctx, stmt)
+        return check_struct_decl_stmt(ctx.source_file, stmt)
       default:
         todo(stmt.kind)
     }
   }
   function check_struct_decl_stmt(
-    ctx: CheckCtx,
+    source_file: SourceFile,
     stmt: StructDeclStmt,
-  ): CheckStmtResult {
+  ): CheckStructDeclResult {
+    const existing = check_struct_decl_stmt_results.get(stmt)
+    if (existing) return existing
+    const ctx = make_check_ctx(source_file, check_struct_decl_stmt_results)
+
     const members: Record<string, Type> = {}
     for (const member of stmt.struct_def.members) {
       switch (member.kind) {
@@ -154,7 +145,7 @@ export function typecheck(
             )
           }
           members[member.name.text] = check_type_annotation(
-            ctx,
+            ctx.source_file,
             member.type_annotation,
           )
           break
@@ -167,22 +158,11 @@ export function typecheck(
       ctx.source_file.path,
     )
     return {
-      values: new Map<string, Type>([
-        [
-          stmt.struct_def.name.text,
-          Type.StructConstructor(qualified_name, members),
-        ],
-      ]),
-      types: new Map<string, Type>([
-        [
-          stmt.struct_def.name.text,
-          Type.StructInstance(qualified_name, members),
-        ],
-      ]),
-      var_decls: [],
+      constructor_type: Type.StructConstructor(qualified_name, members),
+      instance_type: Type.StructInstance(qualified_name, members),
     }
   }
-  function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt): CheckStmtResult {
+  function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt) {
     if (stmt.value) {
       const func = resolution.return_stmt_enclosing_func.get(stmt)
       if (func) {
@@ -210,12 +190,12 @@ export function typecheck(
   function check_import_stmt(_: CheckCtx, __: Stmt): void {}
   function check_import_star_as_stmt(_: CheckCtx, __: Stmt): void {}
   function check_type_alias_stmt(ctx: CheckCtx, stmt: TypeAliasStmt): void {
-    check_type_annotation(ctx, stmt.type_annotation)
+    check_type_annotation(ctx.source_file, stmt.type_annotation)
   }
   function check_func_stmt(ctx: CheckCtx, { func, span }: FuncStmt): void {
     check_func_signature(ctx.source_file, func)
     for (const stmt of func.body.stmts) {
-      check_stmt(ctx.source_file, stmt)
+      check_stmt(ctx, stmt)
     }
   }
   interface CheckFuncSignatureResult {
@@ -246,7 +226,7 @@ export function typecheck(
         )
         continue
       }
-      const type = check_type_annotation(ctx, param.type_annotation)
+      const type = check_type_annotation(ctx.source_file, param.type_annotation)
       if (param.pattern.kind !== "Var") {
         emit_error(
           ctx,
@@ -259,7 +239,7 @@ export function typecheck(
     }
     let return_type: Type | null = null
     if (func.return_type) {
-      return_type = check_type_annotation(ctx, func.return_type)
+      return_type = check_type_annotation(ctx.source_file, func.return_type)
     } else {
       return_type = emit_error_type(ctx, {
         span: func.name?.span ?? func.params[0].span ?? func.span,
@@ -273,41 +253,47 @@ export function typecheck(
     check_func_signature_results.set(func, result)
     return result
   }
-  function check_var_decl_stmt(
-    ctx: CheckCtx,
-    stmt: VarDeclStmt,
-  ): CheckStmtResult {
-    const values = new Map<string, Type>()
+  function check_var_decl(
+    source_file: SourceFile,
+    decl: VarDecl,
+  ): CheckedVarDecl[] {
+    const existing = check_var_decl_result.get(decl)
+    if (existing) {
+      return existing
+    }
     const var_decls: CheckedVarDecl[] = []
-    for (const decl of flatten_var_decl(stmt.decl)) {
-      const annotation = decl.type_annotation
+    check_var_decl_result.set(decl, var_decls)
+    const ctx = make_check_ctx(source_file, check_var_decl_result)
+    const values = new Map<string, Type>()
+    for (const flattened_decl of flatten_var_decl(decl)) {
+      const annotation = flattened_decl.type_annotation
       let type: Type | null = null
       if (annotation) {
-        type = check_type_annotation(ctx, annotation)
+        type = check_type_annotation(ctx.source_file, annotation)
       }
-      if (decl.init) {
+      if (flattened_decl.init) {
         if (type) {
-          check_expr(ctx, decl.init, type)
-          values.set(decl.name, type)
+          check_expr(ctx, flattened_decl.init, type)
+          values.set(flattened_decl.name, type)
           var_decls.push({
-            decl_type: decl.decl_type,
-            name: decl.name,
+            decl_type: flattened_decl.decl_type,
+            name: flattened_decl.name,
             type,
-            init: decl.init,
+            init: flattened_decl.init,
           })
         } else {
-          const ty = infer_expr(ctx, decl.init)
-          values.set(decl.name, ty)
+          const ty = infer_expr(ctx.source_file, flattened_decl.init)
+          values.set(flattened_decl.name, ty)
           var_decls.push({
-            decl_type: decl.decl_type,
-            name: decl.name,
+            decl_type: flattened_decl.decl_type,
+            name: flattened_decl.name,
             type: ty,
-            init: decl.init,
+            init: flattened_decl.init,
           })
         }
       }
     }
-    return { values, types: new Map(), var_decls }
+    return var_decls
   }
   function emit_error(
     ctx: CheckCtx,
@@ -323,9 +309,13 @@ export function typecheck(
   }
 
   function check_ljs_extern_function_stmt(
-    ctx: CheckCtx,
+    source_file: SourceFile,
     stmt: LJSExternFunctionStmt,
-  ): CheckStmtResult {
+  ): Type {
+    const existing = check_extern_function_results.get(stmt)
+    if (existing) return existing
+
+    const ctx = make_check_ctx(source_file, check_extern_function_results)
     const param_types: Type[] = []
     for (const param of stmt.params) {
       if (!param.type_annotation) {
@@ -336,17 +326,15 @@ export function typecheck(
         )
         continue
       } else {
-        param_types.push(check_type_annotation(ctx, param.type_annotation))
+        param_types.push(
+          check_type_annotation(ctx.source_file, param.type_annotation),
+        )
       }
     }
-    const return_type = check_type_annotation(ctx, stmt.return_type)
-    return {
-      values: new Map([
-        [stmt.name.text, Type.UnboxedFunc(param_types, return_type)],
-      ]),
-      types: new Map(),
-      var_decls: [],
-    }
+    const return_type = check_type_annotation(ctx.source_file, stmt.return_type)
+    const ty = Type.UnboxedFunc(param_types, return_type)
+    check_extern_function_results.set(stmt, ty)
+    return ty
   }
 
   function check_expr(ctx: CheckCtx, expr: Expr, expected_type: Type): void {
@@ -368,7 +356,7 @@ export function typecheck(
         values.set(expr, expected_type)
         return
       default: {
-        const inferred = infer_expr(ctx, expr)
+        const inferred = infer_expr(ctx.source_file, expr)
         if (!is_assignable({ source: inferred, target: expected_type })) {
           emit_error(
             ctx,
@@ -429,7 +417,7 @@ export function typecheck(
   }
   function make_check_ctx(
     source_file: SourceFile,
-    _proof_of_uniqueness: Map<unknown, unknown>,
+    _proof_of_uniqueness: Map<unknown, unknown> | Set<unknown>,
   ): CheckCtx {
     return {
       source_file,
@@ -437,10 +425,11 @@ export function typecheck(
       __proof: "__check_ctx__",
     }
   }
-  function infer_expr(ctx: CheckCtx, expr: Expr): Type {
+  function infer_expr(source_file: SourceFile, expr: Expr): Type {
     const existing = values.get(expr)
     if (existing) return existing
 
+    const ctx = make_check_ctx(source_file, values)
     const ty = infer_expr_worker(ctx, expr)
     values.set(expr, ty)
     return ty
@@ -474,7 +463,7 @@ export function typecheck(
     }
   }
   function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
-    const lhs_type = infer_expr(ctx, expr.lhs)
+    const lhs_type = infer_expr(ctx.source_file, expr.lhs)
     if (lhs_type.kind !== "StructConstructor") {
       return emit_error_type(ctx, {
         message:
@@ -521,7 +510,7 @@ export function typecheck(
   }
 
   function infer_call_expr(ctx: CheckCtx, expr: Expr & { kind: "Call" }): Type {
-    const lhs_type = infer_expr(ctx, expr.callee)
+    const lhs_type = infer_expr(ctx.source_file, expr.callee)
     if (lhs_type.kind === "Error") {
       return lhs_type
     }
@@ -538,7 +527,7 @@ export function typecheck(
       }
       return lhs_type.return_type
     } else {
-      expr.args.map((arg) => infer_expr(ctx, arg))
+      expr.args.map((arg) => infer_expr(ctx.source_file, arg))
       return emit_error_type(ctx, {
         span: expr.callee.span,
         message: `Expected a function, got ${type_to_string(lhs_type)}`,
@@ -574,7 +563,7 @@ export function typecheck(
       }
       return type_of_decl(expr.property.text, decl)
     } else {
-      const lhs = infer_expr(ctx, expr.lhs)
+      const lhs = infer_expr(ctx.source_file, expr.lhs)
       if (lhs.kind === "StructInstance") {
         return (
           lhs.fields[expr.property.text] ??
@@ -599,28 +588,22 @@ export function typecheck(
       case "VarDecl": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const check_stmt_result = check_stmt(source_file, decl.stmt)
-        const ty = check_stmt_result?.values.get(name)
-        assert(
-          ty,
-          `Expected type for ${name} in ${source_file.path}; ${check_stmt_result}; ${short_stmt_name(decl.stmt)}`,
-        )
-        return ty
+        const result = check_var_decl(source_file, decl.decl)
+        const declarator = result.find((it) => it.name === name)
+        assert(declarator, `Expected a declarator for variable ${name}`)
+        return declarator.type
       }
       case "LJSExternFunction": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_stmt(source_file, decl.stmt)
-        const ty = result?.values.get(name)
-        assert(ty, `Expected a type for LJSExternFunction ${name}`)
+        const ty = check_ljs_extern_function_stmt(source_file, decl.stmt)
         return ty
       }
       case "Struct": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_stmt(source_file, decl.decl)
-        assert(result, `Expected a result for check_stmt(StructDecl) ${name}`)
-        const type = result.values.get(decl.decl.struct_def.name.text)
+        const result = check_struct_decl_stmt(source_file, decl.decl)
+        const type = result.constructor_type
         assert(type, "Expected check_stmt to set the struct constructor's type")
         return type
       }
@@ -666,7 +649,7 @@ export function typecheck(
     expr: TaggedTemplateLiteralExpr,
   ): Type {
     const callee = expr.tag
-    const callee_ty = infer_expr(ctx, expr.tag)
+    const callee_ty = infer_expr(ctx.source_file, expr.tag)
     if (callee_ty.kind === "CStringConstructor") {
       return infer_and_check_c_string_expr(ctx, expr)
     }
@@ -740,14 +723,14 @@ export function typecheck(
   }
 
   function check_type_annotation(
-    ctx: CheckCtx,
+    source_file: SourceFile,
     annotation: TypeAnnotation,
   ): Type {
-    const { source_file } = ctx
     const existing = types.get(annotation)
     if (existing) {
       return existing
     }
+    const ctx = make_check_ctx(source_file, types)
     const t = annotation_to_type(make_type_var_env(ctx), annotation)
     types.set(annotation, t)
     return t
@@ -760,7 +743,7 @@ export function typecheck(
       case "TypeAlias": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        return check_type_annotation(ctx, decl.stmt.type_annotation)
+        return check_type_annotation(ctx.source_file, decl.stmt.type_annotation)
       }
       case "Module":
         return todo()
@@ -771,15 +754,8 @@ export function typecheck(
       case "Struct": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_stmt(source_file, decl.decl)
-        assert(
-          result,
-          `Expected a result for check_stmt(StructDecl) ${decl.decl}`,
-        )
-        const type = result.types.get(decl.decl.struct_def.name.text)
-        assert(type, "Expected check_stmt to set the struct instance's type")
-
-        return type
+        const result = check_struct_decl_stmt(source_file, decl.decl)
+        return result.instance_type
       }
       default:
         return assert_never(decl)
