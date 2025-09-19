@@ -298,6 +298,11 @@ function emit_for_stmt(
       body,
     },
   })
+  if (stmt.update) {
+    body.push({ kind: "Label", text: "update" })
+    body.push(emit_expr(ctx, source_file, stmt.update))
+    body.push({ kind: "EmptyStmt" })
+  }
   return {
     kind: "Block",
     body: stmts,
@@ -350,6 +355,16 @@ function emit_expr(
         right: emit_expr(ctx, source_file, expr.rhs),
       }
     }
+    case "PostIncrement":
+      return {
+        kind: "PostIncrement",
+        expr: emit_expr(ctx, source_file, expr.value),
+      }
+    case "PostDecrement":
+      return {
+        kind: "PostDeclrement",
+        expr: emit_expr(ctx, source_file, expr.value),
+      }
     default:
       todo(`Unhandled expression: ${expr.kind}`)
   }
@@ -561,6 +576,14 @@ function render_c_node(node: CNode): string {
       return `(${render_c_node(node.left)} ${node.op} ${render_c_node(
         node.right,
       )})`
+    case "Label":
+      return `${node.text}:`
+    case "PostIncrement":
+      return `(${render_c_node(node.expr)}++)`
+    case "PostDeclrement":
+      return `(${render_c_node(node.expr)}--)`
+    case "EmptyStmt":
+      return ";"
     default:
       assert_never(node)
   }
@@ -609,3 +632,7 @@ export type CNode =
   | { kind: "Many"; nodes: CNode[] }
   | { kind: "While"; condition: CNode; body: CNode }
   | { kind: "BinOp"; op: string; left: CNode; right: CNode }
+  | { kind: "Label"; text: string }
+  | { kind: "PostIncrement"; expr: CNode }
+  | { kind: "PostDeclrement"; expr: CNode }
+  | { kind: "EmptyStmt" }
