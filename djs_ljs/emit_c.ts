@@ -219,8 +219,7 @@ function emit_stmt(
       const var_decls = ctx.tc_result.var_decls.get(stmt.decl)
       assert(var_decls, "VarDeclStmt must have checked declarations")
 
-      if (var_decls.length === 1) {
-        const decl = var_decls[0]
+      const decl_nodes = var_decls.map((decl) => {
         const var_type = emit_type(decl.type)
         const init_expr = emit_expr(ctx, source_file, decl.init)
 
@@ -229,21 +228,11 @@ function emit_stmt(
           type: var_type,
           name: decl.name,
           init: init_expr,
-        }
-      } else {
-        const decl_nodes = var_decls.map((decl) => {
-          const var_type = emit_type(decl.type)
-          const init_expr = emit_expr(ctx, source_file, decl.init)
-
-          return {
-            kind: "VarDecl",
-            type: var_type,
-            name: decl.name,
-            init: init_expr,
-          } as CNode
-        })
-
-        return { kind: "Block", body: decl_nodes }
+        } as CNode
+      })
+      return {
+        kind: "Many",
+        nodes: decl_nodes,
       }
     }
     case "Return": {
@@ -490,6 +479,8 @@ function render_c_node(node: CNode): string {
         .join("\n")}\n};`
     case "StructDecl":
       return `struct ${node.name};`
+    case "Many":
+      return node.nodes.map(render_c_node).join("\n")
     default:
       assert_never(node)
   }
@@ -535,3 +526,4 @@ export type CNode =
   | { kind: "Typedef"; name: string; to: CNode }
   | { kind: "StructDecl"; name: string }
   | { kind: "StructDef"; name: string; fields: { name: string; type: CNode }[] }
+  | { kind: "Many"; nodes: CNode[] }
