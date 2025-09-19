@@ -1,4 +1,10 @@
-import type { DeclType, Expr, TypeAnnotation, VarDeclStmt } from "djs_ast"
+import type {
+  DeclType,
+  Expr,
+  TypeAnnotation,
+  VarDecl,
+  VarDeclStmt,
+} from "djs_ast"
 import { todo } from "djs_std"
 
 export interface FlatVarDecl {
@@ -21,13 +27,13 @@ export interface FlatVarDecl {
  * let bar = s_temp.bar;
  * let bat = baz.bat;
  */
-export function flatten_var_decl(stmt: VarDeclStmt): FlatVarDecl[] {
+export function flatten_var_decl(stmt: VarDecl): FlatVarDecl[] {
   const result: FlatVarDecl[] = []
-  for (const declarator of stmt.decl.declarators) {
+  for (const declarator of stmt.declarators) {
     switch (declarator.pattern.kind) {
       case "Var": {
         result.push({
-          decl_type: stmt.decl.decl_type,
+          decl_type: stmt.decl_type,
           name: declarator.pattern.ident.text,
           init: declarator.init,
           type_annotation: declarator.type_annotation,

@@ -279,7 +279,7 @@ export function typecheck(
   ): CheckStmtResult {
     const values = new Map<string, Type>()
     const var_decls: CheckedVarDecl[] = []
-    for (const decl of flatten_var_decl(stmt)) {
+    for (const decl of flatten_var_decl(stmt.decl)) {
       const annotation = decl.type_annotation
       let type: Type | null = null
       if (annotation) {
@@ -799,7 +799,7 @@ export function typecheck(
 
 function short_stmt_name(stmt: Stmt): string {
   if (stmt.kind === "VarDecl") {
-    return flatten_var_decl(stmt)
+    return flatten_var_decl(stmt.decl)
       .map((decl) => `${stmt.decl.decl_type.toLowerCase()} ${decl.name} = ...`)
       .join(";")
   }

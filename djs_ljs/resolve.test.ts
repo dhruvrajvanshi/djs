@@ -220,7 +220,7 @@ test("resolve import * as foo from 'bar'", async () => {
 })
 
 function var_decl_binds(stmt: VarDeclStmt, name: string): boolean {
-  for (const s of flatten_var_decl(stmt)) {
+  for (const s of flatten_var_decl(stmt.decl)) {
     if (s.name === name) {
       return true
     }
