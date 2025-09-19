@@ -197,7 +197,7 @@ export function type_to_sexpr(type: Type): string {
       return assert_never(type)
   }
 }
-function type_is_integral(type: Type): boolean {
+export function type_is_integral(type: Type): boolean {
   return (
     type.kind === "u8" ||
     type.kind === "u16" ||
@@ -210,7 +210,7 @@ function type_is_integral(type: Type): boolean {
     type.kind === "c_int"
   )
 }
-function type_is_floating_point(type: Type): boolean {
+export function type_is_floating_point(type: Type): boolean {
   return type.kind === "f32" || type.kind === "f64"
 }
 export function type_is_convertible_from_numeric_literal(

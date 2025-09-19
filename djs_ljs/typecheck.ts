@@ -18,11 +18,17 @@ import {
   type TypeAnnotation,
   TypeAliasStmt,
   type VarDecl,
+  ForStmt,
+  type Block,
+  BinOpExpr,
+  PostIncrementExpr,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
   Type,
   type_is_convertible_from_numeric_literal,
+  type_is_floating_point,
+  type_is_integral,
   type_to_string,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
@@ -121,9 +127,38 @@ export function typecheck(
         return check_return_stmt(ctx, stmt)
       case "StructDecl":
         return check_struct_decl_stmt(ctx.source_file, stmt)
+      case "For":
+        return check_for_stmt(ctx, stmt)
+      case "Block":
+        return check_block(ctx, stmt.block)
       default:
         todo(stmt.kind)
     }
+  }
+  function check_block(ctx: CheckCtx, block: Block): void {
+    for (const s of block.stmts) {
+      check_stmt(ctx, s)
+    }
+  }
+
+  function check_for_stmt(ctx: CheckCtx, stmt: ForStmt) {
+    switch (stmt.init.kind) {
+      case "VarDecl":
+        check_var_decl(ctx.source_file, stmt.init.decl)
+        break
+      case "Expr":
+        emit_error(
+          ctx,
+          stmt.init.expr.span,
+          "For statement initializers must be a var declaration",
+        )
+        return
+      default:
+        assert_never(stmt.init)
+    }
+    if (stmt.test) check_expr(ctx, stmt.test, Type.boolean)
+    if (stmt.update) infer_expr(ctx.source_file, stmt.update)
+    check_stmt(ctx, stmt.body)
   }
   function check_struct_decl_stmt(
     source_file: SourceFile,
@@ -447,19 +482,60 @@ export function typecheck(
       case "Var":
         return infer_var_expr(ctx, expr)
       case "Number":
-        // TODO: Handle inference for other int types
-        return Type.c_int
+        return Type.i64
       case "StructInit": {
         return infer_struct_init_expr(ctx, expr)
       }
       case "Boolean":
         return Type.boolean
+      case "BinOp":
+        return infer_binop_expr(ctx, expr)
+      case "PostIncrement":
+        return infer_post_increment_expr(ctx, expr)
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
           span: expr.span,
         })
       }
+    }
+  }
+  function infer_post_increment_expr(
+    ctx: CheckCtx,
+    expr: PostIncrementExpr,
+  ): Type {
+    const inner_type = infer_expr(ctx.source_file, expr.value)
+    if (!type_is_integral(inner_type)) {
+      return emit_error_type(ctx, {
+        message: `The operand of a post-increment must be an integral type`,
+        span: expr.value.span,
+        hint: `Got ${type_to_string(inner_type)}`,
+      })
+    }
+    return inner_type
+  }
+  function infer_binop_expr(ctx: CheckCtx, expr: BinOpExpr): Type {
+    switch (expr.operator) {
+      case "Lt":
+      case "Lte":
+      case "Gt":
+      case "Gte": {
+        const lhs_type = infer_expr(ctx.source_file, expr.lhs)
+        if (!type_is_integral(lhs_type) && !type_is_floating_point(lhs_type)) {
+          emit_error(
+            ctx,
+            expr.lhs.span,
+            `Expected an integral or floating point type on the left-hand side of ${expr.operator}`,
+            `Got ${type_to_string(lhs_type)}`,
+          )
+          return Type.boolean
+        }
+        check_expr(ctx, expr.rhs, lhs_type)
+        return Type.boolean
+      }
+
+      default:
+        todo(expr.operator)
     }
   }
   function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
@@ -771,15 +847,6 @@ export function typecheck(
     // TODO: Convert the source path into a qualified module name
     return [ident.text]
   }
-}
-
-function short_stmt_name(stmt: Stmt): string {
-  if (stmt.kind === "VarDecl") {
-    return flatten_var_decl(stmt.decl)
-      .map((decl) => `${stmt.decl.decl_type.toLowerCase()} ${decl.name} = ...`)
-      .join(";")
-  }
-  return stmt.kind
 }
 
 function qualified_name_eq(left: readonly string[], right: readonly string[]) {

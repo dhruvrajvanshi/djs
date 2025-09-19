@@ -1,10 +1,4 @@
-import type {
-  DeclType,
-  Expr,
-  TypeAnnotation,
-  VarDecl,
-  VarDeclStmt,
-} from "djs_ast"
+import type { DeclType, Expr, TypeAnnotation, VarDecl } from "djs_ast"
 import { todo } from "djs_std"
 
 export interface FlatVarDecl {
