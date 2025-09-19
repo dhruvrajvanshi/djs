@@ -278,12 +278,25 @@ function emit_for_stmt(
       init: init_expr,
     })
   })
+  const actual_body: CNode =
+    stmt.body.kind === "Block"
+      ? {
+          kind: "Many",
+          nodes: stmt.body.block.stmts.map((s) =>
+            emit_stmt(ctx, source_file, s),
+          ),
+        }
+      : emit_stmt(ctx, source_file, stmt.body)
+  const body: CNode[] = [actual_body]
   stmts.push({
     kind: "While",
     condition: stmt.test
       ? emit_expr(ctx, source_file, stmt.test)
       : { kind: "Ident", name: "true" },
-    body: emit_stmt(ctx, source_file, stmt.body),
+    body: {
+      kind: "Block",
+      body,
+    },
   })
   return {
     kind: "Block",
