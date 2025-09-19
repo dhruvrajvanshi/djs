@@ -36,7 +36,7 @@ import {
   type_to_string,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
-import { assert_never, is_readonly_array, todo, zip } from "djs_std"
+import { assert_never, defer, is_readonly_array, todo, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
@@ -574,6 +574,20 @@ export function typecheck(
         check_expr(ctx, expr.rhs, lhs_type)
         return Type.boolean
       }
+      case "Add":
+      case "Sub": {
+        const lhs_type = infer_expr(ctx.source_file, expr.lhs)
+        if (!type_is_integral(lhs_type) && !type_is_floating_point(lhs_type)) {
+          emit_error(
+            ctx,
+            expr.lhs.span,
+            `Expected an integral or floating point type on the left-hand side of ${expr.operator}`,
+            `Got ${type_to_string(lhs_type)}`,
+          )
+        }
+        check_expr(ctx, expr.rhs, lhs_type)
+        return lhs_type
+      }
 
       default:
         todo(expr.operator)
@@ -896,7 +910,4 @@ function qualified_name_eq(left: readonly string[], right: readonly string[]) {
     if (left[i] !== right[i]) return false
   }
   return true
-}
-function defer(cb: () => void) {
-  return { [Symbol.dispose]: cb }
 }
