@@ -78,7 +78,7 @@ function initialize_symbol_table(
         for (const decl of flatten_var_decl(stmt.decl)) {
           symbol_table.add_value(decl.name, {
             kind: "VarDecl",
-            stmt,
+            decl: stmt.decl,
             name: decl.name,
             source_file: source_file.path,
           })

@@ -102,22 +102,22 @@ test("resolve smoke test", async () => {
     x1: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
-        decl.stmt,
-        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")),
+        decl.decl,
+        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")).decl,
       )
     },
     y1: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
-        decl.stmt,
-        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "y")),
+        decl.decl,
+        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "y")).decl,
       )
     },
     x2: (decl) => {
       assert(decl.kind === "VarDecl")
       assert.equal(
-        decl.stmt,
-        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")),
+        decl.decl,
+        find_stmt(main, "VarDecl", (s) => var_decl_binds(s, "x")).decl,
       )
     },
   }
