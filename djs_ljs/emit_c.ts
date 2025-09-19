@@ -13,6 +13,8 @@ import type {
   Param,
   SourceFile,
   StructInitExpr,
+  ForStmt,
+  BinOp,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
@@ -90,7 +92,9 @@ export function emit_c(
 
   const c_nodes: CNode[] = [...forward_decls, ...defs]
 
-  return render_c_nodes(c_nodes)
+  return (
+    "#include <stdint.h>\n#include <stdbool.h>\n\n" + render_c_nodes(c_nodes)
+  )
 }
 function emit_struct_decl(stmt: Stmt): CNode {
   assert(stmt.kind === "StructDecl")
@@ -159,6 +163,11 @@ function emit_type(type: Type): CNode {
       return { kind: "Ident", name: "int32_t" }
     case "u32":
       return { kind: "Ident", name: "uint32_t" }
+    case "i64":
+      return { kind: "Ident", name: "int64_t" }
+    case "u64":
+      return { kind: "Ident", name: "uint64_t" }
+
     case "Ptr":
       return { kind: "ConstPtr", to_type: emit_type(type.type) }
     case "MutPtr":
@@ -243,8 +252,42 @@ function emit_stmt(
       const expr = emit_expr(ctx, source_file, stmt.expr)
       return { kind: "ExprStmt", expr }
     }
+    case "For":
+      return emit_for_stmt(ctx, source_file, stmt)
     default:
       todo(`Unhandled statement: ${stmt.kind}`)
+  }
+}
+
+function emit_for_stmt(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: ForStmt,
+): CNode {
+  const stmts: CNode[] = []
+  assert(stmt.init.kind === "VarDecl")
+  const init_var_decls = ctx.tc_result.var_decls.get(stmt.init.decl)
+  assert(init_var_decls, "ForStmt VarDecl must have checked declarations")
+  init_var_decls.forEach((decl) => {
+    const var_type = emit_type(decl.type)
+    const init_expr = emit_expr(ctx, source_file, decl.init)
+    stmts.push({
+      kind: "VarDecl",
+      type: var_type,
+      name: decl.name,
+      init: init_expr,
+    })
+  })
+  stmts.push({
+    kind: "While",
+    condition: stmt.test
+      ? emit_expr(ctx, source_file, stmt.test)
+      : { kind: "Ident", name: "true" },
+    body: emit_stmt(ctx, source_file, stmt.body),
+  })
+  return {
+    kind: "Block",
+    body: stmts,
   }
 }
 
@@ -278,6 +321,22 @@ function emit_expr(
     }
     case "StructInit":
       return emit_struct_init_expr(ctx, source_file, expr)
+    case "BinOp": {
+      const ops: Partial<Record<BinOp, string>> = {
+        Lt: "<",
+        Gt: ">",
+        Lte: "<=",
+        Gte: ">=",
+      }
+      const op = ops[expr.operator]
+      assert(op, `Unhandled binary operator: ${expr.operator}`)
+      return {
+        kind: "BinOp",
+        op,
+        left: emit_expr(ctx, source_file, expr.lhs),
+        right: emit_expr(ctx, source_file, expr.rhs),
+      }
+    }
     default:
       todo(`Unhandled expression: ${expr.kind}`)
   }
@@ -481,6 +540,14 @@ function render_c_node(node: CNode): string {
       return `struct ${node.name};`
     case "Many":
       return node.nodes.map(render_c_node).join("\n")
+    case "While":
+      return `while (${render_c_node(node.condition)}) ${render_c_node(
+        node.body,
+      )}`
+    case "BinOp":
+      return `(${render_c_node(node.left)} ${node.op} ${render_c_node(
+        node.right,
+      )})`
     default:
       assert_never(node)
   }
@@ -527,3 +594,5 @@ export type CNode =
   | { kind: "StructDecl"; name: string }
   | { kind: "StructDef"; name: string; fields: { name: string; type: CNode }[] }
   | { kind: "Many"; nodes: CNode[] }
+  | { kind: "While"; condition: CNode; body: CNode }
+  | { kind: "BinOp"; op: string; left: CNode; right: CNode }
