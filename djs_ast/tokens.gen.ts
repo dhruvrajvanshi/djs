@@ -47,7 +47,6 @@ const TokenKinds = Object.freeze({
   Default: "Default",
   Export: "Export",
   Import: "Import",
-  From: "From",
   As: "As",
   String: "String",
   Number: "Number",
@@ -155,7 +154,6 @@ const text_to_keyword_kind: Map<string, TokenKind> = new Map([
   ["default", TokenKinds.Default],
   ["export", TokenKinds.Export],
   ["import", TokenKinds.Import],
-  ["from", TokenKinds.From],
   ["as", TokenKinds.As],
 ])
 

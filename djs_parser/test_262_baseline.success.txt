@@ -16660,6 +16660,7 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/smallestunit-wrong-type.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/weeks-months.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/wrapping-at-end-of-month.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/year-zero.js
@@ -16885,6 +16886,7 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/smallestunit-wrong-type.js
+../test262/test/built-ins/Temporal/PlainDate/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/weeks-months.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/wrapping-at-end-of-month.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/year-zero.js
@@ -17266,6 +17268,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/subseconds.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/weeks-months-mutually-exclusive.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/wrapping-at-end-of-month.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/year-zero.js
@@ -17479,6 +17482,7 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/subseconds.js
+../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/units-changed.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/weeks-months-mutually-exclusive.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/wrapping-at-end-of-month.js
@@ -18447,6 +18451,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/smallestunit-wrong-type.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/symmetry.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/throws-if-year-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/year-zero.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/argument-duration-max.js
@@ -18586,6 +18591,7 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/smallestunit-plurals-accepted.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/smallestunit-undefined.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/smallestunit-wrong-type.js
+../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/throws-if-year-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/year-zero.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/valueOf/basic.js
@@ -19428,6 +19434,7 @@
 ../test262/test/built-ins/TypedArray/from/from-typedarray-into-itself-mapper-makes-result-out-of-bounds.js
 ../test262/test/built-ins/TypedArray/from/from-typedarray-mapper-detaches-result.js
 ../test262/test/built-ins/TypedArray/from/from-typedarray-mapper-makes-result-out-of-bounds.js
+../test262/test/built-ins/TypedArray/from/invoked-as-func.js
 ../test262/test/built-ins/TypedArray/from/invoked-as-method.js
 ../test262/test/built-ins/TypedArray/from/iter-access-error.js
 ../test262/test/built-ins/TypedArray/from/iter-invoke-error.js
@@ -19439,6 +19446,7 @@
 ../test262/test/built-ins/TypedArray/from/name.js
 ../test262/test/built-ins/TypedArray/from/not-a-constructor.js
 ../test262/test/built-ins/TypedArray/from/prop-desc.js
+../test262/test/built-ins/TypedArray/from/this-is-not-constructor.js
 ../test262/test/built-ins/TypedArray/invoked.js
 ../test262/test/built-ins/TypedArray/length.js
 ../test262/test/built-ins/TypedArray/name.js
@@ -21187,6 +21195,7 @@
 ../test262/test/built-ins/TypedArrayConstructors/from/BigInt/custom-ctor-returns-smaller-instance-throws.js
 ../test262/test/built-ins/TypedArrayConstructors/from/BigInt/custom-ctor.js
 ../test262/test/built-ins/TypedArrayConstructors/from/BigInt/inherited.js
+../test262/test/built-ins/TypedArrayConstructors/from/BigInt/invoked-as-func.js
 ../test262/test/built-ins/TypedArrayConstructors/from/BigInt/iter-access-error.js
 ../test262/test/built-ins/TypedArrayConstructors/from/BigInt/iter-invoke-error.js
 ../test262/test/built-ins/TypedArrayConstructors/from/BigInt/iter-next-error.js
@@ -21213,6 +21222,7 @@
 ../test262/test/built-ins/TypedArrayConstructors/from/custom-ctor-returns-smaller-instance-throws.js
 ../test262/test/built-ins/TypedArrayConstructors/from/custom-ctor.js
 ../test262/test/built-ins/TypedArrayConstructors/from/inherited.js
+../test262/test/built-ins/TypedArrayConstructors/from/invoked-as-func.js
 ../test262/test/built-ins/TypedArrayConstructors/from/iter-access-error.js
 ../test262/test/built-ins/TypedArrayConstructors/from/iter-invoke-error.js
 ../test262/test/built-ins/TypedArrayConstructors/from/iter-next-error.js

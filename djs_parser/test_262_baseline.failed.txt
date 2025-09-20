@@ -377,7 +377,6 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-halfFloor.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/since/roundingmode-trunc.js
-../test262/test/built-ins/Temporal/PlainDate/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-expand.js
@@ -388,7 +387,6 @@
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-halfFloor.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDate/prototype/until/roundingmode-trunc.js
-../test262/test/built-ins/Temporal/PlainDate/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/calendar-undefined.js
 ../test262/test/built-ins/Temporal/PlainDateTime/from/argument-string-offset.js
 ../test262/test/built-ins/Temporal/PlainDateTime/from/overflow-default-constrain.js
@@ -418,7 +416,6 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-halfFloor.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/roundingmode-trunc.js
-../test262/test/built-ins/Temporal/PlainDateTime/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/order-of-operations.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-ceil.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-expand.js
@@ -429,7 +426,6 @@
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-halfFloor.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/roundingmode-trunc.js
-../test262/test/built-ins/Temporal/PlainDateTime/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainDateTime/second-undefined.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/calendar-undefined.js
 ../test262/test/built-ins/Temporal/PlainMonthDay/refisoyear-undefined.js
@@ -478,7 +474,6 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-halfFloor.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/roundingmode-trunc.js
-../test262/test/built-ins/Temporal/PlainYearMonth/prototype/since/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/argument-lower-units.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/subtract/argument-object.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/order-of-operations.js
@@ -491,7 +486,6 @@
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-halfFloor.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/roundingmode-trunc.js
-../test262/test/built-ins/Temporal/PlainYearMonth/prototype/until/throws-if-rounded-date-outside-valid-iso-range.js
 ../test262/test/built-ins/Temporal/PlainYearMonth/refisoday-undefined.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/calendar-undefined.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/from/order-of-operations.js
@@ -517,11 +511,7 @@
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-halfTrunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/roundingmode-trunc.js
 ../test262/test/built-ins/Temporal/ZonedDateTime/prototype/until/subseconds.js
-../test262/test/built-ins/TypedArray/from/invoked-as-func.js
-../test262/test/built-ins/TypedArray/from/this-is-not-constructor.js
 ../test262/test/built-ins/TypedArray/of/invoked-as-func.js
-../test262/test/built-ins/TypedArrayConstructors/from/BigInt/invoked-as-func.js
-../test262/test/built-ins/TypedArrayConstructors/from/invoked-as-func.js
 ../test262/test/built-ins/TypedArrayConstructors/internals/Set/BigInt/key-is-valid-index-reflect-set.js
 ../test262/test/built-ins/TypedArrayConstructors/internals/Set/key-is-valid-index-reflect-set.js
 ../test262/test/built-ins/TypedArrayConstructors/of/BigInt/invoked-as-func.js
