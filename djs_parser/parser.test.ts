@@ -162,8 +162,8 @@ if (process.env.CI) {
         source,
       ).parse_source_file()
       if (
-        (source_file.errors.length > 0 && syntax_error_expected(source)) ||
-        (source_file.errors.length === 0 && !syntax_error_expected(source))
+        (source_file.errors.length > 0 && !syntax_error_expected(source)) ||
+        (source_file.errors.length === 0 && syntax_error_expected(source))
       ) {
         successes.push(path)
       } else {
