@@ -174,10 +174,12 @@ if (process.env.CI) {
       }
     }
 
-    expect(successes.sort().join("\n")).toMatchFileSnapshot(
+    await expect(successes.sort().join("\n")).toMatchFileSnapshot(
       "./test262.passed.txt",
     )
-    expect(failed.sort().join("\n")).toMatchFileSnapshot("./test262.failed.txt")
+    await expect(failed.sort().join("\n")).toMatchFileSnapshot(
+      "./test262.failed.txt",
+    )
   })
   function syntax_error_expected(source: string): boolean {
     const frontmatter = extract_frontmatter(source)
