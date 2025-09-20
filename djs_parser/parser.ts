@@ -41,6 +41,7 @@ import {
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
+import { defer } from "../djs_std/dist/index.js"
 
 type Parser = {
   parse_source_file: () => SourceFile
@@ -82,6 +83,8 @@ type ParserState = {
   last_token: Token | null
   current_token: Token
   errors: Diagnostic[]
+  in_loop: boolean
+  in_switch: boolean
 }
 function make_parser_state(source: string): ParserState {
   let lexer = Lexer(source)
@@ -89,6 +92,8 @@ function make_parser_state(source: string): ParserState {
   let last_token: Token | null = null
   let current_token = lexer.next()
   let errors: Diagnostic[] = []
+  let in_loop = false
+  let in_switch = false
 
   return {
     previous_lexer,
@@ -96,6 +101,8 @@ function make_parser_state(source: string): ParserState {
     last_token,
     current_token,
     errors,
+    in_loop,
+    in_switch,
   }
 }
 
@@ -114,6 +121,8 @@ function parser_impl(
       last_token: self.last_token,
       current_token: self.current_token,
       errors: [...self.errors],
+      in_loop: self.in_loop,
+      in_switch: self.in_switch,
     }
   }
   function restore_snapshot(snapshot: ParserState) {
@@ -121,6 +130,8 @@ function parser_impl(
     self.last_token = snapshot.last_token
     self.current_token = snapshot.current_token
     self.errors = snapshot.errors
+    self.in_loop = snapshot.in_loop
+    self.in_switch = snapshot.in_switch
   }
 
   function fork(): <T>(value: T) => T {
@@ -1841,6 +1852,9 @@ function parser_impl(
         }
       }
       case t.Break: {
+        if (!self.in_loop && !self.in_switch) {
+          emit_error("Break statement not inside a loop")
+        }
         const span = advance().span
         if (at(t.Ident) && !current_is_on_new_line()) {
           const label_token = advance()
@@ -1851,6 +1865,9 @@ function parser_impl(
         return Stmt.Break(span, null)
       }
       case t.Continue: {
+        if (!self.in_loop) {
+          emit_error("Continue statement not inside a loop")
+        }
         const span = advance().span
         expect_semi()
         return Stmt.Continue(span, null)
@@ -2111,6 +2128,11 @@ function parser_impl(
 
   function parse_for_stmt(): Stmt | Err {
     assert(at(t.For))
+    const prev_in_loop = self.in_loop
+    self.in_loop = true
+    using _ = defer(() => {
+      self.in_loop = prev_in_loop
+    })
     const first = advance()
 
     if (expect(t.LParen) === ERR) return ERR
@@ -2168,6 +2190,11 @@ function parser_impl(
   }
   function parse_for_in_of_stmt(): Stmt | Err {
     assert(at(t.For))
+    const prev_in_loop = self.in_loop
+    self.in_loop = true
+    using _ = defer(() => {
+      self.in_loop = prev_in_loop
+    })
     const start = advance().span
     if (expect(t.LParen) === ERR) return ERR
 
@@ -2278,6 +2305,11 @@ function parser_impl(
     return Stmt.Try(span, try_block, catch_pattern, catch_block, finally_block)
   }
   function parse_switch_stmt(): Stmt | Err {
+    const prev_in_switch = self.in_switch
+    self.in_switch = true
+    using _ = defer(() => {
+      self.in_switch = prev_in_switch
+    })
     const start_token = expect(t.Switch)
     if (start_token === ERR) return ERR
 
@@ -2343,6 +2375,11 @@ function parser_impl(
     }
   }
   function parse_while_stmt(): Stmt | Err {
+    const prev_in_loop = self.in_loop
+    self.in_loop = true
+    using _ = defer(() => {
+      self.in_loop = prev_in_loop
+    })
     const start = advance().span // Consume the 'while' keyword
 
     if (expect(t.LParen) === ERR) return ERR
@@ -2359,6 +2396,11 @@ function parser_impl(
     return Stmt.While(span, cond, body)
   }
   function parse_do_while_stmt(): Stmt | Err {
+    const prev_in_loop = self.in_loop
+    self.in_loop = true
+    using _ = defer(() => {
+      self.in_loop = prev_in_loop
+    })
     const start = expect(t.Do)
     if (start === ERR) return ERR
 

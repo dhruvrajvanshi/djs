@@ -144,14 +144,6 @@ export function typecheck(
 
       case "Break":
       case "Continue":
-        if (loop_stack.length === 0) {
-          emit_error(
-            ctx,
-            stmt.span,
-            `${stmt.kind} statement not inside a loop`,
-            null,
-          )
-        }
         break
       default:
         todo(stmt.kind)
