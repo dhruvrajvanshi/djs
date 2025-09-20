@@ -1364,7 +1364,7 @@ function parser_impl(
   function parse_assignment_expr(): Expr | Err {
     if (at(t.Yield)) {
       const start = advance()
-      if (current_is_on_new_line()) {
+      if (current_is_on_new_line() || at(t.Semi)) {
         return Expr.Yield(start.span, null)
       } else {
         let is_yield_from = false
