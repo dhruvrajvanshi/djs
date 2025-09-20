@@ -427,7 +427,7 @@ function parser_impl(
             break
           }
         case t.LBrace:
-          if (flags | PARSER_FLAGS.LJS) {
+          if (flags & PARSER_FLAGS.LJS) {
             const start = advance()
             const items = parse_comma_separated_list(
               t.RBrace,
@@ -1200,7 +1200,7 @@ function parser_impl(
     if (is_mut) advance()
     const type_annotation = parse_type_annotation()
     if (type_annotation === ERR) return ERR
-    if (!(flags | PARSER_FLAGS.LJS)) {
+    if (!(flags & PARSER_FLAGS.LJS)) {
       emit_error("Pointer type annotations are only supported in LJS mode")
     }
 
@@ -1793,7 +1793,7 @@ function parser_impl(
       }
       case t.Ident: {
         if (
-          flags | PARSER_FLAGS.LJS &&
+          flags & PARSER_FLAGS.LJS &&
           self.current_token.text === "extern" &&
           next_is(t.Function)
         ) {
@@ -1812,7 +1812,7 @@ function parser_impl(
         } else if (self.current_token.text === "type") {
           return parse_type_decl()
         } else if (
-          flags | PARSER_FLAGS.LJS &&
+          flags & PARSER_FLAGS.LJS &&
           self.current_token.text === "struct"
         ) {
           return parse_struct_decl()
