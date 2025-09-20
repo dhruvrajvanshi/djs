@@ -1969,6 +1969,23 @@ function parser_impl(
       return_type,
     )
   }
+  function expect_soft_keyword(text: string): Token | Err {
+    if (
+      self.current_token.kind === t.Ident &&
+      self.current_token.text === text
+    ) {
+      return advance()
+    } else {
+      emit_error(`Expected '${text}', got ${self.current_token.kind}`)
+      return ERR
+    }
+  }
+  function at_soft_keyword(text: string): boolean {
+    return (
+      self.current_token.kind === t.Ident && self.current_token.text === text
+    )
+  }
+
   function parse_import_star_as_stmt(start: Token): Stmt | Err {
     assert.equal(t.Import, start.kind)
     assert.equal(t.Star, self.current_token.kind)
@@ -1976,7 +1993,7 @@ function parser_impl(
     if (expect(t.As) === ERR) return ERR
     const name = parse_ident()
     if (name === ERR) return ERR
-    if (expect(t.From) === ERR) return ERR
+    if (expect_soft_keyword("from") === ERR) return ERR
     const from_clause = expect(t.String)
     if (from_clause === ERR) return ERR
     if (expect_semi() === ERR) return ERR
@@ -1998,7 +2015,7 @@ function parser_impl(
     if (default_import) {
       if (at(t.Comma)) {
         advance()
-      } else if (at(t.From)) {
+      } else if (at_soft_keyword("from")) {
         advance()
         const from_clause = expect(t.String)
         if (from_clause === ERR) return ERR
@@ -2021,7 +2038,7 @@ function parser_impl(
     )
     if (import_specifiers === ERR) return ERR
     if (expect(t.RBrace) === ERR) return ERR
-    if (expect(t.From) === ERR) return ERR
+    if (expect_soft_keyword("from") === ERR) return ERR
     const from_clause = expect(t.String)
     if (from_clause === ERR) return ERR
     if (expect_semi() === ERR) return ERR

@@ -47,7 +47,6 @@ export const tokens: (string | [string, string])[] = [
   ["Default", "default"],
   ["Export", "export"],
   ["Import", "import"],
-  ["From", "from"],
   ["As", "as"],
 
   "String",
