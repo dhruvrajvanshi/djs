@@ -3,6 +3,7 @@
 // node djs_ast/gen_ts_ast.js | pnpm prettier > src/ast.gen.ts
 
 import type { Span } from "./Span.ts"
+import type { QualifiedName } from "./QualifiedName.ts"
 import type { Diagnostic } from "./Diagnostic.ts"
 import {
   expr_to_sexpr,
@@ -21,6 +22,7 @@ export interface SourceFile {
   readonly span: Span
   readonly path: string
   readonly stmts: readonly Stmt[]
+  readonly qualified_name: QualifiedName
   readonly errors: readonly Diagnostic[]
 }
 

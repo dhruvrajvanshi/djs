@@ -4,7 +4,7 @@ import fs from "node:fs/promises"
 import { Parser } from "./parser.ts"
 import { parseArgs, inspect } from "node:util"
 import type { SourceFile } from "djs_ast"
-import { source_file_to_sexpr, show_diagnostics } from "djs_ast"
+import { source_file_to_sexpr, show_diagnostics, QualifiedName } from "djs_ast"
 
 export {
   type Token,
@@ -35,7 +35,7 @@ await main()
 async function main() {
   let total_errors = 0
   if (args.raw) {
-    const parser = Parser("<raw input>", args.raw, {
+    const parser = Parser(QualifiedName(), "<raw input>", args.raw, {
       throwOnError: args["internal-throw-on-error"],
     })
     const source_file = parser.parse_source_file()
@@ -51,7 +51,7 @@ async function main() {
     const source_files: SourceFile[] = []
     for (const path of paths) {
       const source_text = await fs.readFile(path, "utf-8")
-      const parser = Parser(path, source_text, {
+      const parser = Parser(QualifiedName(), path, source_text, {
         throwOnError: args["internal-throw-on-error"],
       })
       const source_file = parser.parse_source_file()

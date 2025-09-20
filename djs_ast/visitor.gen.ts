@@ -14,6 +14,7 @@ export class ASTVisitorBase implements ASTVisitor {
     for (const stmt of node.stmts) {
       this.visit_stmt(stmt)
     }
+
     for (const error of node.errors) {
     }
   }

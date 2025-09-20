@@ -2,16 +2,18 @@ import { parse_source_file } from "djs_parser"
 import assert from "node:assert"
 import { test } from "vitest"
 import { build_function_symbol_table } from "./build_symbol_table.ts"
+import { QualifiedName } from "../djs_ast/QualifiedName.ts"
 
 test("build_symbol_table", async () => {
   const source_file = parse_source_file(
+    QualifiedName(),
     "test.ljs",
     `
       function foo(p1: i32, p2: string): void {
         let x = 10;
         const y = ""
         let z = () => {}
-        
+
       }
   `,
   )

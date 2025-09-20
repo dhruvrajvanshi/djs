@@ -32,7 +32,10 @@ type LexerState = {
 }
 
 class Err {
-  constructor(public message: string) {}
+  message: string
+  constructor(message: string) {
+    this.message = message
+  }
 }
 
 function lexer_state_advance(self: LexerState): string {

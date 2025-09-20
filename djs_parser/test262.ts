@@ -1,6 +1,7 @@
 import fs from "node:fs/promises"
 import { Parser } from "./parser.ts"
 import assert from "node:assert"
+import { QualifiedName } from "djs_ast"
 
 const test262Paths: string[] = []
 
@@ -36,7 +37,8 @@ const failures: string[] = []
 const total = test262Paths.length
 for (const path of test262Paths) {
   const source = await fs.readFile(path, "utf-8")
-  const errors = Parser(path, source).parse_source_file().errors
+  const errors = Parser(QualifiedName("test"), path, source).parse_source_file()
+    .errors
   if (syntax_error_expected(source)) {
     if (errors.length === 0) {
       console.log(

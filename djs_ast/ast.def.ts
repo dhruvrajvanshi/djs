@@ -399,6 +399,10 @@ const DLabel = Struct("Label", ["span"], {
 export const DSourceFile = Struct("SourceFile", ["span", "visit"], {
   path: "str",
   stmts: List(Stmt),
+  qualified_name: {
+    tags: ["sexpr_ignore"],
+    type: "QualifiedName",
+  },
   errors: {
     type: List("Diagnostic"),
     tags: ["sexpr_ignore"],
