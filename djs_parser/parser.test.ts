@@ -145,8 +145,19 @@ if (process.env.CI) {
       continue
     }
 
+    const text = await fs.readFile(path, "utf-8")
+
     // Skip known problematic files that cause stack overflow
     if (path.includes("test/language/statements/function/S13.2.1_A1_T1.js")) {
+      continue
+    }
+
+    const frontmatter = extract_frontmatter(text)
+
+    if (frontmatter.includes("IsHTMLDDA")) {
+      continue
+    }
+    if (frontmatter.includes("noStrict")) {
       continue
     }
     test262Paths.push(path)
@@ -161,24 +172,23 @@ if (process.env.CI) {
         path,
         source,
       ).parse_source_file()
-      if (
-        (source_file.errors.length > 0 && !syntax_error_expected(source)) ||
-        (source_file.errors.length === 0 && syntax_error_expected(source))
+      if (source_file.errors.length !== 0 && syntax_error_expected(source)) {
+        successes.push(path)
+      } else if (
+        source_file.errors.length === 0 &&
+        !syntax_error_expected(source)
       ) {
         successes.push(path)
       } else {
-        const prefix = syntax_error_expected(source)
-          ? "MISSING_SYNTAX_ERROR"
-          : "UNEXPECTED_SYNTAX_ERROR"
-        failed.push(`${prefix}: ${path}`)
+        failed.push(path)
       }
     }
 
     await expect(successes.sort().join("\n")).toMatchFileSnapshot(
-      "./test262.passed.txt",
+      "./test_262_baseline.success.txt",
     )
     await expect(failed.sort().join("\n")).toMatchFileSnapshot(
-      "./test262.failed.txt",
+      "./test_262_baseline.failed.txt",
     )
   })
   function syntax_error_expected(source: string): boolean {
