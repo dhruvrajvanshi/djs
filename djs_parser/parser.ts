@@ -2183,6 +2183,12 @@ function parser_impl(
 
     const body = parse_stmt()
     if (body === ERR) return ERR
+    if (body.kind === "VarDecl" && body.decl.decl_type !== DeclType.Var) {
+      emit_error(
+        `'${decl_type_to_string(body.decl.decl_type)}' declarations can only be declared inside a block`,
+        body.span,
+      )
+    }
 
     const span = Span.between(first.span, body.span)
 
@@ -2239,6 +2245,12 @@ function parser_impl(
 
     const body = parse_stmt()
     if (body === ERR) return ERR
+    if (body.kind === "VarDecl" && body.decl.decl_type !== DeclType.Var) {
+      emit_error(
+        `'${decl_type_to_string(body.decl.decl_type)}' declarations can only be declared inside a block`,
+        body.span,
+      )
+    }
 
     return Stmt.ForInOrOf(
       Span.between(start, body.span),
@@ -2391,6 +2403,12 @@ function parser_impl(
 
     const body = parse_stmt()
     if (body === ERR) return ERR
+    if (body.kind === "VarDecl" && body.decl.decl_type !== DeclType.Var) {
+      emit_error(
+        `'${decl_type_to_string(body.decl.decl_type)}' declarations can only be declared inside a block`,
+        body.span,
+      )
+    }
 
     const span = Span.between(start, body.span)
     return Stmt.While(span, cond, body)
@@ -2631,6 +2649,26 @@ function parser_impl(
 
     const else_branch = at(t.Else) ? (advance(), parse_stmt()) : null
     if (else_branch === ERR) return ERR
+
+    if (
+      then_branch.kind === "VarDecl" &&
+      then_branch.decl.decl_type !== DeclType.Var
+    ) {
+      emit_error(
+        `'${decl_type_to_string(then_branch.decl.decl_type)}' declarations can only be declared inside a block`,
+        then_branch.span,
+      )
+    }
+    if (
+      else_branch &&
+      else_branch.kind === "VarDecl" &&
+      else_branch.decl.decl_type !== DeclType.Var
+    ) {
+      emit_error(
+        `'${decl_type_to_string(else_branch.decl.decl_type)}' declarations can only be declared inside a block`,
+        else_branch.span,
+      )
+    }
 
     return Stmt.If(
       Span.between(start, else_branch ? else_branch.span : then_branch.span),
@@ -2938,4 +2976,14 @@ const PatternFlags = {
   all(): number {
     return this.ALLOW_ASSIGNMENT | this.ALLOW_SPREAD
   },
+}
+function decl_type_to_string(decl_type: DeclType): string {
+  switch (decl_type) {
+    case DeclType.Const:
+      return "const"
+    case DeclType.Let:
+      return "let"
+    case DeclType.Var:
+      return "var"
+  }
 }
