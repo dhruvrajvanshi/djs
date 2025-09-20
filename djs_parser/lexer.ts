@@ -355,7 +355,10 @@ export function lexer_impl(self: LexerState): Lexer {
       (is_ascii_digit(current_char()) || current_char() === ".") &&
       current_char() !== "\0"
     ) {
-      advance()
+      const c = advance()
+      if (c === "." && !is_ascii_digit(current_char())) {
+        break
+      }
     }
 
     // Handle exponent part (e.g., 1e10, 1e+10, 1e-10)
