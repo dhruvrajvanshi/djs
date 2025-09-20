@@ -151,10 +151,52 @@ if (process.env.CI) {
     }
     test262Paths.push(path)
   }
-  test.each(test262Paths)("test262 coverage", async (path) => {
-    const source = await fs.readFile(path, "utf-8")
-    Parser(QualifiedName(), path, source).parse_source_file().errors
+  test("test262 baseline", { timeout: 5 * 60 * 1000 }, async () => {
+    const failed: string[] = []
+    const successes: string[] = []
+    for (const path of test262Paths) {
+      const source = await fs.readFile(path, "utf-8")
+      const source_file = Parser(
+        QualifiedName(),
+        path,
+        source,
+      ).parse_source_file()
+      if (
+        (source_file.errors.length > 0 && syntax_error_expected(source)) ||
+        (source_file.errors.length === 0 && !syntax_error_expected(source))
+      ) {
+        successes.push(path)
+      } else {
+        const prefix = syntax_error_expected(source)
+          ? "MISSING_SYNTAX_ERROR"
+          : "UNEXPECTED_SYNTAX_ERROR"
+        failed.push(`${prefix}: ${path}`)
+      }
+    }
+
+    expect(successes.sort().join("\n")).toMatchFileSnapshot(
+      "./test262.passed.txt",
+    )
+    expect(failed.sort().join("\n")).toMatchFileSnapshot("./test262.failed.txt")
   })
+  function syntax_error_expected(source: string): boolean {
+    const frontmatter = extract_frontmatter(source)
+    const isNegative = frontmatter.includes("negative:")
+    const syntaxErrorExpected =
+      frontmatter.includes("phase: parse") &&
+      frontmatter.includes("type: SyntaxError")
+    return isNegative && syntaxErrorExpected
+  }
+
+  function extract_frontmatter(source: string): string {
+    const frontmatterStart = source.indexOf("/*---")
+    if (frontmatterStart === -1) return ""
+
+    const frontmatterEnd = source.indexOf("---*/")
+    if (frontmatterEnd === -1) return ""
+
+    return source.substring(frontmatterStart, frontmatterEnd)
+  }
 }
 
 function parse_expr(input: string): Expr {
