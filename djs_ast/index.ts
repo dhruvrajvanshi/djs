@@ -17,3 +17,4 @@ export {
   prettify_diagnostics,
 } from "./Diagnostic.ts"
 export { type ASTVisitor, ASTVisitorBase } from "./visitor.gen.ts"
+export { QualifiedName } from "./QualifiedName.ts"

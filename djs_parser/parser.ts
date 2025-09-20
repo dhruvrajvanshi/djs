@@ -37,6 +37,7 @@ import {
   TokenKind,
   StructMember,
   type StructInitItem,
+  type QualifiedName,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -48,6 +49,7 @@ export type ParserConfig = {
   throwOnError: boolean
 }
 export function Parser(
+  qualified_name: QualifiedName,
   path: string,
   source: string,
   config: ParserConfig = {
@@ -62,7 +64,7 @@ export function Parser(
     flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
     flags |= PARSER_FLAGS.LJS
   }
-  return parser_impl(path, source, flags, config)
+  return parser_impl(qualified_name, path, source, flags, config)
 }
 
 type Err = "ParseError"
@@ -98,6 +100,7 @@ function make_parser_state(source: string): ParserState {
 }
 
 function parser_impl(
+  qualified_name: QualifiedName,
   path: string,
   source: string,
   flags: number,
@@ -2627,6 +2630,7 @@ function parser_impl(
       stmts.push(stmt)
     }
     return {
+      qualified_name,
       path,
       span,
       stmts,

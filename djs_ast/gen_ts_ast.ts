@@ -7,6 +7,7 @@ let output = `
 // node djs_ast/gen_ts_ast.js | pnpm prettier > src/ast.gen.ts
 
 import type { Span } from "./Span.ts";
+import type { QualifiedName } from "./QualifiedName.ts";
 import type { Diagnostic } from "./Diagnostic.ts";
 import { expr_to_sexpr, stmt_to_sexpr, type_annotation_to_sexpr, pattern_to_sexpr, sexpr_to_string } from "./sexpr.ts";
 

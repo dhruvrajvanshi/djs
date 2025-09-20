@@ -1,6 +1,13 @@
 import { test, expect } from "vitest"
 import { Parser } from "./parser.ts"
-import { AssignOp, Expr, source_file_to_sexpr, TypeAnnotation } from "djs_ast"
+import {
+  AssignOp,
+  Expr,
+  QualifiedName,
+  source_file_to_sexpr,
+  TypeAnnotation,
+  type SourceFile,
+} from "djs_ast"
 import assert from "assert"
 import fs from "node:fs/promises"
 
@@ -12,14 +19,12 @@ test("test_parse_var_expr", () => {
 })
 
 test("parse error for missing parenthesis in if condition", () => {
-  const parser = Parser(
-    "test.js",
+  const source_file = parse_source_file(
     `
       if x
         y
       else z`,
   )
-  const source_file = parser.parse_source_file()
   const errors = source_file.errors
   expect(errors.map((e) => `${e.span.start}: ${e.message}`).join("\n"))
     .toMatchInlineSnapshot(`
@@ -59,13 +64,11 @@ test("parse error for missing parenthesis in if condition", () => {
 })
 
 test("simple regex", () => {
-  const pareser = Parser("test.js", `/x/`)
-  const source_file = pareser.parse_source_file()
+  const source_file = parse_source_file(`/x/`)
   expect(source_file.errors).toEqual([])
 })
 test("division and regex mixed", () => {
-  const parser = Parser("test.js", "1 / 2 / /a/")
-  const source_file = parser.parse_source_file()
+  const source_file = parse_source_file("1 / 2 / /a/")
   expect(source_file.errors).toEqual([])
 })
 test("assignment bitwise or equal |=", () => {
@@ -81,8 +84,7 @@ test("struct type decl", () => {
     current_token: Token
     errors: ParseError[]
   }`
-  const parser = Parser("test.ts", source)
-  const source_file = parser.parse_source_file()
+  const source_file = parse_source_file(source)
   expect(source_file.errors).toEqual([])
 })
 test("function with if stmt", () => {
@@ -91,8 +93,7 @@ test("function with if stmt", () => {
     if (true) {} else {}
   }
   `
-  const parser = Parser("test.ts", source)
-  const source_file = parser.parse_source_file()
+  const source_file = parse_source_file(source, "test.ts")
   expect(source_file.errors).toEqual([])
 })
 
@@ -103,7 +104,7 @@ test("break statement with an identifier on the next line", () => {
     break
     advance()
   `
-  const source_file = Parser("test.ts", source).parse_source_file()
+  const source_file = parse_source_file(source)
   expect(source_file.errors).toEqual([])
 })
 
@@ -111,8 +112,7 @@ test("conditional operator", () => {
   const source = `
     a ? b : c
   `
-  const parser = Parser("test.js", source)
-  const source_file = parser.parse_source_file()
+  const source_file = parse_source_file(source)
   expect(source_file.errors).toEqual([])
   assert(source_file.stmts[0].kind === "Expr")
   expect(source_file.stmts[0].expr.kind).toEqual("Ternary")
@@ -123,8 +123,7 @@ test("is_exported should be correctly set", () => {
     export extern function foo(): void;
     export function bar(): void {}
   `
-  const parser = Parser("test.ljs", source)
-  const source_file = parser.parse_source_file()
+  const source_file = parse_source_file(source, "test.ljs")
   expect(source_file.errors).toEqual([])
   assert(source_file.stmts[0].kind === "LJSExternFunction")
   expect(source_file.stmts[0].is_exported).toBe(true)
@@ -154,23 +153,25 @@ if (process.env.CI) {
   }
   test.each(test262Paths)("test262 coverage", async (path) => {
     const source = await fs.readFile(path, "utf-8")
-    Parser(path, source).parse_source_file().errors
+    Parser(QualifiedName(), path, source).parse_source_file().errors
   })
 }
 
 function parse_expr(input: string): Expr {
-  const parser = Parser("test.js", input)
-  const source_file = parser.parse_source_file()
+  const source_file = parse_source_file(input)
   expect(source_file.errors).toEqual([])
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "Expr")
   return stmt.expr
 }
 function parse_type(input: string): TypeAnnotation {
-  const parser = Parser("test.js", `type Foo = ${input}`)
-  const source_file = parser.parse_source_file()
+  const source_file = parse_source_file(`type Foo = ${input}`, "test.ts")
   expect(source_file.errors).toEqual([])
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "TypeAlias")
   return stmt.type_annotation
+}
+
+function parse_source_file(source: string, name = "test.js"): SourceFile {
+  return Parser(QualifiedName(), name, source).parse_source_file()
 }

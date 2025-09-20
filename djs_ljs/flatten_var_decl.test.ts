@@ -1,12 +1,18 @@
 import assert from "node:assert/strict"
 import { parse_source_file } from "djs_parser"
 import { test } from "vitest"
-import { expr_to_sexpr, type_annotation_to_sexpr, VarDeclStmt } from "djs_ast"
+import {
+  expr_to_sexpr,
+  QualifiedName,
+  type_annotation_to_sexpr,
+  VarDeclStmt,
+} from "djs_ast"
 import { flatten_var_decl, type FlatVarDecl } from "./flatten_var_decl.ts"
-import type { SExpr } from "../djs_ast/sexpr.ts"
+import type { SExpr } from "djs_ast"
 
 test("Simple var decls", () => {
   const source = parse_source_file(
+    QualifiedName(),
     "test.ljs",
     `
         let x: Foo = 30

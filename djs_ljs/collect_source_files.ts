@@ -2,6 +2,7 @@ import {
   ASTVisitorBase,
   ImportStarAsStmt,
   ImportStmt,
+  QualifiedName,
   type SourceFile,
   type Stmt,
 } from "djs_ast"
@@ -63,7 +64,7 @@ export async function collect_source_files(
       }
       continue
     }
-    const source_file = parse_source_file(path, source_text)
+    const source_file = parse_source_file(QualifiedName(), path, source_text)
 
     source_files.set(path, source_file)
     diagnostics.push(path, ...source_file.errors)
