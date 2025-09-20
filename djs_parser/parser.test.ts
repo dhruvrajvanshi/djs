@@ -101,8 +101,10 @@ test("break statement with an identifier on the next line", () => {
   // A break followed by an identifier should only be treated as a labeled break
   // if the label is on the same line as the break
   const source = `
-    break
-    advance()
+    while (true) {
+      break
+      advance()
+    }
   `
   const source_file = parse_source_file(source)
   expect(source_file.errors).toEqual([])
