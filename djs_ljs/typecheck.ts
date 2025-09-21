@@ -571,24 +571,49 @@ export function typecheck(
   }
 
   function infer_assign_expr(ctx: CheckCtx, expr: AssignExpr): Type {
-    if (expr.pattern.kind !== "Var") {
-      emit_error(ctx, expr.pattern.span, "Patterns are not supported in LJS")
+    if (expr.pattern.kind === "Var") {
+      if (expr.operator !== "Eq") {
+        emit_error(ctx, expr.span, "Only simple assignment is supported in LJS")
+        return infer_expr(ctx.source_file, expr.value)
+      }
+      const values = resolution.values.get(ctx.source_file.path)
+      assert(values)
+      const decl = values.get(expr.pattern.ident)
+      if (!decl) {
+        // Unbound variables are reported in the resolve phase
+        return infer_expr(ctx.source_file, expr.value)
+      }
+      const lhs_type = type_of_decl(expr.pattern.ident.text, decl)
+      check_expr(ctx, expr.value, lhs_type)
+      return lhs_type
+    } else if (
+      expr.pattern.kind === "Prop" &&
+      expr.pattern.key.kind === "Ident" &&
+      expr.pattern.expr.kind === "Var"
+    ) {
+      const struct_ty = infer_expr(ctx.source_file, expr.pattern.expr)
+      if (struct_ty.kind !== "StructInstance") {
+        return emit_error_type(ctx, {
+          span: expr.pattern.expr.span,
+          message: `Cannot access property on a non-struct type ${type_to_string(
+            struct_ty,
+          )}`,
+        })
+      }
+      const field_ty = struct_ty.fields[expr.pattern.key.ident.text]
+      if (!field_ty) {
+        return emit_error_type(ctx, {
+          span: expr.pattern.key.span,
+          message: `Struct ${struct_ty.qualified_name} has no field named ${expr.pattern.key.ident.text}`,
+          hint: `Available fields: ${Object.keys(struct_ty.fields).join(", ")}`,
+        })
+      }
+      check_expr(ctx, expr.value, field_ty)
+      return field_ty
+    } else {
+      emit_error(ctx, expr.pattern.span, "Unsupported assignment pattern")
       return infer_expr(ctx.source_file, expr.value)
     }
-    if (expr.operator !== "Eq") {
-      emit_error(ctx, expr.span, "Only simple assignment is supported in LJS")
-      return infer_expr(ctx.source_file, expr.value)
-    }
-    const values = resolution.values.get(ctx.source_file.path)
-    assert(values)
-    const decl = values.get(expr.pattern.ident)
-    if (!decl) {
-      // Unbound variables are reported in the resolve phase
-      return infer_expr(ctx.source_file, expr.value)
-    }
-    const lhs_type = type_of_decl(expr.pattern.ident.text, decl)
-    check_expr(ctx, expr.value, lhs_type)
-    return lhs_type
   }
   function infer_post_increment_expr(
     ctx: CheckCtx,
