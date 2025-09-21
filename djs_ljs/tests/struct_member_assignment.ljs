@@ -1,0 +1,13 @@
+import * as c from "../libc.ljs"
+
+struct StrBox {
+    value: *c.char
+}
+function main(): c.int {
+    const box = StrBox {
+        value: c.str`FAIL`
+    }
+    box.value = c.str`PASS`
+    c.puts(box.value)
+    return 0
+}

@@ -21,6 +21,7 @@ import type {
   ForInOrOfStmt,
   ReturnStmt,
   ContinueStmt,
+  AssignExpr,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
@@ -446,19 +447,7 @@ function emit_expr(
         expr: emit_expr(ctx, source_file, expr.value),
       }
     case "Assign": {
-      assert(expr.operator === "Eq", "Only simple assignment is supported")
-      assert(
-        expr.pattern.kind === "Var",
-        "Only variable assignment is supported",
-      )
-      const var_name = expr.pattern.ident.text
-      const value = emit_expr(ctx, source_file, expr.value)
-      return {
-        kind: "BinOp",
-        op: "=",
-        left: { kind: "Ident", name: var_name },
-        right: value,
-      }
+      return emit_assign_expr(ctx, source_file, expr)
     }
     case "AddressOf": {
       assert(expr.expr.kind === "Var")
@@ -475,6 +464,41 @@ function emit_expr(
     }
     default:
       todo(`Unhandled expression: ${expr.kind}`)
+  }
+}
+function emit_assign_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: AssignExpr,
+): CNode {
+  assert(expr.operator === "Eq", "Only simple assignment is supported")
+  if (expr.pattern.kind === "Var") {
+    const var_name = expr.pattern.ident.text
+    const value = emit_expr(ctx, source_file, expr.value)
+    return {
+      kind: "BinOp",
+      op: "=",
+      left: { kind: "Ident", name: var_name },
+      right: value,
+    }
+  } else if (
+    expr.pattern.kind === "Prop" &&
+    expr.pattern.key.kind === "Ident"
+  ) {
+    const struct_ref = emit_expr(ctx, source_file, expr.pattern.expr)
+    const lhs: CNode = {
+      kind: "Prop",
+      lhs: struct_ref,
+      rhs: expr.pattern.key.ident.text,
+    }
+    return {
+      kind: "BinOp",
+      op: "=",
+      left: lhs,
+      right: emit_expr(ctx, source_file, expr.value),
+    }
+  } else {
+    todo`Unsupported assignment expr ${expr}`
   }
 }
 function emit_struct_init_expr(
