@@ -76,6 +76,9 @@ importers:
       djs_ast:
         specifier: workspace:*
         version: link:../djs_ast
+      djs_std:
+        specifier: workspace:*
+        version: link:../djs_std
     devDependencies:
       '@types/node':
         specifier: ^24.0.13

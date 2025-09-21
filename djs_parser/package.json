@@ -14,7 +14,8 @@
     "run_parser": "node run_parser.ts"
   },
   "dependencies": {
-    "djs_ast": "workspace:*"
+    "djs_ast": "workspace:*",
+    "djs_std": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^24.0.13",
