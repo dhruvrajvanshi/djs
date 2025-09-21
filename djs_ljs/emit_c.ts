@@ -449,6 +449,19 @@ function emit_expr(
         right: value,
       }
     }
+    case "AddressOf": {
+      assert(expr.expr.kind === "Var")
+      return {
+        kind: "AddressOf",
+        expr: emit_expr(ctx, source_file, expr.expr),
+      }
+    }
+    case "Deref": {
+      return {
+        kind: "Deref",
+        expr: emit_expr(ctx, source_file, expr.expr),
+      }
+    }
     default:
       todo(`Unhandled expression: ${expr.kind}`)
   }
@@ -676,6 +689,10 @@ function render_c_node(node: CNode): string {
       return "break;"
     case "Continue":
       return "continue;"
+    case "AddressOf":
+      return `(&${render_c_node(node.expr)})`
+    case "Deref":
+      return `(*${render_c_node(node.expr)})`
     default:
       assert_never(node)
   }
@@ -731,3 +748,5 @@ export type CNode =
   | { kind: "If"; condition: CNode; if_true: CNode; if_false: CNode | null }
   | { kind: "Break" }
   | { kind: "Continue" }
+  | { kind: "AddressOf"; expr: CNode }
+  | { kind: "Deref"; expr: CNode }
