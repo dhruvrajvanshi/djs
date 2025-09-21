@@ -6,22 +6,22 @@ import { resolve_top_level } from "./resolve_top_level.ts"
 
 test("resolve top level", async () => {
   const fs = FS.fake({
-    "main.djs": `
+    "main.ljs": `
        const a_number = 1
-       function foo() {}
+       function foo(): void {}
        extern function external_func(): void
     `,
   })
   const { source_files, diagnostics } = await collect_source_files(
-    "main.djs",
+    "main.ljs",
     fs,
   )
-  assert.equal(diagnostics.size, 0)
+  assert.equal(await diagnostics.prettify(fs), "")
 
   const resolve_result = resolve_top_level(source_files, fs)
-  const entry_file = source_files.get("main.djs")
+  const entry_file = source_files.get("main.ljs")
 
-  assert(entry_file, "main.djs file not found in source_files")
+  assert(entry_file, "main.ljs file not found in source_files")
 
   const entry_file_value_decls = resolve_result.source_file_value_decls.get(
     entry_file.path,
