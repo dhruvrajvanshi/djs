@@ -580,11 +580,32 @@ export function typecheck(
         check_expr(ctx, expr.rhs, lhs_type)
         return lhs_type
       }
-
+      case "EqEq":
+      case "NotEq": {
+        check_expr(ctx, expr.rhs, infer_expr(ctx.source_file, expr.lhs))
+        emit_error(
+          ctx,
+          expr.span,
+          `Use '===' or '!==' for equality comparisons`,
+          null,
+        )
+        return Type.boolean
+      }
+      case "EqEqEq":
+      case "NotEqEq": {
+        return infer_equality_operator(ctx, expr)
+      }
       default:
         todo(expr.operator)
     }
   }
+
+  function infer_equality_operator(ctx: CheckCtx, expr: BinOpExpr): Type {
+    const lhs_type = infer_expr(ctx.source_file, expr.lhs)
+    check_expr(ctx, expr.rhs, lhs_type)
+    return Type.boolean
+  }
+
   function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
     const lhs_type = infer_expr(ctx.source_file, expr.lhs)
     if (lhs_type.kind !== "StructConstructor") {
