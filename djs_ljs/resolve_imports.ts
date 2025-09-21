@@ -5,7 +5,6 @@ import type {
   ValueDecl,
   ValueDeclExcludingKind,
 } from "./SymbolTable.ts"
-import type { ResolveResult } from "./resolve.ts"
 import { PathMap } from "./PathMap.ts"
 import type { Ident } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
