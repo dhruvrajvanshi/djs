@@ -1,7 +1,9 @@
 import {
+  AssignExpr,
   ASTVisitorBase,
   Expr,
   ForStmt,
+  Pattern,
   TypeAnnotation,
   type Block,
   type Func,
@@ -211,6 +213,8 @@ class Resolver extends ASTVisitorBase {
     switch (expr.kind) {
       case "Var":
         return this.visit_var_expr(expr.ident)
+      case "Assign":
+        return this.visit_assign_expr(expr)
       default:
         super.visit_expr(expr)
     }
@@ -224,6 +228,22 @@ class Resolver extends ASTVisitorBase {
         return this.visit_var_type(type_annotation.head)
       default:
         super.visit_type_annotation(type_annotation)
+    }
+  }
+
+  visit_assign_expr(expr: AssignExpr): void {
+    this.bind_pattern_idents(expr.pattern)
+    if (expr.pattern.kind !== "Var") {
+      todo()
+    }
+    this.visit_var_expr(expr.pattern.ident)
+    super.visit_expr(expr)
+  }
+
+  bind_pattern_idents(pattern: Pattern): void {
+    switch (pattern.kind) {
+      case "Var":
+        break
     }
   }
 

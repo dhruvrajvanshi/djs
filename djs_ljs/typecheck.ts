@@ -26,6 +26,7 @@ import {
   ForInOrOfStmt,
   WhileStmt,
   DoWhileStmt,
+  AssignExpr,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -525,6 +526,8 @@ export function typecheck(
         return infer_binop_expr(ctx, expr)
       case "PostIncrement":
         return infer_post_increment_expr(ctx, expr)
+      case "Assign":
+        return infer_assign_expr(ctx, expr)
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
@@ -532,6 +535,26 @@ export function typecheck(
         })
       }
     }
+  }
+  function infer_assign_expr(ctx: CheckCtx, expr: AssignExpr): Type {
+    if (expr.pattern.kind !== "Var") {
+      emit_error(ctx, expr.pattern.span, "Patterns are not supported in LJS")
+      return infer_expr(ctx.source_file, expr.value)
+    }
+    if (expr.operator !== "Eq") {
+      emit_error(ctx, expr.span, "Only simple assignment is supported in LJS")
+      return infer_expr(ctx.source_file, expr.value)
+    }
+    const values = resolution.values.get(ctx.source_file.path)
+    assert(values)
+    const decl = values.get(expr.pattern.ident)
+    if (!decl) {
+      // Unbound variables are reported in the resolve phase
+      return infer_expr(ctx.source_file, expr.value)
+    }
+    const lhs_type = type_of_decl(expr.pattern.ident.text, decl)
+    check_expr(ctx, expr.value, lhs_type)
+    return lhs_type
   }
   function infer_post_increment_expr(
     ctx: CheckCtx,
