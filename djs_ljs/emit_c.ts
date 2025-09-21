@@ -498,7 +498,7 @@ function emit_assign_expr(
       right: emit_expr(ctx, source_file, expr.value),
     }
   } else {
-    todo`Unsupported assignment expr ${expr}`
+    return todo`Unsupported assignment expr ${expr}`
   }
 }
 function emit_struct_init_expr(
