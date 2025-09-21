@@ -11,7 +11,7 @@ function get_message_box(): StrBox {
     }
 }
 
-extern function puts(message: *ffi.c_char): *ffi.c_int
+extern function puts(message: *ffi.c_char): ffi.c_int
 
 function main(): ffi.c_int {
     puts(get_message_box().value)
