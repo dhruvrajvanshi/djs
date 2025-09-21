@@ -424,6 +424,11 @@ export function typecheck(
         }
         values.set(expr, expected_type)
         return
+      case "BinOp": {
+        check_binop_expr(ctx, expr, expected_type)
+        values.set(expr, expected_type)
+        return
+      }
       default: {
         const inferred = infer_expr(ctx.source_file, expr)
         if (!is_assignable({ source: inferred, target: expected_type })) {
@@ -571,6 +576,20 @@ export function typecheck(
     return inner_type
   }
   function infer_binop_expr(ctx: CheckCtx, expr: BinOpExpr): Type {
+    return infer_or_check_binop_expr(ctx, expr, null)
+  }
+  function check_binop_expr(
+    ctx: CheckCtx,
+    expr: BinOpExpr,
+    expected_type: Type,
+  ): void {
+    infer_or_check_binop_expr(ctx, expr, expected_type)
+  }
+  function infer_or_check_binop_expr(
+    ctx: CheckCtx,
+    expr: BinOpExpr,
+    expected_type: Type | null,
+  ): Type {
     switch (expr.operator) {
       case "Lt":
       case "Lte":
@@ -591,7 +610,9 @@ export function typecheck(
       }
       case "Add":
       case "Sub": {
-        const lhs_type = infer_expr(ctx.source_file, expr.lhs)
+        const lhs_type = expected_type
+          ? (check_expr(ctx, expr.lhs, expected_type), expected_type)
+          : infer_expr(ctx.source_file, expr.lhs)
         if (!type_is_integral(lhs_type) && !type_is_floating_point(lhs_type)) {
           emit_error(
             ctx,

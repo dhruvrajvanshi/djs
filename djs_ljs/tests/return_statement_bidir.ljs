@@ -1,0 +1,9 @@
+
+function foo(): u8 {
+    return 1 + 4
+}
+
+function foobar(): u8 {
+    const f: u32 = 1;
+    return f + 4 // EXPECTED_ERROR
+}
