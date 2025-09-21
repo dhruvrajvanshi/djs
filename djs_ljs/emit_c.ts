@@ -412,6 +412,8 @@ function emit_expr(
         Gte: ">=",
         Add: "+",
         Sub: "-",
+        EqEqEq: "==",
+        NotEqEq: "!=",
       }
       const op = ops[expr.operator]
       assert(op, `Unhandled binary operator: ${expr.operator}`)
@@ -432,6 +434,21 @@ function emit_expr(
         kind: "PostDeclrement",
         expr: emit_expr(ctx, source_file, expr.value),
       }
+    case "Assign": {
+      assert(expr.operator === "Eq", "Only simple assignment is supported")
+      assert(
+        expr.pattern.kind === "Var",
+        "Only variable assignment is supported",
+      )
+      const var_name = expr.pattern.ident.text
+      const value = emit_expr(ctx, source_file, expr.value)
+      return {
+        kind: "BinOp",
+        op: "=",
+        left: { kind: "Ident", name: var_name },
+        right: value,
+      }
+    }
     default:
       todo(`Unhandled expression: ${expr.kind}`)
   }
