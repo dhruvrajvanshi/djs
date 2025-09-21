@@ -102,6 +102,8 @@ export function emit_c(
       defs.push(emit_func_def(ctx, source_file, stmt))
     } else if (stmt.kind === "StructDecl") {
       defs.push(emit_struct_def(ctx, stmt))
+    } else {
+      defs.push(emit_stmt(ctx, source_file, stmt))
     }
   }
 
@@ -243,17 +245,19 @@ function emit_stmt(
       const var_decls = ctx.tc_result.var_decls.get(stmt.decl)
       assert(var_decls, "VarDeclStmt must have checked declarations")
 
-      const decl_nodes = var_decls.map((decl) => {
-        const var_type = emit_type(decl.type)
-        const init_expr = emit_expr(ctx, source_file, decl.init)
+      const decl_nodes = var_decls
+        .filter((it) => it.type.kind !== "CStringConstructor")
+        .map((decl): CNode => {
+          const var_type = emit_type(decl.type)
+          const init_expr = emit_expr(ctx, source_file, decl.init)
 
-        return {
-          kind: "VarDecl",
-          type: var_type,
-          name: decl.name,
-          init: init_expr,
-        } as CNode
-      })
+          return {
+            kind: "VarDecl",
+            type: var_type,
+            name: decl.name,
+            init: init_expr,
+          }
+        })
       return {
         kind: "Many",
         nodes: decl_nodes,
@@ -274,6 +278,13 @@ function emit_stmt(
     case "Return": {
       return emit_return_stmt(ctx, source_file, stmt)
     }
+    case "Import":
+    case "ImportStarAs":
+    case "TypeAlias":
+      return { kind: "Empty" }
+    case "LJSExternFunction":
+      // Emitted in the declaration phase
+      return { kind: "Empty" }
     default:
       todo(`Unhandled statement: ${stmt.kind}`)
   }
@@ -693,12 +704,15 @@ function render_c_node(node: CNode): string {
       return `(&${render_c_node(node.expr)})`
     case "Deref":
       return `(*${render_c_node(node.expr)})`
+    case "Empty":
+      return ""
     default:
       assert_never(node)
   }
 }
 
 export type CNode =
+  | { kind: "Empty" }
   | { kind: "Ident"; name: string }
   | { kind: "Block"; body: CNode[] }
   | { kind: "Concat"; items: CNode[] }
