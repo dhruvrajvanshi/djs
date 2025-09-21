@@ -330,6 +330,17 @@ function parser_impl(
       switch (current_kind()) {
         case t.Dot: {
           advance()
+          if (at(t.Star) && flags & PARSER_FLAGS.LJS) {
+            const star = advance()
+            const span = Span.between(lhs.span, star.span)
+            lhs = Expr.Deref(span, lhs)
+            break
+          } else if (at(t.Amp) && flags & PARSER_FLAGS.LJS) {
+            const amp = advance()
+            const span = Span.between(lhs.span, amp.span)
+            lhs = Expr.AddressOf(span, lhs)
+            break
+          }
           const prop = parse_member_ident_name()
           if (prop === ERR) return prop
 
