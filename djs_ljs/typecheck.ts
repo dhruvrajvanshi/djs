@@ -27,6 +27,8 @@ import {
   WhileStmt,
   DoWhileStmt,
   AssignExpr,
+  AddressOfExpr,
+  DerefExpr,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -533,6 +535,10 @@ export function typecheck(
         return infer_post_increment_expr(ctx, expr)
       case "Assign":
         return infer_assign_expr(ctx, expr)
+      case "AddressOf":
+        return infer_address_of_expr(ctx, expr)
+      case "Deref":
+        return infer_deref_expr(ctx, expr)
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
@@ -541,6 +547,29 @@ export function typecheck(
       }
     }
   }
+  function infer_address_of_expr(ctx: CheckCtx, expr: AddressOfExpr): Type {
+    if (expr.expr.kind !== "Var") {
+      emit_error(ctx, expr.expr.span, "Can only take the address of a variable")
+    }
+    const inner_type = infer_expr(ctx.source_file, expr.expr)
+    if (inner_type.kind === "Error") return inner_type
+    return Type.Ptr(inner_type)
+  }
+  function infer_deref_expr(ctx: CheckCtx, expr: DerefExpr): Type {
+    const inner_type = infer_expr(ctx.source_file, expr.expr)
+    if (inner_type.kind === "Ptr" || inner_type.kind === "MutPtr") {
+      return inner_type.type
+    }
+    if (inner_type.kind !== "Error") {
+      emit_error(
+        ctx,
+        expr.span,
+        `Cannot dereference a ${type_to_string(inner_type)}`,
+      )
+    }
+    return Type.Error(`Cannot dereference a ${type_to_string(inner_type)}`)
+  }
+
   function infer_assign_expr(ctx: CheckCtx, expr: AssignExpr): Type {
     if (expr.pattern.kind !== "Var") {
       emit_error(ctx, expr.pattern.span, "Patterns are not supported in LJS")
