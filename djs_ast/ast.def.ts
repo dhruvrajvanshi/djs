@@ -288,6 +288,8 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   Builtin: {
     text: Text,
   },
+  AddressOf: { expr: Expr },
+  Deref: { expr: Expr },
 })
 export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { leading_trivia: Text, ident: Ident },

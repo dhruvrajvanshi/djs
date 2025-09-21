@@ -362,6 +362,14 @@ export class ASTVisitorBase implements ASTVisitor {
       case "Builtin": {
         break
       }
+      case "AddressOf": {
+        this.visit_expr(expr.expr)
+        break
+      }
+      case "Deref": {
+        this.visit_expr(expr.expr)
+        break
+      }
     }
   }
   visit_ident(node: ast.Ident): void {}

@@ -883,6 +883,8 @@ export type Expr =
   | TemplateLiteralExpr
   | TaggedTemplateLiteralExpr
   | BuiltinExpr
+  | AddressOfExpr
+  | DerefExpr
 export class VarExpr {
   constructor(
     readonly span: Span,
@@ -1504,6 +1506,36 @@ export class BuiltinExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
+export class AddressOfExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly expr: Expr,
+  ) {}
+
+  get kind(): "AddressOf" {
+    return "AddressOf"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
+export class DerefExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly expr: Expr,
+  ) {}
+
+  get kind(): "Deref" {
+    return "Deref"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
 
 export const Expr = {
   Var: (span: Span, leading_trivia: Text, ident: Ident): VarExpr =>
@@ -1645,6 +1677,11 @@ export const Expr = {
     new TaggedTemplateLiteralExpr(span, tag, fragments),
 
   Builtin: (span: Span, text: Text): BuiltinExpr => new BuiltinExpr(span, text),
+
+  AddressOf: (span: Span, expr: Expr): AddressOfExpr =>
+    new AddressOfExpr(span, expr),
+
+  Deref: (span: Span, expr: Expr): DerefExpr => new DerefExpr(span, expr),
 } as const
 
 export interface StructInitItem {
