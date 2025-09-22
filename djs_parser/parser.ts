@@ -38,6 +38,7 @@ import {
   StructMember,
   type StructInitItem,
   type QualifiedName,
+  VarPattern,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -2867,6 +2868,8 @@ function expr_to_pattern(expr: Expr): Pattern | null {
         expr.lhs,
         ObjectKey.Ident(expr.property.span, expr.property),
       )
+    case "Deref":
+      return Pattern.Deref(expr.span, expr.expr)
     case "Index":
       return Pattern.Prop(
         expr.span,

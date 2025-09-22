@@ -156,6 +156,7 @@ export const DPattern = Enum(Pattern, ["span", "visit"], {
   Array: { items: List(Pattern) },
   Object: { properties: List("ObjectPatternProperty"), rest: Option(Pattern) },
   Prop: { expr: Expr, key: ObjectKey },
+  Deref: { expr: Expr },
   Elision: {},
   Rest: { pattern: Pattern },
 })

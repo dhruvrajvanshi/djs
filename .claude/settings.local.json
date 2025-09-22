@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm build-parser:*)",
+      "Bash(pnpm build-ast:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

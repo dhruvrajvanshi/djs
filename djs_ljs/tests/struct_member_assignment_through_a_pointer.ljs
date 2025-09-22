@@ -1,0 +1,18 @@
+import * as c from "../libc.ljs"
+
+function main(): c.int {
+  const msg_box = MsgBox { message: c.str`FAIL` }
+
+  process(msg_box.&)
+
+  c.puts(msg_box.message)
+
+  return 0
+}
+function process(msg_box: *mut MsgBox): void {
+   msg_box.message.* = c`PASS`
+}
+
+struct MsgBox {
+  message: *c.char
+}
