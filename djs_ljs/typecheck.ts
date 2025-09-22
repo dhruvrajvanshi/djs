@@ -610,6 +610,31 @@ export function typecheck(
       }
       check_expr(ctx, expr.value, field_ty)
       return field_ty
+    } else if (expr.pattern.kind === "Deref") {
+      const lhs_type = infer_expr(ctx.source_file, expr.pattern.expr)
+      if (
+        lhs_type.kind !== "MutPtr" &&
+        lhs_type.kind !== "Ptr" &&
+        lhs_type.kind !== "Error"
+      ) {
+        return emit_error_type(ctx, {
+          span: expr.pattern.expr.span,
+          message: `Cannot assign to a non-pointer type ${type_to_string(
+            lhs_type,
+          )}`,
+        })
+      }
+      if (lhs_type.kind === "Error") return lhs_type
+
+      if (lhs_type.kind === "Ptr") {
+        emit_error(
+          ctx,
+          expr.pattern.expr.span,
+          `Cannot assign to a non-mutable pointer`,
+        )
+      }
+      check_expr(ctx, expr.value, lhs_type.type)
+      return lhs_type.type
     } else {
       emit_error(ctx, expr.pattern.span, "Unsupported assignment pattern")
       return infer_expr(ctx.source_file, expr.value)
@@ -815,9 +840,28 @@ export function typecheck(
             hint: `Available properties: ` + Object.keys(lhs.fields).join(", "),
           })
         )
+      } else if (
+        (lhs.kind === "Ptr" || lhs.kind === "MutPtr") &&
+        lhs.type.kind === "StructInstance"
+      ) {
+        const field_type = lhs.type.fields[expr.property.text]
+        if (!field_type) {
+          return emit_error_type(ctx, {
+            message: `Property ${expr.property.text} does not exist on type ${type_to_string(lhs.type)}`,
+            span: expr.property.span,
+            hint:
+              `Available properties: ` +
+              Object.keys(lhs.type.fields).join(", "),
+          })
+        }
+        if (lhs.kind === "Ptr") {
+          return Type.Ptr(field_type)
+        } else {
+          return Type.MutPtr(field_type)
+        }
       } else {
         return emit_error_type(ctx, {
-          message: `Expected a module or a struct on the left-hand side of the property access`,
+          message: `Expected a module or a struct on the left-hand side of the property access: ${type_to_string(lhs)}`,
           span: expr.lhs.span,
           hint: null,
         })

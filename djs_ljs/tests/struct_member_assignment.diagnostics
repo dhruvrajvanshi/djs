@@ -1,0 +1,11 @@
+ERROR: ./tests/struct_member_assignment.ljs:10: Unbound variable box
+10|      box.value = c.str`PASS`
+         ^~~
+11|      c.puts(box.value)
+12|      return 0
+
+ERROR: ./tests/struct_member_assignment.ljs:10: Cannot access property on a non-struct type <Error>
+10|      box.value = c.str`PASS`
+         ^~~
+11|      c.puts(box.value)
+12|      return 0

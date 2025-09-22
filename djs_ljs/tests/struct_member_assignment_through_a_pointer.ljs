@@ -10,7 +10,7 @@ function main(): c.int {
   return 0
 }
 function process(msg_box: *mut MsgBox): void {
-   msg_box.message.* = c`PASS`
+   msg_box.message.* = c.str`PASS`
 }
 
 struct MsgBox {
