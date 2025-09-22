@@ -233,24 +233,14 @@ class Resolver extends ASTVisitorBase {
 
   visit_assign_expr(expr: AssignExpr): void {
     this.bind_pattern_idents(expr.pattern)
-    if (expr.pattern.kind === "Var") {
-      this.visit_var_expr(expr.pattern.ident)
-      super.visit_expr(expr)
-    } else if (
-      expr.pattern.kind === "Prop" &&
-      expr.pattern.key.kind === "Ident" &&
-      expr.pattern.expr.kind === "Var"
-    ) {
-      this.visit_var_expr(expr.pattern.expr.ident)
-      super.visit_expr(expr)
-    } else {
-      todo()
-    }
+    super.visit_pattern(expr.pattern)
+    super.visit_expr(expr.value)
   }
 
   bind_pattern_idents(pattern: Pattern): void {
     switch (pattern.kind) {
       case "Var":
+        this.visit_var_expr(pattern.ident)
         break
     }
   }
