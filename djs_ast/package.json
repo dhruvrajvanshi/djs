@@ -14,7 +14,8 @@
     "gen:ast": "node gen_ts_ast.ts | prettier > ast.gen.ts",
     "gen:tokens": "node gen_ts_tokens.ts | prettier > tokens.gen.ts",
     "gen:visitor": "node gen_ts_visitor.ts | prettier > visitor.gen.ts",
-    "build": "tsc"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "djs_std": "workspace:*"

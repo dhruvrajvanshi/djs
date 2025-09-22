@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "license": "UNLICENSED",
   "packageManager": "pnpm@10.12.4",
+  "scripts": {
+    "build-ast": "cd djs_ast && pnpm build",
+    "build-parser": "cd djs_parser && pnpm build",
+    "typecheck": "pnpm run --recursive typecheck"
+  },
   "volta": {
     "node": "24.8.0"
   },

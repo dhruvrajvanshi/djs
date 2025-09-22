@@ -1,11 +1,15 @@
-# Bash commands (from ./djs_ljs directory)
-- ./main.ts my_program.ljs -o my_program : Compile my_program.ljs into an executable named my_program
+# Overview
+This repository contains a compiler for a low level JS like language called ljs.
+Eventually, ljs will be used as a language to write a JS engine for a JS superset called djs.
+The superset aims to support all JS syntax with static types which are preserved at runtime
+for reflection and also used for optimizations, unlike Typescript which erases types at runtime.
 
-- ./main.ts my_program.ljs --dump-ast: Print the ast
-- ./main.ts my_program.ljs --dump-typecheck: Print typecheck results
-- ./main.ts my_program.ljs --dump-resolve-imports: Print the name resolution
-- pnpm tsc --noEmit: Typecheck the compiler
-
+# Commands
+- pnpm typecheck: Typecheck the codebase
+- pnpm build-ast: Build the AST package
+- pnpm build-parser: Build the parser
+- ./djs_ljs/main.ts program.ljs -o program: Compile program.ljs into an executable named program
+- ./djs_parser/run_parser.ts --dump-ast program.ljs: Parse program.ljs and print the AST
 
 # Code style
 - Use `snake_case`.
