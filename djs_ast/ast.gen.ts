@@ -1529,6 +1529,7 @@ export class AddressOfExpr {
     readonly span: Span,
 
     readonly expr: Expr,
+    readonly mut: boolean,
   ) {}
 
   get kind(): "AddressOf" {
@@ -1696,8 +1697,8 @@ export const Expr = {
 
   Builtin: (span: Span, text: Text): BuiltinExpr => new BuiltinExpr(span, text),
 
-  AddressOf: (span: Span, expr: Expr): AddressOfExpr =>
-    new AddressOfExpr(span, expr),
+  AddressOf: (span: Span, expr: Expr, mut: boolean): AddressOfExpr =>
+    new AddressOfExpr(span, expr, mut),
 
   Deref: (span: Span, expr: Expr): DerefExpr => new DerefExpr(span, expr),
 } as const

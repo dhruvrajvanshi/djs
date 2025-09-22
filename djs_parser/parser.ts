@@ -38,7 +38,6 @@ import {
   StructMember,
   type StructInitItem,
   type QualifiedName,
-  VarPattern,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -338,8 +337,13 @@ function parser_impl(
             break
           } else if (at(t.Amp) && flags & PARSER_FLAGS.LJS) {
             const amp = advance()
+            let mut = false
+            if (at_soft_keyword("mut")) {
+              advance()
+              mut = true
+            }
             const span = Span.between(lhs.span, amp.span)
-            lhs = Expr.AddressOf(span, lhs)
+            lhs = Expr.AddressOf(span, lhs, mut)
             break
           }
           const prop = parse_member_ident_name()

@@ -553,7 +553,11 @@ export function typecheck(
     }
     const inner_type = infer_expr(ctx.source_file, expr.expr)
     if (inner_type.kind === "Error") return inner_type
-    return Type.Ptr(inner_type)
+    if (expr.mut) {
+      return Type.MutPtr(inner_type)
+    } else {
+      return Type.Ptr(inner_type)
+    }
   }
   function infer_deref_expr(ctx: CheckCtx, expr: DerefExpr): Type {
     const inner_type = infer_expr(ctx.source_file, expr.expr)
