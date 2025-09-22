@@ -9,7 +9,8 @@
     }
   },
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
   },
   "$schema": "https://json.schemastore.org/package.json",
   "packageManager": "pnpm@10.8.0",
