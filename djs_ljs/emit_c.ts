@@ -2,26 +2,26 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import { assert_never, defer, todo } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
-import type {
-  Expr,
-  Stmt,
-  FuncStmt,
-  TaggedTemplateLiteralExpr,
-  PropExpr,
-  TypeAnnotation,
-  Block,
-  Param,
-  SourceFile,
-  StructInitExpr,
-  ForStmt,
-  BinOp,
-  IfStmt,
-  WhileStmt,
-  DoWhileStmt,
-  ForInOrOfStmt,
-  ReturnStmt,
-  ContinueStmt,
-  AssignExpr,
+import {
+  type Expr,
+  type Stmt,
+  type FuncStmt,
+  type TaggedTemplateLiteralExpr,
+  type PropExpr,
+  type TypeAnnotation,
+  type Block,
+  type Param,
+  type SourceFile,
+  type StructInitExpr,
+  type ForStmt,
+  type BinOp,
+  type IfStmt,
+  type WhileStmt,
+  type DoWhileStmt,
+  type ForInOrOfStmt,
+  type ReturnStmt,
+  type ContinueStmt,
+  type AssignExpr,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type } from "./type.ts"
@@ -497,6 +497,16 @@ function emit_assign_expr(
       left: lhs,
       right: emit_expr(ctx, source_file, expr.value),
     }
+  } else if (expr.pattern.kind === "Deref") {
+    const inner_ty = ctx.tc_result.values.get(expr.pattern.expr)
+    assert(inner_ty?.kind === "MutPtr")
+    const ptr = emit_expr(ctx, source_file, expr.pattern.expr)
+    return {
+      kind: "BinOp",
+      op: "=",
+      left: { kind: "Deref", expr: ptr },
+      right: emit_expr(ctx, source_file, expr.value),
+    }
   } else {
     return todo`Unsupported assignment expr ${expr}`
   }
@@ -565,12 +575,31 @@ function emit_prop_expr(
   } else {
     const lhs_ty = ctx.tc_result.values.get(expr.lhs)
     assert(lhs_ty)
-    assert(lhs_ty.kind === "StructInstance")
-    const prop_ty = lhs_ty.fields[expr.property.text]
-    return {
-      kind: "Prop",
-      lhs: emit_expr(ctx, source_file, expr.lhs),
-      rhs: expr.property.text,
+    if (lhs_ty.kind === "StructInstance") {
+      const prop_ty = lhs_ty.fields[expr.property.text]
+      return {
+        kind: "Prop",
+        lhs: emit_expr(ctx, source_file, expr.lhs),
+        rhs: expr.property.text,
+      }
+    } else if (
+      (lhs_ty.kind === "Ptr" || lhs_ty.kind === "MutPtr") &&
+      lhs_ty.type.kind === "StructInstance"
+    ) {
+      // foo.bar where foo is a pointer to struct
+      // translates to &(foo->bar)
+      const struct_ptr = emit_expr(ctx, source_file, expr.lhs)
+      return {
+        kind: "AddressOf",
+        expr: {
+          kind: "BinOp",
+          op: "->",
+          left: struct_ptr,
+          right: { kind: "Ident", name: expr.property.text },
+        },
+      }
+    } else {
+      assert(false)
     }
   }
 }
