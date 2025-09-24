@@ -36,6 +36,7 @@ import {
   type_is_convertible_from_numeric_literal,
   type_is_floating_point,
   type_is_integral,
+  type_is_one_of,
   type_to_string,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
@@ -550,10 +551,35 @@ export function typecheck(
   function infer_address_of_expr(ctx: CheckCtx, expr: AddressOfExpr): Type {
     if (expr.expr.kind !== "Var") {
       emit_error(ctx, expr.expr.span, "Can only take the address of a variable")
+    } else {
+      check_address_of_mutability(ctx, expr.expr.ident)
     }
     const inner_type = infer_expr(ctx.source_file, expr.expr)
     if (inner_type.kind === "Error") return inner_type
-    return Type.Ptr(inner_type)
+    if (expr.mut) {
+      return Type.MutPtr(inner_type)
+    } else {
+      return Type.Ptr(inner_type)
+    }
+  }
+
+  /**
+   * For exprs like `foo.&mut`, check if `foo` is a `let` variable
+   * which can be converted to a mutable pointer.
+   */
+  function check_address_of_mutability(ctx: CheckCtx, ident: Ident): void {
+    const decl = value_decls.get(ctx.source_file.path)?.get(ident)
+    if (!decl) return
+    if (decl.kind !== "VarDecl" || decl.decl.decl_type !== "Let") {
+      emit_error(
+        ctx,
+        ident.span,
+        "It's not possible to take the mutable address of this variable",
+        decl.kind === "VarDecl"
+          ? `${ident.text} is declared with ${decl.decl.decl_type.toLowerCase()} but you're trying to call .&mut on it.`
+          : undefined,
+      )
+    }
   }
   function infer_deref_expr(ctx: CheckCtx, expr: DerefExpr): Type {
     const inner_type = infer_expr(ctx.source_file, expr.expr)
@@ -586,6 +612,24 @@ export function typecheck(
       const lhs_type = type_of_decl(expr.pattern.ident.text, decl)
       check_expr(ctx, expr.value, lhs_type)
       return lhs_type
+    } else if (expr.pattern.kind === "Deref") {
+      const inner_type = infer_expr(ctx.source_file, expr.pattern.expr)
+      if (inner_type.kind === "Error") return inner_type
+      if (!type_is_one_of(inner_type, "Ptr", "MutPtr")) {
+        return emit_error_type(ctx, {
+          message: `Cannot assign to a dereference of a non-pointer type ${type_to_string(inner_type)}`,
+          span: expr.pattern.expr.span,
+        })
+      }
+      if (inner_type.kind !== "MutPtr") {
+        return emit_error_type(ctx, {
+          message: `Assignment needs a mutable pointer`,
+          span: expr.pattern.expr.span,
+          hint: "A let variable's address can be converted to a mutable pointer using the var_name.&mut syntax",
+        })
+      }
+      check_expr(ctx, expr.value, inner_type.type)
+      return inner_type.type
     } else if (
       expr.pattern.kind === "Prop" &&
       expr.pattern.key.kind === "Ident" &&
