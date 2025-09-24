@@ -337,8 +337,11 @@ function parser_impl(
             break
           } else if (at(t.Amp) && flags & PARSER_FLAGS.LJS) {
             const amp = advance()
-            const span = Span.between(lhs.span, amp.span)
-            lhs = Expr.AddressOf(span, lhs)
+            const [stop_token, mut] = at_soft_keyword("mut")
+              ? [advance(), true]
+              : [amp, false]
+            const span = Span.between(lhs.span, stop_token.span)
+            lhs = Expr.AddressOf(span, lhs, mut)
             break
           }
           const prop = parse_member_ident_name()
