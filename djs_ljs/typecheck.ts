@@ -551,7 +551,7 @@ export function typecheck(
   function infer_address_of_expr(ctx: CheckCtx, expr: AddressOfExpr): Type {
     if (expr.expr.kind !== "Var") {
       emit_error(ctx, expr.expr.span, "Can only take the address of a variable")
-    } else {
+    } else if (expr.mut) {
       check_address_of_mutability(ctx, expr.expr.ident)
     }
     const inner_type = infer_expr(ctx.source_file, expr.expr)

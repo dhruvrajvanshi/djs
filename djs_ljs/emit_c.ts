@@ -481,6 +481,14 @@ function emit_assign_expr(
       left: { kind: "Ident", name: var_name },
       right: value,
     }
+  } else if (expr.pattern.kind === "Deref") {
+    const deref_expr = emit_expr(ctx, source_file, expr.pattern.expr)
+    return {
+      kind: "BinOp",
+      op: "=",
+      left: { kind: "Deref", expr: deref_expr },
+      right: emit_expr(ctx, source_file, expr.value),
+    }
   } else if (
     expr.pattern.kind === "Prop" &&
     expr.pattern.key.kind === "Ident"
