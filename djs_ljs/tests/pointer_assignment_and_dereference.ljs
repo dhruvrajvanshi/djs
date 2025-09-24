@@ -1,0 +1,10 @@
+import * as c from "../libc.ljs"
+
+function main(): c.int {
+    let message = c.str`FAIL`
+    let message_address = message.&mut
+
+    message_address.* = c.str`PASS`
+    c.puts(message_address.*)
+    return 0
+}
