@@ -288,7 +288,7 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   Builtin: {
     text: Text,
   },
-  AddressOf: { expr: Expr },
+  AddressOf: { expr: Expr, mut: "boolean" },
   Deref: { expr: Expr },
 })
 export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
