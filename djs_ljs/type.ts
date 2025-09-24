@@ -225,3 +225,10 @@ export function type_is_convertible_from_numeric_literal(
   }
   return false
 }
+
+export function type_is_one_of<Kinds extends readonly Type["kind"][]>(
+  type: Type,
+  ...kinds: Kinds
+): type is Extract<Type, { kind: Kinds[number] }> {
+  return kinds.includes(type.kind)
+}
