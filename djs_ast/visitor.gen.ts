@@ -413,6 +413,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_object_key(pattern.key)
         break
       }
+      case "Deref": {
+        this.visit_expr(pattern.expr)
+        break
+      }
       case "Elision": {
         break
       }

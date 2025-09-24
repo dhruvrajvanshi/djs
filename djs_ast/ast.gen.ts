@@ -656,6 +656,7 @@ export type Pattern =
   | ArrayPattern
   | ObjectPattern
   | PropPattern
+  | DerefPattern
   | ElisionPattern
   | RestPattern
 export class VarPattern {
@@ -736,6 +737,21 @@ export class PropPattern {
     return sexpr_to_string(pattern_to_sexpr(this))
   }
 }
+export class DerefPattern {
+  constructor(
+    readonly span: Span,
+
+    readonly expr: Expr,
+  ) {}
+
+  get kind(): "Deref" {
+    return "Deref"
+  }
+
+  toString(): string {
+    return sexpr_to_string(pattern_to_sexpr(this))
+  }
+}
 export class ElisionPattern {
   constructor(readonly span: Span) {}
 
@@ -783,6 +799,8 @@ export const Pattern = {
 
   Prop: (span: Span, expr: Expr, key: ObjectKey): PropPattern =>
     new PropPattern(span, expr, key),
+
+  Deref: (span: Span, expr: Expr): DerefPattern => new DerefPattern(span, expr),
 
   Elision: (span: Span): ElisionPattern => new ElisionPattern(span),
 
