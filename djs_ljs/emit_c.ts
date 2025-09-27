@@ -1,5 +1,5 @@
 import type { SourceFiles } from "./SourceFiles.ts"
-import { assert_never, defer, PANIC, todo } from "djs_std"
+import { assert_never, defer, PANIC, TODO } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
 import type {
@@ -196,7 +196,7 @@ function emit_type(type: Type): CNode {
         name: mangle_struct_name(type.qualified_name),
       }
     default:
-      todo(`Unhandled type: ${type.kind}`)
+      TODO(`Unhandled type: ${type.kind}`)
   }
 }
 
@@ -287,7 +287,7 @@ function emit_stmt(
       // Emitted in the declaration phase
       return { kind: "Empty" }
     default:
-      todo(`Unhandled statement: ${stmt.kind}`)
+      TODO(`Unhandled statement: ${stmt.kind}`)
   }
 }
 function emit_return_stmt(
@@ -463,7 +463,7 @@ function emit_expr(
       }
     }
     default:
-      todo(`Unhandled expression: ${expr.kind}`)
+      TODO(`Unhandled expression: ${expr.kind}`)
   }
 }
 function emit_assign_expr(
@@ -506,7 +506,7 @@ function emit_assign_expr(
       right: emit_expr(ctx, source_file, expr.value),
     }
   } else {
-    return todo`Unsupported assignment expr ${expr}`
+    return TODO`Unsupported assignment expr ${expr}`
   }
 }
 function emit_struct_init_expr(
@@ -535,7 +535,7 @@ function emit_struct_init_expr(
 }
 function mangle_struct_name(qualified_name: readonly string[]): string {
   if (qualified_name.length !== 1) {
-    todo()
+    TODO()
   }
   return qualified_name[0]
 }

@@ -1,7 +1,7 @@
 import type { ForStmt, Func, Pattern, SourceFile, Stmt } from "djs_ast"
 import { SymbolTable, type ValueDecl } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
-import { assert_never, todo } from "djs_std"
+import { assert_never, TODO } from "djs_std"
 import { import_stmt_path } from "./import_stmt_path.ts"
 
 export function build_source_file_symbol_table(
@@ -69,16 +69,16 @@ function add_pattern_bindings_to_symbol_table(
       }
       break
     case "Object":
-      todo()
+      TODO()
     case "Elision":
       break
     case "Rest":
       add_pattern_bindings_to_symbol_table(symbol_table, pattern.pattern, stmt)
       break
     case "Assignment":
-      todo()
     case "Prop":
-      todo()
+    case "Deref":
+      TODO()
     default:
       assert_never(pattern)
   }
@@ -150,7 +150,7 @@ function initialize_symbol_table(
             symbol_table.add_value(named_import.imported_name.ident.text, decl)
             symbol_table.add_type(named_import.imported_name.ident.text, decl)
           } else {
-            todo(`import { "quoted" as name } not supported yet.`)
+            TODO(`import { "quoted" as name } not supported yet.`)
           }
         }
         break
