@@ -80,6 +80,12 @@ export function assert_todo(
     })
   }
 }
+export function PANIC(message: string): never {
+  throw new AssertionError({
+    message: `PANIC: ${message}`,
+    stackStartFn: PANIC,
+  })
+}
 
 export const MapUtils = {
   map_entries<K, V, K2, V2>(
