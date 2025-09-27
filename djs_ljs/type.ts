@@ -18,21 +18,8 @@ export type Type = ReadonlyUnion<
   | { kind: "Ptr"; type: Type }
   | { kind: "MutPtr"; type: Type }
   | { kind: "UnboxedFunc"; params: readonly Type[]; return_type: Type }
-
-  /**
-   * In an expression SomeStruct { field: value, ...}
-   * this represents the type of SomeStruct
-   */
-  | {
-      kind: "StructConstructor"
-      qualified_name: readonly string[]
-      fields: Record<string, Type>
-    }
-  | {
-      kind: "StructInstance"
-      qualified_name: readonly string[]
-      fields: Record<string, Type>
-    }
+  | StructConstructorType
+  | StructInstanceType
   | { kind: "Error"; message: string }
   /**
    * typeof @builtin("c_str")
@@ -40,6 +27,20 @@ export type Type = ReadonlyUnion<
    */
   | { kind: "CStringConstructor" }
 >
+/**
+ * In an expression SomeStruct { field: value, ...}
+ * this represents the type of SomeStruct
+ */
+type StructConstructorType = Readonly<{
+  kind: "StructConstructor"
+  qualified_name: readonly string[]
+  fields: Record<string, Type>
+}>
+export type StructInstanceType = Readonly<{
+  kind: "StructInstance"
+  qualified_name: readonly string[]
+  fields: Record<string, Type>
+}>
 export const Type = {
   u8: { kind: "u8" },
   u16: { kind: "u16" },
