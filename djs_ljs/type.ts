@@ -232,3 +232,9 @@ export function type_is_one_of<Kinds extends readonly Type["kind"][]>(
 ): type is Extract<Type, { kind: Kinds[number] }> {
   return kinds.includes(type.kind)
 }
+
+export function type_is_pointer(
+  type: Type,
+): type is Extract<Type, { kind: "Ptr" | "MutPtr" }> {
+  return type.kind === "Ptr" || type.kind === "MutPtr"
+}
