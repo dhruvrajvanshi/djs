@@ -37,7 +37,9 @@ import {
   type_is_floating_point,
   type_is_integral,
   type_is_one_of,
+  type_is_pointer,
   type_to_string,
+  type StructInstanceType,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { assert_never, defer, is_readonly_array, TODO, zip } from "djs_std"
@@ -635,12 +637,27 @@ export function typecheck(
       expr.pattern.key.kind === "Ident" &&
       expr.pattern.expr.kind === "Var"
     ) {
-      const struct_ty = infer_expr(ctx.source_file, expr.pattern.expr)
-      if (struct_ty.kind !== "StructInstance") {
+      const pattern_lhs_ty = infer_expr(ctx.source_file, expr.pattern.expr)
+      let struct_ty: StructInstanceType
+      if (pattern_lhs_ty.kind === "StructInstance") {
+        struct_ty = pattern_lhs_ty
+      } else if (
+        type_is_pointer(pattern_lhs_ty) &&
+        pattern_lhs_ty.type.kind === "StructInstance"
+      ) {
+        struct_ty = pattern_lhs_ty.type
+        if (pattern_lhs_ty.kind === "Ptr") {
+          emit_error(
+            ctx,
+            expr.pattern.expr.span,
+            "Assigning to an immutable pointer is not allowed.",
+          )
+        }
+      } else {
         return emit_error_type(ctx, {
           span: expr.pattern.expr.span,
           message: `Cannot access property on a non-struct type ${type_to_string(
-            struct_ty,
+            pattern_lhs_ty,
           )}`,
         })
       }
