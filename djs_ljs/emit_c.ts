@@ -1,5 +1,5 @@
 import type { SourceFiles } from "./SourceFiles.ts"
-import { assert_never, defer, todo } from "djs_std"
+import { assert_never, defer, PANIC, todo } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
 import type {
@@ -24,7 +24,7 @@ import type {
   AssignExpr,
 } from "djs_ast"
 import assert from "node:assert"
-import { Type } from "./type.ts"
+import { Type, type_is_pointer } from "./type.ts"
 import type { ValueDeclOfKind } from "./SymbolTable.ts"
 
 interface EmitContext {
@@ -573,12 +573,24 @@ function emit_prop_expr(
   } else {
     const lhs_ty = ctx.tc_result.values.get(expr.lhs)
     assert(lhs_ty)
-    assert(lhs_ty.kind === "StructInstance")
-    const prop_ty = lhs_ty.fields[expr.property.text]
-    return {
-      kind: "Prop",
-      lhs: emit_expr(ctx, source_file, expr.lhs),
-      rhs: expr.property.text,
+    if (lhs_ty.kind === "StructInstance") {
+      return {
+        kind: "Prop",
+        lhs: emit_expr(ctx, source_file, expr.lhs),
+        rhs: expr.property.text,
+      }
+    } else if (
+      type_is_pointer(lhs_ty) &&
+      lhs_ty.type.kind === "StructInstance"
+    ) {
+      return {
+        kind: "BinOp",
+        op: "->",
+        left: emit_expr(ctx, source_file, expr.lhs),
+        right: { kind: "Ident", name: expr.property.text },
+      }
+    } else {
+      PANIC(`Unhandled lhs type in property access: ${lhs_ty.kind}`)
     }
   }
 }

@@ -1,0 +1,14 @@
+import * as c from "../libc.ljs"
+
+struct Foo {
+    message: *c.char
+}
+
+function main(): c.int {
+    const foo = Foo {
+        message: c.str`PASS`
+    }
+    const foo_address = foo.&
+    c.puts(foo_address.message)
+    return 0
+}
