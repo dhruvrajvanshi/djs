@@ -122,7 +122,12 @@ export async function main(
   const output_c_path = Path.join(".ljs", args.output + ".c")
   await mkdir(Path.dirname(output_c_path), { recursive: true })
   await writeFile(output_c_path, c_source)
-  execSync(`gcc -o ${args.output} ${output_c_path}`, { stdio: "inherit" })
+  execSync(
+    `gcc -o ${args.output} ${output_c_path} -Wall -Werror -Wno-parentheses-equality`,
+    {
+      stdio: "inherit",
+    },
+  )
   if (!args["preserve-c-output"]) {
     await rm(output_c_path)
   }
