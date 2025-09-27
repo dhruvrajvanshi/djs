@@ -859,6 +859,20 @@ export function typecheck(
             hint: `Available properties: ` + Object.keys(lhs.fields).join(", "),
           })
         )
+      } else if (
+        (lhs.kind === "Ptr" || lhs.kind === "MutPtr") &&
+        lhs.type.kind === "StructInstance"
+      ) {
+        return (
+          lhs.type.fields[expr.property.text] ??
+          emit_error_type(ctx, {
+            message: `Property ${expr.property.text} does not exist on type ${type_to_string(lhs)}`,
+            span: expr.property.span,
+            hint:
+              `Available properties: ` +
+              Object.keys(lhs.type.fields).join(", "),
+          })
+        )
       } else {
         return emit_error_type(ctx, {
           message: `Expected a module or a struct on the left-hand side of the property access`,
