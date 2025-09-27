@@ -31,7 +31,6 @@ import type { FS } from "./FS.ts"
 import type { SourceFiles } from "./SourceFiles.ts"
 import { PathMap } from "./PathMap.ts"
 import { resolve_imports } from "./resolve_imports.ts"
-import { todo } from "djs_std"
 
 export interface ResolveResult {
   values: PathMap<Map<Ident, ValueDeclExcludingKind<"Import" | "ImportStarAs">>>

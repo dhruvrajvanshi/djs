@@ -1,6 +1,6 @@
 import { type Ident, type TypeAnnotation } from "djs_ast"
 import { Type } from "./type.ts"
-import { todo } from "djs_std"
+import { TODO } from "djs_std"
 
 export type TypeVarEnv = (name: Ident | readonly Ident[]) => Type
 
@@ -29,9 +29,9 @@ export function annotation_to_type(
         case '"c_int"':
           return Type.c_int
         default:
-          todo(annotation.text)
+          TODO(annotation.text)
       }
     default:
-      return todo(annotation.kind)
+      return TODO(annotation.kind)
   }
 }

@@ -1,5 +1,5 @@
 import type { DeclType, Expr, TypeAnnotation, VarDecl } from "djs_ast"
-import { todo } from "djs_std"
+import { TODO } from "djs_std"
 
 export interface FlatVarDecl {
   name: string
@@ -35,7 +35,7 @@ export function flatten_var_decl(stmt: VarDecl): FlatVarDecl[] {
         break
       }
       default:
-        return todo(declarator.pattern.kind)
+        return TODO(declarator.pattern.kind)
     }
   }
   return result

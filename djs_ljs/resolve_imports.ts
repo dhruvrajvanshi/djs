@@ -1,4 +1,4 @@
-import { assert_never, MapUtils, todo } from "djs_std"
+import { assert_never, MapUtils, TODO } from "djs_std"
 import type {
   TypeDecl,
   TypeDeclExcludingKind,
@@ -52,15 +52,15 @@ function resolve_value_import(
   switch (decl.kind) {
     case "Import": {
       const source_file = source_files.get(decl.imported_file)
-      if (!source_file) todo()
+      if (!source_file) TODO()
       const symbol_table = build_source_file_symbol_table(source_file)
       const value = symbol_table.get_value(name)
-      if (!value) todo()
+      if (!value) TODO()
       return resolve_value_import(source_files, name, value)
     }
     case "ImportStarAs": {
       const source_file = source_files.get(decl.imported_file)
-      if (!source_file) todo()
+      if (!source_file) TODO()
       const symbol_table = build_source_file_symbol_table(source_file)
       const values = [...symbol_table.value_entries()]
       return {
@@ -92,15 +92,15 @@ function resolve_type_import(
   switch (decl.kind) {
     case "Import": {
       const source_file = source_files.get(decl.imported_file)
-      if (!source_file) todo()
+      if (!source_file) TODO()
       const symbol_table = build_source_file_symbol_table(source_file)
       const type = symbol_table.get_type(name)
-      if (!type) todo()
+      if (!type) TODO()
       return resolve_type_import(source_files, name, type)
     }
     case "ImportStarAs": {
       const source_file = source_files.get(decl.imported_file)
-      if (!source_file) todo()
+      if (!source_file) TODO()
       const symbol_table = build_source_file_symbol_table(source_file)
       const types = [...symbol_table.type_entries()]
       return {

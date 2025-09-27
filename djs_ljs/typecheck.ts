@@ -40,7 +40,7 @@ import {
   type_to_string,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
-import { assert_never, defer, is_readonly_array, todo, zip } from "djs_std"
+import { assert_never, defer, is_readonly_array, TODO, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
@@ -150,7 +150,7 @@ export function typecheck(
       case "Continue":
         break
       default:
-        todo(stmt.kind)
+        TODO(stmt.kind)
     }
   }
   function check_if_stmt(ctx: CheckCtx, stmt: IfStmt) {
@@ -738,7 +738,7 @@ export function typecheck(
         return infer_equality_operator(ctx, expr)
       }
       default:
-        todo(expr.operator)
+        TODO(expr.operator)
     }
   }
 
@@ -925,7 +925,7 @@ export function typecheck(
         )
       }
       default: {
-        return todo(`type_of_decl for ${decl.kind} with name ${name}`)
+        return TODO(`type_of_decl for ${decl.kind} with name ${name}`)
       }
     }
   }
@@ -983,7 +983,7 @@ export function typecheck(
     if (is_readonly_array(t)) {
       const [module_name, ...rest] = t
       const decls = type_decls.get(ctx.source_file.path)
-      if (!decls) todo()
+      if (!decls) TODO()
       const decl = decls.get(module_name)
 
       if (!decl || decl.kind !== "Module") {
@@ -1010,7 +1010,7 @@ export function typecheck(
       return type_decl_to_type(ctx, member)
     } else {
       const decls = type_decls.get(ctx.source_file.path)
-      if (!decls) todo()
+      if (!decls) TODO()
       const decl = decls.get(t)
       if (!decl) {
         return emit_error_type(ctx, {
@@ -1046,11 +1046,11 @@ export function typecheck(
         return check_type_annotation(ctx.source_file, decl.stmt.type_annotation)
       }
       case "Module":
-        return todo()
+        return TODO()
       case "ImportStarAs":
-        return todo("ImportStarAs")
+        return TODO("ImportStarAs")
       case "Import":
-        return todo("Import")
+        return TODO("Import")
       case "Struct": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)

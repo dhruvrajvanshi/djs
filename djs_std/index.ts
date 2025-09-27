@@ -39,11 +39,11 @@ export function assert(value: unknown, message?: string): asserts value {
     })
   }
 }
-export function todo(template: TemplateStringsArray, ...args: unknown[]): never
-export function todo(): never
-export function todo(message: string): never
-export function todo(message: unknown): never
-export function todo(first?: unknown, ...args: unknown[]): never {
+export function TODO(template: TemplateStringsArray, ...args: unknown[]): never
+export function TODO(): never
+export function TODO(message: string): never
+export function TODO(message: unknown): never
+export function TODO(first?: unknown, ...args: unknown[]): never {
   let message: string
   if (first === undefined) {
     message = "TODO"
@@ -64,22 +64,11 @@ export function todo(first?: unknown, ...args: unknown[]): never {
   }
   const e = new Error(message)
   if (Error.captureStackTrace) {
-    Error.captureStackTrace(e, todo)
+    Error.captureStackTrace(e, TODO)
   }
   throw e
 }
 
-export function assert_todo(
-  condition: unknown,
-  message: string | null = null,
-): asserts condition {
-  if (!condition) {
-    throw new AssertionError({
-      message: message ? `TODO(${message})` : "TODO",
-      stackStartFn: assert_todo,
-    })
-  }
-}
 export function PANIC(message: string): never {
   throw new AssertionError({
     message: `PANIC: ${message}`,
