@@ -24,7 +24,7 @@ import type {
   AssignExpr,
 } from "djs_ast"
 import assert from "node:assert"
-import { Type, type_is_pointer } from "./type.ts"
+import { Type, type_is_pointer, type_to_string } from "./type.ts"
 import type { ValueDeclOfKind } from "./SymbolTable.ts"
 
 interface EmitContext {
@@ -494,10 +494,26 @@ function emit_assign_expr(
     expr.pattern.key.kind === "Ident"
   ) {
     const struct_ref = emit_expr(ctx, source_file, expr.pattern.expr)
+    const struct_ty = ctx.tc_result.values.get(expr.pattern.expr)
+    assert(struct_ty)
+
+    let lhs_op: "." | "->"
+    if (struct_ty.kind === "StructInstance") {
+      lhs_op = "."
+    } else if (
+      type_is_pointer(struct_ty) &&
+      struct_ty.type.kind === "StructInstance"
+    ) {
+      assert(struct_ty.kind === "MutPtr")
+      lhs_op = "->"
+    } else {
+      PANIC(`Unexpected type for assignment lhs: ${type_to_string(struct_ty)}`)
+    }
     const lhs: CNode = {
-      kind: "Prop",
-      lhs: struct_ref,
-      rhs: expr.pattern.key.ident.text,
+      kind: "BinOp",
+      left: struct_ref,
+      op: lhs_op,
+      right: { kind: "Ident", name: expr.pattern.key.ident.text },
     }
     return {
       kind: "BinOp",
