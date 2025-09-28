@@ -219,7 +219,7 @@ export function type_is_convertible_from_numeric_literal(
   literal: string,
 ): boolean {
   if (type_is_integral(type)) {
-    return parseInt(literal) === parseFloat(literal)
+    return Number.isInteger( parseInt(literal))
   }
   if (type_is_floating_point(type)) {
     return !Number.isNaN(parseFloat(literal))
