@@ -1808,10 +1808,16 @@ function parser_impl(
       case t.Ident: {
         if (
           flags & PARSER_FLAGS.LJS &&
-          self.current_token.text === "extern" &&
+          at_soft_keyword("extern") &&
           next_is(t.Function)
         ) {
           return parse_extern_function(export_token)
+        } else if (
+          flags & PARSER_FLAGS.LJS &&
+          at_soft_keyword("extern") &&
+          next_is(t.Const)
+        ) {
+          return parse_extern_const(export_token)
         } else if (next_is(t.Colon)) {
           const label = parse_ident()
           assert(label !== ERR) // because of the lookahead above
@@ -1981,6 +1987,26 @@ function parser_impl(
       name,
       params,
       return_type,
+    )
+  }
+  function parse_extern_const(export_token: Token | null): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "extern")
+    if (expect(t.Const) === ERR) return ERR
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+
+    const span = Span.between(export_token ?? start, type_annotation)
+    return Stmt.LJSExternConst(
+      span,
+      export_token !== null,
+      name,
+      type_annotation,
     )
   }
   function expect_soft_keyword(text: string): Token | Err {
