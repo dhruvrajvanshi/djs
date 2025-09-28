@@ -2,7 +2,7 @@ import { parse_source_file } from "djs_parser"
 import assert from "node:assert"
 import { test } from "vitest"
 import { build_function_symbol_table } from "./build_symbol_table.ts"
-import { QualifiedName } from "../djs_ast/QualifiedName.ts"
+import { QualifiedName } from "djs_ast"
 
 test("build_symbol_table", async () => {
   const source_file = parse_source_file(
