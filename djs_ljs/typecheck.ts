@@ -30,7 +30,9 @@ import {
   AddressOfExpr,
   DerefExpr,
   LJSExternConstStmt,
+  CallExpr,
 } from "djs_ast"
+import Path from "node:path"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
   Type,
@@ -49,6 +51,7 @@ import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
 import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
+import { existsSync } from "node:fs"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -829,10 +832,14 @@ export function typecheck(
     return type_of_decl(expr.ident.text, decl)
   }
 
-  function infer_call_expr(ctx: CheckCtx, expr: Expr & { kind: "Call" }): Type {
+  function infer_call_expr(ctx: CheckCtx, expr: CallExpr): Type {
     const lhs_type = infer_expr(ctx.source_file, expr.callee)
     if (lhs_type.kind === "Error") {
       return lhs_type
+    }
+    if (lhs_type.kind === "BuiltinLinkC") {
+      check_builtin_linkc_call_args(ctx, expr)
+      return Type.void
     }
     if (lhs_type.kind === "UnboxedFunc") {
       if (expr.args.length !== lhs_type.params.length) {
@@ -852,6 +859,22 @@ export function typecheck(
         span: expr.callee.span,
         message: `Expected a function, got ${type_to_string(lhs_type)}`,
       })
+    }
+  }
+  function check_builtin_linkc_call_args(ctx: CheckCtx, call: CallExpr) {
+    if (call.args.length !== 1 || call.args[0].kind !== "String") {
+      emit_error(
+        ctx,
+        call.callee.span,
+        "ljs:builtin/linkc expects a single string argument",
+      )
+      return
+    }
+    const relative = call.args[0].text.slice(1, -1)
+    const resolved = Path.join(Path.dirname(ctx.source_file.path), relative)
+
+    if (!existsSync(resolved)) {
+      emit_error(ctx, call.callee.span, `Could not read file ${resolved}`)
     }
   }
   function infer_builtin_expr(ctx: CheckCtx, expr: BuiltinExpr): Type {
@@ -962,6 +985,12 @@ export function typecheck(
           result.params.map(([, t]) => t),
           result.return_type,
         )
+      }
+      case "LJSBuiltin": {
+        switch (decl.name) {
+          case "linkc":
+            return Type.BuiltinLinkC
+        }
       }
       default: {
         return TODO(`type_of_decl for ${decl.kind} with name ${name}`)

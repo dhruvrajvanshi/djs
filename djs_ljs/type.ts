@@ -18,6 +18,7 @@ export type Type = ReadonlyUnion<
   | { kind: "Ptr"; type: Type }
   | { kind: "MutPtr"; type: Type }
   | { kind: "UnboxedFunc"; params: readonly Type[]; return_type: Type }
+  | { kind: "BuiltinLinkC" }
   | StructConstructorType
   | StructInstanceType
   | { kind: "Error"; message: string }
@@ -78,6 +79,9 @@ export const Type = {
     qualified_name: name,
     fields,
   }),
+  BuiltinLinkC: {
+    kind: "BuiltinLinkC",
+  },
   Error: (message: string) => ({ kind: "Error", message }),
 } satisfies Record<string, Type | ((...args: readonly never[]) => Type)>
 
@@ -130,6 +134,8 @@ export function type_to_string(type: Type): string {
       )
     case "StructInstance":
       return type.qualified_name.join(".")
+    case "BuiltinLinkC":
+      return "ljs:builtin/linkc"
     default:
       return assert_never(type)
   }
@@ -219,7 +225,7 @@ export function type_is_convertible_from_numeric_literal(
   literal: string,
 ): boolean {
   if (type_is_integral(type)) {
-    return Number.isInteger( parseInt(literal))
+    return Number.isInteger(parseInt(literal))
   }
   if (type_is_floating_point(type)) {
     return !Number.isNaN(parseFloat(literal))

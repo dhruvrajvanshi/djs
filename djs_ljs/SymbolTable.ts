@@ -43,6 +43,10 @@ export type ValueDecl =
       source_file: string
     }
   | {
+      kind: "LJSBuiltin"
+      name: "linkc"
+    }
+  | {
       kind: "Import"
       stmt: ImportStmt
       /**
