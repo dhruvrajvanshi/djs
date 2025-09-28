@@ -591,12 +591,22 @@ function emit_prop_expr(
   const lhs_module = get_module_of_expr(ctx, source_file, expr.lhs)
   if (lhs_module) {
     const prop_decl = lhs_module.values.get(expr.property.text)
-    assert(
-      prop_decl?.kind === "LJSExternFunction",
-      "Property must be an extern function",
-    )
+    assert(prop_decl)
+    let name: string
+    switch (prop_decl.kind) {
+      case "LJSExternConst":
+      case "LJSExternFunction":
+        name = prop_decl.stmt.name.text
+        break
+      case "Func":
+        assert(prop_decl.func.name)
+        name = prop_decl.func.name.text
+        break
+      default:
+        PANIC(`Unhandled declaration in emit_prop_expr: ${expr.kind};`)
+    }
 
-    return { kind: "Ident", name: prop_decl.stmt.name.text }
+    return { kind: "Ident", name }
   } else {
     const lhs_ty = ctx.tc_result.values.get(expr.lhs)
     assert(lhs_ty)
