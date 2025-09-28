@@ -1,8 +1,7 @@
 import { test } from "vitest"
 import { parse_source_file } from "djs_parser"
 import assert from "node:assert/strict"
-import { prettify_diagnostics } from "../djs_ast/Diagnostic.ts"
-import { QualifiedName } from "../djs_ast/QualifiedName.ts"
+import { prettify_diagnostics, QualifiedName } from "djs_ast"
 
 test("smoke test", async () => {
   const source = `
