@@ -1,0 +1,9 @@
+import * as c from "../libc.ljs"
+
+struct FILE {}
+extern const __stdoutp: *mut FILE
+extern function fputs(message: *c.char, file: *mut FILE): c.int
+
+function main(): c.int {
+    fputs(c.str`PASS\n`, __stdoutp)
+}

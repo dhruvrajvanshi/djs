@@ -134,6 +134,14 @@ function initialize_symbol_table(
         })
         break
       }
+      case "LJSExternConst": {
+        symbol_table.add_value(stmt.name.text, {
+          kind: "LJSExternConst",
+          stmt,
+          source_file: source_file.path,
+        })
+        break
+      }
       case "Import":
         const decl = {
           kind: "Import",
