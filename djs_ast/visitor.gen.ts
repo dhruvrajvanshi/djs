@@ -170,6 +170,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(stmt.type_annotation)
         break
       }
+      case "LJSExternType": {
+        this.visit_ident(stmt.name)
+        break
+      }
       case "Empty": {
         break
       }
