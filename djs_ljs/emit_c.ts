@@ -22,6 +22,7 @@ import type {
   ReturnStmt,
   ContinueStmt,
   AssignExpr,
+  StructDeclStmt,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type, type_is_pointer, type_to_string } from "./type.ts"
@@ -91,6 +92,17 @@ export function emit_c(
         })
         break
       }
+      case "LJSExternConst": {
+        const const_name = stmt.name.text
+        const type = emit_type_annotation(ctx, stmt.type_annotation)
+
+        forward_decls.push({
+          kind: "ExternConst",
+          name: const_name,
+          type,
+        })
+        break
+      }
       case "StructDecl": {
         forward_decls.push(emit_struct_decl(stmt))
       }
@@ -114,15 +126,13 @@ export function emit_c(
     "#include <stdint.h>\n#include <stdbool.h>\n\n" + render_c_nodes(c_nodes)
   )
 }
-function emit_struct_decl(stmt: Stmt): CNode {
-  assert(stmt.kind === "StructDecl")
+function emit_struct_decl(stmt: StructDeclStmt): CNode {
   return {
     kind: "StructDecl",
     name: mangle_struct_name([stmt.struct_def.name.text]),
   }
 }
-function emit_struct_def(ctx: EmitContext, stmt: Stmt): CNode {
-  assert(stmt.kind === "StructDecl")
+function emit_struct_def(ctx: EmitContext, stmt: StructDeclStmt): CNode {
   const fields = stmt.struct_def.members.map((member) => {
     return {
       name: member.name.text,
@@ -284,6 +294,7 @@ function emit_stmt(
     case "TypeAlias":
       return { kind: "Empty" }
     case "LJSExternFunction":
+    case "LJSExternConst":
       // Emitted in the declaration phase
       return { kind: "Empty" }
     default:
@@ -700,6 +711,8 @@ function render_c_node(node: CNode): string {
       return `extern ${render_c_node(node.returns)} ${node.name}(${node.params
         .map(render_c_node)
         .join(", ")});`
+    case "ExternConst":
+      return `extern ${render_c_node(node.type)} ${node.name};`
     case "Return":
       return node.value ? `return ${render_c_node(node.value)};` : "return;"
     case "Call":
@@ -795,6 +808,7 @@ export type CNode =
       body: CNode
     }
   | { kind: "ExternFunc"; name: string; params: CNode[]; returns: CNode }
+  | { kind: "ExternConst"; name: string; type: CNode }
   | { kind: "Return"; value: CNode | null }
   | { kind: "Call"; func: CNode; args: CNode[] }
   | { kind: "StringLiteral"; value: string }

@@ -1,5 +1,6 @@
 import {
   ImportStarAsStmt,
+  LJSExternConstStmt,
   StructDeclStmt,
   type ClassDeclStmt,
   type Func,
@@ -34,6 +35,11 @@ export type ValueDecl =
   | {
       kind: "LJSExternFunction"
       stmt: LJSExternFunctionStmt
+      source_file: string
+    }
+  | {
+      kind: "LJSExternConst"
+      stmt: LJSExternConstStmt
       source_file: string
     }
   | {

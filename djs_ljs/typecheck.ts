@@ -29,6 +29,7 @@ import {
   AssignExpr,
   AddressOfExpr,
   DerefExpr,
+  LJSExternConstStmt,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import {
@@ -77,6 +78,7 @@ export function typecheck(
   const source_file_check_results = new Map<SourceFile, null>()
   const check_var_decl_result = new Map<VarDecl, CheckedVarDecl[]>()
   const check_extern_function_results = new Map<LJSExternFunctionStmt, Type>()
+  const check_extern_const_results = new Map<LJSExternConstStmt, Type>()
   const loop_stack: LoopStmt[] = []
 
   interface CheckStructDeclResult {
@@ -131,6 +133,9 @@ export function typecheck(
         return
       case "LJSExternFunction":
         check_ljs_extern_function_stmt(ctx.source_file, stmt)
+        return
+      case "LJSExternConst":
+        check_ljs_extern_const_stmt(ctx.source_file, stmt)
         return
       case "Expr":
         infer_expr(ctx.source_file, stmt.expr)
@@ -409,6 +414,18 @@ export function typecheck(
     const ty = Type.UnboxedFunc(param_types, return_type)
     check_extern_function_results.set(stmt, ty)
     return ty
+  }
+  function check_ljs_extern_const_stmt(
+    source_file: SourceFile,
+    stmt: LJSExternConstStmt,
+  ): Type {
+    const existing = check_extern_const_results.get(stmt)
+    if (existing) return existing
+
+    const ctx = make_check_ctx(source_file, check_extern_const_results)
+    const type = check_type_annotation(ctx.source_file, stmt.type_annotation)
+    check_extern_const_results.set(stmt, type)
+    return type
   }
 
   function check_expr(ctx: CheckCtx, expr: Expr, expected_type: Type): void {
@@ -915,6 +932,11 @@ export function typecheck(
         assert(source_file, `Unknown source file: ${decl.source_file}`)
         const ty = check_ljs_extern_function_stmt(source_file, decl.stmt)
         return ty
+      }
+      case "LJSExternConst": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        return check_ljs_extern_const_stmt(source_file, decl.stmt)
       }
       case "Struct": {
         const source_file = source_files.get(decl.source_file)
