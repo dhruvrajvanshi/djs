@@ -217,6 +217,11 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
     params: List("Param"),
     return_type: TypeAnnotation,
   },
+  LJSExternConst: {
+    is_exported: "boolean",
+    name: Ident,
+    type_annotation: TypeAnnotation,
+  },
   Empty: {},
 })
 const DObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
