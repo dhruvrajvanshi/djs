@@ -159,6 +159,8 @@ export function typecheck(
       case "Break":
       case "Continue":
         break
+      case "LJSExternType":
+        break
       default:
         TODO(stmt.kind)
     }
@@ -507,6 +509,11 @@ export function typecheck(
       case "StructInstance":
         return (
           source.kind === "StructInstance" &&
+          qualified_name_eq(target.qualified_name, source.qualified_name)
+        )
+      case "Opaque":
+        return (
+          source.kind === "Opaque" &&
           qualified_name_eq(target.qualified_name, source.qualified_name)
         )
 
@@ -1112,6 +1119,12 @@ export function typecheck(
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
         return check_type_annotation(ctx.source_file, decl.stmt.type_annotation)
+      }
+      case "ExternType": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const name = qualified_name_of_decl(decl.stmt.name, source_file.path)
+        return Type.Opaque(name)
       }
       case "Module":
         return TODO()

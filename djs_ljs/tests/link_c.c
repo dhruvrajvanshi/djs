@@ -12,5 +12,3 @@ struct Box* box_new() {
 void box_free(struct Box* box) {
     free(box);
 }
-
-

@@ -142,6 +142,14 @@ function initialize_symbol_table(
         })
         break
       }
+      case "LJSExternType": {
+        symbol_table.add_type(stmt.name.text, {
+          kind: "ExternType",
+          stmt,
+          source_file: source_file.path,
+        })
+        break
+      }
       case "Import":
         const decl = {
           kind: "Import",

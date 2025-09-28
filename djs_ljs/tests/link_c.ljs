@@ -1,0 +1,17 @@
+import * as ljs from "ljs:builtin"
+
+ljs.linkc("./link_c.c")
+
+import * as c from "../libc.ljs"
+
+extern type Box
+extern function box_message(box: *Box): *c.char
+extern function box_new(): *mut Box
+extern function box_free(box: *mut Box): void
+
+function main(): c.int {
+    const box = box_new()
+    c.puts(box_message(box))
+    box_free(box)
+}
+
