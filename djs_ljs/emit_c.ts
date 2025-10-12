@@ -2,27 +2,28 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import { assert_never, defer, PANIC, TODO } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
-import type {
-  Expr,
-  Stmt,
-  FuncStmt,
-  TaggedTemplateLiteralExpr,
-  PropExpr,
-  TypeAnnotation,
-  Block,
-  Param,
-  SourceFile,
-  StructInitExpr,
-  ForStmt,
-  BinOp,
-  IfStmt,
-  WhileStmt,
-  DoWhileStmt,
-  ForInOrOfStmt,
-  ReturnStmt,
-  ContinueStmt,
-  AssignExpr,
-  StructDeclStmt,
+import {
+  type Expr,
+  type Stmt,
+  type FuncStmt,
+  type TaggedTemplateLiteralExpr,
+  type PropExpr,
+  type TypeAnnotation,
+  type Block,
+  type Param,
+  type SourceFile,
+  type StructInitExpr,
+  type ForStmt,
+  type BinOp,
+  type IfStmt,
+  type WhileStmt,
+  type DoWhileStmt,
+  type ForInOrOfStmt,
+  type ReturnStmt,
+  type ContinueStmt,
+  type AssignExpr,
+  type StructDeclStmt,
+  QualifiedName,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type, type_is_pointer, type_to_string } from "./type.ts"
@@ -60,7 +61,7 @@ export function emit_c(
   const all_stmts = [...source_files.values()].flatMap((sf) =>
     sf.stmts.map((stmt) => ({ stmt, source_file: sf })),
   )
-  for (const { stmt } of [...all_stmts].sort(types_first)) {
+  for (const { stmt, source_file } of [...all_stmts].sort(types_first)) {
     switch (stmt.kind) {
       case "Func": {
         const func_name = stmt.func.name?.text
@@ -103,8 +104,19 @@ export function emit_c(
         })
         break
       }
+      case "LJSExternType": {
+        const name = QualifiedName.to_array(source_file.qualified_name).concat(
+          stmt.name.text,
+        )
+        forward_decls.push({
+          kind: "StructDecl",
+          name: mangle_struct_name(name),
+        })
+        break
+      }
       case "StructDecl": {
         forward_decls.push(emit_struct_decl(stmt))
+        break
       }
     }
   }
@@ -201,6 +213,11 @@ function emit_type(type: Type): CNode {
     case "MutPtr":
       return { kind: "Ptr", to_type: emit_type(type.type) }
     case "StructInstance":
+      return {
+        kind: "StructTypeRef",
+        name: mangle_struct_name(type.qualified_name),
+      }
+    case "Opaque":
       return {
         kind: "StructTypeRef",
         name: mangle_struct_name(type.qualified_name),
@@ -562,7 +579,7 @@ function emit_struct_init_expr(
 }
 function mangle_struct_name(qualified_name: readonly string[]): string {
   if (qualified_name.length !== 1) {
-    TODO()
+    return "_L" + qualified_name.join("_")
   }
   return qualified_name[0]
 }
@@ -602,6 +619,8 @@ function emit_prop_expr(
         assert(prop_decl.func.name)
         name = prop_decl.func.name.text
         break
+      case "LJSBuiltin":
+        TODO(prop_decl)
       default:
         PANIC(`Unhandled declaration in emit_prop_expr: ${expr.kind};`)
     }
