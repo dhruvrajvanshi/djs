@@ -2,6 +2,7 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import { assert_never, defer, PANIC, TODO } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
+import Path from "node:path"
 import {
   type Expr,
   type Stmt,
@@ -34,6 +35,7 @@ interface EmitContext {
   tc_result: TypecheckResult
   resolve_result: ResolveImportsResult
   loop_stack: LoopStackEntry[]
+  link_c_paths: string[]
 }
 
 type LoopStackEntry = { stmt: LoopStmt; source_file: SourceFile }
@@ -52,6 +54,7 @@ export function emit_c(
     tc_result,
     resolve_result,
     loop_stack: [],
+    link_c_paths: [],
   }
 
   // Phase 1: Collect forward declarations
@@ -424,6 +427,17 @@ function emit_expr(
       return { kind: "Ident", name: expr.ident.text }
     }
     case "Call": {
+      if (is_builtin_linkc(ctx, expr.callee)) {
+        assert(expr.args.length === 1)
+        const arg = expr.args[0]
+        assert(arg.kind === "String")
+        const path = Path.join(
+          Path.dirname(source_file.path),
+          JSON.parse(arg.text),
+        )
+        ctx.link_c_paths.push(path)
+        return { kind: "Empty" }
+      }
       const func = emit_expr(ctx, source_file, expr.callee)
       const args = expr.args.map((arg) => emit_expr(ctx, source_file, arg))
       return { kind: "Call", func, args }
@@ -493,6 +507,20 @@ function emit_expr(
     default:
       TODO(`Unhandled expression: ${expr.kind}`)
   }
+}
+
+/**
+ * Checks if expr refers to ljs.linkc
+ * E.g.
+ * import * as ljs from "ljs:builtin"
+ * ljs.linkc("something")
+ * ^^^^^^^^^   is_builtin_linkc(ljs.linkc) === true
+ * Note that expr must not inlcude the call args
+ */
+function is_builtin_linkc(ctx: EmitContext, expr: Expr): boolean {
+  const ty = ctx.tc_result.values.get(expr)
+  assert(ty)
+  return ty.kind === "BuiltinLinkC"
 }
 function emit_assign_expr(
   ctx: EmitContext,
@@ -620,7 +648,7 @@ function emit_prop_expr(
         name = prop_decl.func.name.text
         break
       case "LJSBuiltin":
-        TODO(prop_decl)
+        PANIC(`LJSBuiltin should be handled elsewhere`)
       default:
         PANIC(`Unhandled declaration in emit_prop_expr: ${expr.kind};`)
     }
