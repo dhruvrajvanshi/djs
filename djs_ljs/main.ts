@@ -118,16 +118,19 @@ export async function main(
     return io.error_exit()
   }
   assert(args.output, `Output path is not provided`)
-  const c_source = emit_c(source_files, typecheck_result, resolve_result)
+  const { source: c_source, linkc_paths } = emit_c(
+    source_files,
+    typecheck_result,
+    resolve_result,
+  )
   const output_c_path = Path.join(".ljs", args.output + ".c")
   await mkdir(Path.dirname(output_c_path), { recursive: true })
   await writeFile(output_c_path, c_source)
-  execSync(
-    `gcc -o ${args.output} ${output_c_path} -Wall -Werror -Wno-parentheses-equality`,
-    {
-      stdio: "inherit",
-    },
-  )
+  const command = `gcc -o ${args.output} ${output_c_path} ${linkc_paths.join(" ")} -Wall -Werror -Wno-parentheses-equality`
+  console.log(command)
+  execSync(command, {
+    stdio: "inherit",
+  })
   if (!args["preserve-c-output"]) {
     await rm(output_c_path)
   }

@@ -48,7 +48,7 @@ export function emit_c(
   source_files: SourceFiles,
   tc_result: TypecheckResult,
   resolve_result: ResolveImportsResult,
-): string {
+): { source: string; linkc_paths: string[] } {
   const ctx: EmitContext = {
     source_files,
     tc_result,
@@ -108,9 +108,10 @@ export function emit_c(
         break
       }
       case "LJSExternType": {
-        const name = QualifiedName.to_array(source_file.qualified_name).concat(
+        let name = QualifiedName.to_array(source_file.qualified_name).concat(
           stmt.name.text,
         )
+        if (name[0] === "") name = name.slice(1)
         forward_decls.push({
           kind: "StructDecl",
           name: mangle_struct_name(name),
@@ -137,9 +138,11 @@ export function emit_c(
 
   const c_nodes: CNode[] = [...forward_decls, ...defs]
 
-  return (
-    "#include <stdint.h>\n#include <stdbool.h>\n\n" + render_c_nodes(c_nodes)
-  )
+  return {
+    source:
+      "#include <stdint.h>\n#include <stdbool.h>\n\n" + render_c_nodes(c_nodes),
+    linkc_paths: ctx.link_c_paths,
+  }
 }
 function emit_struct_decl(stmt: StructDeclStmt): CNode {
   return {
@@ -316,6 +319,8 @@ function emit_stmt(
     case "LJSExternFunction":
     case "LJSExternConst":
       // Emitted in the declaration phase
+      return { kind: "Empty" }
+    case "LJSExternType":
       return { kind: "Empty" }
     default:
       TODO(`Unhandled statement: ${stmt.kind}`)
@@ -607,7 +612,7 @@ function emit_struct_init_expr(
 }
 function mangle_struct_name(qualified_name: readonly string[]): string {
   if (qualified_name.length !== 1) {
-    return "_L" + qualified_name.join("_")
+    TODO()
   }
   return qualified_name[0]
 }
