@@ -52,6 +52,7 @@ export type Stmt =
   | TypeAliasStmt
   | LJSExternFunctionStmt
   | LJSExternConstStmt
+  | LJSExternTypeStmt
   | EmptyStmt
 export class ExprStmt {
   constructor(
@@ -453,6 +454,22 @@ export class LJSExternConstStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class LJSExternTypeStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly is_exported: boolean,
+    readonly name: Ident,
+  ) {}
+
+  get kind(): "LJSExternType" {
+    return "LJSExternType"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class EmptyStmt {
   constructor(readonly span: Span) {}
 
@@ -587,6 +604,12 @@ export const Stmt = {
     type_annotation: TypeAnnotation,
   ): LJSExternConstStmt =>
     new LJSExternConstStmt(span, is_exported, name, type_annotation),
+
+  LJSExternType: (
+    span: Span,
+    is_exported: boolean,
+    name: Ident,
+  ): LJSExternTypeStmt => new LJSExternTypeStmt(span, is_exported, name),
 
   Empty: (span: Span): EmptyStmt => new EmptyStmt(span),
 } as const

@@ -2,27 +2,29 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import { assert_never, defer, PANIC, TODO } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
-import type {
-  Expr,
-  Stmt,
-  FuncStmt,
-  TaggedTemplateLiteralExpr,
-  PropExpr,
-  TypeAnnotation,
-  Block,
-  Param,
-  SourceFile,
-  StructInitExpr,
-  ForStmt,
-  BinOp,
-  IfStmt,
-  WhileStmt,
-  DoWhileStmt,
-  ForInOrOfStmt,
-  ReturnStmt,
-  ContinueStmt,
-  AssignExpr,
-  StructDeclStmt,
+import Path from "node:path"
+import {
+  type Expr,
+  type Stmt,
+  type FuncStmt,
+  type TaggedTemplateLiteralExpr,
+  type PropExpr,
+  type TypeAnnotation,
+  type Block,
+  type Param,
+  type SourceFile,
+  type StructInitExpr,
+  type ForStmt,
+  type BinOp,
+  type IfStmt,
+  type WhileStmt,
+  type DoWhileStmt,
+  type ForInOrOfStmt,
+  type ReturnStmt,
+  type ContinueStmt,
+  type AssignExpr,
+  type StructDeclStmt,
+  QualifiedName,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type, type_is_pointer, type_to_string } from "./type.ts"
@@ -33,6 +35,7 @@ interface EmitContext {
   tc_result: TypecheckResult
   resolve_result: ResolveImportsResult
   loop_stack: LoopStackEntry[]
+  link_c_paths: string[]
 }
 
 type LoopStackEntry = { stmt: LoopStmt; source_file: SourceFile }
@@ -45,12 +48,13 @@ export function emit_c(
   source_files: SourceFiles,
   tc_result: TypecheckResult,
   resolve_result: ResolveImportsResult,
-): string {
+): { source: string; linkc_paths: string[] } {
   const ctx: EmitContext = {
     source_files,
     tc_result,
     resolve_result,
     loop_stack: [],
+    link_c_paths: [],
   }
 
   // Phase 1: Collect forward declarations
@@ -60,7 +64,7 @@ export function emit_c(
   const all_stmts = [...source_files.values()].flatMap((sf) =>
     sf.stmts.map((stmt) => ({ stmt, source_file: sf })),
   )
-  for (const { stmt } of [...all_stmts].sort(types_first)) {
+  for (const { stmt, source_file } of [...all_stmts].sort(types_first)) {
     switch (stmt.kind) {
       case "Func": {
         const func_name = stmt.func.name?.text
@@ -103,8 +107,20 @@ export function emit_c(
         })
         break
       }
+      case "LJSExternType": {
+        let name = QualifiedName.to_array(source_file.qualified_name).concat(
+          stmt.name.text,
+        )
+        if (name[0] === "") name = name.slice(1)
+        forward_decls.push({
+          kind: "StructDecl",
+          name: mangle_struct_name(name),
+        })
+        break
+      }
       case "StructDecl": {
         forward_decls.push(emit_struct_decl(stmt))
+        break
       }
     }
   }
@@ -122,9 +138,11 @@ export function emit_c(
 
   const c_nodes: CNode[] = [...forward_decls, ...defs]
 
-  return (
-    "#include <stdint.h>\n#include <stdbool.h>\n\n" + render_c_nodes(c_nodes)
-  )
+  return {
+    source:
+      "#include <stdint.h>\n#include <stdbool.h>\n\n" + render_c_nodes(c_nodes),
+    linkc_paths: ctx.link_c_paths,
+  }
 }
 function emit_struct_decl(stmt: StructDeclStmt): CNode {
   return {
@@ -201,6 +219,11 @@ function emit_type(type: Type): CNode {
     case "MutPtr":
       return { kind: "Ptr", to_type: emit_type(type.type) }
     case "StructInstance":
+      return {
+        kind: "StructTypeRef",
+        name: mangle_struct_name(type.qualified_name),
+      }
+    case "Opaque":
       return {
         kind: "StructTypeRef",
         name: mangle_struct_name(type.qualified_name),
@@ -296,6 +319,8 @@ function emit_stmt(
     case "LJSExternFunction":
     case "LJSExternConst":
       // Emitted in the declaration phase
+      return { kind: "Empty" }
+    case "LJSExternType":
       return { kind: "Empty" }
     default:
       TODO(`Unhandled statement: ${stmt.kind}`)
@@ -407,6 +432,17 @@ function emit_expr(
       return { kind: "Ident", name: expr.ident.text }
     }
     case "Call": {
+      if (is_builtin_linkc(ctx, expr.callee)) {
+        assert(expr.args.length === 1)
+        const arg = expr.args[0]
+        assert(arg.kind === "String")
+        const path = Path.join(
+          Path.dirname(source_file.path),
+          JSON.parse(arg.text),
+        )
+        ctx.link_c_paths.push(path)
+        return { kind: "Empty" }
+      }
       const func = emit_expr(ctx, source_file, expr.callee)
       const args = expr.args.map((arg) => emit_expr(ctx, source_file, arg))
       return { kind: "Call", func, args }
@@ -476,6 +512,20 @@ function emit_expr(
     default:
       TODO(`Unhandled expression: ${expr.kind}`)
   }
+}
+
+/**
+ * Checks if expr refers to ljs.linkc
+ * E.g.
+ * import * as ljs from "ljs:builtin"
+ * ljs.linkc("something")
+ * ^^^^^^^^^   is_builtin_linkc(ljs.linkc) === true
+ * Note that expr must not inlcude the call args
+ */
+function is_builtin_linkc(ctx: EmitContext, expr: Expr): boolean {
+  const ty = ctx.tc_result.values.get(expr)
+  assert(ty)
+  return ty.kind === "BuiltinLinkC"
 }
 function emit_assign_expr(
   ctx: EmitContext,
@@ -602,6 +652,8 @@ function emit_prop_expr(
         assert(prop_decl.func.name)
         name = prop_decl.func.name.text
         break
+      case "LJSBuiltin":
+        PANIC(`LJSBuiltin should be handled elsewhere`)
       default:
         PANIC(`Unhandled declaration in emit_prop_expr: ${expr.kind};`)
     }

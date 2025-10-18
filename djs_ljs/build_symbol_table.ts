@@ -142,6 +142,14 @@ function initialize_symbol_table(
         })
         break
       }
+      case "LJSExternType": {
+        symbol_table.add_type(stmt.name.text, {
+          kind: "ExternType",
+          stmt,
+          source_file: source_file.path,
+        })
+        break
+      }
       case "Import":
         const decl = {
           kind: "Import",
@@ -163,6 +171,30 @@ function initialize_symbol_table(
         }
         break
       case "ImportStarAs": {
+        if (
+          stmt.module_specifier === "\'ljs:builtin\'" ||
+          stmt.module_specifier === '"ljs:builtin"'
+        ) {
+          symbol_table.add_value(stmt.as_name.text, {
+            kind: "Module",
+            path: "ljs:builtin",
+            values: new Map([
+              [
+                "linkc",
+                {
+                  kind: "LJSBuiltin",
+                  name: "linkc",
+                },
+              ],
+            ]),
+          })
+          symbol_table.add_type(stmt.as_name.text, {
+            kind: "Module",
+            path: "ljs:builtin",
+            types: new Map(),
+          })
+          break
+        }
         const decl = {
           kind: "ImportStarAs",
           stmt,
