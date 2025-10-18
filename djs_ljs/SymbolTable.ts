@@ -1,6 +1,7 @@
 import {
   ImportStarAsStmt,
   LJSExternConstStmt,
+  LJSExternTypeStmt,
   StructDeclStmt,
   type ClassDeclStmt,
   type Func,
@@ -41,6 +42,10 @@ export type ValueDecl =
       kind: "LJSExternConst"
       stmt: LJSExternConstStmt
       source_file: string
+    }
+  | {
+      kind: "LJSBuiltin"
+      name: "linkc"
     }
   | {
       kind: "Import"
@@ -138,6 +143,11 @@ export type TypeDecl =
   | {
       kind: "Struct"
       decl: StructDeclStmt
+      source_file: string
+    }
+  | {
+      kind: "ExternType"
+      stmt: LJSExternTypeStmt
       source_file: string
     }
   /**

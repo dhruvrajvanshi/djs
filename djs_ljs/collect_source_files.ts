@@ -94,7 +94,10 @@ export async function collect_source_files(
 class CollectImportsVisitor extends ASTVisitorBase {
   readonly imports: (ImportStmt | ImportStarAsStmt)[] = []
   override visit_stmt(stmt: Stmt): void {
-    if (stmt.kind === "Import" || stmt.kind === "ImportStarAs") {
+    if (
+      stmt.kind === "Import" ||
+      (stmt.kind === "ImportStarAs" && !is_ljs_builtin(stmt.module_specifier))
+    ) {
       this.imports.push(stmt)
     } else {
       super.visit_stmt(stmt)
@@ -112,4 +115,10 @@ function parse_module_specifier(specifier: string): string {
   const value: unknown = JSON.parse(specifier)
   assert(typeof value === "string", `Invalid module specifier: ${specifier}`)
   return value
+}
+
+function is_ljs_builtin(module_specifier: ImportStmt["module_specifier"]) {
+  return (
+    module_specifier === "'ljs:builtin'" || module_specifier === '"ljs:builtin"'
+  )
 }
