@@ -1,5 +1,6 @@
+export type LazyType = () => string
 export type Type1 = ["Vec" | "Option", Type]
-export type Type = string | Type1
+export type Type = string | Type1 | LazyType
 export type Tag = "span" | "visit" | "sexpr_ignore" | "trivia"
 export type EnumVariant = {
   name: string

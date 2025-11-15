@@ -47,6 +47,8 @@ function gen_type(ty: Type): string {
       return "string"
     }
     return ty
+  } else if (typeof ty === "function") {
+    return gen_type(ty())
   } else {
     if (ty.length !== 2) {
       throw new Error(`Invalid type: ${ty}`)
