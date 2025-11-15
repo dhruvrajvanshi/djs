@@ -204,6 +204,18 @@ function initialize_symbol_table(
         symbol_table.add_type(stmt.as_name.text, decl)
         break
       }
+      case "UntaggedUnionDecl":
+        symbol_table.add_value(stmt.untagged_union_def.name.text, {
+          kind: "UntaggedUnion",
+          decl: stmt,
+          source_file: source_file.path,
+        })
+        symbol_table.add_type(stmt.untagged_union_def.name.text, {
+          kind: "UntaggedUnion",
+          decl: stmt,
+          source_file: source_file.path,
+        })
+        break
       case "TypeAlias": {
         symbol_table.add_type(stmt.name.text, {
           kind: "TypeAlias",
