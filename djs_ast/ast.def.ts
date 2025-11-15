@@ -6,6 +6,7 @@ import type {
   EnumVariant,
   StructItem,
 } from "./astgen_items.ts"
+import { is_item } from "./astgen_items.ts"
 import assert from "node:assert/strict"
 
 export const type_registry: Record<string, Item> = {}
@@ -13,20 +14,6 @@ const Text = "Text"
 
 const Ident = Struct("Ident", ["span"], {
   text: "str",
-})
-
-export const Pattern = Enum("Pattern", ["span", "visit"], {
-  Var: { ident: Ident.name },
-  Assignment: { pattern: Lazy(() => Pattern), initializer: Lazy(() => Expr) },
-  Array: { items: List(Lazy(() => Pattern)) },
-  Object: {
-    properties: List(Lazy(() => ObjectPatternProperty)),
-    rest: Option(Lazy(() => Pattern)),
-  },
-  Prop: { expr: Lazy(() => Expr), key: Lazy(() => ObjectKey) },
-  Deref: { expr: Lazy(() => Expr) },
-  Elision: {},
-  Rest: { pattern: Lazy(() => Pattern) },
 })
 export const Stmt = Enum("Stmt", ["span", "visit"], {
   Expr: { expr: Lazy(() => Expr) },
@@ -43,7 +30,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   DoWhile: { body: Lazy(() => Stmt), condition: Lazy(() => Expr) },
   Try: {
     try_block: Lazy(() => Block),
-    catch_pattern: Option(Pattern.name),
+    catch_pattern: Option(Lazy(() => Pattern)),
     catch_block: Option(Lazy(() => Block)),
     finally_block: Option(Lazy(() => Block)),
   },
@@ -55,7 +42,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   },
   ForInOrOf: {
     decl_type: Option(Lazy(() => DeclType)), // None for `for (x of y) {}`
-    lhs: Pattern.name,
+    lhs: Lazy(() => Pattern),
     in_or_of: Lazy(() => InOrOf),
     rhs: Lazy(() => Expr),
     body: Lazy(() => Stmt),
@@ -69,12 +56,12 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   StructDecl: { struct_def: Lazy(() => StructDef) },
   UntaggedUnionDecl: { untagged_union_def: Lazy(() => UntaggedUnion) },
   Import: {
-    default_import: Option(Ident.name),
+    default_import: Option(Ident),
     named_imports: List(Lazy(() => ImportSpecifier)),
     module_specifier: Text,
   },
   ImportStarAs: {
-    as_name: Ident.name,
+    as_name: Ident,
     module_specifier: Text,
   },
   Labeled: {
@@ -82,43 +69,33 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     stmt: Lazy(() => Stmt),
   },
   ObjectTypeDecl: {
-    name: Ident.name,
+    name: Ident,
     fields: List("ObjectTypeDeclField"),
   },
   TypeAlias: {
-    name: Ident.name,
+    name: Ident,
     type_annotation: Lazy(() => TypeAnnotation),
   },
   LJSExternFunction: {
     is_exported: "boolean",
-    name: Ident.name,
+    name: Ident,
     params: List(Lazy(() => Param)),
     return_type: Lazy(() => TypeAnnotation),
   },
   LJSExternConst: {
     is_exported: "boolean",
-    name: Ident.name,
+    name: Ident,
     type_annotation: Lazy(() => TypeAnnotation),
   },
   LJSExternType: {
     is_exported: "boolean",
-    name: Ident.name,
+    name: Ident,
   },
   Empty: {},
 })
-const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
-  is_readonly: "boolean",
-  label: Ident.name,
-  type_annotation: Lazy(() => TypeAnnotation),
-})
-
-export const StructInitItem = Struct("StructInitItem", ["span"], {
-  Key: Ident.name,
-  value: Lazy(() => Expr),
-})
 
 export const Expr = Enum("Expr", ["span", "visit"], {
-  Var: { leading_trivia: Text, ident: Ident.name },
+  Var: { leading_trivia: Text, ident: Ident },
   Paren: { expr: Lazy(() => Expr) },
   BinOp: {
     lhs: Lazy(() => Expr),
@@ -146,7 +123,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     property: Lazy(() => Expr),
     is_optional: "boolean",
   },
-  Prop: { lhs: Lazy(() => Expr), property: Ident.name, is_optional: "boolean" },
+  Prop: { lhs: Lazy(() => Expr), property: Ident, is_optional: "boolean" },
   String: { text: Text },
   Number: { text: Text },
   Boolean: { value: "boolean" },
@@ -168,7 +145,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     if_false: Lazy(() => Expr),
   },
   Assign: {
-    pattern: Pattern.name,
+    pattern: Lazy(() => Pattern),
     operator: Lazy(() => AssignOp),
     value: Lazy(() => Expr),
   },
@@ -196,7 +173,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
   Deref: { expr: Lazy(() => Expr) },
 })
 export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
-  Ident: { leading_trivia: Text, ident: Ident.name },
+  Ident: { leading_trivia: Text, ident: Ident },
   Union: {
     left: Lazy(() => TypeAnnotation),
     right: Lazy(() => TypeAnnotation),
@@ -223,22 +200,47 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     text: Text,
   },
   Qualified: {
-    head: Ident.name,
-    tail: List(Ident.name),
+    head: Ident,
+    tail: List(Ident),
   },
 })
 
+export const Pattern = Enum("Pattern", ["span", "visit"], {
+  Var: { ident: Ident },
+  Assignment: { pattern: Lazy(() => Pattern), initializer: Lazy(() => Expr) },
+  Array: { items: List(Lazy(() => Pattern)) },
+  Object: {
+    properties: List(Lazy(() => ObjectPatternProperty)),
+    rest: Option(Lazy(() => Pattern)),
+  },
+  Prop: { expr: Lazy(() => Expr), key: Lazy(() => ObjectKey) },
+  Deref: { expr: Lazy(() => Expr) },
+  Elision: {},
+  Rest: { pattern: Lazy(() => Pattern) },
+})
+
+const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
+  is_readonly: "boolean",
+  label: Ident,
+  type_annotation: Lazy(() => TypeAnnotation),
+})
+
+export const StructInitItem = Struct("StructInitItem", ["span"], {
+  Key: Ident,
+  value: Lazy(() => Expr),
+})
+
 const FuncTypeParam = Struct("FuncTypeParam", [], {
-  label: Ident.name,
+  label: Ident,
   type_annotation: Lazy(() => TypeAnnotation),
 })
 const Class = Struct("Class", ["span"], {
-  name: Option(Ident.name),
+  name: Option(Ident),
   superclass: Option(Lazy(() => Expr)),
   body: Lazy(() => ClassBody),
 })
 const StructDef = Struct("StructDef", ["span"], {
-  name: Ident.name,
+  name: Ident,
   members: List(Lazy(() => StructMember)),
 })
 const ClassBody = Struct("ClassBody", ["span"], {
@@ -250,18 +252,18 @@ const ClassMember = Enum("ClassMember", [], {
 })
 
 const StructMember = Enum("StructMember", [], {
-  FieldDef: { name: Ident.name, type_annotation: Lazy(() => TypeAnnotation) },
+  FieldDef: { name: Ident, type_annotation: Lazy(() => TypeAnnotation) },
 })
 const UntaggedUnionMember = Enum("UntaggedUnionMember", [], {
-  VariantDef: { name: Ident.name, type_annotation: Lazy(() => TypeAnnotation) },
+  VariantDef: { name: Ident, type_annotation: Lazy(() => TypeAnnotation) },
 })
 const UntaggedUnion = Struct("UntaggedUnion", ["span"], {
-  name: Ident.name,
+  name: Ident,
   members: List(Lazy(() => UntaggedUnionMember)),
 })
 
 const FieldDef = Struct("FieldDef", ["span"], {
-  name: Ident.name,
+  name: Ident,
   initializer: Option(Lazy(() => Expr)),
 })
 const MethodDef = Struct("MethodDef", ["span"], {
@@ -272,20 +274,20 @@ const MethodDef = Struct("MethodDef", ["span"], {
 })
 
 const ObjectKey = Enum("ObjectKey", ["span"], {
-  Ident: { ident: Ident.name },
+  Ident: { ident: Ident },
   String: { text: Text },
   Computed: { expr: Lazy(() => Expr) },
 })
 
 const ObjectLiteralEntry = Enum("ObjectLiteralEntry", ["span"], {
-  Ident: { ident: Ident.name },
-  Prop: { key: ObjectKey.name, value: Lazy(() => Expr) },
-  Method: { method: MethodDef.name },
+  Ident: { ident: Ident },
+  Prop: { key: ObjectKey, value: Lazy(() => Expr) },
+  Method: { method: MethodDef },
   Spread: { expr: Lazy(() => Expr) },
 })
 
 const Param = Struct("Param", ["span"], {
-  pattern: Pattern.name,
+  pattern: Pattern,
   type_annotation: Option(Lazy(() => TypeAnnotation)),
   initializer: Option(Lazy(() => Expr)),
 })
@@ -297,16 +299,16 @@ const ArrayLiteralMember = Enum("ArrayLiteralMember", ["span"], {
 })
 
 export const Func = Struct("Func", ["span", "visit"], {
-  name: Option(Ident.name),
+  name: Option(Ident),
   type_params: List("TypeParam"),
-  params: List(Param.name),
+  params: List(Param),
   body: Lazy(() => Block),
   return_type: Option(Lazy(() => TypeAnnotation)),
   is_generator: "boolean",
   is_async: "boolean",
 })
 const TypeParam = Struct("TypeParam", [], {
-  ident: Ident.name,
+  ident: Ident,
 })
 const Block = Struct("Block", ["span", "visit"], {
   stmts: List(Lazy(() => Stmt)),
@@ -338,7 +340,7 @@ const VarDecl = Struct("VarDecl", ["span"], {
   declarators: List(Lazy(() => VarDeclarator)),
 })
 const VarDeclarator = Struct("VarDeclarator", [], {
-  pattern: Pattern.name,
+  pattern: Pattern,
   type_annotation: Option(Lazy(() => TypeAnnotation)),
   init: Option(Lazy(() => Expr)),
 })
@@ -355,16 +357,16 @@ const TemplateLiteralFragment = Enum("TemplateLiteralFragment", ["span"], {
   Expr: { expr: Lazy(() => Expr) },
 })
 const ObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
-  key: ObjectKey.name,
-  value: Pattern.name,
+  key: ObjectKey,
+  value: Pattern,
 })
 const ModuleExportName = Enum("ModuleExportName", [], {
-  Ident: { ident: Ident.name },
+  Ident: { ident: Ident },
   String: { text: Text },
 })
 const ImportSpecifier = Struct("ImportSpecifier", ["span"], {
   type_only: "boolean",
-  as_name: Option(Ident.name),
+  as_name: Option(Ident),
   imported_name: Lazy(() => ModuleExportName),
 })
 const BinOp = StringUnion(
@@ -520,15 +522,16 @@ function Struct(
     `Struct "${name}" cannot have a "kind" field because it reserved for the struct tag`,
   )
   const fields_with_tags = Object.fromEntries(
-    Object.entries(fields).map(([field_name, type]) => {
+    Object.entries(fields).map(([field_name, field_value]) => {
       if (
-        Array.isArray(type) ||
-        typeof type === "string" ||
-        typeof type === "function"
+        Array.isArray(field_value) ||
+        typeof field_value === "string" ||
+        typeof field_value === "function" ||
+        is_item_or_field_def(field_value)
       ) {
-        return [field_name, { type, tags: [] }]
+        return [field_name, { type: field_value, tags: [] }]
       } else {
-        return [field_name, type]
+        return [field_name, field_value]
       }
     }),
   )
@@ -599,12 +602,25 @@ function needs_lifetime_param_set() {
       }
       return item_contains_ident_or_text(items_by_name[type])
     } else if (typeof type === "function") {
-      // Handle lazy type by resolving it and recursing
       return type_contains_ident_or_text(type())
+    } else if (is_item(type)) {
+      return item_contains_ident_or_text(type)
     } else {
       return type.slice(1).some(type_contains_ident_or_text)
     }
   }
+}
+
+function is_item_or_field_def(
+  field_value: Type | { type: Type; tags: Tag[] },
+): field_value is Item {
+  return (
+    typeof field_value === "object" &&
+    field_value !== null &&
+    !Array.isArray(field_value) &&
+    "name" in field_value &&
+    "kind" in field_value
+  )
 }
 
 export { ast_items, items_by_name, needs_lifetime_param }

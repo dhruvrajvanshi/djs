@@ -1,6 +1,6 @@
 export type LazyType = () => string
 export type Type1 = ["Vec" | "Option", Type]
-export type Type = string | Type1 | LazyType
+export type Type = string | Type1 | LazyType | StructItem | EnumItem
 export type Tag = "span" | "visit" | "sexpr_ignore" | "trivia"
 export type EnumVariant = {
   name: string
@@ -21,3 +21,7 @@ export type StructItem = {
 }
 
 export type Item = EnumItem | StructItem
+
+export function is_item(ty: Type): ty is Item {
+  return typeof ty === "object" && ty !== null && !Array.isArray(ty) && "name" in ty && "kind" in ty
+}
