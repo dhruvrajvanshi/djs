@@ -7,7 +7,8 @@ import type {
   Func,
   Pattern,
 } from "./ast.gen.ts"
-import type { EnumItem, StructItem, Type } from "./astgen_items.ts"
+import type { EnumItem, StructItem, Type, Item } from "./astgen_items.ts"
+import { is_item } from "./astgen_items.ts"
 import {
   Stmt as StmtDef,
   Expr as ExprDef,
@@ -166,6 +167,8 @@ function type_to_dumper(type: Type): (value: unknown) => SExpr {
     }
   } else if (typeof type === "function") {
     return type_to_dumper(type())
+  } else if (is_item(type)) {
+    return object_dumper(type)
   } else {
     assert(type.length === 2, `Invalid type: ${JSON.stringify(type)}`)
     const [kind, arg] = type

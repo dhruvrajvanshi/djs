@@ -6,7 +6,12 @@ import type {
   EnumVariant,
   StructItem,
 } from "./astgen_items.ts"
+import { is_item } from "./astgen_items.ts"
 import assert from "node:assert/strict"
+
+function is_item_or_field_def(field_value: Type | { type: Type; tags: Tag[] }): field_value is Item {
+  return typeof field_value === "object" && field_value !== null && !Array.isArray(field_value) && "name" in field_value && "kind" in field_value
+}
 
 export const type_registry: Record<string, Item> = {}
 const Text = "Text"
@@ -16,7 +21,7 @@ const Ident = Struct("Ident", ["span"], {
 })
 
 export const Pattern = Enum("Pattern", ["span", "visit"], {
-  Var: { ident: Ident.name },
+  Var: { ident: Ident },
   Assignment: { pattern: Lazy(() => Pattern), initializer: Lazy(() => Expr) },
   Array: { items: List(Lazy(() => Pattern)) },
   Object: {
@@ -43,7 +48,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   DoWhile: { body: Lazy(() => Stmt), condition: Lazy(() => Expr) },
   Try: {
     try_block: Lazy(() => Block),
-    catch_pattern: Option(Pattern.name),
+    catch_pattern: Option(Pattern),
     catch_block: Option(Lazy(() => Block)),
     finally_block: Option(Lazy(() => Block)),
   },
@@ -113,12 +118,12 @@ const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
 })
 
 export const StructInitItem = Struct("StructInitItem", ["span"], {
-  Key: Ident.name,
+  Key: Ident,
   value: Lazy(() => Expr),
 })
 
 export const Expr = Enum("Expr", ["span", "visit"], {
-  Var: { leading_trivia: Text, ident: Ident.name },
+  Var: { leading_trivia: Text, ident: Ident },
   Paren: { expr: Lazy(() => Expr) },
   BinOp: {
     lhs: Lazy(() => Expr),
@@ -520,15 +525,16 @@ function Struct(
     `Struct "${name}" cannot have a "kind" field because it reserved for the struct tag`,
   )
   const fields_with_tags = Object.fromEntries(
-    Object.entries(fields).map(([field_name, type]) => {
+    Object.entries(fields).map(([field_name, field_value]) => {
       if (
-        Array.isArray(type) ||
-        typeof type === "string" ||
-        typeof type === "function"
+        Array.isArray(field_value) ||
+        typeof field_value === "string" ||
+        typeof field_value === "function" ||
+        is_item_or_field_def(field_value)
       ) {
-        return [field_name, { type, tags: [] }]
+        return [field_name, { type: field_value, tags: [] }]
       } else {
-        return [field_name, type]
+        return [field_name, field_value]
       }
     }),
   )
@@ -599,8 +605,9 @@ function needs_lifetime_param_set() {
       }
       return item_contains_ident_or_text(items_by_name[type])
     } else if (typeof type === "function") {
-      // Handle lazy type by resolving it and recursing
       return type_contains_ident_or_text(type())
+    } else if (is_item(type)) {
+      return item_contains_ident_or_text(type)
     } else {
       return type.slice(1).some(type_contains_ident_or_text)
     }
