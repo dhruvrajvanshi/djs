@@ -15,20 +15,6 @@ const Text = "Text"
 const Ident = Struct("Ident", ["span"], {
   text: "str",
 })
-
-export const Pattern = Enum("Pattern", ["span", "visit"], {
-  Var: { ident: Ident },
-  Assignment: { pattern: Lazy(() => Pattern), initializer: Lazy(() => Expr) },
-  Array: { items: List(Lazy(() => Pattern)) },
-  Object: {
-    properties: List(Lazy(() => ObjectPatternProperty)),
-    rest: Option(Lazy(() => Pattern)),
-  },
-  Prop: { expr: Lazy(() => Expr), key: Lazy(() => ObjectKey) },
-  Deref: { expr: Lazy(() => Expr) },
-  Elision: {},
-  Rest: { pattern: Lazy(() => Pattern) },
-})
 export const Stmt = Enum("Stmt", ["span", "visit"], {
   Expr: { expr: Lazy(() => Expr) },
   Block: { block: Lazy(() => Block) },
@@ -44,7 +30,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   DoWhile: { body: Lazy(() => Stmt), condition: Lazy(() => Expr) },
   Try: {
     try_block: Lazy(() => Block),
-    catch_pattern: Option(Pattern),
+    catch_pattern: Option(Lazy(() => Pattern)),
     catch_block: Option(Lazy(() => Block)),
     finally_block: Option(Lazy(() => Block)),
   },
@@ -56,7 +42,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   },
   ForInOrOf: {
     decl_type: Option(Lazy(() => DeclType)), // None for `for (x of y) {}`
-    lhs: Pattern,
+    lhs: Lazy(() => Pattern),
     in_or_of: Lazy(() => InOrOf),
     rhs: Lazy(() => Expr),
     body: Lazy(() => Stmt),
@@ -106,16 +92,6 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     name: Ident,
   },
   Empty: {},
-})
-const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
-  is_readonly: "boolean",
-  label: Ident,
-  type_annotation: Lazy(() => TypeAnnotation),
-})
-
-export const StructInitItem = Struct("StructInitItem", ["span"], {
-  Key: Ident,
-  value: Lazy(() => Expr),
 })
 
 export const Expr = Enum("Expr", ["span", "visit"], {
@@ -169,7 +145,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     if_false: Lazy(() => Expr),
   },
   Assign: {
-    pattern: Pattern,
+    pattern: Lazy(() => Pattern),
     operator: Lazy(() => AssignOp),
     value: Lazy(() => Expr),
   },
@@ -227,6 +203,31 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     head: Ident,
     tail: List(Ident),
   },
+})
+
+export const Pattern = Enum("Pattern", ["span", "visit"], {
+  Var: { ident: Ident },
+  Assignment: { pattern: Lazy(() => Pattern), initializer: Lazy(() => Expr) },
+  Array: { items: List(Lazy(() => Pattern)) },
+  Object: {
+    properties: List(Lazy(() => ObjectPatternProperty)),
+    rest: Option(Lazy(() => Pattern)),
+  },
+  Prop: { expr: Lazy(() => Expr), key: Lazy(() => ObjectKey) },
+  Deref: { expr: Lazy(() => Expr) },
+  Elision: {},
+  Rest: { pattern: Lazy(() => Pattern) },
+})
+
+const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
+  is_readonly: "boolean",
+  label: Ident,
+  type_annotation: Lazy(() => TypeAnnotation),
+})
+
+export const StructInitItem = Struct("StructInitItem", ["span"], {
+  Key: Ident,
+  value: Lazy(() => Expr),
 })
 
 const FuncTypeParam = Struct("FuncTypeParam", [], {
