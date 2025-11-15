@@ -11,310 +11,314 @@ import assert from "node:assert/strict"
 export const type_registry: Record<string, Item> = {}
 const Text = "Text"
 
-const DIdent = Struct("Ident", ["span"], {
+const Ident = Struct("Ident", ["span"], {
   text: "str",
 })
 
-export const DPattern = Enum("Pattern", ["span", "visit"], {
-  Var: { ident: "Ident" },
-  Assignment: { pattern: Lazy(() => DPattern), initializer: Lazy(() => DExpr) },
-  Array: { items: List(Lazy(() => DPattern)) },
+export const Pattern = Enum("Pattern", ["span", "visit"], {
+  Var: { ident: Ident.name },
+  Assignment: { pattern: Lazy(() => Pattern), initializer: Lazy(() => Expr) },
+  Array: { items: List(Lazy(() => Pattern)) },
   Object: {
-    properties: List(Lazy(() => DObjectPatternProperty)),
-    rest: Option(Lazy(() => DPattern)),
+    properties: List(Lazy(() => ObjectPatternProperty)),
+    rest: Option(Lazy(() => Pattern)),
   },
-  Prop: { expr: Lazy(() => DExpr), key: Lazy(() => DObjectKey) },
-  Deref: { expr: Lazy(() => DExpr) },
+  Prop: { expr: Lazy(() => Expr), key: Lazy(() => ObjectKey) },
+  Deref: { expr: Lazy(() => Expr) },
   Elision: {},
-  Rest: { pattern: Lazy(() => DPattern) },
+  Rest: { pattern: Lazy(() => Pattern) },
 })
-export const DStmt = Enum("Stmt", ["span", "visit"], {
-  Expr: { expr: Lazy(() => DExpr) },
-  Block: { block: Lazy(() => DBlock) },
-  Return: { leading_trivia: Text, value: Option(Lazy(() => DExpr)) },
-  VarDecl: { decl: Lazy(() => DVarDecl) },
+export const Stmt = Enum("Stmt", ["span", "visit"], {
+  Expr: { expr: Lazy(() => Expr) },
+  Block: { block: Lazy(() => Block) },
+  Return: { leading_trivia: Text, value: Option(Lazy(() => Expr)) },
+  VarDecl: { decl: Lazy(() => VarDecl) },
   If: {
-    condition: Lazy(() => DExpr),
-    if_true: Lazy(() => DStmt),
-    if_false: Option(Lazy(() => DStmt)),
+    condition: Lazy(() => Expr),
+    if_true: Lazy(() => Stmt),
+    if_false: Option(Lazy(() => Stmt)),
   },
-  Switch: { condition: Lazy(() => DExpr), cases: List(Lazy(() => DSwitchCase)) },
-  While: { condition: Lazy(() => DExpr), body: Lazy(() => DStmt) },
-  DoWhile: { body: Lazy(() => DStmt), condition: Lazy(() => DExpr) },
+  Switch: { condition: Lazy(() => Expr), cases: List(Lazy(() => SwitchCase)) },
+  While: { condition: Lazy(() => Expr), body: Lazy(() => Stmt) },
+  DoWhile: { body: Lazy(() => Stmt), condition: Lazy(() => Expr) },
   Try: {
-    try_block: Lazy(() => DBlock),
-    catch_pattern: Option(DPattern.name),
-    catch_block: Option(Lazy(() => DBlock)),
-    finally_block: Option(Lazy(() => DBlock)),
+    try_block: Lazy(() => Block),
+    catch_pattern: Option(Pattern.name),
+    catch_block: Option(Lazy(() => Block)),
+    finally_block: Option(Lazy(() => Block)),
   },
   For: {
-    init: Lazy(() => DForInit),
-    test: Option(Lazy(() => DExpr)),
-    update: Option(Lazy(() => DExpr)),
-    body: Lazy(() => DStmt),
+    init: Lazy(() => ForInit),
+    test: Option(Lazy(() => Expr)),
+    update: Option(Lazy(() => Expr)),
+    body: Lazy(() => Stmt),
   },
   ForInOrOf: {
-    decl_type: Option(Lazy(() => DDeclType)), // None for `for (x of y) {}`
-    lhs: DPattern.name,
-    in_or_of: Lazy(() => DInOrOf),
-    rhs: Lazy(() => DExpr),
-    body: Lazy(() => DStmt),
+    decl_type: Option(Lazy(() => DeclType)), // None for `for (x of y) {}`
+    lhs: Pattern.name,
+    in_or_of: Lazy(() => InOrOf),
+    rhs: Lazy(() => Expr),
+    body: Lazy(() => Stmt),
   },
-  Break: { label: Option(Lazy(() => DLabel)) },
-  Continue: { label: Option(Lazy(() => DLabel)) },
+  Break: { label: Option(Lazy(() => Label)) },
+  Continue: { label: Option(Lazy(() => Label)) },
   Debugger: {},
-  With: { expr: Lazy(() => DExpr), body: Lazy(() => DStmt) },
-  Func: { func: Lazy(() => DFunc), is_exported: "boolean" },
-  ClassDecl: { class_def: Lazy(() => DClass) },
-  StructDecl: { struct_def: Lazy(() => DStructDef) },
-  UntaggedUnionDecl: { untagged_union_def: Lazy(() => DUntaggedUnion) },
+  With: { expr: Lazy(() => Expr), body: Lazy(() => Stmt) },
+  Func: { func: Lazy(() => Func), is_exported: "boolean" },
+  ClassDecl: { class_def: Lazy(() => Class) },
+  StructDecl: { struct_def: Lazy(() => StructDef) },
+  UntaggedUnionDecl: { untagged_union_def: Lazy(() => UntaggedUnion) },
   Import: {
-    default_import: Option("Ident"),
-    named_imports: List(Lazy(() => DImportSpecifier)),
+    default_import: Option(Ident.name),
+    named_imports: List(Lazy(() => ImportSpecifier)),
     module_specifier: Text,
   },
   ImportStarAs: {
-    as_name: "Ident",
+    as_name: Ident.name,
     module_specifier: Text,
   },
   Labeled: {
-    label: Lazy(() => DLabel),
-    stmt: Lazy(() => DStmt),
+    label: Lazy(() => Label),
+    stmt: Lazy(() => Stmt),
   },
   ObjectTypeDecl: {
-    name: "Ident",
+    name: Ident.name,
     fields: List("ObjectTypeDeclField"),
   },
   TypeAlias: {
-    name: "Ident",
-    type_annotation: Lazy(() => DTypeAnnotation),
+    name: Ident.name,
+    type_annotation: Lazy(() => TypeAnnotation),
   },
   LJSExternFunction: {
     is_exported: "boolean",
-    name: "Ident",
-    params: List(Lazy(() => DParam)),
-    return_type: Lazy(() => DTypeAnnotation),
+    name: Ident.name,
+    params: List(Lazy(() => Param)),
+    return_type: Lazy(() => TypeAnnotation),
   },
   LJSExternConst: {
     is_exported: "boolean",
-    name: "Ident",
-    type_annotation: Lazy(() => DTypeAnnotation),
+    name: Ident.name,
+    type_annotation: Lazy(() => TypeAnnotation),
   },
   LJSExternType: {
     is_exported: "boolean",
-    name: "Ident",
+    name: Ident.name,
   },
   Empty: {},
 })
-const DObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
+const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
   is_readonly: "boolean",
-  label: "Ident",
-  type_annotation: Lazy(() => DTypeAnnotation),
+  label: Ident.name,
+  type_annotation: Lazy(() => TypeAnnotation),
 })
 
-export const DStructInitItem = Struct("StructInitItem", ["span"], {
-  Key: "Ident",
-  value: Lazy(() => DExpr),
+export const StructInitItem = Struct("StructInitItem", ["span"], {
+  Key: Ident.name,
+  value: Lazy(() => Expr),
 })
 
-export const DExpr = Enum("Expr", ["span", "visit"], {
-  Var: { leading_trivia: Text, ident: "Ident" },
-  Paren: { expr: Lazy(() => DExpr) },
-  BinOp: { lhs: Lazy(() => DExpr), operator: Lazy(() => DBinOp), rhs: Lazy(() => DExpr) },
-  ArrowFn: {
-    params: List(Lazy(() => DParam)),
-    return_type: Option(Lazy(() => DTypeAnnotation)),
-    body: Lazy(() => DArrowFnBody),
+export const Expr = Enum("Expr", ["span", "visit"], {
+  Var: { leading_trivia: Text, ident: Ident.name },
+  Paren: { expr: Lazy(() => Expr) },
+  BinOp: {
+    lhs: Lazy(() => Expr),
+    operator: Lazy(() => BinOp),
+    rhs: Lazy(() => Expr),
   },
-  Func: { func: Lazy(() => DFunc) },
+  ArrowFn: {
+    params: List(Lazy(() => Param)),
+    return_type: Option(Lazy(() => TypeAnnotation)),
+    body: Lazy(() => ArrowFnBody),
+  },
+  Func: { func: Lazy(() => Func) },
   Call: {
-    callee: Lazy(() => DExpr),
-    args: List(Lazy(() => DExpr)),
-    spread: Option(Lazy(() => DExpr)),
+    callee: Lazy(() => Expr),
+    args: List(Lazy(() => Expr)),
+    spread: Option(Lazy(() => Expr)),
     is_optional: "boolean",
   },
   StructInit: {
-    lhs: Lazy(() => DExpr),
+    lhs: Lazy(() => Expr),
     fields: List("StructInitItem"),
   },
   Index: {
-    lhs: Lazy(() => DExpr),
-    property: Lazy(() => DExpr),
+    lhs: Lazy(() => Expr),
+    property: Lazy(() => Expr),
     is_optional: "boolean",
   },
-  Prop: { lhs: Lazy(() => DExpr), property: "Ident", is_optional: "boolean" },
+  Prop: { lhs: Lazy(() => Expr), property: Ident.name, is_optional: "boolean" },
   String: { text: Text },
   Number: { text: Text },
   Boolean: { value: "boolean" },
   Null: {},
   Undefined: {},
-  Object: { entries: List(Lazy(() => DObjectLiteralEntry)) },
-  Throw: { value: Lazy(() => DExpr) },
-  PostIncrement: { value: Lazy(() => DExpr) },
-  PostDecrement: { value: Lazy(() => DExpr) },
-  PreIncrement: { value: Lazy(() => DExpr) },
-  PreDecrement: { value: Lazy(() => DExpr) },
-  Array: { items: List(Lazy(() => DArrayLiteralMember)) },
-  New: { expr: Lazy(() => DExpr) },
-  Yield: { value: Option(Lazy(() => DExpr)) },
-  YieldFrom: { expr: Lazy(() => DExpr) },
+  Object: { entries: List(Lazy(() => ObjectLiteralEntry)) },
+  Throw: { value: Lazy(() => Expr) },
+  PostIncrement: { value: Lazy(() => Expr) },
+  PostDecrement: { value: Lazy(() => Expr) },
+  PreIncrement: { value: Lazy(() => Expr) },
+  PreDecrement: { value: Lazy(() => Expr) },
+  Array: { items: List(Lazy(() => ArrayLiteralMember)) },
+  New: { expr: Lazy(() => Expr) },
+  Yield: { value: Option(Lazy(() => Expr)) },
+  YieldFrom: { expr: Lazy(() => Expr) },
   Ternary: {
-    condition: Lazy(() => DExpr),
-    if_true: Lazy(() => DExpr),
-    if_false: Lazy(() => DExpr),
+    condition: Lazy(() => Expr),
+    if_true: Lazy(() => Expr),
+    if_false: Lazy(() => Expr),
   },
   Assign: {
-    pattern: DPattern.name,
-    operator: Lazy(() => DAssignOp),
-    value: Lazy(() => DExpr),
+    pattern: Pattern.name,
+    operator: Lazy(() => AssignOp),
+    value: Lazy(() => Expr),
   },
   Regex: { text: "Text" },
-  Delete: { expr: Lazy(() => DExpr) },
-  Void: { expr: Lazy(() => DExpr) },
-  TypeOf: { expr: Lazy(() => DExpr) },
-  UnaryPlus: { expr: Lazy(() => DExpr) },
-  UnaryMinus: { expr: Lazy(() => DExpr) },
-  BitNot: { expr: Lazy(() => DExpr) },
-  Not: { expr: Lazy(() => DExpr) },
-  Await: { expr: Lazy(() => DExpr) },
-  Comma: { items: List(Lazy(() => DExpr)) },
+  Delete: { expr: Lazy(() => Expr) },
+  Void: { expr: Lazy(() => Expr) },
+  TypeOf: { expr: Lazy(() => Expr) },
+  UnaryPlus: { expr: Lazy(() => Expr) },
+  UnaryMinus: { expr: Lazy(() => Expr) },
+  BitNot: { expr: Lazy(() => Expr) },
+  Not: { expr: Lazy(() => Expr) },
+  Await: { expr: Lazy(() => Expr) },
+  Comma: { items: List(Lazy(() => Expr)) },
   Super: {},
-  Class: { class_def: Lazy(() => DClass) },
-  TemplateLiteral: { fragments: List(Lazy(() => DTemplateLiteralFragment)) },
+  Class: { class_def: Lazy(() => Class) },
+  TemplateLiteral: { fragments: List(Lazy(() => TemplateLiteralFragment)) },
   TaggedTemplateLiteral: {
-    tag: Lazy(() => DExpr),
-    fragments: List(Lazy(() => DTemplateLiteralFragment)),
+    tag: Lazy(() => Expr),
+    fragments: List(Lazy(() => TemplateLiteralFragment)),
   },
   Builtin: {
     text: Text,
   },
-  AddressOf: { expr: Lazy(() => DExpr), mut: "boolean" },
-  Deref: { expr: Lazy(() => DExpr) },
+  AddressOf: { expr: Lazy(() => Expr), mut: "boolean" },
+  Deref: { expr: Lazy(() => Expr) },
 })
-export const DTypeAnnotation = Enum("TypeAnnotation", ["span"], {
-  Ident: { leading_trivia: Text, ident: "Ident" },
+export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
+  Ident: { leading_trivia: Text, ident: Ident.name },
   Union: {
-    left: Lazy(() => DTypeAnnotation),
-    right: Lazy(() => DTypeAnnotation),
+    left: Lazy(() => TypeAnnotation),
+    right: Lazy(() => TypeAnnotation),
   },
-  Array: { item: Lazy(() => DTypeAnnotation) },
-  ReadonlyArray: { item: Lazy(() => DTypeAnnotation) },
+  Array: { item: Lazy(() => TypeAnnotation) },
+  ReadonlyArray: { item: Lazy(() => TypeAnnotation) },
   Application: {
-    callee: Lazy(() => DTypeAnnotation),
-    args: List(Lazy(() => DTypeAnnotation)),
+    callee: Lazy(() => TypeAnnotation),
+    args: List(Lazy(() => TypeAnnotation)),
   },
   String: { text: Text },
   Func: {
-    type_params: List(Lazy(() => DTypeParam)),
-    params: List(Lazy(() => DFuncTypeParam)),
-    returns: Lazy(() => DTypeAnnotation),
+    type_params: List(Lazy(() => TypeParam)),
+    params: List(Lazy(() => FuncTypeParam)),
+    returns: Lazy(() => TypeAnnotation),
   },
   LJSMutPtr: {
-    to: Lazy(() => DTypeAnnotation),
+    to: Lazy(() => TypeAnnotation),
   },
   LJSPtr: {
-    to: Lazy(() => DTypeAnnotation),
+    to: Lazy(() => TypeAnnotation),
   },
   Builtin: {
     text: Text,
   },
   Qualified: {
-    head: "Ident",
-    tail: List("Ident"),
+    head: Ident.name,
+    tail: List(Ident.name),
   },
 })
 
-const DFuncTypeParam = Struct("FuncTypeParam", [], {
-  label: "Ident",
-  type_annotation: Lazy(() => DTypeAnnotation),
+const FuncTypeParam = Struct("FuncTypeParam", [], {
+  label: Ident.name,
+  type_annotation: Lazy(() => TypeAnnotation),
 })
-const DClass = Struct("Class", ["span"], {
-  name: Option("Ident"),
-  superclass: Option(Lazy(() => DExpr)),
-  body: Lazy(() => DClassBody),
+const Class = Struct("Class", ["span"], {
+  name: Option(Ident.name),
+  superclass: Option(Lazy(() => Expr)),
+  body: Lazy(() => ClassBody),
 })
-const DStructDef = Struct("StructDef", ["span"], {
-  name: "Ident",
-  members: List(Lazy(() => DStructMember)),
+const StructDef = Struct("StructDef", ["span"], {
+  name: Ident.name,
+  members: List(Lazy(() => StructMember)),
 })
-const DClassBody = Struct("ClassBody", ["span"], {
-  members: List(Lazy(() => DClassMember)),
+const ClassBody = Struct("ClassBody", ["span"], {
+  members: List(Lazy(() => ClassMember)),
 })
-const DClassMember = Enum("ClassMember", [], {
-  MethodDef: { method: Lazy(() => DMethodDef) },
-  FieldDef: { field: Lazy(() => DFieldDef) },
-})
-
-const DStructMember = Enum("StructMember", [], {
-  FieldDef: { name: "Ident", type_annotation: Lazy(() => DTypeAnnotation) },
-})
-const DUntaggedUnionMember = Enum("UntaggedUnionMember", [], {
-  VariantDef: { name: "Ident", type_annotation: Lazy(() => DTypeAnnotation) },
-})
-const DUntaggedUnion = Struct("UntaggedUnion", ["span"], {
-  name: "Ident",
-  members: List(Lazy(() => DUntaggedUnionMember)),
+const ClassMember = Enum("ClassMember", [], {
+  MethodDef: { method: Lazy(() => MethodDef) },
+  FieldDef: { field: Lazy(() => FieldDef) },
 })
 
-const DFieldDef = Struct("FieldDef", ["span"], {
-  name: "Ident",
-  initializer: Option(Lazy(() => DExpr)),
+const StructMember = Enum("StructMember", [], {
+  FieldDef: { name: Ident.name, type_annotation: Lazy(() => TypeAnnotation) },
 })
-const DMethodDef = Struct("MethodDef", ["span"], {
-  name: Lazy(() => DObjectKey),
-  body: Lazy(() => DFunc),
-  return_type: Option(Lazy(() => DTypeAnnotation)),
-  accessor_type: Option(Lazy(() => DAccessorType)),
+const UntaggedUnionMember = Enum("UntaggedUnionMember", [], {
+  VariantDef: { name: Ident.name, type_annotation: Lazy(() => TypeAnnotation) },
+})
+const UntaggedUnion = Struct("UntaggedUnion", ["span"], {
+  name: Ident.name,
+  members: List(Lazy(() => UntaggedUnionMember)),
 })
 
-const DObjectKey = Enum("ObjectKey", ["span"], {
-  Ident: { ident: "Ident" },
+const FieldDef = Struct("FieldDef", ["span"], {
+  name: Ident.name,
+  initializer: Option(Lazy(() => Expr)),
+})
+const MethodDef = Struct("MethodDef", ["span"], {
+  name: Lazy(() => ObjectKey),
+  body: Lazy(() => Func),
+  return_type: Option(Lazy(() => TypeAnnotation)),
+  accessor_type: Option(Lazy(() => AccessorType)),
+})
+
+const ObjectKey = Enum("ObjectKey", ["span"], {
+  Ident: { ident: Ident.name },
   String: { text: Text },
-  Computed: { expr: Lazy(() => DExpr) },
+  Computed: { expr: Lazy(() => Expr) },
 })
 
-const DObjectLiteralEntry = Enum("ObjectLiteralEntry", ["span"], {
-  Ident: { ident: "Ident" },
-  Prop: { key: DObjectKey.name, value: Lazy(() => DExpr) },
-  Method: { method: DMethodDef.name },
-  Spread: { expr: Lazy(() => DExpr) },
+const ObjectLiteralEntry = Enum("ObjectLiteralEntry", ["span"], {
+  Ident: { ident: Ident.name },
+  Prop: { key: ObjectKey.name, value: Lazy(() => Expr) },
+  Method: { method: MethodDef.name },
+  Spread: { expr: Lazy(() => Expr) },
 })
 
-const DParam = Struct("Param", ["span"], {
-  pattern: DPattern.name,
-  type_annotation: Option(Lazy(() => DTypeAnnotation)),
-  initializer: Option(Lazy(() => DExpr)),
+const Param = Struct("Param", ["span"], {
+  pattern: Pattern.name,
+  type_annotation: Option(Lazy(() => TypeAnnotation)),
+  initializer: Option(Lazy(() => Expr)),
 })
 
-const DArrayLiteralMember = Enum("ArrayLiteralMember", ["span"], {
-  Expr: { expr: Lazy(() => DExpr) },
+const ArrayLiteralMember = Enum("ArrayLiteralMember", ["span"], {
+  Expr: { expr: Lazy(() => Expr) },
   Elision: {},
-  Spread: { expr: Lazy(() => DExpr) },
+  Spread: { expr: Lazy(() => Expr) },
 })
 
-export const DFunc = Struct("Func", ["span", "visit"], {
-  name: Option("Ident"),
+export const Func = Struct("Func", ["span", "visit"], {
+  name: Option(Ident.name),
   type_params: List("TypeParam"),
-  params: List(DParam.name),
-  body: Lazy(() => DBlock),
-  return_type: Option(Lazy(() => DTypeAnnotation)),
+  params: List(Param.name),
+  body: Lazy(() => Block),
+  return_type: Option(Lazy(() => TypeAnnotation)),
   is_generator: "boolean",
   is_async: "boolean",
 })
-const DTypeParam = Struct("TypeParam", [], {
-  ident: "Ident",
+const TypeParam = Struct("TypeParam", [], {
+  ident: Ident.name,
 })
-const DBlock = Struct("Block", ["span", "visit"], {
-  stmts: List(Lazy(() => DStmt)),
+const Block = Struct("Block", ["span", "visit"], {
+  stmts: List(Lazy(() => Stmt)),
 })
 
-const DLabel = Struct("Label", ["span"], {
+const Label = Struct("Label", ["span"], {
   name: "str",
 })
 
-export const DSourceFile = Struct("SourceFile", ["span", "visit"], {
+export const SourceFile = Struct("SourceFile", ["span", "visit"], {
   path: "str",
-  stmts: List(Lazy(() => DStmt)),
+  stmts: List(Lazy(() => Stmt)),
   qualified_name: {
     tags: ["sexpr_ignore"],
     type: "QualifiedName",
@@ -324,46 +328,46 @@ export const DSourceFile = Struct("SourceFile", ["span", "visit"], {
     tags: ["sexpr_ignore"],
   },
 })
-const DSwitchCase = Struct("SwitchCase", ["span"], {
-  test: Option(Lazy(() => DExpr)),
-  body: List(Lazy(() => DStmt)),
+const SwitchCase = Struct("SwitchCase", ["span"], {
+  test: Option(Lazy(() => Expr)),
+  body: List(Lazy(() => Stmt)),
 })
-const DInOrOf = StringUnion("InOrOf", "In", "Of")
-const DVarDecl = Struct("VarDecl", ["span"], {
-  decl_type: Lazy(() => DDeclType),
-  declarators: List(Lazy(() => DVarDeclarator)),
+const InOrOf = StringUnion("InOrOf", "In", "Of")
+const VarDecl = Struct("VarDecl", ["span"], {
+  decl_type: Lazy(() => DeclType),
+  declarators: List(Lazy(() => VarDeclarator)),
 })
-const DVarDeclarator = Struct("VarDeclarator", [], {
-  pattern: DPattern.name,
-  type_annotation: Option(Lazy(() => DTypeAnnotation)),
-  init: Option(Lazy(() => DExpr)),
+const VarDeclarator = Struct("VarDeclarator", [], {
+  pattern: Pattern.name,
+  type_annotation: Option(Lazy(() => TypeAnnotation)),
+  init: Option(Lazy(() => Expr)),
 })
-const DForInit = Enum("ForInit", [], {
-  VarDecl: { decl: Lazy(() => DVarDecl) },
-  Expr: { expr: Lazy(() => DExpr) },
+const ForInit = Enum("ForInit", [], {
+  VarDecl: { decl: Lazy(() => VarDecl) },
+  Expr: { expr: Lazy(() => Expr) },
 })
-const DArrowFnBody = Enum("ArrowFnBody", ["span"], {
-  Expr: { expr: Lazy(() => DExpr) },
-  Block: { block: Lazy(() => DBlock) },
+const ArrowFnBody = Enum("ArrowFnBody", ["span"], {
+  Expr: { expr: Lazy(() => Expr) },
+  Block: { block: Lazy(() => Block) },
 })
-const DTemplateLiteralFragment = Enum("TemplateLiteralFragment", ["span"], {
+const TemplateLiteralFragment = Enum("TemplateLiteralFragment", ["span"], {
   Text: { text: Text },
-  Expr: { expr: Lazy(() => DExpr) },
+  Expr: { expr: Lazy(() => Expr) },
 })
-const DObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
-  key: DObjectKey.name,
-  value: DPattern.name,
+const ObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
+  key: ObjectKey.name,
+  value: Pattern.name,
 })
-const DModuleExportName = Enum("ModuleExportName", [], {
-  Ident: { ident: "Ident" },
+const ModuleExportName = Enum("ModuleExportName", [], {
+  Ident: { ident: Ident.name },
   String: { text: Text },
 })
-const DImportSpecifier = Struct("ImportSpecifier", ["span"], {
+const ImportSpecifier = Struct("ImportSpecifier", ["span"], {
   type_only: "boolean",
-  as_name: Option("Ident"),
-  imported_name: Lazy(() => DModuleExportName),
+  as_name: Option(Ident.name),
+  imported_name: Lazy(() => ModuleExportName),
 })
-const DBinOp = StringUnion(
+const BinOp = StringUnion(
   "BinOp",
   // Arithmetic
   "Add",
@@ -399,7 +403,7 @@ const DBinOp = StringUnion(
   "RightShift",
   "UnsignedRightShift",
 )
-const DAssignOp = StringUnion(
+const AssignOp = StringUnion(
   "AssignOp",
   "Eq",
   "MulEq",
@@ -415,50 +419,50 @@ const DAssignOp = StringUnion(
   "BitOrEq",
   "ExponentEq",
 )
-const DDeclType = StringUnion("DeclType", "Let", "Const", "Var")
-const DAccessorType = StringUnion("AccessorType", "Get", "Set")
+const DeclType = StringUnion("DeclType", "Let", "Const", "Var")
+const AccessorType = StringUnion("AccessorType", "Get", "Set")
 
 const ast_items = [
-  DSourceFile,
-  DStmt,
-  DClass,
-  DStructDef,
-  DStructMember,
-  DUntaggedUnion,
-  DUntaggedUnionMember,
-  DBlock,
-  DClassBody,
-  DMethodDef,
-  DClassMember,
-  DFieldDef,
-  DIdent,
-  DPattern,
-  DLabel,
-  DSwitchCase,
-  DInOrOf,
-  DVarDecl,
-  DVarDeclarator,
-  DForInit,
-  DExpr,
-  DStructInitItem,
-  DObjectTypeDeclField,
-  DTypeAnnotation,
-  DFuncTypeParam,
-  DObjectLiteralEntry,
-  DObjectKey,
-  DParam,
-  DFunc,
-  DTypeParam,
-  DArrayLiteralMember,
-  DArrowFnBody,
-  DTemplateLiteralFragment,
-  DObjectPatternProperty,
-  DModuleExportName,
-  DImportSpecifier,
-  DBinOp,
-  DAssignOp,
-  DDeclType,
-  DAccessorType,
+  SourceFile,
+  Stmt,
+  Class,
+  StructDef,
+  StructMember,
+  UntaggedUnion,
+  UntaggedUnionMember,
+  Block,
+  ClassBody,
+  MethodDef,
+  ClassMember,
+  FieldDef,
+  Ident,
+  Pattern,
+  Label,
+  SwitchCase,
+  InOrOf,
+  VarDecl,
+  VarDeclarator,
+  ForInit,
+  Expr,
+  StructInitItem,
+  ObjectTypeDeclField,
+  TypeAnnotation,
+  FuncTypeParam,
+  ObjectLiteralEntry,
+  ObjectKey,
+  Param,
+  Func,
+  TypeParam,
+  ArrayLiteralMember,
+  ArrowFnBody,
+  TemplateLiteralFragment,
+  ObjectPatternProperty,
+  ModuleExportName,
+  ImportSpecifier,
+  BinOp,
+  AssignOp,
+  DeclType,
+  AccessorType,
 ]
 
 function StringUnion(name: string, ...variants: readonly string[]): EnumItem {
