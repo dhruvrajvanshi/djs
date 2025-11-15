@@ -103,22 +103,16 @@ function visitor_methods(item_name: string): string {
   }
 }
 function field_walker(field: string, type: Type): string {
-  if (typeof type === "string") {
+  if (is_item(type)) {
+    return item_walker(type, field)
+  } else if (typeof type === "string") {
     const item = type_registry[type]
     if (!item) {
-      return ""
-    }
-    if (
-      item.kind === "enum" &&
-      item.variants.every((v) => Object.entries(v.args).length === 0)
-    ) {
       return ""
     }
     return item_walker(item, field)
   } else if (typeof type === "function") {
     return field_walker(field, type())
-  } else if (is_item(type)) {
-    return item_walker(type, field)
   } else {
     const [container, inner] = type
     switch (container) {
@@ -150,6 +144,9 @@ function item_var_name(item: Item): string {
 }
 
 function item_walker(item: Item, field: string): string {
+  if (is_string_union(item)) {
+    return ""
+  }
   return `this.visit_${to_snake_case(item.name)}(${field})`
 }
 
@@ -159,4 +156,10 @@ function assert_never(value: never, message: string): never {
 
 function to_snake_case(name: string): string {
   return name.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase()
+}
+function is_string_union(item: Item): boolean {
+  return (
+    item.kind === "enum" &&
+    item.variants.every((v) => Object.entries(v.args).length === 0)
+  )
 }
