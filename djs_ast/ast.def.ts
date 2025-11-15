@@ -126,6 +126,14 @@ const Class = "Class"
  */
 const StructDef = "StructDef"
 /**
+ * {@link DUntaggedUnion}
+ */
+const UntaggedUnion = "UntaggedUnion"
+/**
+ * {@link DUntaggedUnionMember}
+ */
+const UntaggedUnionMember = "UntaggedUnionMember"
+/**
  * {@link DFieldDef}
  */
 const FieldDef = "FieldDef"
@@ -190,6 +198,7 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   Func: { func: Func, is_exported: "boolean" },
   ClassDecl: { class_def: Class },
   StructDecl: { struct_def: StructDef },
+  UntaggedUnionDecl: { untagged_union_def: UntaggedUnion },
   Import: {
     default_import: Option(Ident),
     named_imports: List("ImportSpecifier"),
@@ -352,6 +361,14 @@ const DClassMember = Enum(ClassMember, [], {
 const DStructMember = Enum(StructMember, [], {
   FieldDef: { name: Ident, type_annotation: TypeAnnotation },
 })
+const DUntaggedUnionMember = Enum(UntaggedUnionMember, [], {
+  VariantDef: { name: Ident, type_annotation: TypeAnnotation },
+})
+const DUntaggedUnion = Struct(UntaggedUnion, ["span"], {
+  name: Ident,
+  members: List(UntaggedUnionMember),
+})
+
 const DFieldDef = Struct("FieldDef", ["span"], {
   name: Ident,
   initializer: Option(Expr),
@@ -520,6 +537,8 @@ const ast_items = [
   DClass,
   DStructDef,
   DStructMember,
+  DUntaggedUnion,
+  DUntaggedUnionMember,
   DBlock,
   DClassBody,
   DMethodDef,
