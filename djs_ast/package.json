@@ -9,7 +9,6 @@
     "types": "./dist/index.d.ts"
   },
   "scripts": {
-    "test": "vitest",
     "gen": "pnpm gen:ast && pnpm gen:tokens && pnpm gen:visitor",
     "gen:ast": "node gen_ts_ast.ts | prettier > ast.gen.ts",
     "gen:tokens": "node gen_ts_tokens.ts | prettier > tokens.gen.ts",
