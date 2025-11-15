@@ -668,6 +668,32 @@ export const StructMember = {
   ): FieldDefStructMember => new FieldDefStructMember(name, type_annotation),
 } as const
 
+export interface UntaggedUnion {
+  readonly span: Span
+  readonly name: Ident
+  readonly members: readonly UntaggedUnionMember[]
+}
+
+export type UntaggedUnionMember = VariantDefUntaggedUnionMember
+export class VariantDefUntaggedUnionMember {
+  constructor(
+    readonly name: Ident,
+    readonly type_annotation: TypeAnnotation,
+  ) {}
+
+  get kind(): "VariantDef" {
+    return "VariantDef"
+  }
+}
+
+export const UntaggedUnionMember = {
+  VariantDef: (
+    name: Ident,
+    type_annotation: TypeAnnotation,
+  ): VariantDefUntaggedUnionMember =>
+    new VariantDefUntaggedUnionMember(name, type_annotation),
+} as const
+
 export interface Block {
   readonly span: Span
   readonly stmts: readonly Stmt[]
