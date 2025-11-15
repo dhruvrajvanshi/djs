@@ -1,3 +1,4 @@
+/// skip-linux
 import * as c from "../libc.ljs"
 
 struct FILE {}

@@ -11,6 +11,11 @@ test.each(files)("%s", async (file) => {
   await mkdir(`./test-output`, { recursive: true })
   const output = `./test-output/${file.replace(/\.ljs$/, "")}`
   let diagnostics = ""
+  const file_source = await readFile(`./tests/${file}`, "utf8")
+  if (process.platform === "linux" && file_source.includes("/// skip-linux")) {
+    console.log(`skipping ${file} on linux`)
+    return
+  }
 
   await main(
     {
