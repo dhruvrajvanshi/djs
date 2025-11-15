@@ -1,5 +1,6 @@
 import { ast_items } from "./ast.def.ts"
-import type { EnumItem, EnumVariant, StructItem, Type } from "./astgen_items.js"
+import type { EnumItem, EnumVariant, StructItem, Type, Item } from "./astgen_items.ts"
+import { is_item } from "./astgen_items.ts"
 
 let output = `
 // This file is generated automatically
@@ -25,6 +26,7 @@ for (const item of ast_items) {
 }
 console.log(output)
 
+
 function gen_struct(item: StructItem) {
   const span = item.tags.includes("span") ? `readonly span: Span` : ``
   const leading_trivia = item.tags.includes("trivia")
@@ -49,6 +51,8 @@ function gen_type(ty: Type): string {
     return ty
   } else if (typeof ty === "function") {
     return gen_type(ty())
+  } else if (is_item(ty)) {
+    return ty.name
   } else {
     if (ty.length !== 2) {
       throw new Error(`Invalid type: ${ty}`)
