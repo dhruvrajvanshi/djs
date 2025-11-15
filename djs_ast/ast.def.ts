@@ -9,18 +9,6 @@ import type {
 import { is_item } from "./astgen_items.ts"
 import assert from "node:assert/strict"
 
-function is_item_or_field_def(
-  field_value: Type | { type: Type; tags: Tag[] },
-): field_value is Item {
-  return (
-    typeof field_value === "object" &&
-    field_value !== null &&
-    !Array.isArray(field_value) &&
-    "name" in field_value &&
-    "kind" in field_value
-  )
-}
-
 export const type_registry: Record<string, Item> = {}
 const Text = "Text"
 
@@ -620,6 +608,18 @@ function needs_lifetime_param_set() {
       return type.slice(1).some(type_contains_ident_or_text)
     }
   }
+}
+
+function is_item_or_field_def(
+  field_value: Type | { type: Type; tags: Tag[] },
+): field_value is Item {
+  return (
+    typeof field_value === "object" &&
+    field_value !== null &&
+    !Array.isArray(field_value) &&
+    "name" in field_value &&
+    "kind" in field_value
+  )
 }
 
 export { ast_items, items_by_name, needs_lifetime_param }
