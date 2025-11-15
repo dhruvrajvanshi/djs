@@ -24,6 +24,7 @@ import {
   type ContinueStmt,
   type AssignExpr,
   type StructDeclStmt,
+  type UntaggedUnionDeclStmt,
   QualifiedName,
 } from "djs_ast"
 import assert from "node:assert"
@@ -122,6 +123,10 @@ export function emit_c(
         forward_decls.push(emit_struct_decl(stmt))
         break
       }
+      case "UntaggedUnionDecl": {
+        forward_decls.push(emit_untagged_union_decl(stmt))
+        break
+      }
     }
   }
 
@@ -131,6 +136,8 @@ export function emit_c(
       defs.push(emit_func_def(ctx, source_file, stmt))
     } else if (stmt.kind === "StructDecl") {
       defs.push(emit_struct_def(ctx, stmt))
+    } else if (stmt.kind === "UntaggedUnionDecl") {
+      defs.push(emit_untagged_union_def(ctx, stmt))
     } else {
       defs.push(emit_stmt(ctx, source_file, stmt))
     }
@@ -168,8 +175,9 @@ function types_first(
   { stmt: a }: { stmt: Stmt },
   { stmt: b }: { stmt: Stmt },
 ): number {
-  if (a.kind === "StructDecl" && b.kind !== "StructDecl") return -1
-  if (a.kind !== "StructDecl" && b.kind === "StructDecl") return 1
+  const is_type_decl = (kind: string) => kind === "StructDecl" || kind === "UntaggedUnionDecl"
+  if (is_type_decl(a.kind) && !is_type_decl(b.kind)) return -1
+  if (!is_type_decl(a.kind) && is_type_decl(b.kind)) return 1
   return 0
 }
 
@@ -227,6 +235,11 @@ function emit_type(type: Type): CNode {
       return {
         kind: "StructTypeRef",
         name: mangle_struct_name(type.qualified_name),
+      }
+    case "UntaggedUnionInstance":
+      return {
+        kind: "UnionTypeRef",
+        name: mangle_union_name(type.qualified_name),
       }
     default:
       TODO(`Unhandled type: ${type.kind}`)
@@ -593,21 +606,39 @@ function emit_struct_init_expr(
 ): CNode {
   const instance_type = ctx.tc_result.values.get(expr)
   const lhs_type = ctx.tc_result.values.get(expr.lhs)
-  assert(instance_type?.kind === "StructInstance")
-  assert(lhs_type?.kind === "StructConstructor")
-  return {
-    kind: "Cast",
-    to: {
-      kind: "StructTypeRef",
-      name: mangle_struct_name(lhs_type.qualified_name),
-    },
-    expr: {
-      kind: "StructInit",
-      fields: expr.fields.map((field) => ({
-        key: field.Key.text,
+  
+  if (instance_type?.kind === "StructInstance" && lhs_type?.kind === "StructConstructor") {
+    return {
+      kind: "Cast",
+      to: {
+        kind: "StructTypeRef",
+        name: mangle_struct_name(lhs_type.qualified_name),
+      },
+      expr: {
+        kind: "StructInit",
+        fields: expr.fields.map((field) => ({
+          key: field.Key.text,
+          value: emit_expr(ctx, source_file, field.value),
+        })),
+      },
+    }
+  } else if (instance_type?.kind === "UntaggedUnionInstance" && lhs_type?.kind === "UntaggedUnionConstructor") {
+    assert(expr.fields.length === 1, "Untagged union init must have exactly one field")
+    const field = expr.fields[0]
+    return {
+      kind: "Cast",
+      to: {
+        kind: "UnionTypeRef",
+        name: mangle_union_name(lhs_type.qualified_name),
+      },
+      expr: {
+        kind: "UnionInit",
+        field: field.Key.text,
         value: emit_expr(ctx, source_file, field.value),
-      })),
-    },
+      },
+    }
+  } else {
+    TODO(`Unhandled struct init: instance_type=${instance_type?.kind}, lhs_type=${lhs_type?.kind}`)
   }
 }
 function mangle_struct_name(qualified_name: readonly string[]): string {
@@ -615,6 +646,35 @@ function mangle_struct_name(qualified_name: readonly string[]): string {
     TODO()
   }
   return qualified_name[0]
+}
+
+function mangle_union_name(qualified_name: readonly string[]): string {
+  if (qualified_name.length !== 1) {
+    TODO()
+  }
+  return qualified_name[0]
+}
+
+function emit_untagged_union_decl(stmt: UntaggedUnionDeclStmt): CNode {
+  return {
+    kind: "UnionDecl",
+    name: mangle_union_name([stmt.untagged_union_def.name.text]),
+  }
+}
+
+function emit_untagged_union_def(ctx: EmitContext, stmt: UntaggedUnionDeclStmt): CNode {
+  const fields = stmt.untagged_union_def.members.map((member) => {
+    assert(member.kind === "VariantDef", "Union member must be VariantDef")
+    return {
+      name: member.name.text,
+      type: emit_type_annotation(ctx, member.type_annotation),
+    }
+  })
+  return {
+    kind: "UnionDef",
+    name: mangle_union_name([stmt.untagged_union_def.name.text]),
+    fields,
+  }
 }
 
 function get_module_of_expr(
@@ -799,8 +859,12 @@ function render_c_node(node: CNode): string {
       return `{ ${node.fields
         .map((f) => `.${f.key} = ${render_c_node(f.value)}`)
         .join(", ")} }`
+    case "UnionInit":
+      return `{ .${node.field} = ${render_c_node(node.value)} }`
     case "StructTypeRef":
       return `struct ${node.name}`
+    case "UnionTypeRef":
+      return `union ${node.name}`
     case "Typedef":
       return `typedef ${render_c_node(node.to)} ${node.name};`
     case "StructDef":
@@ -809,6 +873,12 @@ function render_c_node(node: CNode): string {
         .join("\n")}\n};`
     case "StructDecl":
       return `struct ${node.name};`
+    case "UnionDef":
+      return `union ${node.name} {\n${node.fields
+        .map((f) => `  ${render_c_node(f.type)} ${f.name};`)
+        .join("\n")}\n};`
+    case "UnionDecl":
+      return `union ${node.name};`
     case "Many":
       return node.nodes.map(render_c_node).join("\n")
     case "While":
@@ -878,6 +948,7 @@ export type CNode =
   | { kind: "ExprStmt"; expr: CNode }
   | { kind: "Prop"; lhs: CNode; rhs: string }
   | { kind: "StructInit"; fields: { key: string; value: CNode }[] }
+  | { kind: "UnionInit"; field: string; value: CNode }
   | { kind: "Cast"; to: CNode; expr: CNode }
   /**
    * The type `struct Foo`
@@ -885,9 +956,17 @@ export type CNode =
    * struct Foo foo;
    */
   | { kind: "StructTypeRef"; name: string }
+  /**
+   * The type `union Foo`
+   * in the following stmt
+   * union Foo foo;
+   */
+  | { kind: "UnionTypeRef"; name: string }
   | { kind: "Typedef"; name: string; to: CNode }
   | { kind: "StructDecl"; name: string }
   | { kind: "StructDef"; name: string; fields: { name: string; type: CNode }[] }
+  | { kind: "UnionDecl"; name: string }
+  | { kind: "UnionDef"; name: string; fields: { name: string; type: CNode }[] }
   | { kind: "Many"; nodes: CNode[] }
   | { kind: "While"; condition: CNode; body: CNode }
   | { kind: "BinOp"; op: string; left: CNode; right: CNode }
