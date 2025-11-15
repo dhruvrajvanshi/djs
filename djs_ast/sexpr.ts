@@ -14,7 +14,7 @@ import {
   DTypeAnnotation as TypeAnnotationDef,
   DSourceFile as SourceFileDef,
   DFunc as FuncDef,
-  Pattern as PatternDef,
+  DPattern as PatternDef,
 } from "./ast.def.ts"
 import assert from "node:assert/strict"
 import { is_readonly_array } from "djs_std"
