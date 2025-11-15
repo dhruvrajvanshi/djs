@@ -1,0 +1,45 @@
+ERROR: ./tests/untagged_union_1.ljs:10: Unbound variable "Foo"
+10|    const foo_str = Foo { str: c.str`PASS` }
+                       ^~~
+11|  }
+12|  
+
+ERROR: ./tests/untagged_union_1.ljs:10: Unbound variable Foo
+10|    const foo_str = Foo { str: c.str`PASS` }
+                       ^~~
+11|  }
+12|  
+
+ERROR: ./tests/untagged_union_1.ljs:10: Expected a struct constructor on the left-hand side of struct initialization
+10|    const foo_str = Foo { str: c.str`PASS` }
+                       ^~~
+11|  }
+12|  
+
+HINT: Got <Error>
+
+ERROR: ./tests/untagged_union_1.ljs:9: Unbound variable "Foo"
+9|    const foo_u32 = Foo { u32: 1 }
+                      ^~~
+10|    const foo_str = Foo { str: c.str`PASS` }
+11|  }
+
+ERROR: ./tests/untagged_union_1.ljs:9: Unbound variable Foo
+9|    const foo_u32 = Foo { u32: 1 }
+                      ^~~
+10|    const foo_str = Foo { str: c.str`PASS` }
+11|  }
+
+ERROR: ./tests/untagged_union_1.ljs:9: Expected a struct constructor on the left-hand side of struct initialization
+9|    const foo_u32 = Foo { u32: 1 }
+                      ^~~
+10|    const foo_str = Foo { str: c.str`PASS` }
+11|  }
+
+HINT: Got <Error>
+
+ERROR: ./tests/untagged_union_1.ljs:3: Missing semicolon
+3|  untagged union Foo {
+             ^~~
+4|    u32: u32
+5|    str: *c.char
