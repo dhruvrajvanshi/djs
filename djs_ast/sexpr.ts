@@ -9,12 +9,12 @@ import type {
 } from "./ast.gen.ts"
 import type { EnumItem, StructItem, Type } from "./astgen_items.ts"
 import {
-  DStmt as StmtDef,
-  DExpr as ExprDef,
-  DTypeAnnotation as TypeAnnotationDef,
-  DSourceFile as SourceFileDef,
-  DFunc as FuncDef,
-  DPattern as PatternDef,
+  Stmt as StmtDef,
+  Expr as ExprDef,
+  TypeAnnotation as TypeAnnotationDef,
+  SourceFile as SourceFileDef,
+  Func as FuncDef,
+  Pattern as PatternDef,
 } from "./ast.def.ts"
 import assert from "node:assert/strict"
 import { is_readonly_array } from "djs_std"
@@ -164,6 +164,8 @@ function type_to_dumper(type: Type): (value: unknown) => SExpr {
         }
       }
     }
+  } else if (typeof type === "function") {
+    return type_to_dumper(type())
   } else {
     assert(type.length === 2, `Invalid type: ${JSON.stringify(type)}`)
     const [kind, arg] = type
