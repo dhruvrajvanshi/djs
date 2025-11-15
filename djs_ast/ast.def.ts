@@ -68,11 +68,6 @@ const DIdent = Struct("Ident", ["span"], {
 })
 
 /**
- * {@link DPattern}
- */
-const Pattern = "Pattern"
-
-/**
  * {@link DArrowFnBody}
  */
 const ArrowFnBody = "ArrowFnBody"
@@ -158,15 +153,18 @@ const ForInit = "ForInit"
  */
 const ArrayLiteralMember = "ArrayLiteralMember"
 
-export const DPattern = Enum(Pattern, ["span", "visit"], {
+export const Pattern = Enum("Pattern", ["span", "visit"], {
   Var: { ident: Ident },
-  Assignment: { pattern: Pattern, initializer: Expr },
-  Array: { items: List(Pattern) },
-  Object: { properties: List("ObjectPatternProperty"), rest: Option(Pattern) },
+  Assignment: { pattern: Lazy(() => Pattern), initializer: Expr },
+  Array: { items: List(Lazy(() => Pattern)) },
+  Object: {
+    properties: List("ObjectPatternProperty"),
+    rest: Option(Lazy(() => Pattern)),
+  },
   Prop: { expr: Expr, key: ObjectKey },
   Deref: { expr: Expr },
   Elision: {},
-  Rest: { pattern: Pattern },
+  Rest: { pattern: Lazy(() => Pattern) },
 })
 export const DStmt = Enum(Stmt, ["span", "visit"], {
   Expr: { expr: Expr },
@@ -179,14 +177,14 @@ export const DStmt = Enum(Stmt, ["span", "visit"], {
   DoWhile: { body: Stmt, condition: Expr },
   Try: {
     try_block: Block,
-    catch_pattern: Option(Pattern),
+    catch_pattern: Option(Pattern.name),
     catch_block: Option(Block),
     finally_block: Option(Block),
   },
   For: { init: ForInit, test: Option(Expr), update: Option(Expr), body: Stmt },
   ForInOrOf: {
     decl_type: Option(DeclType), // None for `for (x of y) {}`
-    lhs: Pattern,
+    lhs: Pattern.name,
     in_or_of: InOrOf,
     rhs: Expr,
     body: Stmt,
@@ -286,7 +284,7 @@ export const DExpr = Enum(Expr, ["span", "visit"], {
   Yield: { value: Option(Expr) },
   YieldFrom: { expr: Expr },
   Ternary: { condition: Expr, if_true: Expr, if_false: Expr },
-  Assign: { pattern: Pattern, operator: AssignOp, value: Expr },
+  Assign: { pattern: Pattern.name, operator: AssignOp, value: Expr },
   Regex: { text: "Text" },
   Delete: { expr: Expr },
   Void: { expr: Expr },
@@ -394,7 +392,7 @@ const DObjectLiteralEntry = Enum(ObjectLiteralEntry, ["span"], {
 })
 
 const DParam = Struct(Param, ["span"], {
-  pattern: Pattern,
+  pattern: Pattern.name,
   type_annotation: Option(TypeAnnotation),
   initializer: Option(Expr),
 })
@@ -447,7 +445,7 @@ const DVarDecl = Struct("VarDecl", ["span"], {
   declarators: List(VarDeclarator),
 })
 const DVarDeclarator = Struct("VarDeclarator", [], {
-  pattern: Pattern,
+  pattern: Pattern.name,
   type_annotation: Option(TypeAnnotation),
   init: Option(Expr),
 })
@@ -465,7 +463,7 @@ const DTemplateLiteralFragment = Enum(TemplateLiteralFragment, ["span"], {
 })
 const DObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
   key: ObjectKey,
-  value: Pattern,
+  value: Pattern.name,
 })
 const DModuleExportName = Enum("ModuleExportName", [], {
   Ident: { ident: Ident },
@@ -545,7 +543,7 @@ const ast_items = [
   DClassMember,
   DFieldDef,
   DIdent,
-  DPattern,
+  Pattern,
   DLabel,
   DSwitchCase,
   DInOrOf,
@@ -630,7 +628,11 @@ function Struct(
   )
   const fields_with_tags = Object.fromEntries(
     Object.entries(fields).map(([field_name, type]) => {
-      if (Array.isArray(type) || typeof type === "string") {
+      if (
+        Array.isArray(type) ||
+        typeof type === "string" ||
+        typeof type === "function"
+      ) {
         return [field_name, { type, tags: [] }]
       } else {
         return [field_name, type]
@@ -651,6 +653,10 @@ function Option<T extends Type>(type: T): ["Option", T] {
 
 function List<T extends Type>(type: T): ["Vec", T] {
   return ["Vec", type]
+}
+
+function Lazy(getItem: () => Item): () => string {
+  return () => getItem().name
 }
 
 const items_by_name = Object.fromEntries(
@@ -699,6 +705,9 @@ function needs_lifetime_param_set() {
         throw new Error(`Unknown type: ${type}`)
       }
       return item_contains_ident_or_text(items_by_name[type])
+    } else if (typeof type === "function") {
+      // Handle lazy type by resolving it and recursing
+      return type_contains_ident_or_text(type())
     } else {
       return type.slice(1).some(type_contains_ident_or_text)
     }

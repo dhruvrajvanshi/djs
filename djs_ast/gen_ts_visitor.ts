@@ -82,6 +82,9 @@ function visitor_methods(item_name: string): string {
         return
       }
       visit_item(item)
+    } else if (typeof type === "function") {
+      // Handle lazy type by resolving it and recursing
+      visit_ty(type())
     } else {
       const [container, inner] = type
       switch (container) {
@@ -110,6 +113,9 @@ function field_walker(field: string, type: Type): string {
       return ""
     }
     return item_walker(item, field)
+  } else if (typeof type === "function") {
+    // Handle lazy type by resolving it and recursing
+    return field_walker(field, type())
   } else {
     const [container, inner] = type
     switch (container) {
