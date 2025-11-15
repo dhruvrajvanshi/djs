@@ -5,6 +5,7 @@ import type {
   Tag,
   EnumVariant,
   StructItem,
+  LazyType,
 } from "./astgen_items.ts"
 import { is_item } from "./astgen_items.ts"
 import assert from "node:assert/strict"
@@ -551,8 +552,8 @@ function List<T extends Type>(type: T): ["Vec", T] {
   return ["Vec", type]
 }
 
-function Lazy(getItem: () => Item): () => string {
-  return () => getItem().name
+function Lazy(getItem: () => Item): LazyType {
+  return getItem
 }
 
 const items_by_name = Object.fromEntries(
