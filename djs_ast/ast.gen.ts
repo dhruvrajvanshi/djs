@@ -45,6 +45,7 @@ export type Stmt =
   | FuncStmt
   | ClassDeclStmt
   | StructDeclStmt
+  | UntaggedUnionDeclStmt
   | ImportStmt
   | ImportStarAsStmt
   | LabeledStmt
@@ -338,6 +339,21 @@ export class StructDeclStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class UntaggedUnionDeclStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly untagged_union_def: UntaggedUnion,
+  ) {}
+
+  get kind(): "UntaggedUnionDecl" {
+    return "UntaggedUnionDecl"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class ImportStmt {
   constructor(
     readonly span: Span,
@@ -558,6 +574,12 @@ export const Stmt = {
 
   StructDecl: (span: Span, struct_def: StructDef): StructDeclStmt =>
     new StructDeclStmt(span, struct_def),
+
+  UntaggedUnionDecl: (
+    span: Span,
+    untagged_union_def: UntaggedUnion,
+  ): UntaggedUnionDeclStmt =>
+    new UntaggedUnionDeclStmt(span, untagged_union_def),
 
   Import: (
     span: Span,
