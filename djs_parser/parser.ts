@@ -37,11 +37,12 @@ import {
   TokenKind,
   StructMember,
   type StructInitItem,
+  UntaggedUnionMember,
   type QualifiedName,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
-import { defer } from "djs_std"
+import { defer, TODO } from "djs_std"
 
 type Parser = {
   parse_source_file: () => SourceFile
@@ -1842,6 +1843,12 @@ function parser_impl(
           self.current_token.text === "struct"
         ) {
           return parse_struct_decl()
+        } else if (
+          flags & PARSER_FLAGS.LJS &&
+          at_soft_keyword("untagged") &&
+          next_is_soft_keyword("union")
+        ) {
+          return parse_untagged_union_decl()
         } else {
           return parse_expr_stmt()
         }
@@ -1968,6 +1975,50 @@ function parser_impl(
     if (type_annotation === ERR) return type_annotation
     if (expect_semi() === ERR) return ERR
     return StructMember.FieldDef(name, type_annotation)
+  }
+
+  function parse_untagged_union_decl(): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "untagged")
+    const union_keyword = advance()
+    if (union_keyword.kind !== t.Ident || union_keyword.text !== "union") {
+      emit_error(
+        `Expected 'union' after 'untagged', got ${union_keyword.text}`,
+        union_keyword.span,
+      )
+      return ERR
+    }
+    const name = parse_ident()
+    if (name === ERR) return ERR
+    if (expect(t.LBrace) === ERR) return ERR
+    const members = parse_comma_semi_or_newline_separated_list(
+      t.RBrace,
+      parse_untagged_union_member,
+    )
+    if (members === ERR) return ERR
+    const last = expect(t.RBrace)
+    if (last === ERR) return ERR
+    return Stmt.UntaggedUnionDecl(Span.between(start, last), {
+      span: Span.between(start, last),
+      name,
+      members,
+    })
+  }
+
+  function parse_untagged_union_member(): UntaggedUnionMember | Err {
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+    if (expect(t.Colon) === ERR) return ERR
+    const type_annotation = parse_type_annotation()
+    if (type_annotation === ERR) return type_annotation
+    if (expect_semi() === ERR) return ERR
+    return UntaggedUnionMember.VariantDef(name, type_annotation)
+  }
+
+  function assert_is_soft_keyword(token: Token, text: string) {
+    assert.equal(token.kind, "Ident")
+    assert.equal(token.text, text)
   }
 
   function parse_extern_function(export_token: Token | null): Stmt | Err {

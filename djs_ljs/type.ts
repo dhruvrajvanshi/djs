@@ -22,6 +22,8 @@ export type Type = ReadonlyUnion<
   | { kind: "Opaque"; qualified_name: readonly string[] }
   | StructConstructorType
   | StructInstanceType
+  | UntaggedUnionConstructorType
+  | UntaggedUnionInstanceType
   | { kind: "Error"; message: string }
   /**
    * typeof @builtin("c_str")
@@ -42,6 +44,20 @@ export type StructInstanceType = Readonly<{
   kind: "StructInstance"
   qualified_name: readonly string[]
   fields: Record<string, Type>
+}>
+/**
+ * In an expression SomeUnion { variant: value }
+ * this represents the type of SomeUnion
+ */
+type UntaggedUnionConstructorType = Readonly<{
+  kind: "UntaggedUnionConstructor"
+  qualified_name: readonly string[]
+  variants: Record<string, Type>
+}>
+export type UntaggedUnionInstanceType = Readonly<{
+  kind: "UntaggedUnionInstance"
+  qualified_name: readonly string[]
+  variants: Record<string, Type>
 }>
 export const Type = {
   u8: { kind: "u8" },
@@ -79,6 +95,19 @@ export const Type = {
     kind: "StructInstance",
     qualified_name: name,
     fields,
+  }),
+  UntaggedUnionConstructor: (
+    name: readonly string[],
+    variants: Record<string, Type>,
+  ) => ({
+    kind: "UntaggedUnionConstructor",
+    qualified_name: name,
+    variants,
+  }),
+  UntaggedUnionInstance: (name: readonly string[], variants: Record<string, Type>) => ({
+    kind: "UntaggedUnionInstance",
+    qualified_name: name,
+    variants,
   }),
   Opaque: (name: readonly string[]) => ({
     kind: "Opaque",
@@ -138,6 +167,14 @@ export function type_to_string(type: Type): string {
           .join(", ")} } =>` + type.qualified_name.join(".")
       )
     case "StructInstance":
+      return type.qualified_name.join(".")
+    case "UntaggedUnionConstructor":
+      return (
+        `{ ${Object.entries(type.variants)
+          .map((it) => `${it[0]}: ${type_to_string(it[1])}`)
+          .join(" | ")} } =>` + type.qualified_name.join(".")
+      )
+    case "UntaggedUnionInstance":
       return type.qualified_name.join(".")
     case "BuiltinLinkC":
       return "ljs:builtin/linkc"
@@ -211,6 +248,10 @@ export function type_to_sexpr(type: Type): string {
       return "ljs:builtin/linkc"
     case "Opaque":
       return `(Opaque ${type.qualified_name.join(".")})`
+    case "UntaggedUnionConstructor":
+      return `(UntaggedUnionConstructor ${type.qualified_name.join(".")} ${Object.entries(type.variants).map(([name, variant_type]) => `(${name} ${type_to_sexpr(variant_type)})`).join(" ")})`
+    case "UntaggedUnionInstance":
+      return `(UntaggedUnionInstance ${type.qualified_name.join(".")})`
     default:
       return assert_never(type)
   }

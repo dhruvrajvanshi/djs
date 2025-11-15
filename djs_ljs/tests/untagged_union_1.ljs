@@ -1,0 +1,12 @@
+import * as c from "../libc.ljs"
+
+untagged union Foo {
+  u32: u32
+  str: *c.char
+}
+
+function main(): c.int {
+  const foo_u32 = Foo { u32: 1 }
+  const foo_str = Foo { str: c.str`PASS` }
+  return 0
+}

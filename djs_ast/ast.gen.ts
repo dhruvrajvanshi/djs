@@ -45,6 +45,7 @@ export type Stmt =
   | FuncStmt
   | ClassDeclStmt
   | StructDeclStmt
+  | UntaggedUnionDeclStmt
   | ImportStmt
   | ImportStarAsStmt
   | LabeledStmt
@@ -338,6 +339,21 @@ export class StructDeclStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class UntaggedUnionDeclStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly untagged_union_def: UntaggedUnion,
+  ) {}
+
+  get kind(): "UntaggedUnionDecl" {
+    return "UntaggedUnionDecl"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class ImportStmt {
   constructor(
     readonly span: Span,
@@ -559,6 +575,12 @@ export const Stmt = {
   StructDecl: (span: Span, struct_def: StructDef): StructDeclStmt =>
     new StructDeclStmt(span, struct_def),
 
+  UntaggedUnionDecl: (
+    span: Span,
+    untagged_union_def: UntaggedUnion,
+  ): UntaggedUnionDeclStmt =>
+    new UntaggedUnionDeclStmt(span, untagged_union_def),
+
   Import: (
     span: Span,
     default_import: Ident | null,
@@ -644,6 +666,32 @@ export const StructMember = {
     name: Ident,
     type_annotation: TypeAnnotation,
   ): FieldDefStructMember => new FieldDefStructMember(name, type_annotation),
+} as const
+
+export interface UntaggedUnion {
+  readonly span: Span
+  readonly name: Ident
+  readonly members: readonly UntaggedUnionMember[]
+}
+
+export type UntaggedUnionMember = VariantDefUntaggedUnionMember
+export class VariantDefUntaggedUnionMember {
+  constructor(
+    readonly name: Ident,
+    readonly type_annotation: TypeAnnotation,
+  ) {}
+
+  get kind(): "VariantDef" {
+    return "VariantDef"
+  }
+}
+
+export const UntaggedUnionMember = {
+  VariantDef: (
+    name: Ident,
+    type_annotation: TypeAnnotation,
+  ): VariantDefUntaggedUnionMember =>
+    new VariantDefUntaggedUnionMember(name, type_annotation),
 } as const
 
 export interface Block {

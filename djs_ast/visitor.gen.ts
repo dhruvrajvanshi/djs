@@ -127,6 +127,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_struct_def(stmt.struct_def)
         break
       }
+      case "UntaggedUnionDecl": {
+        this.visit_untagged_union(stmt.untagged_union_def)
+        break
+      }
       case "Import": {
         if (stmt.default_import !== null) {
           this.visit_ident(stmt.default_import)
@@ -696,6 +700,23 @@ export class ASTVisitorBase implements ASTVisitor {
       case "FieldDef": {
         this.visit_ident(struct_member.name)
         this.visit_type_annotation(struct_member.type_annotation)
+        break
+      }
+    }
+  }
+  visit_untagged_union(node: ast.UntaggedUnion): void {
+    this.visit_ident(node.name)
+    for (const member of node.members) {
+      this.visit_untagged_union_member(member)
+    }
+  }
+  visit_untagged_union_member(
+    untagged_union_member: ast.UntaggedUnionMember,
+  ): void {
+    switch (untagged_union_member.kind) {
+      case "VariantDef": {
+        this.visit_ident(untagged_union_member.name)
+        this.visit_type_annotation(untagged_union_member.type_annotation)
         break
       }
     }
