@@ -8,4 +8,5 @@ untagged union Foo {
 function main(): c.int {
   const foo_u32 = Foo { u32: 1 }
   const foo_str = Foo { str: c.str`PASS` }
+  return 0
 }
