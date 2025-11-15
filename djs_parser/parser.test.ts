@@ -3,8 +3,10 @@ import { Parser } from "./parser.ts"
 import {
   AssignOp,
   Expr,
+  prettify_diagnostics,
   QualifiedName,
   source_file_to_sexpr,
+  Stmt,
   TypeAnnotation,
   type SourceFile,
 } from "djs_ast"
@@ -139,6 +141,102 @@ test("preserves leading trivia in type aliases", () => {
   assert.equal(t.leading_trivia, "/* leading trivia comment */")
 })
 
+test("Parses untagged union stmt without error", () => {
+  const s = parse_stmt(
+    `
+      untagged union Foo {
+        u32: u32
+        str: *c.str
+      }
+  `,
+    "test.ljs",
+  )
+  expect(s.kind).toBe("UntaggedUnionDecl")
+  expect(s).toMatchInlineSnapshot(`
+    UntaggedUnionDeclStmt {
+      "span": {
+        "start": 7,
+        "stop": 72,
+      },
+      "untagged_union_def": {
+        "members": [
+          VariantDefUntaggedUnionMember {
+            "name": {
+              "span": {
+                "start": 36,
+                "stop": 39,
+              },
+              "text": "u32",
+            },
+            "type_annotation": IdentTypeAnnotation {
+              "ident": {
+                "span": {
+                  "start": 41,
+                  "stop": 44,
+                },
+                "text": "u32",
+              },
+              "leading_trivia": "",
+              "span": {
+                "start": 41,
+                "stop": 44,
+              },
+            },
+          },
+          VariantDefUntaggedUnionMember {
+            "name": {
+              "span": {
+                "start": 53,
+                "stop": 56,
+              },
+              "text": "str",
+            },
+            "type_annotation": LJSPtrTypeAnnotation {
+              "span": {
+                "start": 58,
+                "stop": 64,
+              },
+              "to": QualifiedTypeAnnotation {
+                "head": {
+                  "span": {
+                    "start": 59,
+                    "stop": 60,
+                  },
+                  "text": "c",
+                },
+                "span": {
+                  "start": 59,
+                  "stop": 64,
+                },
+                "tail": [
+                  {
+                    "span": {
+                      "start": 61,
+                      "stop": 64,
+                    },
+                    "text": "str",
+                  },
+                ],
+              },
+            },
+          },
+        ],
+        "name": {
+          "span": {
+            "start": 22,
+            "stop": 25,
+          },
+          "text": "Foo",
+        },
+        "span": {
+          "start": 7,
+          "stop": 72,
+        },
+      },
+    }
+  `)
+})
+
 if (process.env.CI) {
   const test262Paths: string[] = []
 
@@ -226,6 +324,13 @@ function parse_type(input: string): TypeAnnotation {
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "TypeAlias")
   return stmt.type_annotation
+}
+function parse_stmt(input: string, name = "test.js"): Stmt {
+  const source_file = parse_source_file(input, name)
+  assert(prettify_diagnostics("", source_file.errors, input, false), "")
+  const stmt = source_file.stmts[0]
+  assert.equal(source_file.stmts.length, 1)
+  return stmt
 }
 
 function parse_source_file(source: string, name = "test.js"): SourceFile {

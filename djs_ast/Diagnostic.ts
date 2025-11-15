@@ -18,7 +18,7 @@ export async function prettify_diagnostics(
   errors: readonly Diagnostic[],
   source_text: string | null,
   colors = true,
-) {
+): Promise<string> {
   const color_error = colors ? COLOR_ERROR : ""
   const color_reset = colors ? COLOR_RESET : ""
   if (source_text === null) {
