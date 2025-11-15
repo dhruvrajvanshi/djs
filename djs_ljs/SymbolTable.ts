@@ -3,6 +3,7 @@ import {
   LJSExternConstStmt,
   LJSExternTypeStmt,
   StructDeclStmt,
+  UntaggedUnionDeclStmt,
   type ClassDeclStmt,
   type Func,
   type ImportStmt,
@@ -33,6 +34,7 @@ export type ValueDecl =
   | { kind: "Param"; func: Func; param_index: number; source_file: string }
   | ClassDeclStmt
   | { kind: "Struct"; decl: StructDeclStmt; source_file: string }
+  | { kind: "UntaggedUnion"; decl: UntaggedUnionDeclStmt; source_file: string }
   | {
       kind: "LJSExternFunction"
       stmt: LJSExternFunctionStmt
@@ -143,6 +145,11 @@ export type TypeDecl =
   | {
       kind: "Struct"
       decl: StructDeclStmt
+      source_file: string
+    }
+  | {
+      kind: "UntaggedUnion"
+      decl: UntaggedUnionDeclStmt
       source_file: string
     }
   | {

@@ -6,6 +6,7 @@ import {
   ReturnStmt,
   Span,
   StructDeclStmt,
+  UntaggedUnionDeclStmt,
   type StructInitExpr,
   TaggedTemplateLiteralExpr,
   VarExpr,
@@ -93,6 +94,15 @@ export function typecheck(
     CheckStructDeclResult
   >()
 
+  interface CheckUntaggedUnionDeclResult {
+    constructor_type: Extract<Type, { kind: "UntaggedUnionConstructor" }>
+    instance_type: Extract<Type, { kind: "UntaggedUnionInstance" }>
+  }
+  const check_untagged_union_decl_stmt_results = new Map<
+    UntaggedUnionDeclStmt,
+    CheckUntaggedUnionDeclResult
+  >()
+
   for (const file of source_files.values()) {
     check_source_file(file)
   }
@@ -147,6 +157,8 @@ export function typecheck(
         return check_return_stmt(ctx, stmt)
       case "StructDecl":
         return check_struct_decl_stmt(ctx.source_file, stmt)
+      case "UntaggedUnionDecl":
+        return check_untagged_union_decl_stmt(ctx.source_file, stmt)
       case "For":
         return check_for_stmt(ctx, stmt)
       case "Block":
@@ -245,6 +257,44 @@ export function typecheck(
       constructor_type: Type.StructConstructor(qualified_name, members),
       instance_type: Type.StructInstance(qualified_name, members),
     }
+  }
+  function check_untagged_union_decl_stmt(
+    source_file: SourceFile,
+    stmt: UntaggedUnionDeclStmt,
+  ): CheckUntaggedUnionDeclResult {
+    const existing = check_untagged_union_decl_stmt_results.get(stmt)
+    if (existing) return existing
+    const ctx = make_check_ctx(source_file, check_untagged_union_decl_stmt_results)
+    const variants: Record<string, Type> = {}
+    for (const member of stmt.untagged_union_def.members) {
+      switch (member.kind) {
+        case "VariantDef":
+          if (member.name.text in variants) {
+            emit_error(
+              ctx,
+              member.name.span,
+              `Duplicate variant name ${member.name.text} in untagged union ${stmt.untagged_union_def.name.text}`,
+            )
+          }
+          variants[member.name.text] = check_type_annotation(
+            ctx.source_file,
+            member.type_annotation,
+          )
+          break
+        default:
+          assert_never(member.kind)
+      }
+    }
+    const qualified_name = qualified_name_of_decl(
+      stmt.untagged_union_def.name,
+      ctx.source_file.path,
+    )
+    const result = {
+      constructor_type: Type.UntaggedUnionConstructor(qualified_name, variants),
+      instance_type: Type.UntaggedUnionInstance(qualified_name, variants),
+    }
+    check_untagged_union_decl_stmt_results.set(stmt, result)
+    return result
   }
   function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt) {
     if (stmt.value) {
@@ -509,6 +559,11 @@ export function typecheck(
       case "StructInstance":
         return (
           source.kind === "StructInstance" &&
+          qualified_name_eq(target.qualified_name, source.qualified_name)
+        )
+      case "UntaggedUnionInstance":
+        return (
+          source.kind === "UntaggedUnionInstance" &&
           qualified_name_eq(target.qualified_name, source.qualified_name)
         )
       case "Opaque":
@@ -794,30 +849,59 @@ export function typecheck(
 
   function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
     const lhs_type = infer_expr(ctx.source_file, expr.lhs)
-    if (lhs_type.kind !== "StructConstructor") {
+    
+    if (lhs_type.kind === "StructConstructor") {
+      // TODO: Check for extra and duplicate fields in the initializer
+
+      for (const [name, expected_type] of Object.entries(lhs_type.fields)) {
+        const field = expr.fields.find((f) => f.Key.text === name)
+        if (!field) {
+          emit_error(ctx, expr.lhs.span, `Missing field ${name} in struct init`)
+          continue
+        }
+        check_expr(ctx, field.value, expected_type)
+      }
+
+      return {
+        kind: "StructInstance",
+        qualified_name: lhs_type.qualified_name,
+        fields: lhs_type.fields,
+      }
+    } else if (lhs_type.kind === "UntaggedUnionConstructor") {
+      // For untagged unions, exactly one variant must be specified
+      if (expr.fields.length !== 1) {
+        return emit_error_type(ctx, {
+          message: `Untagged union initialization must have exactly one variant, got ${expr.fields.length}`,
+          span: expr.span,
+          hint: null,
+        })
+      }
+      
+      const field = expr.fields[0]
+      const variant_name = field.Key.text
+      const expected_type = lhs_type.variants[variant_name]
+      
+      if (!expected_type) {
+        return emit_error_type(ctx, {
+          message: `Unknown variant '${variant_name}' in untagged union`,
+          span: field.Key.span,
+          hint: `Available variants: ${Object.keys(lhs_type.variants).join(", ")}`,
+        })
+      }
+      
+      check_expr(ctx, field.value, expected_type)
+      return {
+        kind: "UntaggedUnionInstance",
+        qualified_name: lhs_type.qualified_name,
+        variants: lhs_type.variants,
+      }
+    } else {
       return emit_error_type(ctx, {
         message:
-          "Expected a struct constructor on the left-hand side of struct initialization",
+          "Expected a struct or untagged union constructor on the left-hand side of initialization",
         span: expr.lhs.span,
         hint: `Got ${type_to_string(lhs_type)}`,
       })
-    }
-
-    // TODO: Check for extra and duplicate fields in the initializer
-
-    for (const [name, expected_type] of Object.entries(lhs_type.fields)) {
-      const field = expr.fields.find((f) => f.Key.text === name)
-      if (!field) {
-        emit_error(ctx, expr.lhs.span, `Missing field ${name} in struct init`)
-        continue
-      }
-      check_expr(ctx, field.value, expected_type)
-    }
-
-    return {
-      kind: "StructInstance",
-      qualified_name: lhs_type.qualified_name,
-      fields: lhs_type.fields,
     }
   }
   function emit_error_type(
@@ -974,6 +1058,14 @@ export function typecheck(
         const result = check_struct_decl_stmt(source_file, decl.decl)
         const type = result.constructor_type
         assert(type, "Expected check_stmt to set the struct constructor's type")
+        return type
+      }
+      case "UntaggedUnion": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const result = check_untagged_union_decl_stmt(source_file, decl.decl)
+        const type = result.constructor_type
+        assert(type, "Expected check_stmt to set the untagged union constructor's type")
         return type
       }
       case "Param": {
@@ -1136,6 +1228,12 @@ export function typecheck(
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
         const result = check_struct_decl_stmt(source_file, decl.decl)
+        return result.instance_type
+      }
+      case "UntaggedUnion": {
+        const source_file = source_files.get(decl.source_file)
+        assert(source_file, `Unknown source file: ${decl.source_file}`)
+        const result = check_untagged_union_decl_stmt(source_file, decl.decl)
         return result.instance_type
       }
       default:
