@@ -5,7 +5,6 @@ import type {
   Tag,
   EnumVariant,
   StructItem,
-  LazyType,
 } from "./astgen_items.ts"
 import { is_item } from "./astgen_items.ts"
 import assert from "node:assert/strict"
@@ -17,48 +16,48 @@ const Ident = Struct("Ident", ["span"], {
   text: "str",
 })
 export const Stmt = Enum("Stmt", ["span", "visit"], {
-  Expr: { expr: Lazy(() => Expr) },
-  Block: { block: Lazy(() => Block) },
-  Return: { leading_trivia: Text, value: Option(Lazy(() => Expr)) },
-  VarDecl: { decl: Lazy(() => VarDecl) },
+  Expr: { expr: () => Expr },
+  Block: { block: () => Block },
+  Return: { leading_trivia: Text, value: Option(() => Expr) },
+  VarDecl: { decl: () => VarDecl },
   If: {
-    condition: Lazy(() => Expr),
-    if_true: Lazy(() => Stmt),
-    if_false: Option(Lazy(() => Stmt)),
+    condition: () => Expr,
+    if_true: () => Stmt,
+    if_false: Option(() => Stmt),
   },
-  Switch: { condition: Lazy(() => Expr), cases: List(Lazy(() => SwitchCase)) },
-  While: { condition: Lazy(() => Expr), body: Lazy(() => Stmt) },
-  DoWhile: { body: Lazy(() => Stmt), condition: Lazy(() => Expr) },
+  Switch: { condition: () => Expr, cases: List(() => SwitchCase) },
+  While: { condition: () => Expr, body: () => Stmt },
+  DoWhile: { body: () => Stmt, condition: () => Expr },
   Try: {
-    try_block: Lazy(() => Block),
-    catch_pattern: Option(Lazy(() => Pattern)),
-    catch_block: Option(Lazy(() => Block)),
-    finally_block: Option(Lazy(() => Block)),
+    try_block: () => Block,
+    catch_pattern: Option(() => Pattern),
+    catch_block: Option(() => Block),
+    finally_block: Option(() => Block),
   },
   For: {
-    init: Lazy(() => ForInit),
-    test: Option(Lazy(() => Expr)),
-    update: Option(Lazy(() => Expr)),
-    body: Lazy(() => Stmt),
+    init: () => ForInit,
+    test: Option(() => Expr),
+    update: Option(() => Expr),
+    body: () => Stmt,
   },
   ForInOrOf: {
-    decl_type: Option(Lazy(() => DeclType)), // None for `for (x of y) {}`
-    lhs: Lazy(() => Pattern),
-    in_or_of: Lazy(() => InOrOf),
-    rhs: Lazy(() => Expr),
-    body: Lazy(() => Stmt),
+    decl_type: Option(() => DeclType), // None for `for (x of y) {}`
+    lhs: () => Pattern,
+    in_or_of: () => InOrOf,
+    rhs: () => Expr,
+    body: () => Stmt,
   },
-  Break: { label: Option(Lazy(() => Label)) },
-  Continue: { label: Option(Lazy(() => Label)) },
+  Break: { label: Option(() => Label) },
+  Continue: { label: Option(() => Label) },
   Debugger: {},
-  With: { expr: Lazy(() => Expr), body: Lazy(() => Stmt) },
-  Func: { func: Lazy(() => Func), is_exported: "boolean" },
-  ClassDecl: { class_def: Lazy(() => Class) },
-  StructDecl: { struct_def: Lazy(() => StructDef) },
-  UntaggedUnionDecl: { untagged_union_def: Lazy(() => UntaggedUnion) },
+  With: { expr: () => Expr, body: () => Stmt },
+  Func: { func: () => Func, is_exported: "boolean" },
+  ClassDecl: { class_def: () => Class },
+  StructDecl: { struct_def: () => StructDef },
+  UntaggedUnionDecl: { untagged_union_def: () => UntaggedUnion },
   Import: {
     default_import: Option(Ident),
-    named_imports: List(Lazy(() => ImportSpecifier)),
+    named_imports: List(() => ImportSpecifier),
     module_specifier: Text,
   },
   ImportStarAs: {
@@ -66,8 +65,8 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     module_specifier: Text,
   },
   Labeled: {
-    label: Lazy(() => Label),
-    stmt: Lazy(() => Stmt),
+    label: () => Label,
+    stmt: () => Stmt,
   },
   ObjectTypeDecl: {
     name: Ident,
@@ -75,18 +74,18 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   },
   TypeAlias: {
     name: Ident,
-    type_annotation: Lazy(() => TypeAnnotation),
+    type_annotation: () => TypeAnnotation,
   },
   LJSExternFunction: {
     is_exported: "boolean",
     name: Ident,
-    params: List(Lazy(() => Param)),
-    return_type: Lazy(() => TypeAnnotation),
+    params: List(() => Param),
+    return_type: () => TypeAnnotation,
   },
   LJSExternConst: {
     is_exported: "boolean",
     name: Ident,
-    type_annotation: Lazy(() => TypeAnnotation),
+    type_annotation: () => TypeAnnotation,
   },
   LJSExternType: {
     is_exported: "boolean",
@@ -97,105 +96,105 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
 
 export const Expr = Enum("Expr", ["span", "visit"], {
   Var: { leading_trivia: Text, ident: Ident },
-  Paren: { expr: Lazy(() => Expr) },
+  Paren: { expr: () => Expr },
   BinOp: {
-    lhs: Lazy(() => Expr),
-    operator: Lazy(() => BinOp),
-    rhs: Lazy(() => Expr),
+    lhs: () => Expr,
+    operator: () => BinOp,
+    rhs: () => Expr,
   },
   ArrowFn: {
-    params: List(Lazy(() => Param)),
-    return_type: Option(Lazy(() => TypeAnnotation)),
-    body: Lazy(() => ArrowFnBody),
+    params: List(() => Param),
+    return_type: Option(() => TypeAnnotation),
+    body: () => ArrowFnBody,
   },
-  Func: { func: Lazy(() => Func) },
+  Func: { func: () => Func },
   Call: {
-    callee: Lazy(() => Expr),
-    args: List(Lazy(() => Expr)),
-    spread: Option(Lazy(() => Expr)),
+    callee: () => Expr,
+    args: List(() => Expr),
+    spread: Option(() => Expr),
     is_optional: "boolean",
   },
   StructInit: {
-    lhs: Lazy(() => Expr),
+    lhs: () => Expr,
     fields: List("StructInitItem"),
   },
   Index: {
-    lhs: Lazy(() => Expr),
-    property: Lazy(() => Expr),
+    lhs: () => Expr,
+    property: () => Expr,
     is_optional: "boolean",
   },
-  Prop: { lhs: Lazy(() => Expr), property: Ident, is_optional: "boolean" },
+  Prop: { lhs: () => Expr, property: Ident, is_optional: "boolean" },
   String: { text: Text },
   Number: { text: Text },
   Boolean: { value: "boolean" },
   Null: {},
   Undefined: {},
-  Object: { entries: List(Lazy(() => ObjectLiteralEntry)) },
-  Throw: { value: Lazy(() => Expr) },
-  PostIncrement: { value: Lazy(() => Expr) },
-  PostDecrement: { value: Lazy(() => Expr) },
-  PreIncrement: { value: Lazy(() => Expr) },
-  PreDecrement: { value: Lazy(() => Expr) },
-  Array: { items: List(Lazy(() => ArrayLiteralMember)) },
-  New: { expr: Lazy(() => Expr) },
-  Yield: { value: Option(Lazy(() => Expr)) },
-  YieldFrom: { expr: Lazy(() => Expr) },
+  Object: { entries: List(() => ObjectLiteralEntry) },
+  Throw: { value: () => Expr },
+  PostIncrement: { value: () => Expr },
+  PostDecrement: { value: () => Expr },
+  PreIncrement: { value: () => Expr },
+  PreDecrement: { value: () => Expr },
+  Array: { items: List(() => ArrayLiteralMember) },
+  New: { expr: () => Expr },
+  Yield: { value: Option(() => Expr) },
+  YieldFrom: { expr: () => Expr },
   Ternary: {
-    condition: Lazy(() => Expr),
-    if_true: Lazy(() => Expr),
-    if_false: Lazy(() => Expr),
+    condition: () => Expr,
+    if_true: () => Expr,
+    if_false: () => Expr,
   },
   Assign: {
-    pattern: Lazy(() => Pattern),
-    operator: Lazy(() => AssignOp),
-    value: Lazy(() => Expr),
+    pattern: () => Pattern,
+    operator: () => AssignOp,
+    value: () => Expr,
   },
   Regex: { text: "Text" },
-  Delete: { expr: Lazy(() => Expr) },
-  Void: { expr: Lazy(() => Expr) },
-  TypeOf: { expr: Lazy(() => Expr) },
-  UnaryPlus: { expr: Lazy(() => Expr) },
-  UnaryMinus: { expr: Lazy(() => Expr) },
-  BitNot: { expr: Lazy(() => Expr) },
-  Not: { expr: Lazy(() => Expr) },
-  Await: { expr: Lazy(() => Expr) },
-  Comma: { items: List(Lazy(() => Expr)) },
+  Delete: { expr: () => Expr },
+  Void: { expr: () => Expr },
+  TypeOf: { expr: () => Expr },
+  UnaryPlus: { expr: () => Expr },
+  UnaryMinus: { expr: () => Expr },
+  BitNot: { expr: () => Expr },
+  Not: { expr: () => Expr },
+  Await: { expr: () => Expr },
+  Comma: { items: List(() => Expr) },
   Super: {},
-  Class: { class_def: Lazy(() => Class) },
-  TemplateLiteral: { fragments: List(Lazy(() => TemplateLiteralFragment)) },
+  Class: { class_def: () => Class },
+  TemplateLiteral: { fragments: List(() => TemplateLiteralFragment) },
   TaggedTemplateLiteral: {
-    tag: Lazy(() => Expr),
-    fragments: List(Lazy(() => TemplateLiteralFragment)),
+    tag: () => Expr,
+    fragments: List(() => TemplateLiteralFragment),
   },
   Builtin: {
     text: Text,
   },
-  AddressOf: { expr: Lazy(() => Expr), mut: "boolean" },
-  Deref: { expr: Lazy(() => Expr) },
+  AddressOf: { expr: () => Expr, mut: "boolean" },
+  Deref: { expr: () => Expr },
 })
 export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { leading_trivia: Text, ident: Ident },
   Union: {
-    left: Lazy(() => TypeAnnotation),
-    right: Lazy(() => TypeAnnotation),
+    left: () => TypeAnnotation,
+    right: () => TypeAnnotation,
   },
-  Array: { item: Lazy(() => TypeAnnotation) },
-  ReadonlyArray: { item: Lazy(() => TypeAnnotation) },
+  Array: { item: () => TypeAnnotation },
+  ReadonlyArray: { item: () => TypeAnnotation },
   Application: {
-    callee: Lazy(() => TypeAnnotation),
-    args: List(Lazy(() => TypeAnnotation)),
+    callee: () => TypeAnnotation,
+    args: List(() => TypeAnnotation),
   },
   String: { text: Text },
   Func: {
-    type_params: List(Lazy(() => TypeParam)),
-    params: List(Lazy(() => FuncTypeParam)),
-    returns: Lazy(() => TypeAnnotation),
+    type_params: List(() => TypeParam),
+    params: List(() => FuncTypeParam),
+    returns: () => TypeAnnotation,
   },
   LJSMutPtr: {
-    to: Lazy(() => TypeAnnotation),
+    to: () => TypeAnnotation,
   },
   LJSPtr: {
-    to: Lazy(() => TypeAnnotation),
+    to: () => TypeAnnotation,
   },
   Builtin: {
     text: Text,
@@ -208,103 +207,103 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
 
 export const Pattern = Enum("Pattern", ["span", "visit"], {
   Var: { ident: Ident },
-  Assignment: { pattern: Lazy(() => Pattern), initializer: Lazy(() => Expr) },
-  Array: { items: List(Lazy(() => Pattern)) },
+  Assignment: { pattern: () => Pattern, initializer: () => Expr },
+  Array: { items: List(() => Pattern) },
   Object: {
-    properties: List(Lazy(() => ObjectPatternProperty)),
-    rest: Option(Lazy(() => Pattern)),
+    properties: List(() => ObjectPatternProperty),
+    rest: Option(() => Pattern),
   },
-  Prop: { expr: Lazy(() => Expr), key: Lazy(() => ObjectKey) },
-  Deref: { expr: Lazy(() => Expr) },
+  Prop: { expr: () => Expr, key: () => ObjectKey },
+  Deref: { expr: () => Expr },
   Elision: {},
-  Rest: { pattern: Lazy(() => Pattern) },
+  Rest: { pattern: () => Pattern },
 })
 
 const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
   is_readonly: "boolean",
   label: Ident,
-  type_annotation: Lazy(() => TypeAnnotation),
+  type_annotation: () => TypeAnnotation,
 })
 
 export const StructInitItem = Struct("StructInitItem", ["span"], {
   Key: Ident,
-  value: Lazy(() => Expr),
+  value: () => Expr,
 })
 
 const FuncTypeParam = Struct("FuncTypeParam", [], {
   label: Ident,
-  type_annotation: Lazy(() => TypeAnnotation),
+  type_annotation: () => TypeAnnotation,
 })
 const Class = Struct("Class", ["span"], {
   name: Option(Ident),
-  superclass: Option(Lazy(() => Expr)),
-  body: Lazy(() => ClassBody),
+  superclass: Option(() => Expr),
+  body: () => ClassBody,
 })
 const StructDef = Struct("StructDef", ["span"], {
   name: Ident,
-  members: List(Lazy(() => StructMember)),
+  members: List(() => StructMember),
 })
 const ClassBody = Struct("ClassBody", ["span"], {
-  members: List(Lazy(() => ClassMember)),
+  members: List(() => ClassMember),
 })
 const ClassMember = Enum("ClassMember", [], {
-  MethodDef: { method: Lazy(() => MethodDef) },
-  FieldDef: { field: Lazy(() => FieldDef) },
+  MethodDef: { method: () => MethodDef },
+  FieldDef: { field: () => FieldDef },
 })
 
 const StructMember = Enum("StructMember", [], {
-  FieldDef: { name: Ident, type_annotation: Lazy(() => TypeAnnotation) },
+  FieldDef: { name: Ident, type_annotation: () => TypeAnnotation },
 })
 const UntaggedUnionMember = Enum("UntaggedUnionMember", [], {
-  VariantDef: { name: Ident, type_annotation: Lazy(() => TypeAnnotation) },
+  VariantDef: { name: Ident, type_annotation: () => TypeAnnotation },
 })
 const UntaggedUnion = Struct("UntaggedUnion", ["span"], {
   name: Ident,
-  members: List(Lazy(() => UntaggedUnionMember)),
+  members: List(() => UntaggedUnionMember),
 })
 
 const FieldDef = Struct("FieldDef", ["span"], {
   name: Ident,
-  initializer: Option(Lazy(() => Expr)),
+  initializer: Option(() => Expr),
 })
 const MethodDef = Struct("MethodDef", ["span"], {
-  name: Lazy(() => ObjectKey),
-  body: Lazy(() => Func),
-  return_type: Option(Lazy(() => TypeAnnotation)),
-  accessor_type: Option(Lazy(() => AccessorType)),
+  name: () => ObjectKey,
+  body: () => Func,
+  return_type: Option(() => TypeAnnotation),
+  accessor_type: Option(() => AccessorType),
 })
 
 const ObjectKey = Enum("ObjectKey", ["span"], {
   Ident: { ident: Ident },
   String: { text: Text },
-  Computed: { expr: Lazy(() => Expr) },
+  Computed: { expr: () => Expr },
 })
 
 const ObjectLiteralEntry = Enum("ObjectLiteralEntry", ["span"], {
   Ident: { ident: Ident },
-  Prop: { key: ObjectKey, value: Lazy(() => Expr) },
+  Prop: { key: ObjectKey, value: () => Expr },
   Method: { method: MethodDef },
-  Spread: { expr: Lazy(() => Expr) },
+  Spread: { expr: () => Expr },
 })
 
 const Param = Struct("Param", ["span"], {
   pattern: Pattern,
-  type_annotation: Option(Lazy(() => TypeAnnotation)),
-  initializer: Option(Lazy(() => Expr)),
+  type_annotation: Option(() => TypeAnnotation),
+  initializer: Option(() => Expr),
 })
 
 const ArrayLiteralMember = Enum("ArrayLiteralMember", ["span"], {
-  Expr: { expr: Lazy(() => Expr) },
+  Expr: { expr: () => Expr },
   Elision: {},
-  Spread: { expr: Lazy(() => Expr) },
+  Spread: { expr: () => Expr },
 })
 
 export const Func = Struct("Func", ["span", "visit"], {
   name: Option(Ident),
   type_params: List("TypeParam"),
   params: List(Param),
-  body: Lazy(() => Block),
-  return_type: Option(Lazy(() => TypeAnnotation)),
+  body: () => Block,
+  return_type: Option(() => TypeAnnotation),
   is_generator: "boolean",
   is_async: "boolean",
 })
@@ -312,7 +311,7 @@ const TypeParam = Struct("TypeParam", [], {
   ident: Ident,
 })
 const Block = Struct("Block", ["span", "visit"], {
-  stmts: List(Lazy(() => Stmt)),
+  stmts: List(() => Stmt),
 })
 
 const Label = Struct("Label", ["span"], {
@@ -321,7 +320,7 @@ const Label = Struct("Label", ["span"], {
 
 export const SourceFile = Struct("SourceFile", ["span", "visit"], {
   path: "str",
-  stmts: List(Lazy(() => Stmt)),
+  stmts: List(() => Stmt),
   qualified_name: {
     tags: ["sexpr_ignore"],
     type: "QualifiedName",
@@ -332,30 +331,30 @@ export const SourceFile = Struct("SourceFile", ["span", "visit"], {
   },
 })
 const SwitchCase = Struct("SwitchCase", ["span"], {
-  test: Option(Lazy(() => Expr)),
-  body: List(Lazy(() => Stmt)),
+  test: Option(() => Expr),
+  body: List(() => Stmt),
 })
 const InOrOf = StringUnion("InOrOf", "In", "Of")
 const VarDecl = Struct("VarDecl", ["span"], {
-  decl_type: Lazy(() => DeclType),
-  declarators: List(Lazy(() => VarDeclarator)),
+  decl_type: () => DeclType,
+  declarators: List(() => VarDeclarator),
 })
 const VarDeclarator = Struct("VarDeclarator", [], {
   pattern: Pattern,
-  type_annotation: Option(Lazy(() => TypeAnnotation)),
-  init: Option(Lazy(() => Expr)),
+  type_annotation: Option(() => TypeAnnotation),
+  init: Option(() => Expr),
 })
 const ForInit = Enum("ForInit", [], {
-  VarDecl: { decl: Lazy(() => VarDecl) },
-  Expr: { expr: Lazy(() => Expr) },
+  VarDecl: { decl: () => VarDecl },
+  Expr: { expr: () => Expr },
 })
 const ArrowFnBody = Enum("ArrowFnBody", ["span"], {
-  Expr: { expr: Lazy(() => Expr) },
-  Block: { block: Lazy(() => Block) },
+  Expr: { expr: () => Expr },
+  Block: { block: () => Block },
 })
 const TemplateLiteralFragment = Enum("TemplateLiteralFragment", ["span"], {
   Text: { text: Text },
-  Expr: { expr: Lazy(() => Expr) },
+  Expr: { expr: () => Expr },
 })
 const ObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
   key: ObjectKey,
@@ -368,7 +367,7 @@ const ModuleExportName = Enum("ModuleExportName", [], {
 const ImportSpecifier = Struct("ImportSpecifier", ["span"], {
   type_only: "boolean",
   as_name: Option(Ident),
-  imported_name: Lazy(() => ModuleExportName),
+  imported_name: () => ModuleExportName,
 })
 const BinOp = StringUnion(
   "BinOp",
@@ -550,10 +549,6 @@ function Option<T extends Type>(type: T): ["Option", T] {
 
 function List<T extends Type>(type: T): ["Vec", T] {
   return ["Vec", type]
-}
-
-function Lazy(getItem: () => Item): LazyType {
-  return getItem
 }
 
 const items_by_name = Object.fromEntries(
