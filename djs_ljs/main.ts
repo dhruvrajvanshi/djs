@@ -126,7 +126,7 @@ export async function main(
   const output_c_path = Path.join(".ljs", args.output + ".c")
   await mkdir(Path.dirname(output_c_path), { recursive: true })
   await writeFile(output_c_path, c_source)
-  const command = `gcc -o ${args.output} ${output_c_path} ${linkc_paths.join(" ")} -Wall -Werror -Wno-parentheses-equality`
+  const command = `gcc -o ${args.output} ${output_c_path} ${linkc_paths.join(" ")} -Wall -Werror -Wno-parentheses-equality -Wno-unused-variable`
   console.log(command)
   execSync(command, {
     stdio: "inherit",
