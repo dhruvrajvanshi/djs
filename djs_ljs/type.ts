@@ -17,6 +17,7 @@ export type Type = ReadonlyUnion<
   | { kind: "boolean" }
   | { kind: "Ptr"; type: Type }
   | { kind: "MutPtr"; type: Type }
+  | { kind: "FixedSizeArray"; element_type: Type; size: number }
   | { kind: "UnboxedFunc"; params: readonly Type[]; return_type: Type }
   | { kind: "BuiltinLinkC" }
   | { kind: "Opaque"; qualified_name: readonly string[] }
@@ -77,6 +78,11 @@ export const Type = {
 
   Ptr: (type: Type) => ({ kind: "Ptr", type }),
   MutPtr: (type: Type) => ({ kind: "MutPtr", type }),
+  FixedSizeArray: (element_type: Type, size: number) => ({
+    kind: "FixedSizeArray",
+    element_type,
+    size,
+  }),
   UnboxedFunc: (params: readonly Type[], return_type: Type) => ({
     kind: "UnboxedFunc",
     params,
@@ -149,6 +155,8 @@ export function type_to_string(type: Type): string {
       return `*${type_to_string(type.type)}`
     case "MutPtr":
       return `*mut ${type_to_string(type.type)}`
+    case "FixedSizeArray":
+      return `${type_to_string(type.element_type)}[${type.size}]`
     case "UnboxedFunc":
       const params = type.params.map(type_to_string).join(", ")
       return `(${params}) => ${type_to_string(type.return_type)}`
@@ -216,6 +224,8 @@ export function type_to_sexpr(type: Type): string {
       return `(* ${type_to_sexpr(type.type)})`
     case "MutPtr":
       return `(*mut ${type_to_sexpr(type.type)})`
+    case "FixedSizeArray":
+      return `(FixedSizeArray ${type_to_sexpr(type.element_type)} ${type.size})`
     case "UnboxedFunc":
       const params = type.params.map(type_to_sexpr).join(" ")
       return `((${params}) => ${type_to_sexpr(type.return_type)})`

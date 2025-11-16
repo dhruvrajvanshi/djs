@@ -180,6 +180,7 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   },
   Array: { item: () => TypeAnnotation },
   ReadonlyArray: { item: () => TypeAnnotation },
+  FixedSizeArray: { item: () => TypeAnnotation, size: () => Expr },
   Application: {
     callee: () => TypeAnnotation,
     args: List(() => TypeAnnotation),

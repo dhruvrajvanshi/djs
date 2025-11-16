@@ -1095,9 +1095,24 @@ function parser_impl(
       switch (self.current_token.kind) {
         case t.LSquare: {
           advance()
-          const end = expect(t.RSquare)
-          if (end === ERR) return ERR
-          head = TypeAnnotation.Array(Span.between(head, end), head)
+          if (at(t.RSquare)) {
+            const end = expect(t.RSquare)
+            if (end === ERR) return ERR
+            head = TypeAnnotation.Array(Span.between(head, end), head)
+          } else if (flags & PARSER_FLAGS.LJS) {
+            const size = parse_assignment_expr()
+            if (size === ERR) return ERR
+            const end = expect(t.RSquare)
+            if (end === ERR) return ERR
+            head = TypeAnnotation.FixedSizeArray(
+              Span.between(head, end),
+              head,
+              size,
+            )
+          } else {
+            emit_error("Array size annotations are only supported in LJS mode")
+            return ERR
+          }
           break
         }
         case t.LessThan: {

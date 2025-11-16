@@ -477,6 +477,11 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(type_annotation.item)
         break
       }
+      case "FixedSizeArray": {
+        this.visit_type_annotation(type_annotation.item)
+        this.visit_expr(type_annotation.size)
+        break
+      }
       case "Application": {
         this.visit_type_annotation(type_annotation.callee)
         for (const arg of type_annotation.args) {

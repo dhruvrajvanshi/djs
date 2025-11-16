@@ -264,7 +264,10 @@ export function typecheck(
   ): CheckUntaggedUnionDeclResult {
     const existing = check_untagged_union_decl_stmt_results.get(stmt)
     if (existing) return existing
-    const ctx = make_check_ctx(source_file, check_untagged_union_decl_stmt_results)
+    const ctx = make_check_ctx(
+      source_file,
+      check_untagged_union_decl_stmt_results,
+    )
     const variants: Record<string, Type> = {}
     for (const member of stmt.untagged_union_def.members) {
       switch (member.kind) {
@@ -849,7 +852,7 @@ export function typecheck(
 
   function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
     const lhs_type = infer_expr(ctx.source_file, expr.lhs)
-    
+
     if (lhs_type.kind === "StructConstructor") {
       // TODO: Check for extra and duplicate fields in the initializer
 
@@ -876,11 +879,11 @@ export function typecheck(
           hint: null,
         })
       }
-      
+
       const field = expr.fields[0]
       const variant_name = field.Key.text
       const expected_type = lhs_type.variants[variant_name]
-      
+
       if (!expected_type) {
         return emit_error_type(ctx, {
           message: `Unknown variant '${variant_name}' in untagged union`,
@@ -888,7 +891,7 @@ export function typecheck(
           hint: `Available variants: ${Object.keys(lhs_type.variants).join(", ")}`,
         })
       }
-      
+
       check_expr(ctx, field.value, expected_type)
       return {
         kind: "UntaggedUnionInstance",
@@ -1065,7 +1068,10 @@ export function typecheck(
         assert(source_file, `Unknown source file: ${decl.source_file}`)
         const result = check_untagged_union_decl_stmt(source_file, decl.decl)
         const type = result.constructor_type
-        assert(type, "Expected check_stmt to set the untagged union constructor's type")
+        assert(
+          type,
+          "Expected check_stmt to set the untagged union constructor's type",
+        )
         return type
       }
       case "Param": {
@@ -1198,7 +1204,12 @@ export function typecheck(
       return existing
     }
     const ctx = make_check_ctx(source_file, types)
-    const t = annotation_to_type(make_type_var_env(ctx), annotation)
+    emit_error_type
+    const t = annotation_to_type(
+      make_type_var_env(ctx),
+      annotation,
+      (message) => emit_error_type(ctx, { message, span: annotation.span }),
+    )
     types.set(annotation, t)
     return t
   }
