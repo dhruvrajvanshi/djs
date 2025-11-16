@@ -9,7 +9,8 @@ function returns_u32(): u32 {
 function returns_u8(): u8 {
     return 1
 }
-function returns_cint(): @builtin("c_int") {
+builtin type c_int
+function returns_cint(): c_int {
     return 1
 }
 function returns_int_error(): u8 {

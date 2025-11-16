@@ -91,6 +91,14 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     is_exported: "boolean",
     name: Ident,
   },
+  LJSBuiltinType: {
+    is_exported: "boolean",
+    name: Ident,
+  },
+  LJSBuiltinConst: {
+    is_exported: "boolean",
+    name: Ident,
+  },
   Empty: {},
 })
 
@@ -166,9 +174,6 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     tag: () => Expr,
     fragments: List(() => TemplateLiteralFragment),
   },
-  Builtin: {
-    text: Text,
-  },
   AddressOf: { expr: () => Expr, mut: "boolean" },
   Deref: { expr: () => Expr },
 })
@@ -196,9 +201,6 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   },
   LJSPtr: {
     to: () => TypeAnnotation,
-  },
-  Builtin: {
-    text: Text,
   },
   Qualified: {
     head: Ident,

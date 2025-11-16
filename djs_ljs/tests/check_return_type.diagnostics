@@ -1,8 +1,8 @@
-ERROR: ./tests/check_return_type.ljs:16: Expected u8, got boolean
-16|      return true // EXPECTED ERROR
+ERROR: ./tests/check_return_type.ljs:17: Expected u8, got boolean
+17|      return true // EXPECTED ERROR
                 ^~~
-17|  }
-18|  
+18|  }
+19|  
 
 ERROR: ./tests/check_return_type.ljs:3: Expected a boolean
 3|      return 1 // EXPECTED ERROR

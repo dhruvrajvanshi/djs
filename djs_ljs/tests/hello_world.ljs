@@ -1,8 +1,10 @@
-import * as c from "../libc.ljs"
+import * as ffi from "ljs:ffi"
 
-export function main(): c.int {
-  const msg: *c.char = c.str`Hello, world!`
-  c.puts(msg)
+extern function puts(message: *ffi.c_char): ffi.c_int
+
+export function main(): ffi.c_int {
+  const msg: *ffi.c_char = ffi.c_str`Hello, world!`
+  puts(msg)
   return 0
 }
 

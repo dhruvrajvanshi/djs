@@ -1,4 +1,4 @@
-import * as ffi from "../ffi.ljs"
+import * as ffi from "ljs:ffi"
 
 function str_box_value(i: StrBox): *ffi.c_char {
     return i.value

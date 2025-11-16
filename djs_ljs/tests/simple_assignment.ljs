@@ -1,10 +1,10 @@
-
-const c = @builtin("c_str")
-type int = @builtin("c_int")
-type char = @builtin("c_char")
+import * as ffi from "ljs:ffi"
+const c = ffi.c_str
+type int = ffi.c_int
+type char = ffi.c_char
 extern function puts(message: *char): int;
 
-function main(): @builtin("c_int") {
+function main(): ffi.c_int {
     let i: int = 0
 
     if (i === 0) {

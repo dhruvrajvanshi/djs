@@ -1,4 +1,4 @@
-import * as ffi from "../ffi.ljs"
+import * as ffi from "ljs:ffi"
 
 function main(): ffi.c_int {
     const i: u32 = 56

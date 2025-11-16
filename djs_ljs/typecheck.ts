@@ -1,5 +1,4 @@
 import {
-  BuiltinExpr,
   DeclType,
   LJSExternFunctionStmt,
   PropExpr,
@@ -32,6 +31,8 @@ import {
   DerefExpr,
   LJSExternConstStmt,
   CallExpr,
+  LJSBuiltinConstStmt,
+  LJSBuiltinTypeStmt,
 } from "djs_ast"
 import Path from "node:path"
 import type { SourceFiles } from "./SourceFiles.ts"
@@ -53,6 +54,7 @@ import assert from "node:assert"
 import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
 import { existsSync } from "node:fs"
+import { builtin_types, builtin_values } from "./builtins.ts"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -173,6 +175,10 @@ export function typecheck(
         break
       case "LJSExternType":
         break
+      case "LJSBuiltinConst":
+        return check_builtin_const_stmt(ctx, stmt)
+      case "LJSBuiltinType":
+        return check_builtin_type_stmt(ctx, stmt)
       default:
         TODO(stmt.kind)
     }
@@ -256,6 +262,17 @@ export function typecheck(
     return {
       constructor_type: Type.StructConstructor(qualified_name, members),
       instance_type: Type.StructInstance(qualified_name, members),
+    }
+  }
+  function check_builtin_const_stmt(ctx: CheckCtx, stmt: LJSBuiltinConstStmt) {
+    if (!(stmt.name.text in builtin_values)) {
+      emit_error(ctx, stmt.name.span, `Unknown builtin const ${stmt.name.text}`)
+    }
+  }
+
+  function check_builtin_type_stmt(ctx: CheckCtx, stmt: LJSBuiltinTypeStmt) {
+    if (!(stmt.name.text in builtin_types)) {
+      emit_error(ctx, stmt.name.span, `Unknown builtin type ${stmt.name.text}`)
     }
   }
   function check_untagged_union_decl_stmt(
@@ -608,8 +625,6 @@ export function typecheck(
         return infer_tagged_template_literal_expr(ctx, expr)
       case "Prop":
         return infer_prop_expr(ctx, expr)
-      case "Builtin":
-        return infer_builtin_expr(ctx, expr)
       case "Call":
         return infer_call_expr(ctx, expr)
       case "Var":
@@ -975,19 +990,6 @@ export function typecheck(
       emit_error(ctx, call.callee.span, `Could not read file ${resolved}`)
     }
   }
-  function infer_builtin_expr(ctx: CheckCtx, expr: BuiltinExpr): Type {
-    const builtin_name = JSON.parse(expr.text)
-    switch (builtin_name) {
-      case "c_str":
-        return Type.CStringConstructor
-      default: {
-        return emit_error_type(ctx, {
-          message: `Unknown builtin: ${builtin_name}`,
-          span: expr.span,
-        })
-      }
-    }
-  }
 
   function infer_prop_expr(ctx: CheckCtx, expr: PropExpr): Type {
     const lhs_module_decl = get_module_decl(ctx.source_file, expr.lhs)
@@ -1095,12 +1097,11 @@ export function typecheck(
           result.return_type,
         )
       }
-      case "LJSBuiltin": {
-        switch (decl.name) {
-          case "linkc":
-            return Type.BuiltinLinkC
-          case "uninitialized":
-            return Type.Uninitialized
+      case "BuiltinConst": {
+        if (name in builtin_values) {
+          return builtin_values[name as keyof typeof builtin_values].type
+        } else {
+          throw new Error(`Unknown builtin const: ${name}`)
         }
       }
       default: {
@@ -1158,35 +1159,47 @@ export function typecheck(
     return (t) => lookup_type_var(ctx, t)
   }
 
+  function lookup_qualified_type_name(
+    ctx: CheckCtx,
+    t: readonly Ident[],
+  ): Type {
+    const [module_name, ...rest] = t
+    const decls = type_decls.get(ctx.source_file.path)
+    if (!decls) TODO()
+    const decl = decls.get(module_name)
+
+    if (!decl || decl.kind !== "Module") {
+      return emit_error_type(ctx, {
+        message: `${module_name.text} is not a module`,
+        span: module_name.span,
+      })
+    }
+    if (rest.length !== 1) {
+      return emit_error_type(ctx, {
+        message: `Expected a single type after module name, got ${rest.length}`,
+        span: module_name.span,
+        hint: null,
+      })
+    }
+
+    const member = decl.types.get(rest[0].text)
+    if (!member) {
+      return emit_error_type(ctx, {
+        message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
+        span: rest[0].span,
+      })
+    }
+    return type_decl_to_type(
+      {
+        ...ctx,
+        source_file: source_files.get(decl.path)!,
+      },
+      member,
+    )
+  }
   function lookup_type_var(ctx: CheckCtx, t: Ident | readonly Ident[]): Type {
     if (is_readonly_array(t)) {
-      const [module_name, ...rest] = t
-      const decls = type_decls.get(ctx.source_file.path)
-      if (!decls) TODO()
-      const decl = decls.get(module_name)
-
-      if (!decl || decl.kind !== "Module") {
-        return emit_error_type(ctx, {
-          message: `${module_name.text} is not a module`,
-          span: module_name.span,
-        })
-      }
-      if (rest.length !== 1) {
-        return emit_error_type(ctx, {
-          message: `Expected a single type after module name, got ${rest.length}`,
-          span: module_name.span,
-          hint: null,
-        })
-      }
-
-      const member = decl.types.get(rest[0].text)
-      if (!member) {
-        return emit_error_type(ctx, {
-          message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
-          span: rest[0].span,
-        })
-      }
-      return type_decl_to_type(ctx, member)
+      return lookup_qualified_type_name(ctx, t)
     } else {
       const decls = type_decls.get(ctx.source_file.path)
       if (!decls) TODO()
@@ -1210,7 +1223,6 @@ export function typecheck(
       return existing
     }
     const ctx = make_check_ctx(source_file, types)
-    emit_error_type
     const t = annotation_to_type(
       make_type_var_env(ctx),
       annotation,
@@ -1253,6 +1265,8 @@ export function typecheck(
         const result = check_untagged_union_decl_stmt(source_file, decl.decl)
         return result.instance_type
       }
+      case "BuiltinType":
+        return decl.type
       default:
         return assert_never(decl)
     }
