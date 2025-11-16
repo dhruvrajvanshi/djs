@@ -50,6 +50,10 @@ export type ValueDecl =
       name: "linkc"
     }
   | {
+      kind: "LJSBuiltin"
+      name: "uninitialized"
+    }
+  | {
       kind: "Import"
       stmt: ImportStmt
       /**

@@ -186,6 +186,13 @@ function initialize_symbol_table(
                   name: "linkc",
                 },
               ],
+              [
+                "uninitialized",
+                {
+                  kind: "LJSBuiltin",
+                  name: "uninitialized",
+                },
+              ],
             ]),
           })
           symbol_table.add_type(stmt.as_name.text, {

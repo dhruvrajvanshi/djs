@@ -329,7 +329,12 @@ function emit_stmt(
       const decl_nodes = var_decls
         .filter((it) => it.type.kind !== "CStringConstructor")
         .map((decl): CNode => {
-          const init_expr = emit_expr(ctx, source_file, decl.init)
+          const init_ty = ctx.tc_result.values.get(decl.init)
+          assert(init_ty, "VarDecl init must have a type")
+          const init_expr =
+            init_ty.kind === "BuiltinUninitialized"
+              ? null
+              : emit_expr(ctx, source_file, decl.init)
 
           if (decl.type.kind === "FixedSizeArray") {
             return {
@@ -890,9 +895,15 @@ function render_c_node(node: CNode): string {
     case "Ptr":
       return `${render_c_node(node.to_type)}*`
     case "VarDecl":
-      return `${render_c_node(node.type)} ${node.name} = ${render_c_node(
-        node.init,
-      )};`
+      const array_size = node.array_size !== null ? `[${node.array_size}]` : ""
+      if (node.init) {
+        return `${render_c_node(node.type)} ${node.name}${array_size} = ${render_c_node(
+          node.init,
+        )};`
+      } else {
+        return `${render_c_node(node.type)} ${node.name}${array_size};`
+      }
+
     case "FuncDef":
       return `${render_c_node(node.returns)} ${node.name}(${node.params
         .map(render_c_node)
@@ -1003,7 +1014,7 @@ export type CNode =
       kind: "VarDecl"
       type: CNode
       name: string
-      init: CNode
+      init: CNode | null
       array_size: number | null
     }
   | {

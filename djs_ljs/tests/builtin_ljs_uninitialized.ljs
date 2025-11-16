@@ -1,0 +1,9 @@
+import * as c from "../libc.ljs"
+import * as ljs from "ljs:builtin"
+
+function main(): c.int {
+    let message: *c.char = ljs.uninitialized
+    message = c.str`PASS`
+    c.puts(message)
+    return 0
+}
