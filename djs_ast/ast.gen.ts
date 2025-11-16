@@ -1817,6 +1817,7 @@ export type TypeAnnotation =
   | UnionTypeAnnotation
   | ArrayTypeAnnotation
   | ReadonlyArrayTypeAnnotation
+  | FixedSizeArrayTypeAnnotation
   | ApplicationTypeAnnotation
   | StringTypeAnnotation
   | FuncTypeAnnotation
@@ -1880,6 +1881,22 @@ export class ReadonlyArrayTypeAnnotation {
 
   get kind(): "ReadonlyArray" {
     return "ReadonlyArray"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class FixedSizeArrayTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly item: TypeAnnotation,
+    readonly size: Expr,
+  ) {}
+
+  get kind(): "FixedSizeArray" {
+    return "FixedSizeArray"
   }
 
   toString(): string {
@@ -2017,6 +2034,13 @@ export const TypeAnnotation = {
     span: Span,
     item: TypeAnnotation,
   ): ReadonlyArrayTypeAnnotation => new ReadonlyArrayTypeAnnotation(span, item),
+
+  FixedSizeArray: (
+    span: Span,
+    item: TypeAnnotation,
+    size: Expr,
+  ): FixedSizeArrayTypeAnnotation =>
+    new FixedSizeArrayTypeAnnotation(span, item, size),
 
   Application: (
     span: Span,
