@@ -1,4 +1,4 @@
-import * as ffi from "../ljs:ffi"
+import * as ffi from "ljs:ffi"
 
 struct CStringBox {
     value: *ffi.c_char
