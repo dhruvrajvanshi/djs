@@ -16,3 +16,7 @@ export type char = @builtin("c_char")
 export type int = @builtin("c_int")
 
 export extern function puts(s: *char): int
+
+extern type FILE
+
+extern function fopen(filename: *char, mode: *char): *FILE
