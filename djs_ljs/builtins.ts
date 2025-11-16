@@ -11,6 +11,14 @@ export const builtin_values: Record<BuiltinConstName, BuiltinConstDecl> = {
     name: "uninitialized",
     type: Type.Uninitialized,
   },
+  transmute: {
+    kind: "BuiltinConst",
+    name: "transmute",
+    type: Type.Forall(
+      [{ name: "To" }, { name: "From" }],
+      Type.UnboxedFunc([Type.ParamRef("From")], Type.ParamRef("To")),
+    ),
+  },
   c_str: {
     kind: "BuiltinConst",
     name: "c_str",

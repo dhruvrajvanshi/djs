@@ -47,7 +47,7 @@ export type ValueDecl =
     }
   | {
       kind: "BuiltinConst"
-      name: "linkc" | "uninitialized" | "c_str"
+      name: "linkc" | "uninitialized" | "c_str" | "transmute"
       type: Type
     }
   | {

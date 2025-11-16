@@ -22,6 +22,8 @@ export type Type = ReadonlyUnion<
   | { kind: "BuiltinLinkC" }
   | { kind: "BuiltinUninitialized" }
   | { kind: "Opaque"; qualified_name: readonly string[] }
+  | { kind: "Forall"; params: readonly TypeParam[]; body: Type }
+  | { kind: "ParamRef"; name: string }
   | StructConstructorType
   | StructInstanceType
   | UntaggedUnionConstructorType
@@ -33,6 +35,9 @@ export type Type = ReadonlyUnion<
    */
   | { kind: "CStringConstructor" }
 >
+type TypeParam = Readonly<{
+  name: string
+}>
 /**
  * In an expression SomeStruct { field: value, ...}
  * this represents the type of SomeStruct
@@ -84,6 +89,12 @@ export const Type = {
     element_type,
     size,
   }),
+  Forall: (params: readonly TypeParam[], body: Type) => ({
+    kind: "Forall",
+    params,
+    body,
+  }),
+  ParamRef: (name: string) => ({ kind: "ParamRef", name }),
   UnboxedFunc: (params: readonly Type[], return_type: Type) => ({
     kind: "UnboxedFunc",
     params,
@@ -197,6 +208,10 @@ export function type_to_string(type: Type): string {
       return type.qualified_name.join(".")
     case "BuiltinUninitialized":
       return "<uninitialized>"
+    case "Forall":
+      return `forall ${type.params.map((p) => p.name).join(", ")}. ${type_to_string(type.body)}`
+    case "ParamRef":
+      return type.name
     default:
       return assert_never(type)
   }
@@ -279,6 +294,12 @@ export function type_to_sexpr(type: Type): string {
       return `(UntaggedUnionInstance ${type.qualified_name.join(".")})`
     case "BuiltinUninitialized":
       return "<uninitialized>"
+    case "Forall":
+      return `(Forall (${type.params
+        .map((p) => p.name)
+        .join(" ")}) ${type_to_sexpr(type.body)})`
+    case "ParamRef":
+      return `(ParamRef ${type.name})`
     default:
       return assert_never(type)
   }
