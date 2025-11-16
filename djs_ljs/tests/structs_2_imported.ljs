@@ -1,5 +1,5 @@
 import * as Imported from "./modules/CStringBox.ljs"
-import * as ffi from "../ffi.ljs"
+import * as ffi from "ljs:ffi"
 
 function main(): ffi.c_int {
     puts(Imported.CStringBox { value: ffi.c_str`Hello world` }.value)

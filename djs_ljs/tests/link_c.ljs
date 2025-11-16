@@ -1,8 +1,6 @@
-import * as ljs from "ljs:builtin"
-
-ljs.linkc("./link_c.c")
-
+import * as ffi from "ljs:ffi"
 import * as c from "../libc.ljs"
+ffi.linkc("./link_c.c")
 
 extern type Box
 extern function box_message(box: *Box): *c.char

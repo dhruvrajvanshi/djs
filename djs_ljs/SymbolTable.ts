@@ -46,12 +46,9 @@ export type ValueDecl =
       source_file: string
     }
   | {
-      kind: "LJSBuiltin"
-      name: "linkc"
-    }
-  | {
-      kind: "LJSBuiltin"
-      name: "uninitialized"
+      kind: "BuiltinConst"
+      name: "linkc" | "uninitialized" | "c_str"
+      type: Type
     }
   | {
       kind: "Import"
@@ -160,6 +157,11 @@ export type TypeDecl =
       kind: "ExternType"
       stmt: LJSExternTypeStmt
       source_file: string
+    }
+  | {
+      kind: "BuiltinType"
+      name: "c_char" | "c_int"
+      type: Type
     }
   /**
    * Introduced after resolving imports

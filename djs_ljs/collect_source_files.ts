@@ -71,12 +71,18 @@ export async function collect_source_files(
 
     const imports = collect_imports(source_file)
     for (const import_stmt of imports) {
-      const imported_path = fs.to_absolute(
-        Path.join(
-          Path.dirname(source_file.path),
-          parse_module_specifier(import_stmt.module_specifier),
-        ),
+      const module_specifier = parse_module_specifier(
+        import_stmt.module_specifier,
       )
+      let imported_path: string
+      if (module_specifier.startsWith("ljs:")) {
+        const path = module_specifier.slice("ljs:".length)
+        imported_path = Path.join(import.meta.dirname, "stdlib", `${path}.ljs`)
+      } else {
+        imported_path = fs.to_absolute(
+          Path.join(Path.dirname(source_file.path), module_specifier),
+        )
+      }
       if (imported_path in source_files) continue
 
       queue.push({
@@ -94,10 +100,7 @@ export async function collect_source_files(
 class CollectImportsVisitor extends ASTVisitorBase {
   readonly imports: (ImportStmt | ImportStarAsStmt)[] = []
   override visit_stmt(stmt: Stmt): void {
-    if (
-      stmt.kind === "Import" ||
-      (stmt.kind === "ImportStarAs" && !is_ljs_builtin(stmt.module_specifier))
-    ) {
+    if (stmt.kind === "Import" || stmt.kind === "ImportStarAs") {
       this.imports.push(stmt)
     } else {
       super.visit_stmt(stmt)
@@ -115,10 +118,4 @@ function parse_module_specifier(specifier: string): string {
   const value: unknown = JSON.parse(specifier)
   assert(typeof value === "string", `Invalid module specifier: ${specifier}`)
   return value
-}
-
-function is_ljs_builtin(module_specifier: ImportStmt["module_specifier"]) {
-  return (
-    module_specifier === "'ljs:builtin'" || module_specifier === '"ljs:builtin"'
-  )
 }

@@ -5,7 +5,8 @@ import { prettify_diagnostics, QualifiedName } from "djs_ast"
 
 test("smoke test", async () => {
   const source = `
-     const c = @builtin("c_str")
+     builtin const c_str
+     const c = c_str
      extern function puts(s: *u8): void
 
      export function main(): void {

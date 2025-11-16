@@ -1,8 +1,8 @@
 import * as c from "../libc.ljs"
-import * as ljs from "ljs:builtin"
+import * as mem from "ljs:mem"
 
 function main(): c.int {
-    let message: *c.char = ljs.uninitialized
+    let message: *c.char = mem.uninitialized
     message = c.str`PASS`
     c.puts(message)
     return 0
