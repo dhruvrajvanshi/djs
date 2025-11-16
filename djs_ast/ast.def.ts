@@ -176,6 +176,10 @@ export const Expr = Enum("Expr", ["span", "visit"], {
   },
   AddressOf: { expr: () => Expr, mut: "boolean" },
   Deref: { expr: () => Expr },
+  TypeApplication: {
+    expr: () => Expr,
+    type_args: List(() => TypeAnnotation),
+  },
 })
 export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { leading_trivia: Text, ident: Ident },
