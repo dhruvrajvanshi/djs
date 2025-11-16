@@ -511,6 +511,10 @@ export function typecheck(
       }
       default: {
         const inferred = infer_expr(ctx.source_file, expr)
+        if (inferred.kind === "BuiltinUninitialized") {
+          values.set(expr, inferred)
+          return
+        }
         if (!is_assignable({ source: inferred, target: expected_type })) {
           emit_error(
             ctx,
@@ -1095,6 +1099,8 @@ export function typecheck(
         switch (decl.name) {
           case "linkc":
             return Type.BuiltinLinkC
+          case "uninitialized":
+            return Type.Uninitialized
         }
       }
       default: {

@@ -20,6 +20,7 @@ export type Type = ReadonlyUnion<
   | { kind: "FixedSizeArray"; element_type: Type; size: number }
   | { kind: "UnboxedFunc"; params: readonly Type[]; return_type: Type }
   | { kind: "BuiltinLinkC" }
+  | { kind: "BuiltinUninitialized" }
   | { kind: "Opaque"; qualified_name: readonly string[] }
   | StructConstructorType
   | StructInstanceType
@@ -110,7 +111,10 @@ export const Type = {
     qualified_name: name,
     variants,
   }),
-  UntaggedUnionInstance: (name: readonly string[], variants: Record<string, Type>) => ({
+  UntaggedUnionInstance: (
+    name: readonly string[],
+    variants: Record<string, Type>,
+  ) => ({
     kind: "UntaggedUnionInstance",
     qualified_name: name,
     variants,
@@ -121,6 +125,9 @@ export const Type = {
   }),
   BuiltinLinkC: {
     kind: "BuiltinLinkC",
+  },
+  Uninitialized: {
+    kind: "BuiltinUninitialized",
   },
   Error: (message: string) => ({ kind: "Error", message }),
 } satisfies Record<string, Type | ((...args: readonly never[]) => Type)>
@@ -188,6 +195,8 @@ export function type_to_string(type: Type): string {
       return "ljs:builtin/linkc"
     case "Opaque":
       return type.qualified_name.join(".")
+    case "BuiltinUninitialized":
+      return "<uninitialized>"
     default:
       return assert_never(type)
   }
@@ -259,9 +268,17 @@ export function type_to_sexpr(type: Type): string {
     case "Opaque":
       return `(Opaque ${type.qualified_name.join(".")})`
     case "UntaggedUnionConstructor":
-      return `(UntaggedUnionConstructor ${type.qualified_name.join(".")} ${Object.entries(type.variants).map(([name, variant_type]) => `(${name} ${type_to_sexpr(variant_type)})`).join(" ")})`
+      return `(UntaggedUnionConstructor ${type.qualified_name.join(".")} ${Object.entries(
+        type.variants,
+      )
+        .map(
+          ([name, variant_type]) => `(${name} ${type_to_sexpr(variant_type)})`,
+        )
+        .join(" ")})`
     case "UntaggedUnionInstance":
       return `(UntaggedUnionInstance ${type.qualified_name.join(".")})`
+    case "BuiltinUninitialized":
+      return "<uninitialized>"
     default:
       return assert_never(type)
   }
