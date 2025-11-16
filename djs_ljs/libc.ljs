@@ -19,4 +19,4 @@ export extern function puts(s: *char): int
 
 extern type FILE
 
-extern function fopen(filename: *char, mode: *char): *FILE
+extern function fopen(filename: *char, mode: *char): *mut FILE
