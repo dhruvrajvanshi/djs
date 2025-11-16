@@ -1,7 +1,8 @@
+import { c_str, c_char, c_int } from "ljs:ffi"
 
-const c = @builtin("c_str")
-function main(): @builtin("c_int") {
-    for (let i: @builtin("c_int") = 0; i < 10; i++) {
+const c = c_str
+function main(): c_int {
+    for (let i: c_int = 0; i < 10; i++) {
         putchar(i + 48)
         puts(c` LOOP`)
         if (i < 3) {
@@ -14,5 +15,5 @@ function main(): @builtin("c_int") {
         }
     }
 }
-extern function puts(msg: *@builtin("c_char")): @builtin("c_int")
-extern function putchar(c: @builtin("c_int")): @builtin("c_int")
+extern function puts(msg: *c_char): c_int
+extern function putchar(c: c_int): c_int
