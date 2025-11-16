@@ -20,3 +20,4 @@ export extern function puts(s: *char): int
 extern type FILE
 
 extern function fopen(filename: *char, mode: *char): *mut FILE
+extern function fclose(file: *mut FILE): int
