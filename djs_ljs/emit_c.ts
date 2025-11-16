@@ -595,10 +595,10 @@ function emit_expr(
 }
 
 /**
- * Checks if expr refers to ljs.linkc
+ * Checks if expr refers to builtin const linkc
  * E.g.
- * import * as ljs from "ljs:builtin"
- * ljs.linkc("something")
+ * builtin const linkc
+ * linkc("something")
  * ^^^^^^^^^   is_builtin_linkc(ljs.linkc) === true
  * Note that expr must not inlcude the call args
  */

@@ -173,39 +173,6 @@ function initialize_symbol_table(
         }
         break
       case "ImportStarAs": {
-        if (
-          stmt.module_specifier === "\'ljs:builtin\'" ||
-          stmt.module_specifier === '"ljs:builtin"'
-        ) {
-          symbol_table.add_value(stmt.as_name.text, {
-            kind: "Module",
-            path: "ljs:builtin",
-            values: new Map([
-              [
-                "linkc",
-                {
-                  kind: "BuiltinConst",
-                  name: "linkc",
-                  type: Type.BuiltinLinkC,
-                },
-              ],
-              [
-                "uninitialized",
-                {
-                  kind: "BuiltinConst",
-                  name: "uninitialized",
-                  type: Type.Uninitialized,
-                },
-              ],
-            ]),
-          })
-          symbol_table.add_type(stmt.as_name.text, {
-            kind: "Module",
-            path: "ljs:builtin",
-            types: new Map(),
-          })
-          break
-        }
         const decl = {
           kind: "ImportStarAs",
           stmt,

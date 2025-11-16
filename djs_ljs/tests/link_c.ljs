@@ -1,6 +1,5 @@
-import * as ljs from "ljs:builtin"
-
-ljs.linkc("./link_c.c")
+import * as ffi from "ljs:ffi"
+ffi.linkc("./link_c.c")
 
 import * as c from "../libc.ljs"
 

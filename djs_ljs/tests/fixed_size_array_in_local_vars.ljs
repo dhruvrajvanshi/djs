@@ -1,5 +1,5 @@
 import * as c from "../libc.ljs"
-import * as ljs from "ljs:builtin"
+import { uninitialized } from "ljs:mem"
 
 function main(): c.int {
     let bytes: u8[10] = ljs.uninitialized
