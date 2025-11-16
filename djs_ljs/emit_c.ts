@@ -175,7 +175,8 @@ function types_first(
   { stmt: a }: { stmt: Stmt },
   { stmt: b }: { stmt: Stmt },
 ): number {
-  const is_type_decl = (kind: string) => kind === "StructDecl" || kind === "UntaggedUnionDecl"
+  const is_type_decl = (kind: string) =>
+    kind === "StructDecl" || kind === "UntaggedUnionDecl"
   if (is_type_decl(a.kind) && !is_type_decl(b.kind)) return -1
   if (!is_type_decl(a.kind) && is_type_decl(b.kind)) return 1
   return 0
@@ -606,8 +607,11 @@ function emit_struct_init_expr(
 ): CNode {
   const instance_type = ctx.tc_result.values.get(expr)
   const lhs_type = ctx.tc_result.values.get(expr.lhs)
-  
-  if (instance_type?.kind === "StructInstance" && lhs_type?.kind === "StructConstructor") {
+
+  if (
+    instance_type?.kind === "StructInstance" &&
+    lhs_type?.kind === "StructConstructor"
+  ) {
     return {
       kind: "Cast",
       to: {
@@ -622,8 +626,14 @@ function emit_struct_init_expr(
         })),
       },
     }
-  } else if (instance_type?.kind === "UntaggedUnionInstance" && lhs_type?.kind === "UntaggedUnionConstructor") {
-    assert(expr.fields.length === 1, "Untagged union init must have exactly one field")
+  } else if (
+    instance_type?.kind === "UntaggedUnionInstance" &&
+    lhs_type?.kind === "UntaggedUnionConstructor"
+  ) {
+    assert(
+      expr.fields.length === 1,
+      "Untagged union init must have exactly one field",
+    )
     const field = expr.fields[0]
     return {
       kind: "Cast",
@@ -638,7 +648,9 @@ function emit_struct_init_expr(
       },
     }
   } else {
-    TODO(`Unhandled struct init: instance_type=${instance_type?.kind}, lhs_type=${lhs_type?.kind}`)
+    TODO(
+      `Unhandled struct init: instance_type=${instance_type?.kind}, lhs_type=${lhs_type?.kind}`,
+    )
   }
 }
 function mangle_struct_name(qualified_name: readonly string[]): string {
@@ -662,7 +674,10 @@ function emit_untagged_union_decl(stmt: UntaggedUnionDeclStmt): CNode {
   }
 }
 
-function emit_untagged_union_def(ctx: EmitContext, stmt: UntaggedUnionDeclStmt): CNode {
+function emit_untagged_union_def(
+  ctx: EmitContext,
+  stmt: UntaggedUnionDeclStmt,
+): CNode {
   const fields = stmt.untagged_union_def.members.map((member) => {
     assert(member.kind === "VariantDef", "Union member must be VariantDef")
     return {
