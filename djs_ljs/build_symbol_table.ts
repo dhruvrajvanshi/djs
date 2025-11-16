@@ -1,8 +1,10 @@
 import type { ForStmt, Func, Pattern, SourceFile, Stmt } from "djs_ast"
-import { SymbolTable, type ValueDecl } from "./SymbolTable.ts"
+import { SymbolTable, type TypeDecl, type ValueDecl } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { assert_never, TODO } from "djs_std"
 import { import_stmt_path } from "./import_stmt_path.ts"
+import { builtin_types, builtin_values } from "./builtins.ts"
+import { Type } from "./type.ts"
 
 export function build_source_file_symbol_table(
   source_file: SourceFile,
@@ -182,15 +184,17 @@ function initialize_symbol_table(
               [
                 "linkc",
                 {
-                  kind: "LJSBuiltin",
+                  kind: "BuiltinConst",
                   name: "linkc",
+                  type: Type.BuiltinLinkC,
                 },
               ],
               [
                 "uninitialized",
                 {
-                  kind: "LJSBuiltin",
+                  kind: "BuiltinConst",
                   name: "uninitialized",
+                  type: Type.Uninitialized,
                 },
               ],
             ]),
@@ -229,6 +233,25 @@ function initialize_symbol_table(
           stmt,
           source_file: source_file.path,
         })
+        break
+      }
+      case "LJSBuiltinConst": {
+        if (stmt.name.text in builtin_values) {
+          symbol_table.add_value(
+            stmt.name.text,
+            builtin_values[stmt.name.text as keyof typeof builtin_values],
+          )
+        }
+        break
+      }
+      case "LJSBuiltinType": {
+        if (stmt.name.text in builtin_types) {
+          symbol_table.add_type(
+            stmt.name.text,
+            builtin_types[stmt.name.text as keyof typeof builtin_types],
+          )
+        }
+        break
       }
     }
   }

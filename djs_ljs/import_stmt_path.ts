@@ -24,5 +24,9 @@ export function import_stmt_path(
     typeof value === "string",
     `Invalid module specifier: ${stmt.module_specifier}`,
   )
+  if (value.startsWith("ljs:")) {
+    const path = value.slice("ljs:".length)
+    return Path.join(import.meta.dirname, "stdlib", `${path}.ljs`)
+  }
   return Path.join(Path.dirname(source_file.path), value)
 }

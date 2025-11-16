@@ -32,6 +32,8 @@ import {
   DerefExpr,
   LJSExternConstStmt,
   CallExpr,
+  LJSBuiltinConstStmt,
+  LJSBuiltinTypeStmt,
 } from "djs_ast"
 import Path from "node:path"
 import type { SourceFiles } from "./SourceFiles.ts"
@@ -53,6 +55,7 @@ import assert from "node:assert"
 import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
 import { existsSync } from "node:fs"
+import { builtin_types, builtin_values } from "./builtins.ts"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -173,6 +176,10 @@ export function typecheck(
         break
       case "LJSExternType":
         break
+      case "LJSBuiltinConst":
+        return check_builtin_const_stmt(ctx, stmt)
+      case "LJSBuiltinType":
+        return check_builtin_type_stmt(ctx, stmt)
       default:
         TODO(stmt.kind)
     }
@@ -256,6 +263,17 @@ export function typecheck(
     return {
       constructor_type: Type.StructConstructor(qualified_name, members),
       instance_type: Type.StructInstance(qualified_name, members),
+    }
+  }
+  function check_builtin_const_stmt(ctx: CheckCtx, stmt: LJSBuiltinConstStmt) {
+    if (!(stmt.name.text in builtin_values)) {
+      emit_error(ctx, stmt.name.span, `Unknown builtin const ${stmt.name.text}`)
+    }
+  }
+
+  function check_builtin_type_stmt(ctx: CheckCtx, stmt: LJSBuiltinTypeStmt) {
+    if (!(stmt.name.text in builtin_types)) {
+      emit_error(ctx, stmt.name.span, `Unknown builtin type ${stmt.name.text}`)
     }
   }
   function check_untagged_union_decl_stmt(
@@ -1095,12 +1113,11 @@ export function typecheck(
           result.return_type,
         )
       }
-      case "LJSBuiltin": {
-        switch (decl.name) {
-          case "linkc":
-            return Type.BuiltinLinkC
-          case "uninitialized":
-            return Type.Uninitialized
+      case "BuiltinConst": {
+        if (name in builtin_values) {
+          return builtin_values[name as keyof typeof builtin_values].type
+        } else {
+          throw new Error(`Unknown builtin const: ${name}`)
         }
       }
       default: {
@@ -1253,6 +1270,8 @@ export function typecheck(
         const result = check_untagged_union_decl_stmt(source_file, decl.decl)
         return result.instance_type
       }
+      case "BuiltinType":
+        return decl.type
       default:
         return assert_never(decl)
     }

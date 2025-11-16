@@ -60,7 +60,7 @@ function resolve_value_import(
     }
     case "ImportStarAs": {
       const source_file = source_files.get(decl.imported_file)
-      if (!source_file) TODO()
+      if (!source_file) TODO([decl, source_files.keys()])
       const symbol_table = build_source_file_symbol_table(source_file)
       const values = [...symbol_table.value_entries()]
       return {

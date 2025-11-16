@@ -386,9 +386,11 @@ function emit_stmt(
       return { kind: "Empty" }
     case "LJSExternFunction":
     case "LJSExternConst":
+    case "LJSExternType":
       // Emitted in the declaration phase
       return { kind: "Empty" }
-    case "LJSExternType":
+    case "LJSBuiltinConst":
+    case "LJSBuiltinType":
       return { kind: "Empty" }
     default:
       TODO(`Unhandled statement: ${stmt.kind}`)
@@ -791,7 +793,7 @@ function emit_prop_expr(
         assert(prop_decl.func.name)
         name = prop_decl.func.name.text
         break
-      case "LJSBuiltin":
+      case "BuiltinConst":
         PANIC(`LJSBuiltin should be handled elsewhere`)
       default:
         PANIC(`Unhandled declaration in emit_prop_expr: ${expr.kind};`)

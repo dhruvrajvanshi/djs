@@ -1,0 +1,3 @@
+builtin type c_int
+builtin type c_char
+builtin const c_str

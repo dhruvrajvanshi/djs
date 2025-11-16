@@ -55,6 +55,9 @@ export class PathMap<T> {
   entries(): IterableIterator<[string, T]> {
     return this.#map.entries()
   }
+  keys(): IterableIterator<string> {
+    return this.#map.keys()
+  }
   values(): IterableIterator<T> {
     return this.#map.values()
   }

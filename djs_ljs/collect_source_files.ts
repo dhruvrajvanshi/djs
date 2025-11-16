@@ -71,12 +71,18 @@ export async function collect_source_files(
 
     const imports = collect_imports(source_file)
     for (const import_stmt of imports) {
-      const imported_path = fs.to_absolute(
-        Path.join(
-          Path.dirname(source_file.path),
-          parse_module_specifier(import_stmt.module_specifier),
-        ),
+      const module_specifier = parse_module_specifier(
+        import_stmt.module_specifier,
       )
+      let imported_path: string
+      if (module_specifier.startsWith("ljs:")) {
+        const path = module_specifier.slice("ljs:".length)
+        imported_path = Path.join(import.meta.dirname, "stdlib", `${path}.ljs`)
+      } else {
+        imported_path = fs.to_absolute(
+          Path.join(Path.dirname(source_file.path), module_specifier),
+        )
+      }
       if (imported_path in source_files) continue
 
       queue.push({
