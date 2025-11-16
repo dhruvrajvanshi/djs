@@ -159,9 +159,21 @@ function emit_struct_decl(stmt: StructDeclStmt): CNode {
 }
 function emit_struct_def(ctx: EmitContext, stmt: StructDeclStmt): CNode {
   const fields = stmt.struct_def.members.map((member) => {
-    return {
-      name: member.name.text,
-      type: emit_type_annotation(ctx, member.type_annotation),
+    const type_obj = ctx.tc_result.types.get(member.type_annotation)
+    assert(type_obj, "Type annotation must have resolved type")
+
+    if (type_obj.kind === "FixedSizeArray") {
+      return {
+        name: member.name.text,
+        type: emit_type(type_obj.element_type),
+        array_size: type_obj.size,
+      }
+    } else {
+      return {
+        name: member.name.text,
+        type: emit_type(type_obj),
+        array_size: null,
+      }
     }
   })
   return {
@@ -185,14 +197,33 @@ function types_first(
 function emit_param(ctx: EmitContext, param: Param): CNode {
   assert(param.pattern.kind === "Var", "Param pattern must be a variable")
   const param_name = param.pattern.ident.text
-  const param_type = param.type_annotation
-    ? emit_type_annotation(ctx, param.type_annotation)
-    : ({ kind: "Ident", name: "void" } as CNode)
 
-  return {
-    kind: "Param",
-    name: param_name,
-    type: param_type,
+  if (param.type_annotation) {
+    const type_obj = ctx.tc_result.types.get(param.type_annotation)
+    assert(type_obj, "Type annotation must have resolved type")
+
+    if (type_obj.kind === "FixedSizeArray") {
+      return {
+        kind: "Param",
+        name: param_name,
+        type: emit_type(type_obj.element_type),
+        array_size: type_obj.size,
+      }
+    } else {
+      return {
+        kind: "Param",
+        name: param_name,
+        type: emit_type(type_obj),
+        array_size: null,
+      }
+    }
+  } else {
+    return {
+      kind: "Param",
+      name: param_name,
+      type: { kind: "Ident", name: "void" } as CNode,
+      array_size: null,
+    }
   }
 }
 
@@ -214,6 +245,8 @@ function emit_type(type: Type): CNode {
       return { kind: "Ident", name: "char" }
     case "void":
       return { kind: "Ident", name: "void" }
+    case "u8":
+      return { kind: "Ident", name: "uint8_t" }
     case "i32":
       return { kind: "Ident", name: "int32_t" }
     case "u32":
@@ -296,14 +329,24 @@ function emit_stmt(
       const decl_nodes = var_decls
         .filter((it) => it.type.kind !== "CStringConstructor")
         .map((decl): CNode => {
-          const var_type = emit_type(decl.type)
           const init_expr = emit_expr(ctx, source_file, decl.init)
 
-          return {
-            kind: "VarDecl",
-            type: var_type,
-            name: decl.name,
-            init: init_expr,
+          if (decl.type.kind === "FixedSizeArray") {
+            return {
+              kind: "VarDecl",
+              type: emit_type(decl.type.element_type),
+              name: decl.name,
+              init: init_expr,
+              array_size: decl.type.size,
+            }
+          } else {
+            return {
+              kind: "VarDecl",
+              type: emit_type(decl.type),
+              name: decl.name,
+              init: init_expr,
+              array_size: null,
+            }
           }
         })
       return {
@@ -397,14 +440,24 @@ function emit_for_stmt(
   const init_var_decls = ctx.tc_result.var_decls.get(stmt.init.decl)
   assert(init_var_decls, "ForStmt VarDecl must have checked declarations")
   init_var_decls.forEach((decl) => {
-    const var_type = emit_type(decl.type)
     const init_expr = emit_expr(ctx, source_file, decl.init)
-    stmts.push({
-      kind: "VarDecl",
-      type: var_type,
-      name: decl.name,
-      init: init_expr,
-    })
+    if (decl.type.kind === "FixedSizeArray") {
+      stmts.push({
+        kind: "VarDecl",
+        type: emit_type(decl.type.element_type),
+        name: decl.name,
+        init: init_expr,
+        array_size: decl.type.size,
+      })
+    } else {
+      stmts.push({
+        kind: "VarDecl",
+        type: emit_type(decl.type),
+        name: decl.name,
+        init: init_expr,
+        array_size: null,
+      })
+    }
   })
   const actual_body: CNode =
     stmt.body.kind === "Block"
@@ -943,10 +996,16 @@ export type CNode =
       params: CNode[]
       returns: CNode
     }
-  | { kind: "Param"; name: string; type: CNode }
+  | { kind: "Param"; name: string; type: CNode; array_size: number | null }
   | { kind: "ConstPtr"; to_type: CNode }
   | { kind: "Ptr"; to_type: CNode }
-  | { kind: "VarDecl"; type: CNode; name: string; init: CNode }
+  | {
+      kind: "VarDecl"
+      type: CNode
+      name: string
+      init: CNode
+      array_size: number | null
+    }
   | {
       kind: "FuncDef"
       name: string
@@ -979,7 +1038,11 @@ export type CNode =
   | { kind: "UnionTypeRef"; name: string }
   | { kind: "Typedef"; name: string; to: CNode }
   | { kind: "StructDecl"; name: string }
-  | { kind: "StructDef"; name: string; fields: { name: string; type: CNode }[] }
+  | {
+      kind: "StructDef"
+      name: string
+      fields: { name: string; type: CNode; array_size: number | null }[]
+    }
   | { kind: "UnionDecl"; name: string }
   | { kind: "UnionDef"; name: string; fields: { name: string; type: CNode }[] }
   | { kind: "Many"; nodes: CNode[] }
