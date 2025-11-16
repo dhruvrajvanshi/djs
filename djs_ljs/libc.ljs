@@ -1,19 +1,22 @@
 
+builtin const c_str
 /**
  * Null terminated C style bytestring
  * @example
  * const msg: *char = str`Hello` // ['H', 'e', 'l', 'l', '0', '\0']
  */
-builtin const str
+export const str = c_str
 
 /**
  * Equivalent to the c char type.
  * Can be either i8 or u8, depending on the platform
  */
-builtin type char
+builtin type c_char
+export type char = c_char
 
 
-builtin type int
+builtin type c_int
+export type int = c_int
 
 export extern function puts(s: *char): int
 
