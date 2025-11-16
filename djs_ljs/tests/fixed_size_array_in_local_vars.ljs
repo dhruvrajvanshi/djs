@@ -1,0 +1,7 @@
+import * as c from "../libc.ljs"
+import * as ljs from "ljs:builtin"
+
+function main(): c.int {
+    let bytes: u8[10] = ljs.uninitialized
+    return 0
+}
