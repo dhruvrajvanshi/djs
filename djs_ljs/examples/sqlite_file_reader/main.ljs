@@ -1,0 +1,12 @@
+import * as c from "../../libc.ljs"
+
+struct SQHeader {
+    header_string: c.char[16]
+    page_size: u16
+}
+
+const file = c.str`./test.sqlite`
+function main(): c.int {
+    c.puts(c.str`SQLite file reader`)
+    return 0
+}
