@@ -247,6 +247,12 @@ function emit_type(type: Type): CNode {
       return { kind: "Ident", name: "void" }
     case "u8":
       return { kind: "Ident", name: "uint8_t" }
+    case "i8":
+      return { kind: "Ident", name: "int8_t" }
+    case "u16":
+      return { kind: "Ident", name: "uint16_t" }
+    case "i16":
+      return { kind: "Ident", name: "int16_t" }
     case "i32":
       return { kind: "Ident", name: "int32_t" }
     case "u32":
