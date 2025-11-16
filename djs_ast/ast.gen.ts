@@ -54,6 +54,8 @@ export type Stmt =
   | LJSExternFunctionStmt
   | LJSExternConstStmt
   | LJSExternTypeStmt
+  | LJSBuiltinTypeStmt
+  | LJSBuiltinConstStmt
   | EmptyStmt
 export class ExprStmt {
   constructor(
@@ -486,6 +488,38 @@ export class LJSExternTypeStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class LJSBuiltinTypeStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly is_exported: boolean,
+    readonly name: Ident,
+  ) {}
+
+  get kind(): "LJSBuiltinType" {
+    return "LJSBuiltinType"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
+export class LJSBuiltinConstStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly is_exported: boolean,
+    readonly name: Ident,
+  ) {}
+
+  get kind(): "LJSBuiltinConst" {
+    return "LJSBuiltinConst"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class EmptyStmt {
   constructor(readonly span: Span) {}
 
@@ -632,6 +666,18 @@ export const Stmt = {
     is_exported: boolean,
     name: Ident,
   ): LJSExternTypeStmt => new LJSExternTypeStmt(span, is_exported, name),
+
+  LJSBuiltinType: (
+    span: Span,
+    is_exported: boolean,
+    name: Ident,
+  ): LJSBuiltinTypeStmt => new LJSBuiltinTypeStmt(span, is_exported, name),
+
+  LJSBuiltinConst: (
+    span: Span,
+    is_exported: boolean,
+    name: Ident,
+  ): LJSBuiltinConstStmt => new LJSBuiltinConstStmt(span, is_exported, name),
 
   Empty: (span: Span): EmptyStmt => new EmptyStmt(span),
 } as const

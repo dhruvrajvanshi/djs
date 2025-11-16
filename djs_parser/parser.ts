@@ -1840,6 +1840,18 @@ function parser_impl(
           next_is_soft_keyword("type")
         ) {
           return parse_extern_type(export_token)
+        } else if (
+          flags & PARSER_FLAGS.LJS &&
+          at_soft_keyword("builtin") &&
+          next_is(t.Const)
+        ) {
+          return parse_builtin_const(export_token)
+        } else if (
+          flags & PARSER_FLAGS.LJS &&
+          at_soft_keyword("builtin") &&
+          next_is_soft_keyword("type")
+        ) {
+          return parse_builtin_type(export_token)
         } else if (next_is(t.Colon)) {
           const label = parse_ident()
           assert(label !== ERR) // because of the lookahead above
@@ -2093,6 +2105,31 @@ function parser_impl(
 
     const span = Span.between(export_token ?? start, name)
     return Stmt.LJSExternType(span, export_token !== null, name)
+  }
+  function parse_builtin_const(export_token: Token | null): Stmt | Err {
+    // builtin const foo;
+    const start = advance()
+    assert_is_soft_keyword(start, "builtin")
+    if (expect(t.Const) === ERR) return ERR
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+
+    const span = Span.between(export_token ?? start, name)
+    return Stmt.LJSBuiltinConst(span, export_token !== null, name)
+  }
+  function parse_builtin_type(export_token: Token | null): Stmt | Err {
+    // builtin type Foo;
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "builtin")
+    if (expect_soft_keyword("type") === ERR) return ERR
+    const name = parse_binding_ident()
+    if (name === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+
+    const span = Span.between(export_token ?? start, name)
+    return Stmt.LJSBuiltinType(span, export_token !== null, name)
   }
 
   function expect_soft_keyword(text: string): Token | Err {

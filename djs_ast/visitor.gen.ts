@@ -178,6 +178,14 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_ident(stmt.name)
         break
       }
+      case "LJSBuiltinType": {
+        this.visit_ident(stmt.name)
+        break
+      }
+      case "LJSBuiltinConst": {
+        this.visit_ident(stmt.name)
+        break
+      }
       case "Empty": {
         break
       }

@@ -91,6 +91,14 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     is_exported: "boolean",
     name: Ident,
   },
+  LJSBuiltinType: {
+    is_exported: "boolean",
+    name: Ident,
+  },
+  LJSBuiltinConst: {
+    is_exported: "boolean",
+    name: Ident,
+  },
   Empty: {},
 })
 
