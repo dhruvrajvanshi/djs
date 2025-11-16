@@ -174,9 +174,6 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     tag: () => Expr,
     fragments: List(() => TemplateLiteralFragment),
   },
-  Builtin: {
-    text: Text,
-  },
   AddressOf: { expr: () => Expr, mut: "boolean" },
   Deref: { expr: () => Expr },
 })
@@ -204,9 +201,6 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   },
   LJSPtr: {
     to: () => TypeAnnotation,
-  },
-  Builtin: {
-    text: Text,
   },
   Qualified: {
     head: Ident,

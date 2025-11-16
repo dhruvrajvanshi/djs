@@ -1043,7 +1043,6 @@ export type Expr =
   | ClassExpr
   | TemplateLiteralExpr
   | TaggedTemplateLiteralExpr
-  | BuiltinExpr
   | AddressOfExpr
   | DerefExpr
 export class VarExpr {
@@ -1652,21 +1651,6 @@ export class TaggedTemplateLiteralExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
-export class BuiltinExpr {
-  constructor(
-    readonly span: Span,
-
-    readonly text: Text,
-  ) {}
-
-  get kind(): "Builtin" {
-    return "Builtin"
-  }
-
-  toString(): string {
-    return sexpr_to_string(expr_to_sexpr(this))
-  }
-}
 export class AddressOfExpr {
   constructor(
     readonly span: Span,
@@ -1838,8 +1822,6 @@ export const Expr = {
   ): TaggedTemplateLiteralExpr =>
     new TaggedTemplateLiteralExpr(span, tag, fragments),
 
-  Builtin: (span: Span, text: Text): BuiltinExpr => new BuiltinExpr(span, text),
-
   AddressOf: (span: Span, expr: Expr, mut: boolean): AddressOfExpr =>
     new AddressOfExpr(span, expr, mut),
 
@@ -1869,7 +1851,6 @@ export type TypeAnnotation =
   | FuncTypeAnnotation
   | LJSMutPtrTypeAnnotation
   | LJSPtrTypeAnnotation
-  | BuiltinTypeAnnotation
   | QualifiedTypeAnnotation
 export class IdentTypeAnnotation {
   constructor(
@@ -2027,21 +2008,6 @@ export class LJSPtrTypeAnnotation {
     return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
-export class BuiltinTypeAnnotation {
-  constructor(
-    readonly span: Span,
-
-    readonly text: Text,
-  ) {}
-
-  get kind(): "Builtin" {
-    return "Builtin"
-  }
-
-  toString(): string {
-    return sexpr_to_string(type_annotation_to_sexpr(this))
-  }
-}
 export class QualifiedTypeAnnotation {
   constructor(
     readonly span: Span,
@@ -2111,9 +2077,6 @@ export const TypeAnnotation = {
 
   LJSPtr: (span: Span, to: TypeAnnotation): LJSPtrTypeAnnotation =>
     new LJSPtrTypeAnnotation(span, to),
-
-  Builtin: (span: Span, text: Text): BuiltinTypeAnnotation =>
-    new BuiltinTypeAnnotation(span, text),
 
   Qualified: (
     span: Span,

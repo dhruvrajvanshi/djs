@@ -4,7 +4,6 @@ import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { assert_never, TODO } from "djs_std"
 import { import_stmt_path } from "./import_stmt_path.ts"
 import { builtin_types, builtin_values } from "./builtins.ts"
-import { Type } from "./type.ts"
 
 export function build_source_file_symbol_table(
   source_file: SourceFile,

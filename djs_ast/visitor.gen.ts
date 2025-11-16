@@ -380,9 +380,6 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
-      case "Builtin": {
-        break
-      }
       case "AddressOf": {
         this.visit_expr(expr.expr)
         break
@@ -516,9 +513,6 @@ export class ASTVisitorBase implements ASTVisitor {
       }
       case "LJSPtr": {
         this.visit_type_annotation(type_annotation.to)
-        break
-      }
-      case "Builtin": {
         break
       }
       case "Qualified": {

@@ -48,15 +48,6 @@ export function annotation_to_type(
     }
     case "Qualified":
       return env([annotation.head, ...annotation.tail])
-    case "Builtin":
-      switch (annotation.text) {
-        case '"c_char"':
-          return Type.c_char
-        case '"c_int"':
-          return Type.c_int
-        default:
-          TODO(annotation.text)
-      }
     default:
       return TODO(annotation.kind)
   }

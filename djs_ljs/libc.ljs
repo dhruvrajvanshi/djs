@@ -4,16 +4,16 @@
  * @example
  * const msg: *char = str`Hello` // ['H', 'e', 'l', 'l', '0', '\0']
  */
-export const str = @builtin("c_str")
+builtin const str
 
 /**
  * Equivalent to the c char type.
  * Can be either i8 or u8, depending on the platform
  */
-export type char = @builtin("c_char")
+builtin type char
 
 
-export type int = @builtin("c_int")
+builtin type int
 
 export extern function puts(s: *char): int
 

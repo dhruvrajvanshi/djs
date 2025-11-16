@@ -1,5 +1,4 @@
 import {
-  BuiltinExpr,
   DeclType,
   LJSExternFunctionStmt,
   PropExpr,
@@ -626,8 +625,6 @@ export function typecheck(
         return infer_tagged_template_literal_expr(ctx, expr)
       case "Prop":
         return infer_prop_expr(ctx, expr)
-      case "Builtin":
-        return infer_builtin_expr(ctx, expr)
       case "Call":
         return infer_call_expr(ctx, expr)
       case "Var":
@@ -991,19 +988,6 @@ export function typecheck(
 
     if (!existsSync(resolved)) {
       emit_error(ctx, call.callee.span, `Could not read file ${resolved}`)
-    }
-  }
-  function infer_builtin_expr(ctx: CheckCtx, expr: BuiltinExpr): Type {
-    const builtin_name = JSON.parse(expr.text)
-    switch (builtin_name) {
-      case "c_str":
-        return Type.CStringConstructor
-      default: {
-        return emit_error_type(ctx, {
-          message: `Unknown builtin: ${builtin_name}`,
-          span: expr.span,
-        })
-      }
     }
   }
 

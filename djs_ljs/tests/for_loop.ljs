@@ -1,4 +1,4 @@
-import * as ffi from "../ffi.ljs"
+import * as ffi from "ljs:ffi"
 
 extern function puts(s: *ffi.c_char): ffi.c_int
 
