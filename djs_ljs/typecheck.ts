@@ -1159,35 +1159,47 @@ export function typecheck(
     return (t) => lookup_type_var(ctx, t)
   }
 
+  function lookup_qualified_type_name(
+    ctx: CheckCtx,
+    t: readonly Ident[],
+  ): Type {
+    const [module_name, ...rest] = t
+    const decls = type_decls.get(ctx.source_file.path)
+    if (!decls) TODO()
+    const decl = decls.get(module_name)
+
+    if (!decl || decl.kind !== "Module") {
+      return emit_error_type(ctx, {
+        message: `${module_name.text} is not a module`,
+        span: module_name.span,
+      })
+    }
+    if (rest.length !== 1) {
+      return emit_error_type(ctx, {
+        message: `Expected a single type after module name, got ${rest.length}`,
+        span: module_name.span,
+        hint: null,
+      })
+    }
+
+    const member = decl.types.get(rest[0].text)
+    if (!member) {
+      return emit_error_type(ctx, {
+        message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
+        span: rest[0].span,
+      })
+    }
+    return type_decl_to_type(
+      {
+        ...ctx,
+        source_file: source_files.get(decl.path)!,
+      },
+      member,
+    )
+  }
   function lookup_type_var(ctx: CheckCtx, t: Ident | readonly Ident[]): Type {
     if (is_readonly_array(t)) {
-      const [module_name, ...rest] = t
-      const decls = type_decls.get(ctx.source_file.path)
-      if (!decls) TODO()
-      const decl = decls.get(module_name)
-
-      if (!decl || decl.kind !== "Module") {
-        return emit_error_type(ctx, {
-          message: `${module_name.text} is not a module`,
-          span: module_name.span,
-        })
-      }
-      if (rest.length !== 1) {
-        return emit_error_type(ctx, {
-          message: `Expected a single type after module name, got ${rest.length}`,
-          span: module_name.span,
-          hint: null,
-        })
-      }
-
-      const member = decl.types.get(rest[0].text)
-      if (!member) {
-        return emit_error_type(ctx, {
-          message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
-          span: rest[0].span,
-        })
-      }
-      return type_decl_to_type(ctx, member)
+      return lookup_qualified_type_name(ctx, t)
     } else {
       const decls = type_decls.get(ctx.source_file.path)
       if (!decls) TODO()
@@ -1211,7 +1223,6 @@ export function typecheck(
       return existing
     }
     const ctx = make_check_ctx(source_file, types)
-    emit_error_type
     const t = annotation_to_type(
       make_type_var_env(ctx),
       annotation,

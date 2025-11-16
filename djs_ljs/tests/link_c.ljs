@@ -1,7 +1,6 @@
 import * as ffi from "ljs:ffi"
-ffi.linkc("./link_c.c")
-
 import * as c from "../libc.ljs"
+ffi.linkc("./link_c.c")
 
 extern type Box
 extern function box_message(box: *Box): *c.char
