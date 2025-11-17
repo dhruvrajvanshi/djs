@@ -23,6 +23,8 @@ export type ValueDeclExcludingKind<K extends ValueDecl["kind"]> = Exclude<
   ValueDecl,
   { kind: K }
 >
+
+export type BuiltinConstDecl = Extract<ValueDecl, { kind: "BuiltinConst" }>
 export type ValueDecl =
   | {
       kind: "VarDecl"

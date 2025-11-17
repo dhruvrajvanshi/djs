@@ -35,7 +35,7 @@ export type Type = ReadonlyUnion<
    */
   | { kind: "CStringConstructor" }
 >
-type TypeParam = Readonly<{
+export type TypeParam = Readonly<{
   name: string
 }>
 /**
