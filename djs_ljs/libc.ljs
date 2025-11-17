@@ -38,3 +38,9 @@ extern function mmap(
     filedes: int,
     offset: off_t
 ): *mut void
+export const PROT_NONE: int  = 0x00    /* [MC2] no permissions */
+export const PROT_READ: int  = 0x01    /* [MC2] pages can be read */
+export const PROT_WRITE: int = 0x02    /* [MC2] pages can be written */
+export const PROT_EXEC: int  = 0x04    /* [MC2] pages can be executed */
+export const MAP_SHARED: int = 0x1
+export const MAP_PRIVATE: int = 0x2
