@@ -849,7 +849,20 @@ function emit_prop_expr(
         break
       case "BuiltinConst":
         PANIC(`${prop_decl.name} should be handled elsewhere`)
+      case "VarDecl": {
+        const declarator = ctx.tc_result.var_decls
+          .get(prop_decl.decl)
+          ?.find((d) => d.name === expr.property.text)
+        assert(declarator, "VarDecl must have a matching declarator")
+        if (
+          declarator.init.kind === "Number" &&
+          declarator.decl_type === "Const"
+        ) {
+          return emit_expr(ctx, source_file, declarator.init)
+        }
+      }
       default:
+        TODO([prop_decl])
         PANIC(`Unhandled declaration in emit_prop_expr: ${expr.kind};`)
     }
 
