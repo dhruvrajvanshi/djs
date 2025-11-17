@@ -17,6 +17,8 @@ export type char = c_char
 
 builtin type c_int
 export type int = c_int
+export type size_t = c_int // TODO: Add usize type
+export type off_t = c_int // TODO: Add isize type
 
 export extern function puts(s: *char): int
 
@@ -24,3 +26,12 @@ extern type FILE
 
 extern function fopen(filename: *char, mode: *char): *mut FILE
 extern function fclose(file: *mut FILE): int
+extern function fileno(file: *mut FILE): int
+extern function mmap(
+    addr: *mut void,
+    len: size_t,
+    prot: int,
+    flags: int,
+    filedes: int,
+    offset: off_t
+): *mut void
