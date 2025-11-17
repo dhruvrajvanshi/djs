@@ -29,6 +29,12 @@ export function assert_never(value: never): never {
     stackStartFn: assert_never,
   })
 }
+export function assert_unreachable(message = ""): never {
+  throw new AssertionError({
+    message: `Unreachable assertion reached: ${message}`,
+    stackStartFn: assert_unreachable,
+  })
+}
 export function assert(value: unknown, message?: string): asserts value {
   if (!value) {
     throw new AssertionError({

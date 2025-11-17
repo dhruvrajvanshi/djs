@@ -1,5 +1,5 @@
 import type { SourceFiles } from "./SourceFiles.ts"
-import { assert_never, defer, PANIC, TODO } from "djs_std"
+import { assert_never, assert_unreachable, defer, PANIC, TODO } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
 import type { ResolveImportsResult } from "./resolve_imports.ts"
 import Path from "node:path"
@@ -26,6 +26,8 @@ import {
   type StructDeclStmt,
   type UntaggedUnionDeclStmt,
   QualifiedName,
+  TypeApplicationExpr,
+  CallExpr,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type, type_is_pointer, type_to_string } from "./type.ts"
@@ -522,6 +524,9 @@ function emit_expr(
         )
         ctx.link_c_paths.push(path)
         return { kind: "Empty" }
+      } else {
+        const node = try_emit_transmute(ctx, source_file, expr)
+        if (node) return node
       }
       const func = emit_expr(ctx, source_file, expr.callee)
       const args = expr.args.map((arg) => emit_expr(ctx, source_file, arg))
@@ -589,9 +594,58 @@ function emit_expr(
         expr: emit_expr(ctx, source_file, expr.expr),
       }
     }
+    case "TypeApplication":
+      return emit_type_application_expr(ctx, source_file, expr)
     default:
       TODO(`Unhandled expression: ${expr.kind}`)
   }
+}
+function try_emit_transmute(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: CallExpr,
+): CNode | null {
+  // e.g. foo.transmute<X, Y>(arg)
+  //   or transmute<X, Y>(arg)
+  // This should be lowered to `((X) arg)`
+  // However, if the pattern doesn't match, this would be treated as
+  // a normal function call
+  if (expr.callee.kind !== "TypeApplication") {
+    return null
+  }
+  if (expr.callee.expr.kind !== "Prop" && expr.callee.expr.kind !== "Var") {
+    return null
+  }
+
+  const builtin_const_ref = ctx.tc_result.builtin_const_refs.get(
+    expr.callee.expr,
+  )
+  if (!builtin_const_ref) return null
+  if (builtin_const_ref.name !== "transmute") return null
+
+  if (expr.callee.expr)
+    assert(
+      expr.callee.type_args.length === 2,
+      "transmute must have exactly two type arguments",
+    )
+  const callee_ty = ctx.tc_result.values.get(expr.callee)
+  assert(callee_ty, "Callee must have a type")
+  const to_type = ctx.tc_result.types.get(expr.callee.type_args[0])
+  assert(to_type)
+  return {
+    kind: "Cast",
+    to: emit_type(to_type),
+    expr: emit_expr(ctx, source_file, expr.args[0]),
+  }
+}
+function emit_type_application_expr(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  expr: TypeApplicationExpr,
+): CNode {
+  assert_unreachable(
+    "Type applications should be handled during emit_expr of the callee",
+  )
 }
 
 /**
@@ -794,7 +848,7 @@ function emit_prop_expr(
         name = prop_decl.func.name.text
         break
       case "BuiltinConst":
-        PANIC(`LJSBuiltin should be handled elsewhere`)
+        PANIC(`${prop_decl.name} should be handled elsewhere`)
       default:
         PANIC(`Unhandled declaration in emit_prop_expr: ${expr.kind};`)
     }

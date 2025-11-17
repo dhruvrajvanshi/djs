@@ -388,6 +388,13 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_expr(expr.expr)
         break
       }
+      case "TypeApplication": {
+        this.visit_expr(expr.expr)
+        for (const type_arg of expr.type_args) {
+          this.visit_type_annotation(type_arg)
+        }
+        break
+      }
     }
   }
   visit_ident(node: ast.Ident): void {}

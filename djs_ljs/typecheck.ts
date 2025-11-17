@@ -33,6 +33,7 @@ import {
   CallExpr,
   LJSBuiltinConstStmt,
   LJSBuiltinTypeStmt,
+  TypeApplicationExpr,
 } from "djs_ast"
 import Path from "node:path"
 import type { SourceFiles } from "./SourceFiles.ts"
@@ -51,15 +52,36 @@ import { assert_never, defer, is_readonly_array, TODO, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
-import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
+import type {
+  BuiltinConstDecl,
+  TypeDecl,
+  ValueDecl,
+  ValueDeclOfKind,
+} from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
 import { existsSync } from "node:fs"
 import { builtin_types, builtin_values } from "./builtins.ts"
+import { Subst } from "./subt.ts"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
   types: Map<TypeAnnotation, Type>
   var_decls: Map<VarDecl, CheckedVarDecl[]>
+  /**
+   * Expressions that refer to a builtin const.
+   * e.g.
+   * builtin const linkc
+   *
+   * linkc("some.c_file")
+   * ^^^^^ This will be in the map (excluding the call)
+   *
+   * Can also be a prop expr
+   * e.g.
+   * import * as mem from "ljs:mem"
+   * mem.tranmute<X, Y>(...)
+   * ^^^^^^^^^^^^ This will be in the map (excluding the type application and call)
+   */
+  builtin_const_refs: Map<PropExpr | VarExpr, BuiltinConstDecl>
   diagnostics: Diagnostics
 }
 interface CheckedVarDecl {
@@ -86,6 +108,7 @@ export function typecheck(
   const check_extern_function_results = new Map<LJSExternFunctionStmt, Type>()
   const check_extern_const_results = new Map<LJSExternConstStmt, Type>()
   const loop_stack: LoopStmt[] = []
+  const builtin_const_refs = new Map<PropExpr | VarExpr, BuiltinConstDecl>()
 
   interface CheckStructDeclResult {
     constructor_type: Extract<Type, { kind: "StructConstructor" }>
@@ -114,6 +137,7 @@ export function typecheck(
     values,
     types,
     var_decls: check_var_decl_result,
+    builtin_const_refs,
   }
 
   function check_source_file(file: SourceFile): void {
@@ -646,6 +670,10 @@ export function typecheck(
         return infer_address_of_expr(ctx, expr)
       case "Deref":
         return infer_deref_expr(ctx, expr)
+      case "Paren":
+        return infer_expr(ctx.source_file, expr.expr)
+      case "TypeApplication":
+        return infer_type_application_expr(ctx, expr)
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
@@ -654,6 +682,34 @@ export function typecheck(
       }
     }
   }
+  function infer_type_application_expr(
+    ctx: CheckCtx,
+    expr: TypeApplicationExpr,
+  ): Type {
+    const callee_type = infer_expr(ctx.source_file, expr.expr)
+    if (callee_type.kind !== "Forall") {
+      return emit_error_type(ctx, {
+        message: "Type application on a non-polymorphic type",
+        span: expr.span,
+      })
+    }
+
+    if (callee_type.params.length !== expr.type_args.length) {
+      emit_error(
+        ctx,
+        expr.span,
+        "Type application with incorrect number of type arguments",
+      )
+    }
+    const subst = Subst.of_application(
+      callee_type.params,
+      expr.type_args.map((type_arg) =>
+        check_type_annotation(ctx.source_file, type_arg),
+      ),
+    )
+    return Subst.apply(subst, callee_type.body)
+  }
+
   function infer_address_of_expr(ctx: CheckCtx, expr: AddressOfExpr): Type {
     if (expr.expr.kind !== "Var") {
       emit_error(ctx, expr.expr.span, "Can only take the address of a variable")
@@ -942,6 +998,10 @@ export function typecheck(
         hint: null,
       })
     }
+    if (decl.kind === "BuiltinConst") {
+      assert(!builtin_const_refs.has(expr))
+      builtin_const_refs.set(expr, decl)
+    }
     return type_of_decl(expr.ident.text, decl)
   }
 
@@ -1003,6 +1063,10 @@ export function typecheck(
             `Available properties: ` +
             [...lhs_module_decl.values.keys()].slice(5).join(", "),
         })
+      }
+      if (decl.kind === "BuiltinConst") {
+        assert(!builtin_const_refs.has(expr))
+        builtin_const_refs.set(expr, decl)
       }
       return type_of_decl(expr.property.text, decl)
     } else {

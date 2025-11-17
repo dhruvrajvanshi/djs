@@ -1,4 +1,5 @@
 import * as c from "../../libc.ljs"
+import * as mem from "ljs:mem"
 
 struct SQHeader {
     header_string: c.char[16]
@@ -7,6 +8,9 @@ struct SQHeader {
 
 const file = c.str`./test.sqlite`
 function main(): c.int {
+    let header: SQHeader = mem.uninitialized
+
+    let header_string = mem.transmute<*c.char, *SQHeader>(header.&)
     c.puts(c.str`SQLite file reader`)
     return 0
 }
