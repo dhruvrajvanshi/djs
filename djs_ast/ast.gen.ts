@@ -1045,6 +1045,7 @@ export type Expr =
   | TaggedTemplateLiteralExpr
   | AddressOfExpr
   | DerefExpr
+  | TypeApplicationExpr
 export class VarExpr {
   constructor(
     readonly span: Span,
@@ -1682,6 +1683,22 @@ export class DerefExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
+export class TypeApplicationExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly expr: Expr,
+    readonly type_args: readonly TypeAnnotation[],
+  ) {}
+
+  get kind(): "TypeApplication" {
+    return "TypeApplication"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
 
 export const Expr = {
   Var: (span: Span, leading_trivia: Text, ident: Ident): VarExpr =>
@@ -1826,6 +1843,12 @@ export const Expr = {
     new AddressOfExpr(span, expr, mut),
 
   Deref: (span: Span, expr: Expr): DerefExpr => new DerefExpr(span, expr),
+
+  TypeApplication: (
+    span: Span,
+    expr: Expr,
+    type_args: readonly TypeAnnotation[],
+  ): TypeApplicationExpr => new TypeApplicationExpr(span, expr, type_args),
 } as const
 
 export interface StructInitItem {

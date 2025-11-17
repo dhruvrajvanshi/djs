@@ -411,6 +411,29 @@ function parser_impl(
           }
           break
         }
+        case t.LessThan: {
+          if (
+            flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS ||
+            flags & PARSER_FLAGS.LJS
+          ) {
+            const restore = fork()
+            const type_args = parse_type_arguments()
+
+            if (type_args === ERR) {
+              restore(null)
+              return lhs
+            } else {
+              lhs = Expr.TypeApplication(
+                Span.between(lhs.span, type_args.at(-1)?.span ?? lhs.span),
+                lhs,
+                type_args,
+              )
+              break
+            }
+          } else {
+            return lhs
+          }
+        }
         case t.TemplateLiteralFragment:
           // The lexer doesn't differentiate between a template literal start and a template literal continuation
           // For example, `foo ${bar}baz`,
@@ -2913,6 +2936,20 @@ function parser_impl(
     }
     assert(self.current_token.span.start >= self.last_token.span.start)
     return self.last_token
+  }
+  function parse_type_arguments(): readonly TypeAnnotation[] | Err {
+    assert(advance().kind === t.LessThan)
+    const type_args = parse_comma_separated_list(
+      t.GreaterThan,
+      parse_type_annotation,
+    )
+    if (type_args === ERR) return ERR
+    if (type_args.length === 0) {
+      emit_error("Expected at least one type argument")
+      return ERR
+    }
+    if (expect(t.GreaterThan) === ERR) return ERR
+    return type_args
   }
 
   function define_binop_parser(
