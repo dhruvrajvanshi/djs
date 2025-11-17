@@ -17,10 +17,13 @@ export type char = c_char
 
 builtin type c_int
 export type int = c_int
-export type size_t = c_int // TODO: Add usize type
-export type off_t = c_int // TODO: Add isize type
+export type long = i64
+export type size_t = long // TODO: Add usize type
+export type off_t = long // TODO: Add isize type
 
 export extern function puts(s: *char): int
+export extern function abort(): void
+export extern function perror(s: *char): void
 
 extern type FILE
 
