@@ -590,6 +590,7 @@ export function typecheck(
           source.kind === "MutPtr" &&
           is_assignable({ source: source.type, target: target.type })
         )
+      case "void":
       case "c_char":
       case "c_int":
       case "u8":
