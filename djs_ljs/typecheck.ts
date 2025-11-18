@@ -549,6 +549,18 @@ export function typecheck(
         values.set(expr, expected_type)
         return
       }
+      case "Null": {
+        if (!type_is_pointer(expected_type)) {
+          emit_error(
+            ctx,
+            expr.span,
+            `Expected a pointer type, got ${type_to_string(expected_type)}`,
+          )
+        }
+        values.set(expr, expected_type)
+        return
+      }
+
       default: {
         const inferred = infer_expr(ctx.source_file, expr)
         if (inferred.kind === "BuiltinUninitialized") {
