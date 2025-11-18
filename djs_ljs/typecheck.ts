@@ -687,6 +687,11 @@ export function typecheck(
         return infer_expr(ctx.source_file, expr.expr)
       case "TypeApplication":
         return infer_type_application_expr(ctx, expr)
+      case "Not": {
+        check_expr(ctx, expr.expr, Type.boolean)
+        values.set(expr, Type.boolean)
+        return Type.boolean
+      }
       default: {
         return emit_error_type(ctx, {
           message: `TODO: ${expr.kind} cannot be inferred at the moment`,
