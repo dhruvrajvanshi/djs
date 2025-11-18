@@ -542,6 +542,9 @@ function emit_expr(
       const num_value = Number(expr.text)
       return { kind: "IntLiteral", value: num_value }
     }
+    case "Boolean": {
+      return { kind: "Ident", name: expr.value ? "true" : "false" }
+    }
     case "TaggedTemplateLiteral": {
       return emit_tagged_template_literal_expr(ctx, expr)
     }
