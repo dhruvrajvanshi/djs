@@ -34,6 +34,7 @@ import {
   LJSBuiltinConstStmt,
   LJSBuiltinTypeStmt,
   TypeApplicationExpr,
+  TernaryExpr,
 } from "djs_ast"
 import Path from "node:path"
 import type { SourceFiles } from "./SourceFiles.ts"
@@ -691,6 +692,8 @@ export function typecheck(
       case "StructInit": {
         return infer_struct_init_expr(ctx, expr)
       }
+      case "Ternary":
+        return infer_ternary_expr(ctx, expr)
       case "Boolean":
         return Type.boolean
       case "BinOp":
@@ -961,6 +964,12 @@ export function typecheck(
     const lhs_type = infer_expr(ctx.source_file, expr.lhs)
     check_expr(ctx, expr.rhs, lhs_type)
     return Type.boolean
+  }
+  function infer_ternary_expr(ctx: CheckCtx, expr: TernaryExpr): Type {
+    check_expr(ctx, expr.condition, Type.boolean)
+    const then_type = infer_expr(ctx.source_file, expr.if_false)
+    check_expr(ctx, expr.if_false, then_type)
+    return then_type
   }
 
   function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
