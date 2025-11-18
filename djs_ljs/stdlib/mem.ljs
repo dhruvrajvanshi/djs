@@ -1,2 +1,2 @@
 builtin const uninitialized
-builtin const transmute
+builtin const cast

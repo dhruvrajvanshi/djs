@@ -579,6 +579,8 @@ export function typecheck(
       return true
     }
     switch (target.kind) {
+      case "unknown":
+        return true
       case "Ptr":
         return (
           (source.kind === "Ptr" || source.kind === "MutPtr") &&
@@ -619,7 +621,6 @@ export function typecheck(
           source.kind === "Opaque" &&
           qualified_name_eq(target.qualified_name, source.qualified_name)
         )
-
       default:
         return false
     }

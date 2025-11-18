@@ -12,14 +12,14 @@ function main(): c.int {
     c.puts(c.str`==================`)
     const file = c.fopen(c.str`./djs_ljs/examples/sqlite_file_reader/test.sqlite`, c.str`r`)
     // TODO: Allow pointer comparisons with null
-    if (mem.transmute<c.size_t, *mut c.FILE>(file) === 0) {
+    if (mem.cast<c.size_t>(file) === 0) {
         c.perror(c.str`Couldn't open file`)
         c.abort()
     }
 
     const fd = c.fileno(file)
 
-    const NULL = mem.transmute<*mut void, c.size_t>(0)
+    const NULL = mem.cast<*mut void>(0)
 
     const ptr: *mut void = c.mmap(
         NULL,
@@ -33,8 +33,8 @@ function main(): c.int {
         c.perror(c.str`Couldn't mmap`)
         c.abort()
     }
-    const header_ptr = mem.transmute<*SQHeader, *mut void>(ptr)
-    const header_str = mem.transmute<*c.char, *SQHeader>(header_ptr)
+    const header_ptr = mem.cast<*SQHeader>(ptr)
+    const header_str = mem.cast<*c.char>(header_ptr)
     c.puts(header_str)
 
     c.fclose(file)
