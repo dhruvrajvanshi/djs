@@ -6,14 +6,13 @@ struct SQHeader {
     page_size: u16
 }
 
-const file = c.str`./test.sqlite`
+const s = c.str
 function main(): c.int {
-    c.puts(c.str`SQLite file reader`)
-    c.puts(c.str`==================`)
-    const file = c.fopen(c.str`./djs_ljs/examples/sqlite_file_reader/test.sqlite`, c.str`r`)
-    // TODO: Allow pointer comparisons with null
+    c.puts(s`SQLite file reader`)
+    c.puts(s`==================`)
+    const file = c.fopen(s`./djs_ljs/examples/sqlite_file_reader/test.sqlite`, s`r`)
     if (file === null) {
-        c.perror(c.str`Couldn't open file`)
+        c.perror(s`Couldn't open file`)
         c.abort()
     }
 
@@ -28,7 +27,7 @@ function main(): c.int {
         0
     )
     if (ptr === null) {
-        c.perror(c.str`Couldn't mmap`)
+        c.perror(s`Couldn't mmap`)
         c.abort()
     }
     const header_ptr = cast<*SQHeader>(ptr)
