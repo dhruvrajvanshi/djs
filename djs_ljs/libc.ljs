@@ -44,6 +44,7 @@ extern function fprintf(
     fmt: *char,
     ...args
 ): int
+extern function printf(fmt: *char, ...args): int
 extern function mmap(
     addr: *mut void,
     len: size_t,

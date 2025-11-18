@@ -53,6 +53,7 @@ function apply_to_type(subst: Subst, to: Type): Type {
       return Type.UnboxedFunc(
         to.params.map((param) => apply_to_type(subst, param)),
         apply_to_type(subst, to.return_type),
+        to.is_vararg,
       )
     case "FixedSizeArray":
       return Type.FixedSizeArray(apply_to_type(subst, to.element_type), to.size)

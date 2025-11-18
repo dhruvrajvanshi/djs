@@ -18,7 +18,7 @@ export type Type = ReadonlyUnion<
   | { kind: "Ptr"; type: Type }
   | { kind: "MutPtr"; type: Type }
   | { kind: "FixedSizeArray"; element_type: Type; size: number }
-  | { kind: "UnboxedFunc"; params: readonly Type[]; return_type: Type }
+  | { kind: "UnboxedFunc"; params: readonly Type[]; return_type: Type; is_vararg: boolean }
   | { kind: "BuiltinLinkC" }
   | { kind: "BuiltinUninitialized" }
   | { kind: "Opaque"; qualified_name: readonly string[] }
@@ -99,10 +99,11 @@ export const Type = {
     body,
   }),
   ParamRef: (name: string) => ({ kind: "ParamRef", name }),
-  UnboxedFunc: (params: readonly Type[], return_type: Type) => ({
+  UnboxedFunc: (params: readonly Type[], return_type: Type, is_vararg = false) => ({
     kind: "UnboxedFunc",
     params,
     return_type,
+    is_vararg,
   }),
   CStringConstructor: { kind: "CStringConstructor" },
   StructConstructor: (
@@ -184,7 +185,8 @@ export function type_to_string(type: Type): string {
       return `${type_to_string(type.element_type)}[${type.size}]`
     case "UnboxedFunc":
       const params = type.params.map(type_to_string).join(", ")
-      return `(${params}) => ${type_to_string(type.return_type)}`
+      const paramsList = type.is_vararg ? `${params}${params ? ", " : ""}...` : params
+      return `(${paramsList}) => ${type_to_string(type.return_type)}`
     case "Error":
       return "<Error>"
     case "void":
@@ -261,7 +263,8 @@ export function type_to_sexpr(type: Type): string {
       return `(FixedSizeArray ${type_to_sexpr(type.element_type)} ${type.size})`
     case "UnboxedFunc":
       const params = type.params.map(type_to_sexpr).join(" ")
-      return `((${params}) => ${type_to_sexpr(type.return_type)})`
+      const paramsList = type.is_vararg ? `${params}${params ? " " : ""}...` : params
+      return `((${paramsList}) => ${type_to_sexpr(type.return_type)})`
 
     case "CStringConstructor":
       return "`` => *c_str"
