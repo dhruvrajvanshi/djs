@@ -4,12 +4,13 @@ import { cast } from "ljs:mem"
 struct SQHeader {
     header_string: c.char[16]
     page_size: u16
+    file_format: u8
 }
 
 const s = c.str
 function main(): c.int {
-    c.puts(s`SQLite file reader`)
-    c.puts(s`==================`)
+    c.printf(s`SQLite file reader\n`)
+    c.printf(s`==================\n`)
     const file = c.fopen(s`./djs_ljs/examples/sqlite_file_reader/test.sqlite`, s`r`)
     if (file === null) {
         c.perror(s`Couldn't open file`)
@@ -30,9 +31,18 @@ function main(): c.int {
         c.perror(s`Couldn't mmap`)
         c.abort()
     }
-    const header_ptr = cast<*SQHeader>(ptr)
-    const header_str = cast<*c.char>(header_ptr)
+    const header = cast<*SQHeader>(ptr)
+    const header_str = cast<*c.char>(header)
     c.puts(header_str)
+    c.printf(s`DB page size: %d\n`, header.page_size)
+    let format_name: *c.char = s`Unknown`
+    if (header.file_format === 1) {
+        format_name = s`Legacy`
+    } else {
+        format_name = s`WAL`
+    }
+
+    c.printf(s`File format: %s\n`, format_name)
 
     c.fclose(file)
     return 0
