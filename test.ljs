@@ -1,4 +1,0 @@
-untagged union Foo {
-  u32: u32
-  str: *c.str
-}
