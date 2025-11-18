@@ -41,14 +41,20 @@ test("parse error for missing parenthesis in if condition", () => {
         kind: "If",
         condition: {
           kind: "Var",
-          ident: "x",
+          ident: {
+            kind: "Ident",
+            text: "x",
+          },
           leading_trivia: "",
         },
         if_false: {
           kind: "Expr",
           expr: {
             kind: "Var",
-            ident: "z",
+            ident: {
+              kind: "Ident",
+              text: "z",
+            },
             leading_trivia: "",
           },
         },
@@ -56,7 +62,10 @@ test("parse error for missing parenthesis in if condition", () => {
           kind: "Expr",
           expr: {
             kind: "Var",
-            ident: "y",
+            ident: {
+              kind: "Ident",
+              text: "y",
+            },
             leading_trivia: "",
           },
         },
