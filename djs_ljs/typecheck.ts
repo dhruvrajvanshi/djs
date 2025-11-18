@@ -494,8 +494,26 @@ export function typecheck(
 
     const ctx = make_check_ctx(source_file, check_extern_function_results)
     const param_types: Type[] = []
+    let index = -1
     for (const param of stmt.params) {
-      if (!param.type_annotation) {
+      index++
+      if (param.pattern.kind === "Rest") {
+        if (index !== stmt.params.length - 1) {
+          emit_error(
+            ctx,
+            param.span,
+            "Rest parameter must be the last parameter",
+          )
+        }
+        if (param.type_annotation) {
+          emit_error(
+            ctx,
+            param.span,
+            "A Rest parameter in an extern function cannot have a type annotation",
+          )
+        }
+        continue
+      } else if (!param.type_annotation) {
         emit_error(
           ctx,
           param.span,

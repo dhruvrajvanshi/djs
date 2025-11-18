@@ -190,6 +190,7 @@ export class SymbolTable {
     ty("f64", Type.f64)
     ty("void", Type.void)
     ty("boolean", Type.boolean)
+    ty("unknown", Type.Unknown)
   }
 
   add_value(name: string, decl: ValueDecl): void {

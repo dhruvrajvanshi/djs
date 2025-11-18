@@ -197,6 +197,15 @@ function types_first(
 }
 
 function emit_param(ctx: EmitContext, param: Param): CNode {
+  if (param.pattern.kind === "Rest") {
+    assert(
+      param.pattern.pattern.kind === "Var",
+      "Rest param must be a variable",
+    )
+    return {
+      kind: "...",
+    }
+  }
   assert(param.pattern.kind === "Var", "Param pattern must be a variable")
   const param_name = param.pattern.ident.text
 
@@ -1088,6 +1097,8 @@ function render_c_node(node: CNode): string {
     case "Not": {
       return `(!${render_c_node(node.expr)})`
     }
+    case "...":
+      return "..."
     case "Empty":
       return ""
     default:
@@ -1169,3 +1180,4 @@ export type CNode =
   | { kind: "AddressOf"; expr: CNode }
   | { kind: "Deref"; expr: CNode }
   | { kind: "Not"; expr: CNode }
+  | { kind: "..." }

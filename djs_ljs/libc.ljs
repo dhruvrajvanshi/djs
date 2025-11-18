@@ -39,6 +39,11 @@ extern function fopen(filename: *char, mode: *char): *mut FILE
 extern function fclose(file: *mut FILE): int
 extern function fileno(file: *mut FILE): int
 extern function fputs(str: *char, file: *mut FILE): int
+extern function fprintf(
+    file: *mut FILE,
+    fmt: *char,
+    ...args
+): int
 extern function mmap(
     addr: *mut void,
     len: size_t,
