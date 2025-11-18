@@ -596,6 +596,16 @@ function emit_expr(
     }
     case "TypeApplication":
       return emit_type_application_expr(ctx, source_file, expr)
+    case "Null": {
+      const ty = ctx.tc_result.values.get(expr)
+      assert(ty, "expr must have a type")
+      assert(ty.kind === "Ptr" || ty.kind === "MutPtr")
+      return {
+        kind: "Cast",
+        to: emit_type(ty),
+        expr: { kind: "IntLiteral", value: 0 },
+      }
+    }
     default:
       TODO(`Unhandled expression: ${expr.kind}`)
   }
