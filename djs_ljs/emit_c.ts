@@ -627,6 +627,17 @@ function emit_expr(
         expr: expr_node,
       }
     }
+    case "Ternary": {
+      const condition = emit_expr(ctx, source_file, expr.condition)
+      const then_branch = emit_expr(ctx, source_file, expr.if_true)
+      const else_branch = emit_expr(ctx, source_file, expr.if_false)
+      return {
+        kind: "Ternary",
+        condition,
+        then_branch,
+        else_branch,
+      }
+    }
     default:
       TODO(`Unhandled expression: ${expr.kind}`)
   }
@@ -1101,6 +1112,10 @@ function render_c_node(node: CNode): string {
       return "..."
     case "Empty":
       return ""
+    case "Ternary":
+      return `(${render_c_node(node.condition)} ? ${render_c_node(
+        node.then_branch,
+      )} : ${render_c_node(node.else_branch)})`
     default:
       assert_never(node)
   }
@@ -1181,3 +1196,9 @@ export type CNode =
   | { kind: "Deref"; expr: CNode }
   | { kind: "Not"; expr: CNode }
   | { kind: "..." }
+  | {
+      kind: "Ternary"
+      condition: CNode
+      then_branch: CNode
+      else_branch: CNode
+    }
