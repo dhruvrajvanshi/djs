@@ -263,6 +263,8 @@ function emit_type(type: Type): CNode {
       return { kind: "Ident", name: "int64_t" }
     case "u64":
       return { kind: "Ident", name: "uint64_t" }
+    case "boolean":
+      return { kind: "Ident", name: "bool" }
 
     case "Ptr":
       return { kind: "ConstPtr", to_type: emit_type(type.type) }
@@ -604,6 +606,13 @@ function emit_expr(
         kind: "Cast",
         to: emit_type(ty),
         expr: { kind: "IntLiteral", value: 0 },
+      }
+    }
+    case "Not": {
+      const expr_node = emit_expr(ctx, source_file, expr.expr)
+      return {
+        kind: "Not",
+        expr: expr_node,
       }
     }
     default:
@@ -1073,6 +1082,9 @@ function render_c_node(node: CNode): string {
       return `(&${render_c_node(node.expr)})`
     case "Deref":
       return `(*${render_c_node(node.expr)})`
+    case "Not": {
+      return `(!${render_c_node(node.expr)})`
+    }
     case "Empty":
       return ""
     default:
@@ -1153,3 +1165,4 @@ export type CNode =
   | { kind: "Continue" }
   | { kind: "AddressOf"; expr: CNode }
   | { kind: "Deref"; expr: CNode }
+  | { kind: "Not"; expr: CNode }
