@@ -52,15 +52,14 @@ import { assert_never, defer, is_readonly_array, TODO, zip } from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
-import type {
-  BuiltinConstDecl,
-  TypeDecl,
-  ValueDecl,
-  ValueDeclOfKind,
-} from "./SymbolTable.ts"
+import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
 import { existsSync } from "node:fs"
-import { builtin_types, builtin_values } from "./builtins.ts"
+import {
+  builtin_types,
+  builtin_values,
+  type BuiltinConstDecl,
+} from "./builtins.ts"
 import { Subst } from "./subt.ts"
 
 export interface TypecheckResult {
