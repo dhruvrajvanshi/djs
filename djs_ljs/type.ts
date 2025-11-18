@@ -24,6 +24,10 @@ export type Type = ReadonlyUnion<
   | { kind: "Opaque"; qualified_name: readonly string[] }
   | { kind: "Forall"; params: readonly TypeParam[]; body: Type }
   | { kind: "ParamRef"; name: string }
+  /**
+   * Top type: Every type is assignable to this type.
+   */
+  | { kind: "unknown" }
   | StructConstructorType
   | StructInstanceType
   | UntaggedUnionConstructorType
@@ -140,6 +144,9 @@ export const Type = {
   Uninitialized: {
     kind: "BuiltinUninitialized",
   },
+  Unknown: {
+    kind: "unknown",
+  },
   Error: (message: string) => ({ kind: "Error", message }),
 } satisfies Record<string, Type | ((...args: readonly never[]) => Type)>
 
@@ -212,6 +219,8 @@ export function type_to_string(type: Type): string {
       return `forall ${type.params.map((p) => p.name).join(", ")}. ${type_to_string(type.body)}`
     case "ParamRef":
       return type.name
+    case "unknown":
+      return "unknown"
     default:
       return assert_never(type)
   }
@@ -300,6 +309,8 @@ export function type_to_sexpr(type: Type): string {
         .join(" ")}) ${type_to_sexpr(type.body)})`
     case "ParamRef":
       return `(ParamRef ${type.name})`
+    case "unknown":
+      return "unknown"
     default:
       return assert_never(type)
   }
@@ -324,6 +335,7 @@ export function type_is_convertible_from_numeric_literal(
   type: Type,
   literal: string,
 ): boolean {
+  if (type.kind === "unknown") return true
   if (type_is_integral(type)) {
     return Number.isInteger(parseInt(literal))
   }

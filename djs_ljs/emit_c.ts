@@ -525,7 +525,7 @@ function emit_expr(
         ctx.link_c_paths.push(path)
         return { kind: "Empty" }
       } else {
-        const node = try_emit_transmute(ctx, source_file, expr)
+        const node = try_emit_cast(ctx, source_file, expr)
         if (node) return node
       }
       const func = emit_expr(ctx, source_file, expr.callee)
@@ -600,13 +600,13 @@ function emit_expr(
       TODO(`Unhandled expression: ${expr.kind}`)
   }
 }
-function try_emit_transmute(
+function try_emit_cast(
   ctx: EmitContext,
   source_file: SourceFile,
   expr: CallExpr,
 ): CNode | null {
-  // e.g. foo.transmute<X, Y>(arg)
-  //   or transmute<X, Y>(arg)
+  // e.g. foo.cast<X>(arg)
+  //   or cast<X>(arg)
   // This should be lowered to `((X) arg)`
   // However, if the pattern doesn't match, this would be treated as
   // a normal function call
@@ -621,12 +621,12 @@ function try_emit_transmute(
     expr.callee.expr,
   )
   if (!builtin_const_ref) return null
-  if (builtin_const_ref.name !== "transmute") return null
+  if (builtin_const_ref.name !== "cast") return null
 
   if (expr.callee.expr)
     assert(
-      expr.callee.type_args.length === 2,
-      "transmute must have exactly two type arguments",
+      expr.callee.type_args.length === 1,
+      "cast must have exactly one type argument",
     )
   const callee_ty = ctx.tc_result.values.get(expr.callee)
   assert(callee_ty, "Callee must have a type")

@@ -82,6 +82,7 @@ function apply_to_type(subst: Subst, to: Type): Type {
     case "c_char":
     case "c_int":
     case "void":
+    case "unknown":
     case "Error":
       return to
     default:
