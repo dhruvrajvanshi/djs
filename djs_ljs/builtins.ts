@@ -1,10 +1,7 @@
-import type { TypeDecl, ValueDecl } from "./SymbolTable.ts"
 import { Type } from "./type.ts"
 
-type BuiltinConstDecl = Extract<ValueDecl, { kind: "BuiltinConst" }>
-type BuiltinConstName = BuiltinConstDecl["name"]
-
-export const builtin_values: Record<BuiltinConstName, BuiltinConstDecl> = {
+export type BuiltinConstDecl = ValueOf<typeof builtin_values>
+export const builtin_values = {
   linkc: { kind: "BuiltinConst", name: "linkc", type: Type.BuiltinLinkC },
   uninitialized: {
     kind: "BuiltinConst",
@@ -24,11 +21,10 @@ export const builtin_values: Record<BuiltinConstName, BuiltinConstDecl> = {
     name: "c_str",
     type: Type.CStringConstructor,
   },
-}
+} as const
 
-type BuiltinTypeDecl = Extract<TypeDecl, { kind: "BuiltinType" }>
-type BuiltinTypeName = BuiltinTypeDecl["name"]
-export const builtin_types: Record<BuiltinTypeName, BuiltinTypeDecl> = {
+export type BuiltinTypeDecl = ValueOf<typeof builtin_types>
+export const builtin_types = {
   c_char: {
     kind: "BuiltinType",
     name: "c_char",
@@ -39,4 +35,6 @@ export const builtin_types: Record<BuiltinTypeName, BuiltinTypeDecl> = {
     name: "c_int",
     type: Type.c_int,
   },
-}
+} as const
+
+type ValueOf<T> = T[keyof T]

@@ -14,6 +14,7 @@ import {
 import { MapUtils } from "djs_std"
 import assert from "node:assert"
 import { Type } from "./type.ts"
+import type { BuiltinConstDecl, BuiltinTypeDecl } from "./builtins.ts"
 
 export type ValueDeclOfKind<K extends ValueDecl["kind"]> = Extract<
   ValueDecl,
@@ -24,7 +25,6 @@ export type ValueDeclExcludingKind<K extends ValueDecl["kind"]> = Exclude<
   { kind: K }
 >
 
-export type BuiltinConstDecl = Extract<ValueDecl, { kind: "BuiltinConst" }>
 export type ValueDecl =
   | {
       kind: "VarDecl"
@@ -47,11 +47,7 @@ export type ValueDecl =
       stmt: LJSExternConstStmt
       source_file: string
     }
-  | {
-      kind: "BuiltinConst"
-      name: "linkc" | "uninitialized" | "c_str" | "transmute"
-      type: Type
-    }
+  | BuiltinConstDecl
   | {
       kind: "Import"
       stmt: ImportStmt
@@ -160,11 +156,7 @@ export type TypeDecl =
       stmt: LJSExternTypeStmt
       source_file: string
     }
-  | {
-      kind: "BuiltinType"
-      name: "c_char" | "c_int"
-      type: Type
-    }
+  | BuiltinTypeDecl
   /**
    * Introduced after resolving imports
    * See the comment in ValueDecl for more details.
@@ -176,7 +168,6 @@ export type TypeDecl =
     }
 export type ImportTypeDecl = Extract<TypeDecl, { kind: "Import" }>
 export type TypeAliasTypeDecl = Extract<TypeDecl, { kind: "TypeAlias" }>
-export type BuiltinTypeDecl = Extract<TypeDecl, { kind: "Builtin" }>
 
 export class SymbolTable {
   private values = new Map<string, ValueDecl>()
