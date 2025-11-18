@@ -494,6 +494,7 @@ export function typecheck(
 
     const ctx = make_check_ctx(source_file, check_extern_function_results)
     const param_types: Type[] = []
+    let is_vararg = false
     let index = -1
     for (const param of stmt.params) {
       index++
@@ -512,6 +513,7 @@ export function typecheck(
             "A Rest parameter in an extern function cannot have a type annotation",
           )
         }
+        is_vararg = true
         continue
       } else if (!param.type_annotation) {
         emit_error(
@@ -527,7 +529,7 @@ export function typecheck(
       }
     }
     const return_type = check_type_annotation(ctx.source_file, stmt.return_type)
-    const ty = Type.UnboxedFunc(param_types, return_type)
+    const ty = Type.UnboxedFunc(param_types, return_type, is_vararg)
     check_extern_function_results.set(stmt, ty)
     return ty
   }
@@ -1051,15 +1053,31 @@ export function typecheck(
       return Type.void
     }
     if (lhs_type.kind === "UnboxedFunc") {
-      if (expr.args.length !== lhs_type.params.length) {
-        emit_error(
-          ctx,
-          expr.callee.span,
-          `Expected ${lhs_type.params.length} arguments, got ${expr.args.length}`,
-        )
-      }
-      for (const [arg, expected_type] of zip(expr.args, lhs_type.params)) {
-        check_expr(ctx, arg, expected_type)
+      if (lhs_type.is_vararg) {
+        if (expr.args.length < lhs_type.params.length) {
+          emit_error(
+            ctx,
+            expr.callee.span,
+            `Expected at least ${lhs_type.params.length} arguments, got ${expr.args.length}`,
+          )
+        }
+        for (const [arg, expected_type] of zip(expr.args, lhs_type.params)) {
+          check_expr(ctx, arg, expected_type)
+        }
+        for (let i = lhs_type.params.length; i < expr.args.length; i++) {
+          infer_expr(ctx.source_file, expr.args[i])
+        }
+      } else {
+        if (expr.args.length !== lhs_type.params.length) {
+          emit_error(
+            ctx,
+            expr.callee.span,
+            `Expected ${lhs_type.params.length} arguments, got ${expr.args.length}`,
+          )
+        }
+        for (const [arg, expected_type] of zip(expr.args, lhs_type.params)) {
+          check_expr(ctx, arg, expected_type)
+        }
       }
       return lhs_type.return_type
     } else {
