@@ -1,5 +1,5 @@
 import * as c from "../../libc.ljs"
-import * as mem from "ljs:mem"
+import { cast } from "ljs:mem"
 
 struct SQHeader {
     header_string: c.char[16]
@@ -31,8 +31,8 @@ function main(): c.int {
         c.perror(c.str`Couldn't mmap`)
         c.abort()
     }
-    const header_ptr = mem.cast<*SQHeader>(ptr)
-    const header_str = mem.cast<*c.char>(header_ptr)
+    const header_ptr = cast<*SQHeader>(ptr)
+    const header_str = cast<*c.char>(header_ptr)
     c.puts(header_str)
 
     c.fclose(file)
