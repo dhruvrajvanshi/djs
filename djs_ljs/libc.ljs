@@ -1,3 +1,11 @@
+builtin const linkc
+
+linkc("./libc_shims.c")
+// TODO: Figure out how to portably get these as
+//       constants without breaking tests in CI
+extern function get_stdin(): *mut FILE
+extern function get_stdout(): *mut FILE
+extern function get_stderr(): *mut FILE
 
 builtin const c_str
 /**
@@ -30,6 +38,7 @@ extern type FILE
 extern function fopen(filename: *char, mode: *char): *mut FILE
 extern function fclose(file: *mut FILE): int
 extern function fileno(file: *mut FILE): int
+extern function fputs(str: *char, file: *mut FILE): int
 extern function mmap(
     addr: *mut void,
     len: size_t,
