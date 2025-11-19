@@ -60,7 +60,12 @@ import {
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
-import type { TypeDecl, ValueDecl, ValueDeclOfKind } from "./SymbolTable.ts"
+import type {
+  TypeDecl,
+  TypeDeclExcludingKind,
+  ValueDecl,
+  ValueDeclOfKind,
+} from "./SymbolTable.ts"
 import type { ResolveResult } from "./resolve.ts"
 import { existsSync } from "node:fs"
 import {
@@ -1323,6 +1328,10 @@ export function typecheck(
         span: rest[0].span,
       })
     }
+    assert(
+      member.kind !== "Module",
+      "Should not happen because of the rest.length !== 1 check above",
+    )
     return type_decl_to_type(member)
   }
   function lookup_type_var(ctx: CheckCtx, t: Ident | readonly Ident[]): Type {
@@ -1336,6 +1345,12 @@ export function typecheck(
         return emit_error_type(ctx, {
           span: t.span,
           message: `Unbound type variable ${t.text}`,
+        })
+      }
+      if (decl.kind === "Module") {
+        return emit_error_type(ctx, {
+          span: t.span,
+          message: `${t.text} is a module, not a type`,
         })
       }
       return type_decl_to_type(decl)
@@ -1360,7 +1375,9 @@ export function typecheck(
     return t
   }
 
-  function type_decl_to_type(decl: TypeDecl): Type {
+  function type_decl_to_type(
+    decl: TypeDeclExcludingKind<"Module" | "Import" | "ImportStarAs">,
+  ): Type {
     switch (decl.kind) {
       case "Builtin":
         return decl.type
@@ -1375,12 +1392,6 @@ export function typecheck(
         const name = qualified_name_of_decl(decl.stmt.name, source_file.path)
         return Type.Opaque(name)
       }
-      case "Module":
-      case "ImportStarAs":
-      case "Import":
-        return PANIC(
-          "type_decl_to_type must be called called after resolving modules",
-        )
       case "Struct": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
