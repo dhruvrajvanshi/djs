@@ -49,7 +49,14 @@ import {
   type StructInstanceType,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
-import { assert_never, defer, is_readonly_array, TODO, zip } from "djs_std"
+import {
+  assert_never,
+  defer,
+  is_readonly_array,
+  PANIC,
+  TODO,
+  zip,
+} from "djs_std"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
@@ -1316,13 +1323,7 @@ export function typecheck(
         span: rest[0].span,
       })
     }
-    return type_decl_to_type(
-      {
-        ...ctx,
-        source_file: source_files.get(decl.path)!,
-      },
-      member,
-    )
+    return type_decl_to_type(member)
   }
   function lookup_type_var(ctx: CheckCtx, t: Ident | readonly Ident[]): Type {
     if (is_readonly_array(t)) {
@@ -1337,7 +1338,7 @@ export function typecheck(
           message: `Unbound type variable ${t.text}`,
         })
       }
-      return type_decl_to_type(ctx, decl)
+      return type_decl_to_type(decl)
     }
   }
 
@@ -1359,14 +1360,14 @@ export function typecheck(
     return t
   }
 
-  function type_decl_to_type(ctx: CheckCtx, decl: TypeDecl): Type {
+  function type_decl_to_type(decl: TypeDecl): Type {
     switch (decl.kind) {
       case "Builtin":
         return decl.type
       case "TypeAlias": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        return check_type_annotation(ctx.source_file, decl.stmt.type_annotation)
+        return check_type_annotation(source_file, decl.stmt.type_annotation)
       }
       case "ExternType": {
         const source_file = source_files.get(decl.source_file)
@@ -1375,11 +1376,11 @@ export function typecheck(
         return Type.Opaque(name)
       }
       case "Module":
-        return TODO()
       case "ImportStarAs":
-        return TODO("ImportStarAs")
       case "Import":
-        return TODO("Import")
+        return PANIC(
+          "type_decl_to_type must be called called after resolving modules",
+        )
       case "Struct": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
