@@ -35,6 +35,7 @@ import {
   LJSBuiltinTypeStmt,
   TypeApplicationExpr,
   TernaryExpr,
+  QualifiedName,
 } from "djs_ast"
 import Path from "node:path"
 import type { SourceFiles } from "./SourceFiles.ts"
@@ -1389,7 +1390,8 @@ export function typecheck(
       case "ExternType": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const name = qualified_name_of_decl(decl.stmt.name, source_file.path)
+        // Extern types should not be mangled - they refer to actual link-time names
+        const name = [decl.stmt.name.text]
         return Type.Opaque(name)
       }
       case "Struct": {
@@ -1417,8 +1419,12 @@ export function typecheck(
   ): string[] {
     const source_file = source_files.get(source_file_path)
     assert(source_file, `Unknown source file: ${source_file_path}`)
-    // TODO: Convert the source path into a qualified module name
-    return [ident.text]
+    const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
+    if (qualified_parts.length === 1 && qualified_parts[0] === '') {
+      // Entry file has empty qualified name, just return the identifier
+      return [ident.text]
+    }
+    return [...qualified_parts, ident.text]
   }
 }
 

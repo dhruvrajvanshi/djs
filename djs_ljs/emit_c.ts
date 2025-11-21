@@ -80,7 +80,7 @@ export function emit_c(
 
         forward_decls.push({
           kind: "FuncForwardDecl",
-          name: func_name,
+          name: mangle_func_name(ctx, source_file, func_name),
           params,
           returns: return_type,
         })
@@ -111,22 +111,18 @@ export function emit_c(
         break
       }
       case "LJSExternType": {
-        let name = QualifiedName.to_array(source_file.qualified_name).concat(
-          stmt.name.text,
-        )
-        if (name[0] === "") name = name.slice(1)
         forward_decls.push({
           kind: "StructDecl",
-          name: mangle_struct_name(name),
+          name: stmt.name.text,
         })
         break
       }
       case "StructDecl": {
-        forward_decls.push(emit_struct_decl(stmt))
+        forward_decls.push(emit_struct_decl(ctx, source_file, stmt))
         break
       }
       case "UntaggedUnionDecl": {
-        forward_decls.push(emit_untagged_union_decl(stmt))
+        forward_decls.push(emit_untagged_union_decl(ctx, source_file, stmt))
         break
       }
     }
@@ -137,9 +133,9 @@ export function emit_c(
     if (stmt.kind === "Func") {
       defs.push(emit_func_def(ctx, source_file, stmt))
     } else if (stmt.kind === "StructDecl") {
-      defs.push(emit_struct_def(ctx, stmt))
+      defs.push(emit_struct_def(ctx, source_file, stmt))
     } else if (stmt.kind === "UntaggedUnionDecl") {
-      defs.push(emit_untagged_union_def(ctx, stmt))
+      defs.push(emit_untagged_union_def(ctx, source_file, stmt))
     } else {
       defs.push(emit_stmt(ctx, source_file, stmt))
     }
@@ -153,13 +149,23 @@ export function emit_c(
     linkc_paths: ctx.link_c_paths,
   }
 }
-function emit_struct_decl(stmt: StructDeclStmt): CNode {
+function emit_struct_decl(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: StructDeclStmt,
+): CNode {
+  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
+  const full_name = [...qualified_parts, stmt.struct_def.name.text]
   return {
     kind: "StructDecl",
-    name: mangle_struct_name([stmt.struct_def.name.text]),
+    name: mangle_struct_name(full_name),
   }
 }
-function emit_struct_def(ctx: EmitContext, stmt: StructDeclStmt): CNode {
+function emit_struct_def(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: StructDeclStmt,
+): CNode {
   const fields = stmt.struct_def.members.map((member) => {
     const type_obj = ctx.tc_result.types.get(member.type_annotation)
     assert(type_obj, "Type annotation must have resolved type")
@@ -178,9 +184,11 @@ function emit_struct_def(ctx: EmitContext, stmt: StructDeclStmt): CNode {
       }
     }
   })
+  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
+  const full_name = [...qualified_parts, stmt.struct_def.name.text]
   return {
     kind: "StructDef",
-    name: mangle_struct_name([stmt.struct_def.name.text]),
+    name: mangle_struct_name(full_name),
     fields,
   }
 }
@@ -315,7 +323,7 @@ function emit_func_def(
 
   return {
     kind: "FuncDef",
-    name: func_name,
+    name: mangle_func_name(ctx, source_file, func_name),
     params,
     returns: return_type,
     body,
@@ -816,28 +824,44 @@ function emit_struct_init_expr(
   }
 }
 function mangle_struct_name(qualified_name: readonly string[]): string {
-  if (qualified_name.length !== 1) {
-    TODO()
-  }
-  return qualified_name[0]
+  if (qualified_name.length === 0) return "anonymous_struct"
+  return qualified_name.join("_")
 }
 
 function mangle_union_name(qualified_name: readonly string[]): string {
-  if (qualified_name.length !== 1) {
-    TODO()
-  }
-  return qualified_name[0]
+  if (qualified_name.length === 0) return "anonymous_union"
+  return qualified_name.join("_")
 }
 
-function emit_untagged_union_decl(stmt: UntaggedUnionDeclStmt): CNode {
+function mangle_func_name(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  func_name: string,
+): string {
+  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
+  if (qualified_parts.length === 0) {
+    return func_name
+  }
+
+  return `${qualified_parts.join("_")}_${func_name}`
+}
+
+function emit_untagged_union_decl(
+  ctx: EmitContext,
+  source_file: SourceFile,
+  stmt: UntaggedUnionDeclStmt,
+): CNode {
+  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
+  const full_name = [...qualified_parts, stmt.untagged_union_def.name.text]
   return {
     kind: "UnionDecl",
-    name: mangle_union_name([stmt.untagged_union_def.name.text]),
+    name: mangle_union_name(full_name),
   }
 }
 
 function emit_untagged_union_def(
   ctx: EmitContext,
+  source_file: SourceFile,
   stmt: UntaggedUnionDeclStmt,
 ): CNode {
   const fields = stmt.untagged_union_def.members.map((member) => {
@@ -847,9 +871,11 @@ function emit_untagged_union_def(
       type: emit_type_annotation(ctx, member.type_annotation),
     }
   })
+  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
+  const full_name = [...qualified_parts, stmt.untagged_union_def.name.text]
   return {
     kind: "UnionDef",
-    name: mangle_union_name([stmt.untagged_union_def.name.text]),
+    name: mangle_union_name(full_name),
     fields,
   }
 }
@@ -885,10 +911,19 @@ function emit_prop_expr(
       case "LJSExternFunction":
         name = prop_decl.stmt.name.text
         break
-      case "Func":
+      case "Func": {
         assert(prop_decl.func.name)
-        name = prop_decl.func.name.text
+        const func_name = prop_decl.func.name.text
+        const module_source_file = [...ctx.source_files.values()].find((sf) =>
+          sf.stmts.some(
+            (stmt) =>
+              stmt.kind === "Func" && stmt.func.name?.text === func_name,
+          ),
+        )
+        assert(module_source_file, "Could not find source file for function")
+        name = mangle_func_name(ctx, module_source_file, func_name)
         break
+      }
       case "BuiltinConst":
         PANIC(`${prop_decl.name} should be handled elsewhere`)
       case "VarDecl": {

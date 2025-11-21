@@ -21,6 +21,38 @@ export type CollectSourceFilesResult = {
   diagnostics: Diagnostics
 }
 
+function calculate_qualified_name(
+  entry_path: string,
+  file_path: string,
+): QualifiedName {
+  if (entry_path === file_path) {
+    return QualifiedName()
+  }
+
+  const entry_dir = Path.dirname(entry_path)
+  const relative_path = Path.relative(entry_dir, file_path)
+
+  // Handle paths outside the entry file directory
+  if (relative_path.startsWith("..")) {
+    // Use "external" prefix for files outside entry directory
+    // First remove the file extension
+    const without_ext = relative_path.replace(/\.[^./\\]*$/, "")
+    // Then replace .. with external and path separators with underscores
+    const normalized = without_ext
+      .replace(/\.\./g, "external")
+      .replace(/[/\\]/g, "_")
+    const parts = normalized.split("_").filter((part) => part.length > 0)
+    return QualifiedName(...parts)
+  }
+
+  // Convert path to qualified name parts, removing file extension
+  const without_ext = relative_path.replace(/\.[^.]*$/, "")
+  const parts = without_ext
+    .split(/[/\\]/)
+    .filter((part) => part.length > 0 && part !== ".")
+  return QualifiedName(...parts)
+}
+
 export async function collect_source_files(
   entry_path: string,
   fs: FS,
@@ -35,9 +67,10 @@ export async function collect_source_files(
     path: string
     import_info: ImportInfo | null
   }
+  const absolute_entry_path = fs.to_absolute(entry_path)
   const queue = Queue.from<Entry>([
     {
-      path: fs.to_absolute(entry_path),
+      path: absolute_entry_path,
       import_info: null,
     },
   ])
@@ -64,7 +97,8 @@ export async function collect_source_files(
       }
       continue
     }
-    const source_file = parse_source_file(QualifiedName(), path, source_text)
+    const qualified_name = calculate_qualified_name(absolute_entry_path, path)
+    const source_file = parse_source_file(qualified_name, path, source_text)
 
     source_files.set(path, source_file)
     diagnostics.push(path, ...source_file.errors)
