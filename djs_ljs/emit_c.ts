@@ -80,7 +80,7 @@ export function emit_c(
 
         forward_decls.push({
           kind: "FuncForwardDecl",
-          name: mangle_func_name(ctx, source_file, func_name),
+          name: mangle_func_name(source_file, func_name),
           params,
           returns: return_type,
         })
@@ -122,7 +122,7 @@ export function emit_c(
         break
       }
       case "UntaggedUnionDecl": {
-        forward_decls.push(emit_untagged_union_decl(ctx, source_file, stmt))
+        forward_decls.push(emit_untagged_union_decl(source_file, stmt))
         break
       }
     }
@@ -323,7 +323,7 @@ function emit_func_def(
 
   return {
     kind: "FuncDef",
-    name: mangle_func_name(ctx, source_file, func_name),
+    name: mangle_func_name(source_file, func_name),
     params,
     returns: return_type,
     body,
@@ -824,20 +824,16 @@ function emit_struct_init_expr(
   }
 }
 function mangle_struct_name(qualified_name: readonly string[]): string {
-  if (qualified_name.length === 0) return "anonymous_struct"
+  assert(qualified_name.length > 0, "Struct must have a name")
   return qualified_name.join("_")
 }
 
 function mangle_union_name(qualified_name: readonly string[]): string {
-  if (qualified_name.length === 0) return "anonymous_union"
+  assert(qualified_name.length > 0, "Union must have a name")
   return qualified_name.join("_")
 }
 
-function mangle_func_name(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  func_name: string,
-): string {
+function mangle_func_name(source_file: SourceFile, func_name: string): string {
   const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
   if (qualified_parts.length === 0) {
     return func_name
@@ -847,7 +843,6 @@ function mangle_func_name(
 }
 
 function emit_untagged_union_decl(
-  ctx: EmitContext,
   source_file: SourceFile,
   stmt: UntaggedUnionDeclStmt,
 ): CNode {
@@ -921,7 +916,7 @@ function emit_prop_expr(
           ),
         )
         assert(module_source_file, "Could not find source file for function")
-        name = mangle_func_name(ctx, module_source_file, func_name)
+        name = mangle_func_name(module_source_file, func_name)
         break
       }
       case "BuiltinConst":
