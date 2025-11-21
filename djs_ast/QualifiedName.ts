@@ -16,6 +16,9 @@ QualifiedName.append = (base: QualifiedName, ...parts: string[]) => {
 QualifiedName.to_array = (name: QualifiedName): string[] => {
   const s = name as unknown
   assert(typeof s === "string")
+  if (s === "") {
+    return []
+  }
   return s.split(".")
 }
 
