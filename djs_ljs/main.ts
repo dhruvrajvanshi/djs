@@ -11,26 +11,16 @@ import { collect_source_files } from "./collect_source_files.ts"
 import { FS } from "./FS.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import { emit_c } from "./emit_c.ts"
-import { resolve, type ResolveResult } from "./resolve.ts"
-import {
-  ANSI_BLUE,
-  ANSI_BOLD,
-  ANSI_CYAN,
-  ANSI_MAGENTA,
-  ANSI_RESET,
-  MapUtils,
-} from "djs_std"
+import { ANSI_BLUE, ANSI_BOLD, ANSI_RESET } from "djs_std"
 import type { SourceFiles } from "./SourceFiles.ts"
-import {
-  resolve_imports,
-  type ResolveImportsResult,
-} from "./resolve_imports.ts"
+
 import { typecheck, type TypecheckResult } from "./typecheck.ts"
 import { type_to_sexpr } from "./type.ts"
 import { exit } from "node:process"
 import assert from "node:assert/strict"
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import { execSync } from "node:child_process"
+import * as Resolve from "./resolve.ts"
 
 const argsConfig = {
   allowPositionals: true,
@@ -38,7 +28,6 @@ const argsConfig = {
     "dump-phases": { type: "boolean" },
     "dump-ast": { type: "boolean" },
     "dump-resolve": { type: "boolean" },
-    "dump-resolve-imports": { type: "boolean" },
     "dump-typecheck": { type: "boolean" },
     "preserve-c-output": { type: "boolean" },
     "no-errors": { type: "boolean" },
@@ -72,8 +61,6 @@ export async function main(
 ) {
   const dump_ast = args["dump-ast"] || args["dump-phases"]
   const dump_resolve = args["dump-resolve"] || args["dump-phases"]
-  const dump_resolve_imports =
-    args["dump-resolve-imports"] || args["dump-phases"]
   const dump_typecheck = args["dump-typecheck"] || args["dump-phases"]
 
   if (files.length === 0) {
@@ -91,7 +78,7 @@ export async function main(
     await collect_source_files(files[0], fs)
   if (dump_ast) dump_source_files(source_files)
 
-  const resolve_result = resolve(fs, source_files)
+  const resolve_result = Resolve.resolve(fs, source_files)
   if (dump_resolve) dump_resolve_results(resolve_result)
 
   const typecheck_result = typecheck(source_files, resolve_result)
@@ -144,54 +131,10 @@ function dump_source_files(source_files: SourceFiles) {
   }
 }
 
-function dump_resolve_results(resolve_result: ResolveResult) {
+function dump_resolve_results(resolve_result: Resolve.ResolveResult) {
   console.log(`${ANSI_BLUE}${ANSI_BOLD}Resolve:${ANSI_RESET}`)
-  for (const [path, types] of resolve_result.types.entries()) {
-    console.log(`${ANSI_CYAN}${ANSI_BOLD}resolve: ${path}${ANSI_RESET}`)
-    console.log(`${ANSI_MAGENTA}Types:${ANSI_RESET}`)
-    console.dir(
-      MapUtils.map_entries(types, ([key, value]) => [key.text, value]),
-      { depth: 2 },
-    )
-    console.log("")
-    console.log(`${ANSI_CYAN}Values:${ANSI_RESET}`)
-    console.dir(
-      MapUtils.map_entries(
-        resolve_result.values.get(path) ?? new Map(),
-        ([key, value]) => [key.text, value],
-      ),
-      { depth: 2 },
-    )
-    console.log(`${ANSI_CYAN}${ANSI_BOLD}/resolve ${path}${ANSI_RESET}`)
-  }
+  console.dir(resolve_result)
   console.log(`${ANSI_BLUE}${ANSI_BOLD}/resolve${ANSI_RESET}`)
-  console.log("")
-}
-function dump_resolve_imports_results(resolve_result: ResolveImportsResult) {
-  console.log(`${ANSI_BLUE}${ANSI_BOLD}Resolve imports:${ANSI_RESET}`)
-  for (const [path, types] of resolve_result.types.entries()) {
-    console.log(
-      `${ANSI_CYAN}${ANSI_BOLD}resolved imports: ${path}${ANSI_RESET}`,
-    )
-    console.log(`${ANSI_MAGENTA}Types:${ANSI_RESET}`)
-    console.dir(
-      MapUtils.map_entries(types, ([key, value]) => [key, value]),
-      { depth: 3 },
-    )
-    console.log("")
-    console.log(`${ANSI_CYAN}Values:${ANSI_RESET}`)
-    console.dir(
-      MapUtils.map_entries(
-        resolve_result.values.get(path) ?? new Map(),
-        ([key, value]) => [key.text, value],
-      ),
-      { depth: 3 },
-    )
-    console.log(
-      `${ANSI_CYAN}${ANSI_BOLD}/resolved imports ${path}${ANSI_RESET}`,
-    )
-  }
-  console.log(`${ANSI_BLUE}${ANSI_BOLD}/resolve imports${ANSI_RESET}`)
   console.log("")
 }
 
@@ -207,6 +150,14 @@ function dump_typecheck_result(typecheck_result: TypecheckResult) {
   }
   console.log(`${ANSI_BLUE}${ANSI_BOLD}/typecheck${ANSI_RESET}`)
   console.log("")
+}
+function dump_symbols(
+  result: Resolve.ResolveResult,
+  filters: readonly string[],
+) {
+  console.log(`${ANSI_BLUE}${ANSI_BOLD}=== symbols === ${ANSI_RESET}\n`)
+  console.dir(result)
+  console.log(`\n${ANSI_BLUE}${ANSI_BOLD}=== end symbols === ${ANSI_RESET}`)
 }
 declare global {
   interface ImportMeta {

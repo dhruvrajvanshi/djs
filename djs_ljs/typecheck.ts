@@ -61,13 +61,6 @@ import {
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
-import type {
-  TypeDecl,
-  TypeDeclExcludingKind,
-  ValueDecl,
-  ValueDeclOfKind,
-} from "./SymbolTable.ts"
-import type { ResolveResult } from "./resolve.ts"
 import { existsSync } from "node:fs"
 import {
   builtin_types,
@@ -75,6 +68,12 @@ import {
   type BuiltinConstDecl,
 } from "./builtins.ts"
 import { Subst } from "./subt.ts"
+import type {
+  ResolveResult,
+  ValueDecl,
+  TypeDecl,
+  ModuleDecl,
+} from "./resolve.ts"
 
 export interface TypecheckResult {
   values: Map<Expr, Type>
@@ -108,10 +107,37 @@ type LoopStmt = ForStmt | ForInOrOfStmt | WhileStmt | DoWhileStmt
 
 export function typecheck(
   source_files: SourceFiles,
-  resolution: ResolveResult,
+  _resolution: ResolveResult,
 ): TypecheckResult {
-  const value_decls = resolution.values
-  const type_decls = resolution.types
+  const { return_stmt_enclosing_func } = _resolution
+  const value_decl = (
+    ident: Ident,
+  ): Exclude<ValueDecl, { kind: "ModuleProp" }> | null => {
+    let current: ValueDecl | null = _resolution.values.get(ident) ?? null
+    while (current && current.kind === "ModuleProp") {
+      current = current.module.values.get(current.name) ?? null
+    }
+    return current
+  }
+  const type_decl = (
+    ident: Ident,
+  ): Exclude<TypeDecl, { kind: "ModuleProp" }> | null => {
+    const decl = _resolution.types.get(ident)
+    if (decl) {
+      return collapse_module_props(decl)
+    } else {
+      return null
+    }
+  }
+  function collapse_module_props(
+    type_decl: TypeDecl | null,
+  ): Exclude<TypeDecl, { kind: "ModuleProp" }> | null {
+    let current: TypeDecl | null = type_decl
+    while (current && current.kind === "ModuleProp") {
+      current = current.module.types.get(current.name) ?? null
+    }
+    return current
+  }
   const _diagnostics = new Diagnostics(source_files.fs)
   const values = new Map<Expr, Type>()
   const types = new Map<TypeAnnotation, Type>()
@@ -355,7 +381,7 @@ export function typecheck(
   }
   function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt) {
     if (stmt.value) {
-      const func = resolution.return_stmt_enclosing_func.get(stmt)
+      const func = return_stmt_enclosing_func.get(stmt)
       if (func) {
         const { return_type } = check_func_signature(ctx.source_file, func)
         check_expr(ctx, stmt.value, return_type)
@@ -817,7 +843,7 @@ export function typecheck(
    * which can be converted to a mutable pointer.
    */
   function check_address_of_mutability(ctx: CheckCtx, ident: Ident): void {
-    const decl = value_decls.get(ctx.source_file.path)?.get(ident)
+    const decl = value_decl(ident)
     if (!decl) return
     if (decl.kind !== "VarDecl" || decl.decl.decl_type !== "Let") {
       emit_error(
@@ -851,9 +877,7 @@ export function typecheck(
         emit_error(ctx, expr.span, "Only simple assignment is supported in LJS")
         return infer_expr(ctx.source_file, expr.value)
       }
-      const values = resolution.values.get(ctx.source_file.path)
-      assert(values)
-      const decl = values.get(expr.pattern.ident)
+      const decl = value_decl(expr.pattern.ident)
       if (!decl) {
         // Unbound variables are reported in the resolve phase
         return infer_expr(ctx.source_file, expr.value)
@@ -1083,7 +1107,7 @@ export function typecheck(
     return Type.Error(error.message)
   }
   function infer_var_expr(ctx: CheckCtx, expr: VarExpr): Type {
-    const decl = value_decls.get(ctx.source_file.path)?.get(expr.ident)
+    const decl = value_decl(expr.ident)
     if (!decl) {
       return emit_error_type(ctx, {
         message: `Unbound variable ${expr.ident.text}`,
@@ -1161,7 +1185,7 @@ export function typecheck(
   }
 
   function infer_prop_expr(ctx: CheckCtx, expr: PropExpr): Type {
-    const lhs_module_decl = get_module_decl(ctx.source_file, expr.lhs)
+    const lhs_module_decl = get_module_decl(expr.lhs)
     if (lhs_module_decl) {
       const decl = lhs_module_decl.values.get(expr.property.text)
       if (!decl) {
@@ -1277,17 +1301,23 @@ export function typecheck(
           throw new Error(`Unknown builtin const: ${name}`)
         }
       }
-      default: {
-        return TODO(`type_of_decl for ${decl.kind} with name ${name}`)
+      case "Module":
+        TODO()
+      case "ClassDecl":
+        TODO()
+      case "ModuleProp": {
+        let current: ValueDecl | undefined = decl
+        while (current && current.kind === "ModuleProp") {
+          current = current.module.values.get(decl.name)
+        }
+        if (!current) TODO()
+        return type_of_decl(name, current)
       }
     }
   }
-  function get_module_decl(
-    source_file: SourceFile,
-    expr: Expr,
-  ): ValueDeclOfKind<"Module"> | null {
+  function get_module_decl(expr: Expr): ModuleDecl | null {
     if (expr.kind !== "Var") return null
-    const lhs_decl = value_decls.get(source_file.path)?.get(expr.ident)
+    const lhs_decl = value_decl(expr.ident)
     if (!lhs_decl) return null
     switch (lhs_decl.kind) {
       case "Module":
@@ -1337,9 +1367,7 @@ export function typecheck(
     t: readonly Ident[],
   ): Type {
     const [module_name, ...rest] = t
-    const decls = type_decls.get(ctx.source_file.path)
-    if (!decls) TODO()
-    const decl = decls.get(module_name)
+    const decl = type_decl(module_name)
 
     if (!decl || decl.kind !== "Module") {
       return emit_error_type(ctx, {
@@ -1355,13 +1383,14 @@ export function typecheck(
       })
     }
 
-    const member = decl.types.get(rest[0].text)
+    const member = collapse_module_props(decl.types.get(rest[0].text) ?? null)
     if (!member) {
       return emit_error_type(ctx, {
         message: `Unknown type ${rest[0].text} in module ${module_name.text}`,
         span: rest[0].span,
       })
     }
+
     assert(
       member.kind !== "Module",
       "Should not happen because of the rest.length !== 1 check above",
@@ -1372,9 +1401,7 @@ export function typecheck(
     if (is_readonly_array(t)) {
       return lookup_qualified_type_name(ctx, t)
     } else {
-      const decls = type_decls.get(ctx.source_file.path)
-      if (!decls) TODO()
-      const decl = decls.get(t)
+      const decl = type_decl(t)
       if (!decl) {
         return emit_error_type(ctx, {
           span: t.span,
@@ -1410,7 +1437,7 @@ export function typecheck(
   }
 
   function type_decl_to_type(
-    decl: TypeDeclExcludingKind<"Module" | "Import" | "ImportStarAs">,
+    decl: Exclude<TypeDecl, { kind: "ModuleProp" }>,
   ): Type {
     switch (decl.kind) {
       case "Builtin":
@@ -1441,6 +1468,8 @@ export function typecheck(
       }
       case "BuiltinType":
         return decl.type
+      case "Module":
+        TODO("Using module as a type")
       default:
         return assert_never(decl)
     }
