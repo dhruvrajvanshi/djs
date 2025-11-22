@@ -164,8 +164,20 @@ function parser_impl(
     t.GreaterThanGreaterThanGreaterThan,
   )
 
+  const parse_as_expr = (): Expr | Err => {
+    let lhs = parse_shift_expr()
+    if (lhs === ERR) return lhs
+    while (at(t.As)) {
+      advance()
+      const ty = parse_type_annotation()
+      if (ty === ERR) return ERR
+      lhs = Expr.As(Span.between(lhs, ty), lhs, ty)
+    }
+    return lhs
+  }
+
   const parse_relational_expr = define_binop_parser(
-    parse_shift_expr,
+    parse_as_expr,
     t.LessThan,
     t.GreaterThan,
     t.LessThanEq,
