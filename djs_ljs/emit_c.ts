@@ -154,8 +154,10 @@ function emit_struct_decl(
   source_file: SourceFile,
   stmt: StructDeclStmt,
 ): CNode {
-  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
-  const full_name = [...qualified_parts, stmt.struct_def.name.text]
+  const full_name = QualifiedName.append(
+    source_file.qualified_name,
+    stmt.struct_def.name.text,
+  )
   return {
     kind: "StructDecl",
     name: mangle_struct_name(full_name),
@@ -184,8 +186,10 @@ function emit_struct_def(
       }
     }
   })
-  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
-  const full_name = [...qualified_parts, stmt.struct_def.name.text]
+  const full_name = QualifiedName.append(
+    source_file.qualified_name,
+    stmt.struct_def.name.text,
+  )
   return {
     kind: "StructDef",
     name: mangle_struct_name(full_name),
@@ -836,20 +840,20 @@ function mangle_union_name(qualified_name: readonly string[]): string {
 }
 
 function mangle_func_name(source_file: SourceFile, func_name: string): string {
-  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
-  if (qualified_parts.length === 0) {
+  if (source_file.qualified_name.length === 0) {
     return func_name
   }
-
-  return `${qualified_parts.join("_")}_${func_name}`
+  return QualifiedName.append(source_file.qualified_name, func_name).join("_")
 }
 
 function emit_untagged_union_decl(
   source_file: SourceFile,
   stmt: UntaggedUnionDeclStmt,
 ): CNode {
-  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
-  const full_name = [...qualified_parts, stmt.untagged_union_def.name.text]
+  const full_name = QualifiedName.append(
+    source_file.qualified_name,
+    stmt.untagged_union_def.name.text,
+  )
   return {
     kind: "UnionDecl",
     name: mangle_union_name(full_name),
@@ -868,8 +872,10 @@ function emit_untagged_union_def(
       type: emit_type_annotation(ctx, member.type_annotation),
     }
   })
-  const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
-  const full_name = [...qualified_parts, stmt.untagged_union_def.name.text]
+  const full_name = QualifiedName.append(
+    source_file.qualified_name,
+    stmt.untagged_union_def.name.text,
+  )
   return {
     kind: "UnionDef",
     name: mangle_union_name(full_name),

@@ -1416,15 +1416,10 @@ export function typecheck(
   function qualified_name_of_decl(
     ident: Ident,
     source_file_path: string,
-  ): string[] {
+  ): QualifiedName {
     const source_file = source_files.get(source_file_path)
     assert(source_file, `Unknown source file: ${source_file_path}`)
-    const qualified_parts = QualifiedName.to_array(source_file.qualified_name)
-    if (qualified_parts.length === 1 && qualified_parts[0] === '') {
-      // Entry file has empty qualified name, just return the identifier
-      return [ident.text]
-    }
-    return [...qualified_parts, ident.text]
+    return QualifiedName.append(source_file.qualified_name, ident.text)
   }
 }
 

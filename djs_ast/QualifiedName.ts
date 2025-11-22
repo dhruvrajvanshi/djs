@@ -1,25 +1,17 @@
-import assert from "node:assert"
-
-export type QualifiedName = {
-  __kind__: "__QualifiedName__" | undefined
+export interface QualifiedName extends ReadonlyArray<string> {
+  __kind__: typeof QualifiedNameKind | undefined
 }
 
-export function QualifiedName(...parts: string[]): QualifiedName {
-  return parts.join(".") as never as QualifiedName
+export function QualifiedName(...parts: readonly string[]): QualifiedName {
+  return parts as QualifiedName
 }
 
-QualifiedName.append = (base: QualifiedName, ...parts: string[]) => {
-  const s = base as unknown
-  assert(typeof s === "string")
-  return QualifiedName(...s.split("."), ...parts)
+QualifiedName.is_entry = (self: QualifiedName) => {
+  return self.length === 0
 }
-QualifiedName.to_array = (name: QualifiedName): string[] => {
-  const s = name as unknown
-  assert(typeof s === "string")
-  if (s === "") {
-    return []
-  }
-  return s.split(".")
+
+QualifiedName.append = (base: QualifiedName, ...parts: readonly string[]) => {
+  return QualifiedName(...base, ...parts)
 }
 
 const QualifiedNameKind: unique symbol = Symbol("QualifiedName")
