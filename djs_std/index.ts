@@ -1,6 +1,7 @@
 export * from "./ansi.ts"
 import { AssertionError } from "node:assert/strict"
 import { inspect } from "node:util"
+export { Stack } from "./Stack.ts"
 
 export type Prettify<T> = {
   [K in keyof T]: T[K]
