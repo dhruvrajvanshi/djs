@@ -28,6 +28,7 @@ import {
   QualifiedName,
   TypeApplicationExpr,
   CallExpr,
+  type Func,
 } from "djs_ast"
 import assert from "node:assert"
 import { Type, type_is_pointer, type_to_string } from "./type.ts"
@@ -39,6 +40,7 @@ interface EmitContext {
   resolve_result: ResolveImportsResult
   loop_stack: LoopStackEntry[]
   link_c_paths: string[]
+  implicit_return_value: CNode | null
 }
 
 type LoopStackEntry = { stmt: LoopStmt; source_file: SourceFile }
@@ -58,6 +60,7 @@ export function emit_c(
     resolve_result,
     loop_stack: [],
     link_c_paths: [],
+    implicit_return_value: null,
   }
 
   // Phase 1: Collect forward declarations
@@ -74,9 +77,19 @@ export function emit_c(
         assert(func_name, "Function must have a name")
 
         const params = stmt.func.params.map((param) => emit_param(ctx, param))
-        const return_type = stmt.func.return_type
+        let return_type = stmt.func.return_type
           ? emit_type_annotation(ctx, stmt.func.return_type)
           : ({ kind: "Ident", name: "void" } as CNode)
+        if (
+          is_main_func(stmt.func, source_file) &&
+          (!stmt.func.return_type ||
+            ctx.tc_result.types.get(stmt.func.return_type)?.kind === "void")
+        ) {
+          return_type = {
+            kind: "Ident",
+            name: "int",
+          }
+        }
 
         forward_decls.push({
           kind: "FuncForwardDecl",
@@ -322,10 +335,37 @@ function emit_func_def(
   assert(func_name, "Function must have a name")
 
   const params = func_stmt.func.params.map((param) => emit_param(ctx, param))
-  const return_type = func_stmt.func.return_type
+  let return_type = func_stmt.func.return_type
     ? emit_type_annotation(ctx, func_stmt.func.return_type)
     : ({ kind: "Ident", name: "void" } as CNode)
+  const return_ty =
+    func_stmt.func.return_type &&
+    ctx.tc_result.types.get(func_stmt.func.return_type)
+
+  const convert_void_return_to_int =
+    is_main_func(func_stmt.func, source_file) &&
+    (!return_ty || return_ty?.kind === "void")
+  if (convert_void_return_to_int) {
+    return_type = {
+      kind: "Ident",
+      name: "int",
+    }
+    ctx.implicit_return_value = {
+      kind: "IntLiteral",
+      value: 0,
+    }
+  }
   const body = emit_block(ctx, source_file, func_stmt.func.body)
+  if (convert_void_return_to_int) {
+    body.body.push({
+      kind: "Return",
+      value: {
+        kind: "IntLiteral",
+        value: 0,
+      },
+    })
+  }
+  ctx.implicit_return_value = null
 
   return {
     kind: "FuncDef",
@@ -335,12 +375,15 @@ function emit_func_def(
     body,
   }
 }
+function is_main_func(func: Func, source_file: SourceFile): boolean {
+  return func.name?.text === "main" && source_file.qualified_name.length === 0
+}
 
 function emit_block(
   ctx: EmitContext,
   source_file: SourceFile,
   block: Block,
-): CNode {
+): Extract<CNode, { kind: "Block" }> {
   const body = block.stmts.map((s: Stmt) => emit_stmt(ctx, source_file, s))
   return { kind: "Block", body }
 }

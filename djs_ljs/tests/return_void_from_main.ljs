@@ -1,0 +1,5 @@
+import * as c from "../libc.ljs"
+
+function main(): void {
+    c.puts(c.str`PASS`)
+}
