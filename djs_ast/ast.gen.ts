@@ -1046,6 +1046,7 @@ export type Expr =
   | AddressOfExpr
   | DerefExpr
   | TypeApplicationExpr
+  | AsExpr
 export class VarExpr {
   constructor(
     readonly span: Span,
@@ -1699,6 +1700,22 @@ export class TypeApplicationExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
+export class AsExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly expr: Expr,
+    readonly type_annotation: TypeAnnotation,
+  ) {}
+
+  get kind(): "As" {
+    return "As"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
 
 export const Expr = {
   Var: (span: Span, leading_trivia: Text, ident: Ident): VarExpr =>
@@ -1849,6 +1866,9 @@ export const Expr = {
     expr: Expr,
     type_args: readonly TypeAnnotation[],
   ): TypeApplicationExpr => new TypeApplicationExpr(span, expr, type_args),
+
+  As: (span: Span, expr: Expr, type_annotation: TypeAnnotation): AsExpr =>
+    new AsExpr(span, expr, type_annotation),
 } as const
 
 export interface StructInitItem {

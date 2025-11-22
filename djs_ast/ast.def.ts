@@ -180,6 +180,10 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     expr: () => Expr,
     type_args: List(() => TypeAnnotation),
   },
+  As: {
+    expr: () => Expr,
+    type_annotation: () => TypeAnnotation,
+  },
 })
 export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { leading_trivia: Text, ident: Ident },
