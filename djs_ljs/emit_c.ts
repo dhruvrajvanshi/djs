@@ -197,8 +197,10 @@ function types_first(
   { stmt: a }: { stmt: Stmt },
   { stmt: b }: { stmt: Stmt },
 ): number {
-  const is_type_decl = (kind: string) =>
-    kind === "StructDecl" || kind === "UntaggedUnionDecl"
+  const is_type_decl = (kind: Stmt["kind"]) =>
+    kind === "StructDecl" ||
+    kind === "UntaggedUnionDecl" ||
+    kind === "LJSExternType"
   if (is_type_decl(a.kind) && !is_type_decl(b.kind)) return -1
   if (!is_type_decl(a.kind) && is_type_decl(b.kind)) return 1
   return 0
