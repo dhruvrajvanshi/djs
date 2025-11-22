@@ -395,6 +395,11 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
+      case "As": {
+        this.visit_expr(expr.expr)
+        this.visit_type_annotation(expr.type_annotation)
+        break
+      }
     }
   }
   visit_ident(node: ast.Ident): void {}
