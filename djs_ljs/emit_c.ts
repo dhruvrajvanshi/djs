@@ -1,7 +1,6 @@
 import type { SourceFiles } from "./SourceFiles.ts"
 import { assert_never, assert_unreachable, defer, PANIC, TODO } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
-import type { ResolveImportsResult } from "./resolve_imports.ts"
 import Path from "node:path"
 import {
   type Expr,
@@ -32,12 +31,12 @@ import {
 } from "djs_ast"
 import assert from "node:assert"
 import { Type, type_is_pointer, type_to_string } from "./type.ts"
-import type { ValueDeclOfKind } from "./SymbolTable.ts"
+import type { ModuleDecl, ResolveResult } from "./resolve.ts"
 
 interface EmitContext {
   source_files: SourceFiles
   tc_result: TypecheckResult
-  resolve_result: ResolveImportsResult
+  resolve_result: ResolveResult
   loop_stack: LoopStackEntry[]
   link_c_paths: string[]
   implicit_return_value: CNode | null
@@ -52,7 +51,7 @@ type LoopStmt = ForStmt | WhileStmt | DoWhileStmt | ForInOrOfStmt
 export function emit_c(
   source_files: SourceFiles,
   tc_result: TypecheckResult,
-  resolve_result: ResolveImportsResult,
+  resolve_result: ResolveResult,
 ): { source: string; linkc_paths: string[] } {
   const ctx: EmitContext = {
     source_files,
@@ -926,17 +925,11 @@ function emit_untagged_union_def(
   }
 }
 
-function get_module_of_expr(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  expr: Expr,
-): ValueDeclOfKind<"Module"> | null {
+function get_module_of_expr(ctx: EmitContext, expr: Expr): ModuleDecl | null {
   if (expr.kind !== "Var") return null
   assert(expr.kind === "Var", "Property access lhs must be a variable")
 
-  const lhs_decl = ctx.resolve_result.values
-    .get(source_file.path)
-    ?.get(expr.ident)
+  const lhs_decl = ctx.resolve_result.values.get(expr.ident)
   if (!lhs_decl) return null
 
   if (lhs_decl.kind === "Module") return lhs_decl
@@ -947,7 +940,7 @@ function emit_prop_expr(
   source_file: SourceFile,
   expr: PropExpr,
 ): CNode {
-  const lhs_module = get_module_of_expr(ctx, source_file, expr.lhs)
+  const lhs_module = get_module_of_expr(ctx, expr.lhs)
   if (lhs_module) {
     const prop_decl = lhs_module.values.get(expr.property.text)
     assert(prop_decl)
