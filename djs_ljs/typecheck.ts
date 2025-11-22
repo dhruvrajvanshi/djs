@@ -426,6 +426,12 @@ export function typecheck(
         )
         continue
       }
+      if (
+        source_file.qualified_name.length === 0 &&
+        func.name?.text === "main"
+      ) {
+        check_main_function_signature(ctx, source_file, func)
+      }
       params.push([param.pattern.ident, type])
     }
     let return_type: Type | null = null
@@ -443,6 +449,33 @@ export function typecheck(
     }
     check_func_signature_results.set(func, result)
     return result
+  }
+  function check_main_function_signature(
+    ctx: CheckCtx,
+    source_file: SourceFile,
+    func: Func,
+  ) {
+    assert(
+      func.name,
+      "check_main_function_signature must be called for a function with a name",
+    )
+    if (func.params.length > 0) {
+      emit_error(
+        ctx,
+        func.name.span,
+        "main function must not have any parameters.",
+      )
+    }
+    const return_type = func.return_type
+      ? check_type_annotation(source_file, func.return_type)
+      : null
+    if (
+      return_type &&
+      return_type.kind !== Type.void.kind &&
+      return_type.kind !== Type.c_int.kind
+    ) {
+      emit_error(ctx, func.name.span, "main function must return int or void")
+    }
   }
   function check_var_decl(
     source_file: SourceFile,
