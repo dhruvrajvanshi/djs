@@ -68,3 +68,23 @@ test.each(files)("%s", async (file) => {
     `./tests/${file.replace(/\.ljs$/, "")}.stdout`,
   )
 })
+
+test("examples/sqlite_file_reader", async () => {
+  let diagnostics = ""
+  await main(
+    {
+      positionals: ["./examples/sqlite_file_reader/main.ljs"],
+      values: {
+        output: "./test-output/sqlite_file_reader",
+        "no-colors": true,
+      },
+    },
+    {
+      show_diagnostics: (e) => {
+        diagnostics += e
+      },
+      error_exit: () => {},
+    },
+  )
+  expect(diagnostics).toBe("")
+})
