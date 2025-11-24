@@ -52,9 +52,12 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   Debugger: {},
   With: { expr: () => Expr, body: () => Stmt },
   Func: { func: () => Func, is_exported: "boolean" },
-  ClassDecl: { class_def: () => Class },
-  StructDecl: { struct_def: () => StructDef },
-  UntaggedUnionDecl: { untagged_union_def: () => UntaggedUnion },
+  ClassDecl: { class_def: () => Class, is_exported: "boolean" },
+  StructDecl: { struct_def: () => StructDef, is_exported: "boolean" },
+  UntaggedUnionDecl: {
+    untagged_union_def: () => UntaggedUnion,
+    is_exported: "boolean",
+  },
   Import: {
     default_import: Option(Ident),
     named_imports: List(() => ImportSpecifier),
@@ -73,6 +76,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     fields: List("ObjectTypeDeclField"),
   },
   TypeAlias: {
+    is_exported: "boolean",
     name: Ident,
     type_annotation: () => TypeAnnotation,
   },
@@ -349,6 +353,7 @@ const InOrOf = StringUnion("InOrOf", "In", "Of")
 const VarDecl = Struct("VarDecl", ["span"], {
   decl_type: () => DeclType,
   declarators: List(() => VarDeclarator),
+  is_exported: "boolean",
 })
 const VarDeclarator = Struct("VarDeclarator", [], {
   pattern: Pattern,

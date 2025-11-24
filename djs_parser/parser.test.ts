@@ -163,6 +163,7 @@ test("Parses untagged union stmt without error", () => {
   expect(s.kind).toBe("UntaggedUnionDecl")
   expect(s).toMatchInlineSnapshot(`
     UntaggedUnionDeclStmt {
+      "is_exported": false,
       "span": {
         "start": 7,
         "stop": 72,

@@ -316,6 +316,7 @@ export class ClassDeclStmt {
     readonly span: Span,
 
     readonly class_def: Class,
+    readonly is_exported: boolean,
   ) {}
 
   get kind(): "ClassDecl" {
@@ -331,6 +332,7 @@ export class StructDeclStmt {
     readonly span: Span,
 
     readonly struct_def: StructDef,
+    readonly is_exported: boolean,
   ) {}
 
   get kind(): "StructDecl" {
@@ -346,6 +348,7 @@ export class UntaggedUnionDeclStmt {
     readonly span: Span,
 
     readonly untagged_union_def: UntaggedUnion,
+    readonly is_exported: boolean,
   ) {}
 
   get kind(): "UntaggedUnionDecl" {
@@ -425,6 +428,7 @@ export class TypeAliasStmt {
   constructor(
     readonly span: Span,
 
+    readonly is_exported: boolean,
     readonly name: Ident,
     readonly type_annotation: TypeAnnotation,
   ) {}
@@ -603,17 +607,24 @@ export const Stmt = {
   Func: (span: Span, func: Func, is_exported: boolean): FuncStmt =>
     new FuncStmt(span, func, is_exported),
 
-  ClassDecl: (span: Span, class_def: Class): ClassDeclStmt =>
-    new ClassDeclStmt(span, class_def),
+  ClassDecl: (
+    span: Span,
+    class_def: Class,
+    is_exported: boolean,
+  ): ClassDeclStmt => new ClassDeclStmt(span, class_def, is_exported),
 
-  StructDecl: (span: Span, struct_def: StructDef): StructDeclStmt =>
-    new StructDeclStmt(span, struct_def),
+  StructDecl: (
+    span: Span,
+    struct_def: StructDef,
+    is_exported: boolean,
+  ): StructDeclStmt => new StructDeclStmt(span, struct_def, is_exported),
 
   UntaggedUnionDecl: (
     span: Span,
     untagged_union_def: UntaggedUnion,
+    is_exported: boolean,
   ): UntaggedUnionDeclStmt =>
-    new UntaggedUnionDeclStmt(span, untagged_union_def),
+    new UntaggedUnionDeclStmt(span, untagged_union_def, is_exported),
 
   Import: (
     span: Span,
@@ -640,9 +651,11 @@ export const Stmt = {
 
   TypeAlias: (
     span: Span,
+    is_exported: boolean,
     name: Ident,
     type_annotation: TypeAnnotation,
-  ): TypeAliasStmt => new TypeAliasStmt(span, name, type_annotation),
+  ): TypeAliasStmt =>
+    new TypeAliasStmt(span, is_exported, name, type_annotation),
 
   LJSExternFunction: (
     span: Span,
@@ -972,6 +985,7 @@ export interface VarDecl {
   readonly span: Span
   readonly decl_type: DeclType
   readonly declarators: readonly VarDeclarator[]
+  readonly is_exported: boolean
 }
 
 export interface VarDeclarator {

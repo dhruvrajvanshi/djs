@@ -1,38 +1,25 @@
 import {
   ASTVisitorBase,
-  ClassDeclStmt,
   Expr,
   ForStmt,
-  LJSExternConstStmt,
-  LJSExternFunctionStmt,
-  LJSExternTypeStmt,
   Pattern,
   ReturnStmt,
   Stmt,
-  StructDeclStmt,
-  TypeAliasStmt,
   TypeAnnotation,
-  UntaggedUnionDeclStmt,
   type Block,
   type Func,
   type Ident,
   type SourceFile,
-  type VarDecl,
 } from "djs_ast"
 import type { SourceFiles } from "./SourceFiles.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import type { FS } from "./FS.ts"
-import { PathMap } from "./PathMap.ts"
 import { assert, assert_never, Stack, TODO } from "djs_std"
+import { builtin_types, builtin_values } from "./builtins.ts"
+import { SymbolTable } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
-import {
-  builtin_types,
-  builtin_values,
-  type BuiltinConstDecl,
-  type BuiltinTypeDecl,
-} from "./builtins.ts"
-import { Type } from "./type.ts"
 import { import_stmt_path } from "./import_stmt_path.ts"
+import type { TypeDecl, ValueDecl, ModuleDecl } from "./decl.ts"
 
 export interface ResolveResult {
   diagnostics: Diagnostics
@@ -41,107 +28,12 @@ export interface ResolveResult {
   return_stmt_enclosing_func: Map<ReturnStmt, Func>
 }
 
-export type ValueDecl =
-  | {
-      kind: "VarDecl"
-      decl: VarDecl
-      name: string
-      source_file: string
-    }
-  | { kind: "Func"; func: Func; source_file: string }
-  | { kind: "Param"; func: Func; param_index: number; source_file: string }
-  | ClassDeclStmt
-  | { kind: "Struct"; decl: StructDeclStmt; source_file: string }
-  | { kind: "UntaggedUnion"; decl: UntaggedUnionDeclStmt; source_file: string }
-  | {
-      kind: "LJSExternFunction"
-      stmt: LJSExternFunctionStmt
-      source_file: string
-    }
-  | {
-      kind: "LJSExternConst"
-      stmt: LJSExternConstStmt
-      source_file: string
-    }
-  | BuiltinConstDecl
-  | ModuleDecl
-  | {
-      kind: "ModuleProp"
-      module: ModuleDecl
-      name: string
-    }
-
-export interface ModuleDecl {
-  kind: "Module"
-  values: ReadonlyMap<string, ValueDecl>
-  types: ReadonlyMap<string, TypeDecl>
-}
-
-export type TypeDecl =
-  | {
-      kind: "TypeAlias"
-      stmt: TypeAliasStmt
-      source_file: string
-    }
-  | { kind: "Builtin"; type: Type }
-  | {
-      kind: "Struct"
-      decl: StructDeclStmt
-      source_file: string
-    }
-  | {
-      kind: "UntaggedUnion"
-      decl: UntaggedUnionDeclStmt
-      source_file: string
-    }
-  | {
-      kind: "ExternType"
-      stmt: LJSExternTypeStmt
-      source_file: string
-    }
-  | BuiltinTypeDecl
-  /**
-   * Introduced after resolving imports
-   * See the comment in ValueDecl for more details.
-   */
-  | ModuleDecl
-  | {
-      kind: "ModuleProp"
-      module: ModuleDecl
-      name: string
-    }
-
-class SymbolTableBuilder {
-  values = new Map<string, ValueDecl>()
-  types = new Map<string, TypeDecl>()
-  name: string
-
-  constructor(name: string) {
-    this.name = name
-  }
-
-  add_value(name: string, decl: ValueDecl): void {
-    this.values.set(name, decl)
-  }
-  add_type(name: string, decl: TypeDecl): void {
-    this.types.set(name, decl)
-  }
-}
-
-interface SymbolTable {
-  /**
-   * Only used for debugging
-   */
-  name: string
-  values: ReadonlyMap<string, ValueDecl>
-  types: ReadonlyMap<string, TypeDecl>
-}
 export function resolve(fs: FS, source_files: SourceFiles): ResolveResult {
   return new Resolver(fs, source_files).run()
 }
 
 class Resolver extends ASTVisitorBase {
-  source_file_symbols: PathMap<SymbolTableBuilder>
+  source_file_symbols_tables = new Map<SourceFile, SymbolTable>()
   diagnostics: Diagnostics
   source_files: SourceFiles
   _source_file: SourceFile | null = null
@@ -155,22 +47,12 @@ class Resolver extends ASTVisitorBase {
 
   constructor(fs: FS, source_files: SourceFiles) {
     super()
-    this.source_file_symbols = new PathMap(fs)
     this.diagnostics = new Diagnostics(fs)
     this.source_files = source_files
-    this.scope.push(GlobalSymbolTable)
+    this.scope.push(SymbolTable.Global)
   }
 
   run(): ResolveResult {
-    // Phase 1: Insert empty symbol tables for each source file.
-    // This means that import * as foo from "./bar.djs" can
-    // set the symbol for foo as { kind: "Module", symbols: // symbol table for "bar.djs" }
-    for (const source_file of this.source_files.values()) {
-      this.source_file_symbols.set(
-        source_file.path,
-        new SymbolTableBuilder(`SourceFile(${source_file.path}`),
-      )
-    }
     for (const source_file of this.source_files.values()) {
       this.visit_source_file(source_file)
     }
@@ -184,21 +66,25 @@ class Resolver extends ASTVisitorBase {
   }
 
   override visit_source_file(sf: SourceFile) {
-    assert(this.scope.peek() === GlobalSymbolTable)
-    assert(
-      !this._source_file,
-      "visit_source_file called when already visiting a source file",
-    )
+    const previous_source_file = this._source_file
     this._source_file = sf
-    const symbol_table = this.source_file_symbols.get(sf.path)
+    const symbol_table = this.get_source_file_symbol_table(sf)
     assert(symbol_table, `Missing symbol table for ${sf.path}`)
     this.scope.push(symbol_table)
-
-    init_source_file_symbol_table(this, symbol_table, sf)
     super.visit_source_file(sf)
 
     assert(this.scope.pop() === symbol_table)
-    this._source_file = null
+    assert(this._source_file === sf)
+    this._source_file = previous_source_file
+  }
+  get_source_file_symbol_table(source_file: SourceFile): SymbolTable {
+    const existing = this.source_file_symbols_tables.get(source_file)
+    if (existing) {
+      return existing
+    }
+    const symbol_table = build_source_file_symbol_table(this, source_file)
+    this.source_file_symbols_tables.set(source_file, symbol_table)
+    return symbol_table
   }
 
   get source_file(): SourceFile {
@@ -207,7 +93,7 @@ class Resolver extends ASTVisitorBase {
   }
 
   override visit_func(node: Func): void {
-    const func_symbol_table = init_function_symbol_table(
+    const func_symbol_table = build_function_symbol_table(
       this,
       this.source_file,
       node,
@@ -340,37 +226,6 @@ class Resolver extends ASTVisitorBase {
     }
   }
 }
-function lookup_value(
-  scope: Stack<SymbolTable>,
-  ident: Ident,
-): ValueDecl | null {
-  let trace = process.env.LJS_TRACE_SYMBOL_LOOKUP === ident.text
-
-  for (const symbols of scope) {
-    const value = symbols.values.get(ident.text)
-    if (value) {
-      return value
-    } else {
-      if (trace) {
-        console.log(
-          `lookup_value: ${ident.text} not found in symbol table ${symbols.name} with values: ${[
-            ...symbols.values.keys(),
-          ].join(", ")}`,
-        )
-      }
-    }
-  }
-  return null
-}
-function lookup_type(scope: Stack<SymbolTable>, ident: Ident): TypeDecl | null {
-  for (const symbols of scope) {
-    const ty = symbols.types.get(ident.text)
-    if (ty) {
-      return ty
-    }
-  }
-  return null
-}
 
 /**
  * Unlike the build_*_symbol_table functions for source files,
@@ -382,12 +237,13 @@ function lookup_type(scope: Stack<SymbolTable>, ident: Ident): TypeDecl | null {
  * to the imported module's symbol table.
  *
  */
-function init_source_file_symbol_table(
+function build_source_file_symbol_table(
   resolver: Resolver,
-  symbol_table: SymbolTableBuilder,
   source_file: SourceFile,
-): void {
+): SymbolTable {
+  const symbol_table = new SymbolTable()
   init_symbol_table(resolver, source_file, symbol_table, source_file.stmts)
+  return symbol_table
 }
 
 function build_block_symbol_table(
@@ -395,19 +251,17 @@ function build_block_symbol_table(
   source_file: SourceFile,
   stmts: readonly Stmt[],
 ): SymbolTable {
-  const symbol_table = new SymbolTableBuilder(
-    `Block(file = ${source_file.path})`,
-  )
+  const symbol_table = new SymbolTable()
   init_symbol_table(resolver, source_file, symbol_table, stmts)
   return symbol_table
 }
 
-function init_function_symbol_table(
+function build_function_symbol_table(
   resolver: Resolver,
   source_file: SourceFile,
   func: Func,
 ): SymbolTable {
-  const symbol_table = new SymbolTableBuilder(`function(${func.name})`)
+  const symbol_table = new SymbolTable()
   let index = -1
   for (const param of func.params) {
     index++
@@ -424,28 +278,36 @@ function init_function_symbol_table(
 function build_for_stmt_symbol_table(
   source_file: SourceFile,
   stmt: ForStmt,
+): SymbolTable
+function build_for_stmt_symbol_table(
+  source_file: SourceFile,
+  stmt: ForStmt,
 ): SymbolTable {
-  const symbol_table = new SymbolTableBuilder(`for-stmt in ${source_file.path}`)
+  const symbol_table = new SymbolTable()
   if (stmt.init.kind === "VarDecl") {
     for (const decl of flatten_var_decl(stmt.init.decl)) {
-      symbol_table.add_value(decl.name, {
-        kind: "VarDecl",
-        decl: stmt.init.decl,
-        name: decl.name,
-        source_file: source_file.path,
-      })
+      symbol_table.add_value(
+        decl.name,
+        {
+          kind: "VarDecl",
+          decl: stmt.init.decl,
+          name: decl.name,
+          source_file: source_file.path,
+        },
+        /* is_exported */ false,
+      )
     }
   }
   return symbol_table
 }
 function add_pattern_bindings_to_symbol_table(
-  symbol_table: SymbolTableBuilder,
+  symbol_table: SymbolTable,
   pattern: Pattern,
   stmt: ValueDecl,
 ) {
   switch (pattern.kind) {
     case "Var":
-      symbol_table.add_value(pattern.ident.text, stmt)
+      symbol_table.add_value(pattern.ident.text, stmt, /* is_exported */ false)
       break
     case "Array":
       for (const item of pattern.items) {
@@ -469,193 +331,219 @@ function add_pattern_bindings_to_symbol_table(
 }
 
 function init_symbol_table(
-  resolver: Omit<Resolver, "source_file_symbols"> & {
-    // Making source_file_symbols read-only to prevent accidental mutation
-    // This method should only write to the passed symbol_table parameter
-    // This catches a real bug where I was mutating resolver.source_file_symbols.get(imported_path)
-    source_file_symbols: PathMap<SymbolTable>
-  },
+  resolver: Resolver,
+  source_file: SourceFile,
+  symbol_table: SymbolTable,
+  stmts: readonly Stmt[],
+): void {
+  for (const stmt of stmts) {
+    add_stmt_to_symbol_table(resolver, source_file, stmt, symbol_table)
+  }
+}
+function add_stmt_to_symbol_table(
+  resolver: Resolver,
   /**
-   * This source file is the one that contains {@link stmts}
+   * The source file containing {@link stmt}
    */
   source_file: SourceFile,
-  symbol_table: SymbolTableBuilder,
-  stmts: readonly Stmt[],
-) {
-  for (const stmt of stmts) {
-    switch (stmt.kind) {
-      case "VarDecl":
-        for (const decl of flatten_var_decl(stmt.decl)) {
-          symbol_table.add_value(decl.name, {
+  stmt: Stmt,
+  symbol_table: SymbolTable,
+): void {
+  switch (stmt.kind) {
+    case "VarDecl": {
+      for (const decl of flatten_var_decl(stmt.decl)) {
+        symbol_table.add_value(
+          decl.name,
+          {
             kind: "VarDecl",
             decl: stmt.decl,
             name: decl.name,
             source_file: source_file.path,
-          })
-        }
-        break
-      case "Func":
-        if (!stmt.func.name) break
-        symbol_table.add_value(stmt.func.name.text, {
+          },
+          stmt.decl.is_exported,
+        )
+      }
+      break
+    }
+    case "Func": {
+      if (!stmt.func.name) break
+      symbol_table.add_value(
+        stmt.func.name.text,
+        {
           kind: "Func",
           func: stmt.func,
           source_file: source_file.path,
-        })
-        break
-      case "ClassDecl":
-        if (!stmt.class_def.name) break
-        symbol_table.add_value(stmt.class_def.name.text, stmt)
-        break
-      case "StructDecl":
-        symbol_table.add_value(stmt.struct_def.name.text, {
-          kind: "Struct",
-          decl: stmt,
-          source_file: source_file.path,
-        })
-        symbol_table.add_type(stmt.struct_def.name.text, {
-          kind: "Struct",
-          decl: stmt,
-          source_file: source_file.path,
-        })
-        break
-      case "LJSExternFunction": {
-        if (!stmt.name) break
-        symbol_table.add_value(stmt.name.text, {
-          kind: "LJSExternFunction",
-          stmt,
-          source_file: source_file.path,
-        })
-        break
-      }
-      case "LJSExternConst": {
-        symbol_table.add_value(stmt.name.text, {
+        },
+        stmt.is_exported,
+      )
+      break
+    }
+    case "LJSExternConst": {
+      symbol_table.add_value(
+        stmt.name.text,
+        {
           kind: "LJSExternConst",
-          stmt,
+          stmt: stmt,
           source_file: source_file.path,
-        })
-        break
-      }
-      case "LJSExternType": {
-        symbol_table.add_type(stmt.name.text, {
-          kind: "ExternType",
-          stmt,
+        },
+        stmt.is_exported,
+      )
+      break
+    }
+    case "LJSExternFunction": {
+      symbol_table.add_value(
+        stmt.name.text,
+        {
+          kind: "LJSExternFunction",
+          stmt: stmt,
           source_file: source_file.path,
-        })
-        break
-      }
-      case "Import": {
-        if (stmt.default_import) {
-          TODO()
-        }
-        const imported_symbol_table = resolver.source_file_symbols.get(
-          import_stmt_path(source_file, stmt),
-        )
-        if (!imported_symbol_table) {
-          // Diagnostic will be reported in `collect_source_files`
-          break
-        }
-        const decl: ModuleDecl = {
-          kind: "Module",
-          values: imported_symbol_table.values,
-          types: imported_symbol_table.types,
-        }
-        for (const named_import of stmt.named_imports) {
-          if (named_import.as_name) {
-            TODO(`import { name as alias } not supported yet.`)
-          } else if (named_import.imported_name.kind === "Ident") {
-            symbol_table.add_value(named_import.imported_name.ident.text, {
-              kind: "ModuleProp",
-              module: decl,
-              name: named_import.imported_name.ident.text,
-            })
-            symbol_table.add_type(named_import.imported_name.ident.text, {
-              kind: "ModuleProp",
-              module: decl,
-              name: named_import.imported_name.ident.text,
-            })
-          } else {
-            TODO(`import { "quoted" as name } not supported yet.`)
-          }
-        }
-        break
-      }
-      case "ImportStarAs": {
-        const path = import_stmt_path(source_file, stmt)
-        const symbols = resolver.source_file_symbols.get(path)
-        if (!symbols) {
-          // Diagnostic will be reported in `collect_source_files`
-          break
-        }
-        symbol_table.add_value(stmt.as_name.text, {
-          kind: "Module",
-          values: symbols.values,
-          types: symbols.types,
-        })
-        symbol_table.add_type(stmt.as_name.text, {
-          kind: "Module",
-          values: symbols.values,
-          types: symbols.types,
-        })
-
-        break
-      }
-      case "UntaggedUnionDecl":
-        symbol_table.add_value(stmt.untagged_union_def.name.text, {
-          kind: "UntaggedUnion",
-          decl: stmt,
-          source_file: source_file.path,
-        })
-        symbol_table.add_type(stmt.untagged_union_def.name.text, {
-          kind: "UntaggedUnion",
-          decl: stmt,
-          source_file: source_file.path,
-        })
-        break
-      case "TypeAlias": {
-        symbol_table.add_type(stmt.name.text, {
+        },
+        stmt.is_exported,
+      )
+      break
+    }
+    case "LJSBuiltinConst": {
+      const builtin =
+        builtin_values[stmt.name.text as keyof typeof builtin_values]
+      if (!builtin) TODO()
+      symbol_table.add_value(stmt.name.text, builtin, stmt.is_exported)
+      break
+    }
+    case "LJSBuiltinType": {
+      const builtin =
+        builtin_types[stmt.name.text as keyof typeof builtin_types]
+      if (!builtin) TODO()
+      symbol_table.add_type(stmt.name.text, builtin, stmt.is_exported)
+      break
+    }
+    case "TypeAlias": {
+      symbol_table.add_type(
+        stmt.name.text,
+        {
           kind: "TypeAlias",
-          stmt,
+          stmt: stmt,
           source_file: source_file.path,
-        })
-        break
-      }
-      case "LJSBuiltinConst": {
-        if (stmt.name.text in builtin_values) {
+        },
+        stmt.is_exported,
+      )
+      break
+    }
+    case "StructDecl": {
+      const decl = {
+        kind: "Struct",
+        decl: stmt,
+        source_file: source_file.path,
+      } as const
+      symbol_table.add_type(stmt.struct_def.name.text, decl, stmt.is_exported)
+      symbol_table.add_value(stmt.struct_def.name.text, decl, stmt.is_exported)
+      break
+    }
+    case "UntaggedUnionDecl": {
+      const decl = {
+        kind: "UntaggedUnion",
+        decl: stmt,
+        source_file: source_file.path,
+      } as const
+      symbol_table.add_type(
+        stmt.untagged_union_def.name.text,
+        decl,
+        stmt.is_exported,
+      )
+      symbol_table.add_value(
+        stmt.untagged_union_def.name.text,
+        decl,
+        stmt.is_exported,
+      )
+      break
+    }
+    case "LJSExternType": {
+      symbol_table.add_type(
+        stmt.name.text,
+        {
+          kind: "ExternType",
+          stmt: stmt,
+          source_file: source_file.path,
+        },
+        stmt.is_exported,
+      )
+      break
+    }
+    case "Import": {
+      const imported_source_file = resolver.source_files.get(
+        import_stmt_path(source_file, stmt),
+      )
+      if (!imported_source_file) TODO()
+      const imported_file_symbol_table =
+        resolver.get_source_file_symbol_table(imported_source_file)
+      if (!imported_file_symbol_table) TODO()
+
+      // import { foo, bar } from "..."
+      for (const specifier of stmt.named_imports) {
+        if (specifier.imported_name.kind === "String")
+          TODO(`import { "quoted" as name } from "..."`)
+        const value_decl = imported_file_symbol_table.get_value(
+          specifier.imported_name.ident.text,
+        )
+        if (value_decl) {
           symbol_table.add_value(
-            stmt.name.text,
-            builtin_values[stmt.name.text as keyof typeof builtin_values],
+            specifier.imported_name.ident.text,
+            value_decl,
+            /* is_exported */ false,
           )
         }
-        break
-      }
-      case "LJSBuiltinType": {
-        if (stmt.name.text in builtin_types) {
+        const type_decl = imported_file_symbol_table.get_type(
+          specifier.imported_name.ident.text,
+        )
+        if (type_decl) {
           symbol_table.add_type(
-            stmt.name.text,
-            builtin_types[stmt.name.text as keyof typeof builtin_types],
+            specifier.imported_name.ident.text,
+            type_decl,
+            /* is_exported */ false,
           )
         }
-        break
       }
+      break
+    }
+    case "ImportStarAs": {
+      const imported_source_file = resolver.source_files.get(
+        import_stmt_path(source_file, stmt),
+      )
+      if (!imported_source_file) TODO()
+      const imported_file_symbol_table =
+        resolver.get_source_file_symbol_table(imported_source_file)
+      if (!imported_file_symbol_table) TODO()
+      const module: ModuleDecl = {
+        kind: "Module",
+        values: imported_file_symbol_table.exported_values,
+        types: imported_file_symbol_table.exported_types,
+
+        private_values: imported_file_symbol_table.private_values,
+        private_types: imported_file_symbol_table.private_types,
+      }
+
+      // import * as foo from "..."
+      // foo is not visible outside this source file
+      symbol_table.add_value(stmt.as_name.text, module, /* is_exported */ false)
+      symbol_table.add_type(stmt.as_name.text, module, /* is_exported */ false)
+      break
     }
   }
 }
-const _GlobalSymbolTable = new SymbolTableBuilder("<global>")
-{
-  const ty = (name: string, type: Type) =>
-    _GlobalSymbolTable.add_type(name, { kind: "Builtin", type })
-  ty("u8", Type.u8)
-  ty("u16", Type.u16)
-  ty("u32", Type.u32)
-  ty("u64", Type.u64)
-  ty("i8", Type.i8)
-  ty("i16", Type.i16)
-  ty("i32", Type.i32)
-  ty("i64", Type.i64)
-  ty("f32", Type.f32)
-  ty("f64", Type.f64)
-  ty("void", Type.void)
-  ty("boolean", Type.boolean)
-  ty("unknown", Type.Unknown)
+
+function lookup_value(
+  scope: Stack<SymbolTable>,
+  ident: Ident,
+): ValueDecl | null {
+  for (const symbols of scope) {
+    const decl = symbols.get_value(ident.text)
+    if (decl) return decl
+  }
+  return null
 }
-const GlobalSymbolTable: SymbolTable = _GlobalSymbolTable
+function lookup_type(scope: Stack<SymbolTable>, ident: Ident): TypeDecl | null {
+  for (const symbols of scope) {
+    const decl = symbols.get_type(ident.text)
+    if (decl) return decl
+  }
+  return null
+}
