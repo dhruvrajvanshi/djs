@@ -1,2 +1,2 @@
-builtin const uninitialized
-builtin const cast
+export builtin const uninitialized
+export builtin const cast
