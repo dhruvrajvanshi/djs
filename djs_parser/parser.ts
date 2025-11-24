@@ -1804,7 +1804,10 @@ function parser_impl(
         next_is(t.Let) ||
         next_is(t.Const) ||
         next_is_soft_keyword("extern") ||
-        next_is_soft_keyword("type"))
+        next_is_soft_keyword("type") ||
+        next_is_soft_keyword("builtin") ||
+        next_is_soft_keyword("struct") ||
+        next_is_soft_keyword("untagged"))
     ) {
       const export_token = advance()
       return parse_stmt(export_token)
@@ -1813,7 +1816,7 @@ function parser_impl(
       case t.Let:
       case t.Const:
       case t.Var: {
-        const decl = parse_var_decl()
+        const decl = parse_var_decl(export_token)
         if (decl === ERR) return ERR
         return Stmt.VarDecl(decl.span, decl)
       }
@@ -1860,18 +1863,18 @@ function parser_impl(
             stmt,
           )
         } else if (self.current_token.text === "type") {
-          return parse_type_decl()
+          return parse_type_decl(export_token)
         } else if (
           flags & PARSER_FLAGS.LJS &&
           self.current_token.text === "struct"
         ) {
-          return parse_struct_decl()
+          return parse_struct_decl(export_token)
         } else if (
           flags & PARSER_FLAGS.LJS &&
           at_soft_keyword("untagged") &&
           next_is_soft_keyword("union")
         ) {
-          return parse_untagged_union_decl()
+          return parse_untagged_union_decl(export_token)
         } else {
           return parse_expr_stmt()
         }
@@ -1951,7 +1954,7 @@ function parser_impl(
       case t.Class: {
         const c = parse_class()
         if (c === ERR) return ERR
-        return Stmt.ClassDecl(c.span, c)
+        return Stmt.ClassDecl(c.span, c, export_token !== null)
       }
       case t.Async: {
         if (next_is(t.Function)) {
@@ -1970,7 +1973,7 @@ function parser_impl(
         return parse_expr_stmt()
     }
   }
-  function parse_struct_decl(): Stmt | Err {
+  function parse_struct_decl(export_token: Token | null): Stmt | Err {
     const start = advance()
     assert.equal(t.Ident, start.kind)
     assert.equal(start.text, "struct")
@@ -1984,11 +1987,16 @@ function parser_impl(
     if (members === ERR) return ERR
     const last = expect(t.RBrace)
     if (last === ERR) return ERR
-    return Stmt.StructDecl(Span.between(start, last), {
-      span: Span.between(start, last),
-      name,
-      members,
-    })
+    const span = Span.between(export_token?.span ?? start, last)
+    return Stmt.StructDecl(
+      span,
+      {
+        span,
+        name,
+        members,
+      },
+      export_token !== null,
+    )
   }
   function parse_struct_member(): StructMember | Err {
     const name = parse_binding_ident()
@@ -2000,7 +2008,7 @@ function parser_impl(
     return StructMember.FieldDef(name, type_annotation)
   }
 
-  function parse_untagged_union_decl(): Stmt | Err {
+  function parse_untagged_union_decl(export_token: Token | null): Stmt | Err {
     const start = advance()
     assert.equal(t.Ident, start.kind)
     assert.equal(start.text, "untagged")
@@ -2022,11 +2030,16 @@ function parser_impl(
     if (members === ERR) return ERR
     const last = expect(t.RBrace)
     if (last === ERR) return ERR
-    return Stmt.UntaggedUnionDecl(Span.between(start, last), {
-      span: Span.between(start, last),
-      name,
-      members,
-    })
+    const span = Span.between(start, last)
+    return Stmt.UntaggedUnionDecl(
+      span,
+      {
+        span,
+        name,
+        members,
+      },
+      export_token !== null,
+    )
   }
 
   function parse_untagged_union_member(): UntaggedUnionMember | Err {
@@ -2208,7 +2221,7 @@ function parser_impl(
       from_clause.text,
     )
   }
-  function parse_type_decl(): Stmt | Err {
+  function parse_type_decl(export_token: Token | null): Stmt | Err {
     const start = advance()
     assert.equal(t.Ident, start.kind)
     assert.equal(start.text, "type")
@@ -2230,7 +2243,8 @@ function parser_impl(
       if (type_annotation === ERR) return ERR
       if (expect_semi() === ERR) return ERR
       return Stmt.TypeAlias(
-        Span.between(ident, type_annotation),
+        Span.between(export_token?.span ?? ident.span, type_annotation),
+        export_token !== null,
         ident,
         type_annotation,
       )
@@ -2316,7 +2330,7 @@ function parser_impl(
     // Parse the initialization part
     let init: ForInit
     if (at(t.Let) || at(t.Const) || at(t.Var)) {
-      const decl = parse_var_decl()
+      const decl = parse_var_decl(/* export_token */ null)
       if (decl === ERR) return ERR
       init = ForInit.VarDecl(decl)
     } else if (at(t.Semi)) {
@@ -2693,8 +2707,8 @@ function parser_impl(
     if (expect(t.GreaterThan) === ERR) return ERR
     return params.map((ident) => ({ ident }))
   }
-  function parse_var_decl(): VarDecl | Err {
-    let span = self.current_token.span
+  function parse_var_decl(export_token: Token | null): VarDecl | Err {
+    let span = export_token?.span ?? self.current_token.span
 
     let decl_type: DeclType
     switch (self.current_token.kind) {
@@ -2742,6 +2756,7 @@ function parser_impl(
       span,
       decl_type,
       declarators,
+      is_exported: export_token !== null,
     }
   }
 
