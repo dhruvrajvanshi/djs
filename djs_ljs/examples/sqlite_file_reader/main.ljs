@@ -2,9 +2,10 @@ import * as c from "../../libc.ljs"
 import { cast } from "ljs:mem"
 
 struct SQHeader {
-    header_string: c.char[16]
+    header_string: u8[16]
     page_size: u16
-    file_format: u8
+    write_file_format: u8
+    read_file_format: u8
 }
 
 const s = c.str
@@ -21,7 +22,7 @@ function main(): c.int {
 
     const ptr = c.mmap(
         null,
-        24,
+        100,
         c.PROT_READ,
         c.MAP_PRIVATE,
         fd,
@@ -35,15 +36,18 @@ function main(): c.int {
     const header_str = cast<*c.char>(header)
     c.puts(header_str)
     c.printf(s`DB page size: %d\n`, header.page_size)
-    let format_name: *c.char = s`Unknown`
-    if (header.file_format === 1) {
-        format_name = s`Legacy`
-    } else {
-        format_name = s`WAL`
-    }
-
-    c.printf(s`File format: %s\n`, format_name)
+    c.printf(s`Write file format: %s (%d)\n`, file_format_to_str(header.write_file_format), header.write_file_format)
+    c.printf(s`Read file format: %s (%d)\n`, file_format_to_str(header.read_file_format), header.read_file_format)
 
     c.fclose(file)
     return 0
+}
+function file_format_to_str(file_format: u8): *c.char {
+    if (file_format === 1) {
+        return s`Legacy`
+    } else if (file_format === 2) {
+        return s`WAL`
+    } else {
+        return s`Unknown`
+    }
 }

@@ -3,7 +3,8 @@ import { mkdir, readdir, readFile } from "node:fs/promises"
 import { main } from "./main.ts"
 import assert from "node:assert/strict"
 import { existsSync } from "node:fs"
-import { spawn } from "node:child_process"
+import { execSync, spawn } from "node:child_process"
+import * as Path from "node:path"
 
 const files = (await readdir("./tests")).filter((it) => it.endsWith(".ljs"))
 
@@ -75,7 +76,7 @@ test("examples/sqlite_file_reader", async () => {
     {
       positionals: ["./examples/sqlite_file_reader/main.ljs"],
       values: {
-        output: "./test-output/sqlite_file_reader",
+        output: "test-output/sqlite_file_reader",
         "no-colors": true,
       },
     },
@@ -87,4 +88,19 @@ test("examples/sqlite_file_reader", async () => {
     },
   )
   expect(diagnostics).toBe("")
+  const result = execSync(
+    Path.resolve(import.meta.dirname, "test-output/sqlite_file_reader"),
+    {
+      cwd: "..",
+    },
+  )
+  expect(result.toString()).toMatchInlineSnapshot(`
+    "SQLite file reader
+    ==================
+    SQLite format 3
+    DB page size: 16
+    Write file format: Legacy (1)
+    Read file format: Legacy (1)
+    "
+  `)
 })
