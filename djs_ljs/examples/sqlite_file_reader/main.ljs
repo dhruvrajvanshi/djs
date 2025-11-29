@@ -2,10 +2,49 @@ import * as c from "../../libc.ljs"
 import { cast } from "ljs:mem"
 
 struct SQHeader {
+    /**
+     *  The header string: "SQLite format 3\000"
+     */
     header_string: u8[16]
+    /**
+     * The database page size in bytes. Must be a power of two between
+     * 512 and 32768 inclusive, or the value 1 representing a page size
+     * of 65536.
+     */
     page_size: u16
+    /**
+     * File format write version. 1 for legacy; 2 for WAL.
+     */
     write_file_format: u8
+    /**
+     * File format read version. 1 for legacy; 2 for WAL.
+     */
     read_file_format: u8
+    /**
+     * Bytes of unused "reserved" space at the end of each page. Usually 0.
+     */
+    page_end_reserved_bytes: u8
+    /**
+     * Maximum embedded payload fraction. Must be 64.
+     */
+    max_embedded_payload_fraction: u8
+    /**
+     * Minimum embedded payload fraction. Must be 32.
+     */
+    min_embedded_payload_fraction: u8
+    /**
+     * Leaf payload fraction. Must be 32.
+     */
+    leaf_payload_fraction: u8
+
+    /**
+     * File change counter.
+     */
+    file_change_counter: u32
+    /**
+     *  Size of the database file in pages. The "in-header database size".
+     */
+    page_count: u32
 }
 
 const s = c.str
@@ -38,6 +77,12 @@ function main(): c.int {
     c.printf(s`DB page size: %d\n`, header.page_size)
     c.printf(s`Write file format: %s (%d)\n`, file_format_to_str(header.write_file_format), header.write_file_format)
     c.printf(s`Read file format: %s (%d)\n`, file_format_to_str(header.read_file_format), header.read_file_format)
+    c.printf(s`Bytes reserved after every page: %d\n`, header.page_end_reserved_bytes)
+    c.printf(s`Max embedded payload fraction: %d\n`, header.max_embedded_payload_fraction)
+    c.printf(s`Min embedded payload fraction: %d\n`, header.min_embedded_payload_fraction)
+    c.printf(s`Leaf payload fraction: %d\n`, header.leaf_payload_fraction)
+    c.printf(s`File change counter: %d\n`, header.file_change_counter)
+    c.printf(s`Page count: %d`, header.page_count)
 
     c.fclose(file)
     return 0

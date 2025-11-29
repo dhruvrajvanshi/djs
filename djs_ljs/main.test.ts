@@ -101,6 +101,11 @@ test("examples/sqlite_file_reader", async () => {
     DB page size: 16
     Write file format: Legacy (1)
     Read file format: Legacy (1)
-    "
+    Bytes reserved after every page: 0
+    Max embedded payload fraction: 64
+    Min embedded payload fraction: 32
+    Leaf payload fraction: 32
+    File change counter: 16777216
+    Page count: 33554432"
   `)
 })
