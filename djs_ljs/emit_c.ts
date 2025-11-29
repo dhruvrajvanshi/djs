@@ -31,7 +31,8 @@ import {
 } from "djs_ast"
 import assert from "node:assert"
 import { Type, type_is_pointer, type_to_string } from "./type.ts"
-import type { ModuleDecl, ResolveResult } from "./resolve.ts"
+import type { ResolveResult } from "./resolve.ts"
+import type { ModuleDecl } from "./decl.ts"
 
 interface EmitContext {
   source_files: SourceFiles
@@ -180,7 +181,7 @@ function emit_struct_def(
   source_file: SourceFile,
   stmt: StructDeclStmt,
 ): CNode {
-  const fields = stmt.struct_def.members.map((member) => {
+  const fields = stmt.struct_def.members.map((member): CStructDefField => {
     const type_obj = ctx.tc_result.types.get(member.type_annotation)
     assert(type_obj, "Type annotation must have resolved type")
 
@@ -1139,7 +1140,10 @@ function render_c_node(node: CNode): string {
       return `typedef ${render_c_node(node.to)} ${node.name};`
     case "StructDef":
       return `struct ${node.name} {\n${node.fields
-        .map((f) => `  ${render_c_node(f.type)} ${f.name};`)
+        .map(
+          (f) =>
+            `  ${render_c_node(f.type)} ${f.name}${f.array_size !== null ? `[${f.array_size}]` : ""};`,
+        )
         .join("\n")}\n};`
     case "StructDecl":
       return `struct ${node.name};`
@@ -1252,7 +1256,7 @@ export type CNode =
   | {
       kind: "StructDef"
       name: string
-      fields: { name: string; type: CNode; array_size: number | null }[]
+      fields: CStructDefField[]
     }
   | { kind: "UnionDecl"; name: string }
   | { kind: "UnionDef"; name: string; fields: { name: string; type: CNode }[] }
@@ -1276,3 +1280,9 @@ export type CNode =
       then_branch: CNode
       else_branch: CNode
     }
+
+interface CStructDefField {
+  name: string
+  type: CNode
+  array_size: number | null
+}
