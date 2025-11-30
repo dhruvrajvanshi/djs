@@ -1,7 +1,7 @@
 import * as c from "../libc.ljs";
 
-let size_val: usize = 42;
-let signed_size_val: isize = 0;
+let size_val: usize = 12;
+let signed_size_val: isize = -2345;
 
 export function main(): void {
     c.printf(c.str`usize value: %zu\n`, size_val);
