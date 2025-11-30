@@ -695,6 +695,9 @@ function emit_expr(
         else_branch,
       }
     }
+    case "Paren": {
+      return emit_expr(ctx, source_file, expr.expr)
+    }
     default:
       TODO(`Unhandled expression: ${expr.kind}`)
   }
