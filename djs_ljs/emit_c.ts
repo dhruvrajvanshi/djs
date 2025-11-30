@@ -667,6 +667,15 @@ function emit_expr(
     }
     case "TypeApplication":
       return emit_type_application_expr(ctx, source_file, expr)
+    case "As": {
+      const target_type = ctx.tc_result.types.get(expr.type_annotation)
+      assert(target_type, "Target type must be available")
+      return {
+        kind: "Cast",
+        to: emit_type(target_type),
+        expr: emit_expr(ctx, source_file, expr.expr),
+      }
+    }
     case "Null": {
       const ty = ctx.tc_result.values.get(expr)
       assert(ty, "expr must have a type")
