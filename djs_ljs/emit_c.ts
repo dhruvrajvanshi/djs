@@ -658,7 +658,7 @@ function emit_expr(
       return emit_assign_expr(ctx, source_file, expr)
     }
     case "AddressOf": {
-      assert(expr.expr.kind === "Var")
+      assert(expr.expr.kind === "Var" || expr.expr.kind === "Prop")
       return {
         kind: "AddressOf",
         expr: emit_expr(ctx, source_file, expr.expr),

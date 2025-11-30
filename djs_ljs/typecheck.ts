@@ -861,10 +861,12 @@ export function typecheck(
   }
 
   function infer_address_of_expr(ctx: CheckCtx, expr: AddressOfExpr): Type {
-    if (expr.expr.kind !== "Var") {
-      emit_error(ctx, expr.expr.span, "Can only take the address of a variable")
-    } else if (expr.mut) {
+    if (expr.expr.kind !== "Var" && expr.expr.kind !== "Prop") {
+      emit_error(ctx, expr.expr.span, "Can only take the address of a variable or struct field")
+    } else if (expr.expr.kind === "Var" && expr.mut) {
       check_address_of_mutability(ctx, expr.expr.ident)
+    } else if (expr.expr.kind === "Prop" && expr.mut) {
+      emit_error(ctx, expr.expr.span, "Cannot take mutable address of struct field")
     }
     const inner_type = infer_expr(ctx.source_file, expr.expr)
     if (inner_type.kind === "Error") return inner_type
