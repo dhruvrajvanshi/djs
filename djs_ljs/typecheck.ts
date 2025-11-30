@@ -622,6 +622,12 @@ export function typecheck(
         values.set(expr, expected_type)
         return
       }
+      case "UnaryMinus":
+      case "UnaryPlus": {
+        check_expr(ctx, expr.expr, expected_type)
+        values.set(expr, expected_type)
+        return
+      }
 
       default: {
         const inferred = infer_expr(ctx.source_file, expr)
@@ -759,6 +765,22 @@ export function typecheck(
         check_expr(ctx, expr.expr, Type.boolean)
         values.set(expr, Type.boolean)
         return Type.boolean
+      }
+      case "UnaryMinus":
+      case "UnaryPlus": {
+        const inner_type = infer_expr(ctx.source_file, expr.expr)
+        if (
+          !type_is_integral(inner_type) &&
+          !type_is_floating_point(inner_type)
+        ) {
+          emit_error(
+            ctx,
+            expr.span,
+            `Unary operator ${expr.kind} requires an integral or floating point operand, but got ${type_to_string(inner_type)}`,
+          )
+        }
+        values.set(expr, inner_type)
+        return inner_type
       }
       default: {
         return emit_error_type(ctx, {
