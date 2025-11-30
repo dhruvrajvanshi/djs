@@ -158,7 +158,7 @@ export function emit_c(
 
   return {
     source:
-      "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n\n" +
+      "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n#include <sys/types.h>\n\n" +
       render_c_nodes(c_nodes),
     linkc_paths: ctx.link_c_paths,
   }
@@ -712,6 +712,22 @@ function emit_expr(
     case "Paren": {
       return emit_expr(ctx, source_file, expr.expr)
     }
+    case "UnaryMinus": {
+      const expr_node = emit_expr(ctx, source_file, expr.expr)
+      return {
+        kind: "PrefixOp",
+        op: "-",
+        expr: expr_node,
+      }
+    }
+    case "UnaryPlus": {
+      const expr_node = emit_expr(ctx, source_file, expr.expr)
+      return {
+        kind: "PrefixOp",
+        op: "+",
+        expr: expr_node,
+      }
+    }
     default:
       TODO(`Unhandled expression: ${expr.kind}`)
   }
@@ -1211,6 +1227,8 @@ function render_c_node(node: CNode): string {
       return `(${render_c_node(node.condition)} ? ${render_c_node(
         node.then_branch,
       )} : ${render_c_node(node.else_branch)})`
+    case "PrefixOp":
+      return `(${node.op}${render_c_node(node.expr)})`
     default:
       assert_never(node)
   }
@@ -1291,6 +1309,7 @@ export type CNode =
   | { kind: "Deref"; expr: CNode }
   | { kind: "Not"; expr: CNode }
   | { kind: "..." }
+  | { kind: "PrefixOp"; op: string; expr: CNode }
   | {
       kind: "Ternary"
       condition: CNode
