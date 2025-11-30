@@ -1,0 +1,10 @@
+import * as c from "ljs:libc"
+
+struct Foo {
+    value0: u8
+    value1: u64
+}
+function main(): void {
+    const foo = Foo { value0: 1, value1: 2 }
+    c.printf(c.str`Address difference: %ld\n`, foo.value1.& as usize - foo.value0.& as usize)
+}
