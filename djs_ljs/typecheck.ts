@@ -34,6 +34,7 @@ import {
   LJSBuiltinConstStmt,
   LJSBuiltinTypeStmt,
   TypeApplicationExpr,
+  AsExpr,
   TernaryExpr,
   QualifiedName,
 } from "djs_ast"
@@ -750,6 +751,8 @@ export function typecheck(
         return infer_expr(ctx.source_file, expr.expr)
       case "TypeApplication":
         return infer_type_application_expr(ctx, expr)
+      case "As":
+        return infer_as_expr(ctx, expr)
       case "Not": {
         check_expr(ctx, expr.expr, Type.boolean)
         values.set(expr, Type.boolean)
@@ -789,6 +792,48 @@ export function typecheck(
       ),
     )
     return Subst.apply(subst, callee_type.body)
+  }
+
+  function is_valid_cast(source_type: Type, target_type: Type): boolean {
+    if (source_type.kind === "Error" || target_type.kind === "Error") {
+      return true
+    }
+
+    if (type_is_pointer(source_type) && type_is_pointer(target_type)) {
+      return true
+    }
+
+    if (type_is_pointer(source_type) && type_is_integral(target_type)) {
+      return true
+    }
+
+    if (type_is_integral(source_type) && type_is_pointer(target_type)) {
+      return true
+    }
+
+    if (type_is_integral(source_type) && type_is_integral(target_type)) {
+      return true
+    }
+
+    return false
+  }
+
+  function infer_as_expr(ctx: CheckCtx, expr: AsExpr): Type {
+    const source_type = infer_expr(ctx.source_file, expr.expr)
+    const target_type = check_type_annotation(
+      ctx.source_file,
+      expr.type_annotation,
+    )
+
+    if (!is_valid_cast(source_type, target_type)) {
+      emit_error(
+        ctx,
+        expr.span,
+        `Cannot cast from ${type_to_string(source_type)} to ${type_to_string(target_type)}`,
+      )
+    }
+
+    return target_type
   }
 
   function infer_address_of_expr(ctx: CheckCtx, expr: AddressOfExpr): Type {
