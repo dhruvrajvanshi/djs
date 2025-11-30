@@ -1,4 +1,4 @@
-import * as c from "../libc.ljs";
+import * as c from "ljs:libc";
 
 let size_val: usize = 12;
 let signed_size_val: isize = -2345;

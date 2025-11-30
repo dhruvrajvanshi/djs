@@ -1,5 +1,5 @@
 import * as ffi from "ljs:ffi"
-import * as c from "../libc.ljs"
+import * as c from "ljs:libc"
 ffi.linkc("./link_c.c")
 
 extern type Box
