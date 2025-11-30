@@ -158,7 +158,8 @@ export function emit_c(
 
   return {
     source:
-      "#include <stdint.h>\n#include <stdbool.h>\n\n" + render_c_nodes(c_nodes),
+      "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n\n" +
+      render_c_nodes(c_nodes),
     linkc_paths: ctx.link_c_paths,
   }
 }
@@ -299,6 +300,10 @@ function emit_type(type: Type): CNode {
       return { kind: "Ident", name: "int64_t" }
     case "u64":
       return { kind: "Ident", name: "uint64_t" }
+    case "usize":
+      return { kind: "Ident", name: "size_t" }
+    case "isize":
+      return { kind: "Ident", name: "ssize_t" }
     case "boolean":
       return { kind: "Ident", name: "bool" }
 
