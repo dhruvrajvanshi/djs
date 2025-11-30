@@ -1,4 +1,4 @@
-import * as c from "../libc.ljs"
+import * as c from "ljs:libc"
 
 function main(): void {
   const u16_max: u16 = 1023

@@ -1,4 +1,4 @@
-import * as c from "../libc.ljs"
+import * as c from "ljs:libc"
 
 untagged union Foo {
   u32: u32
