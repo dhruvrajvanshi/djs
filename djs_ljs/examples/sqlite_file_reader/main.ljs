@@ -1,5 +1,4 @@
 import * as c from "../../libc.ljs"
-import { cast } from "ljs:mem"
 
 struct SQHeader {
     /**
@@ -71,8 +70,8 @@ function main(): c.int {
         c.perror(s`Couldn't mmap`)
         c.abort()
     }
-    const header = cast<*SQHeader>(ptr)
-    const header_str = cast<*c.char>(header)
+    const header = ptr as *SQHeader
+    const header_str = header as *c.char
     c.puts(header_str)
     c.printf(s`DB page size: %d\n`, header.page_size)
     c.printf(s`Write file format: %s (%d)\n`, file_format_to_str(header.write_file_format), header.write_file_format)
