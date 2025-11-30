@@ -31,6 +31,9 @@ test.each(files)("%s", async (file) => {
       error_exit: () => {},
     },
   )
+  if (existsSync(`./tests/${file.replace(/\.ljs$/, "")}.stdout`)) {
+    expect(diagnostics).toBe("")
+  }
   if (diagnostics) {
     await expect(diagnostics).toMatchFileSnapshot(
       `./tests/${file.replace(/\.ljs$/, "")}.diagnostics`,
