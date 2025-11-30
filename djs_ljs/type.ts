@@ -5,10 +5,12 @@ export type Type = ReadonlyUnion<
   | { kind: "u16" }
   | { kind: "u32" }
   | { kind: "u64" }
+  | { kind: "usize" }
   | { kind: "i8" }
   | { kind: "i16" }
   | { kind: "i32" }
   | { kind: "i64" }
+  | { kind: "isize" }
   | { kind: "f32" }
   | { kind: "f64" }
   | { kind: "c_int" }
@@ -75,10 +77,12 @@ export const Type = {
   u16: { kind: "u16" },
   u32: { kind: "u32" },
   u64: { kind: "u64" },
+  usize: { kind: "usize" },
   i8: { kind: "i8" },
   i16: { kind: "i16" },
   i32: { kind: "i32" },
   i64: { kind: "i64" },
+  isize: { kind: "isize" },
   f32: { kind: "f32" },
   f64: { kind: "f64" },
   void: { kind: "void" },
@@ -161,6 +165,8 @@ export function type_to_string(type: Type): string {
       return "u32"
     case "u64":
       return "u64"
+    case "usize":
+      return "usize"
     case "i8":
       return "i8"
     case "i16":
@@ -169,6 +175,8 @@ export function type_to_string(type: Type): string {
       return "i32"
     case "i64":
       return "i64"
+    case "isize":
+      return "isize"
     case "f32":
       return "f32"
     case "f64":
@@ -237,6 +245,8 @@ export function type_to_sexpr(type: Type): string {
       return "u32"
     case "u64":
       return "u64"
+    case "usize":
+      return "usize"
     case "i8":
       return "i8"
     case "i16":
@@ -245,6 +255,8 @@ export function type_to_sexpr(type: Type): string {
       return "i32"
     case "i64":
       return "i64"
+    case "isize":
+      return "isize"
     case "f32":
       return "f32"
     case "f64":
@@ -324,10 +336,12 @@ export function type_is_integral(type: Type): boolean {
     type.kind === "u16" ||
     type.kind === "u32" ||
     type.kind === "u64" ||
+    type.kind === "usize" ||
     type.kind === "i8" ||
     type.kind === "i16" ||
     type.kind === "i32" ||
     type.kind === "i64" ||
+    type.kind === "isize" ||
     type.kind === "c_int"
   )
 }

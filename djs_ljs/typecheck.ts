@@ -672,10 +672,12 @@ export function typecheck(
       case "u16":
       case "u32":
       case "u64":
+      case "usize":
       case "i8":
       case "i16":
       case "i32":
       case "i64":
+      case "isize":
       case "f32":
       case "f64":
       case "boolean":

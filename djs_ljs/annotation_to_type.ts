@@ -16,6 +16,10 @@ export function annotation_to_type(
           return Type.u8
         case "u32":
           return Type.u32
+        case "usize":
+          return Type.usize
+        case "isize":
+          return Type.isize
         default:
           return env(annotation.ident)
       }
