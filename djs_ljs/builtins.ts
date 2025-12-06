@@ -21,6 +21,11 @@ export const builtin_values = {
       Type.UnboxedFunc([Type.Unknown], Type.ParamRef("To")),
     ),
   },
+  size_of: {
+    kind: "BuiltinConst",
+    name: "size_of",
+    type: Type.Forall([{ name: "T" }], Type.UnboxedFunc([], Type.usize)),
+  },
 } as const
 
 export type BuiltinTypeDecl = ValueOf<typeof builtin_types>

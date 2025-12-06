@@ -597,6 +597,21 @@ function emit_expr(
         )
         ctx.link_c_paths.push(path)
         return { kind: "Empty" }
+      } else if (is_builtin_size_of(ctx, expr.callee)) {
+        assert(expr.args.length === 0)
+        assert(expr.callee.kind === "TypeApplication")
+        assert(expr.callee.type_args.length === 1)
+        const type_arg = expr.callee.type_args[0]
+        const type_obj = ctx.tc_result.types.get(type_arg)
+        assert(type_obj, "Type argument must have a type object")
+        return {
+          kind: "Call",
+          func: {
+            kind: "Ident",
+            name: "sizeof",
+          },
+          args: [emit_type(type_obj)],
+        }
       } else {
         const node = try_emit_cast(ctx, source_file, expr)
         if (node) return node
@@ -793,6 +808,24 @@ function is_builtin_linkc(ctx: EmitContext, expr: Expr): boolean {
   const ty = ctx.tc_result.values.get(expr)
   assert(ty)
   return ty.kind === "BuiltinLinkC"
+}
+function is_builtin_size_of(ctx: EmitContext, expr: Expr): boolean {
+  if (expr.kind !== "TypeApplication") return false
+  const callee_callee = expr.expr
+  switch (callee_callee.kind) {
+    case "Prop": {
+      const lhs = callee_callee.lhs
+      if (lhs.kind !== "Var") return false
+      const decl = ctx.resolve_result.values.get(lhs.ident)
+      if (decl?.kind !== "Module") return false
+      const prop_decl = decl.values.get(callee_callee.property.text)
+      return prop_decl?.kind === "BuiltinConst" && prop_decl.name === "size_of"
+    }
+    case "Var":
+      TODO()
+    default:
+      return false
+  }
 }
 function emit_assign_expr(
   ctx: EmitContext,
