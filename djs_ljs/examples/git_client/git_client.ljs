@@ -1,0 +1,13 @@
+import * as c from "ljs:libc"
+import * as mem from "ljs:mem"
+
+const s = c.str
+const SIZEOF_PTR: usize = 8
+function main(argc: c.int, argv: **c.char): void {
+    c.printf(s`argc = %d\n`, argc)
+    for (let i: c.int = 0; i < argc; i++) {
+        const start_ptr = argv as usize
+        const current_ptr = (start_ptr + ((i as usize) * SIZEOF_PTR)) as **c.char
+        c.printf(s`argc[%d] = %s\n`, i, current_ptr.*)
+    }
+}
