@@ -1195,6 +1195,10 @@ function parser_impl(
         return parse_generic_func_type_annotation()
       case t.Star:
         return parse_ptr_type_annotation()
+      case t.StarStar:
+        // a bit of a hack, but since ** is a valid token, we need special handling for it.
+        // **foo must be interpreted as a pointer to a pointer to foo
+        return parse_ptr_type_annotation()
       default:
         emit_error("Expected a type annotation")
         return ERR
@@ -1221,7 +1225,8 @@ function parser_impl(
 
   function parse_ptr_type_annotation(): TypeAnnotation | Err {
     const start = advance()
-    assert(start.kind === t.Star)
+    assert(start.kind === t.Star || start.kind === t.StarStar)
+    let was_star_star = start.kind === t.StarStar
     const is_mut = at(t.Ident) && self.current_token.text === "mut"
     if (is_mut) advance()
     const type_annotation = parse_type_annotation()
@@ -1230,16 +1235,25 @@ function parser_impl(
       emit_error("Pointer type annotations are only supported in LJS mode")
     }
 
+    let result: TypeAnnotation
     if (is_mut) {
-      return TypeAnnotation.LJSMutPtr(
+      result = TypeAnnotation.LJSMutPtr(
         Span.between(start.span, type_annotation.span),
         type_annotation,
       )
     } else {
-      return TypeAnnotation.LJSPtr(
+      result = TypeAnnotation.LJSPtr(
         Span.between(start.span, type_annotation.span),
         type_annotation,
       )
+    }
+    if (was_star_star) {
+      return TypeAnnotation.LJSPtr(
+        Span.between(start.span, type_annotation.span),
+        result,
+      )
+    } else {
+      return result
     }
   }
 
