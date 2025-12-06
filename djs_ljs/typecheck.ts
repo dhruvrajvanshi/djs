@@ -1025,7 +1025,8 @@ export function typecheck(
         return Type.boolean
       }
       case "Add":
-      case "Sub": {
+      case "Sub":
+      case "Mul": {
         const lhs_type = expected_type
           ? (check_expr(ctx, expr.lhs, expected_type), expected_type)
           : infer_expr(ctx.source_file, expr.lhs)

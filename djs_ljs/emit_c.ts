@@ -634,6 +634,7 @@ function emit_expr(
         Sub: "-",
         EqEqEq: "==",
         NotEqEq: "!=",
+        Mul: "*",
       }
       const op = ops[expr.operator]
       assert(op, `Unhandled binary operator: ${expr.operator}`)
