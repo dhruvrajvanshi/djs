@@ -1116,7 +1116,7 @@ function render_c_node(node: CNode): string {
     case "Param":
       return `${render_c_node(node.type)} ${node.name}`
     case "ConstPtr":
-      return `const ${render_c_node(node.to_type)}*`
+      return `${render_c_node(node.to_type)} const*`
     case "Ptr":
       return `${render_c_node(node.to_type)}*`
     case "VarDecl":

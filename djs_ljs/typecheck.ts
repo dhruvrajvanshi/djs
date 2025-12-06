@@ -454,13 +454,6 @@ export function typecheck(
       func.name,
       "check_main_function_signature must be called for a function with a name",
     )
-    if (func.params.length > 0) {
-      emit_error(
-        ctx,
-        func.name.span,
-        "main function must not have any parameters.",
-      )
-    }
     const return_type = func.return_type
       ? check_type_annotation(source_file, func.return_type)
       : null
