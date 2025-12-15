@@ -10,7 +10,7 @@
   "license": "UNLCENCED",
   "packageManager": "pnpm@10.8.0",
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@types/node": "^25.0.2",
     "@vitest/coverage-v8": "4.0.13",
     "prettier": "^3.6.2",
     "typescript": "5.9.3",
