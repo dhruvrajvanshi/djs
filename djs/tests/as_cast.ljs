@@ -1,0 +1,9 @@
+import * as c from "ljs:libc"
+
+function main(): void {
+  const u16_max: u16 = 1023
+  c.printf(c.str`255 === %d\n`, u16_max as u8)
+
+  const message = c.str`?PASS`
+  c.printf(c.str`"PASS" = "%s"\n`, ((message as u64) + 1) as *c.char)
+}

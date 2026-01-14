@@ -1,0 +1,9 @@
+import * as c from "ljs:libc"
+import * as mem from "ljs:mem"
+
+function main(): c.int {
+    let message: *c.char = mem.uninitialized
+    message = c.str`PASS`
+    c.puts(message)
+    return 0
+}

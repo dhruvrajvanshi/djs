@@ -1,0 +1,11 @@
+import * as ffi from "ljs:ffi"
+
+extern function puts(s: *ffi.c_char): ffi.c_int
+
+function main(): ffi.c_int {
+    for (let i = 0; i < 10; i++) {
+        puts(ffi.c_str`LOOP`)
+    }
+    puts(ffi.c_str`PASS`)
+    return 0
+}

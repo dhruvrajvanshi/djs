@@ -1,0 +1,23 @@
+ERROR: ./tests/break_or_continue_outside_loops.ljs:16: Continue statement not inside a loop
+16|    continue // EXPECTED_ERROR
+       ^~~
+17|  }
+18|  
+
+ERROR: ./tests/break_or_continue_outside_loops.ljs:15: Break statement not inside a loop
+15|    break // EXPECTED_ERROR
+       ^~~
+16|    continue // EXPECTED_ERROR
+17|  }
+
+ERROR: ./tests/break_or_continue_outside_loops.ljs:3: Continue statement not inside a loop
+3|  continue // EXPECTED_ERROR
+    ^~~
+4|  
+5|  function foo(): void {
+
+ERROR: ./tests/break_or_continue_outside_loops.ljs:2: Break statement not inside a loop
+2|  break // EXPECTED_ERROR
+    ^~~
+3|  continue // EXPECTED_ERROR
+4|  

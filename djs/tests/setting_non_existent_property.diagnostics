@@ -1,0 +1,19 @@
+ERROR: ./tests/setting_non_existent_property.ljs:12: Expected u32, got boolean
+12|      bar.value2 = true // EXPECTED_ERROR
+                      ^~~
+13|  }
+14|  
+
+ERROR: ./tests/setting_non_existent_property.ljs:8: Struct Foo has no field named x
+8|      bar.x = 1 // EXPECTED_ERROR
+            ^~~
+9|  
+10|      bar.value1 = 3
+
+HINT: Available fields: value1, value2
+
+ERROR: ./tests/setting_non_existent_property.ljs:5: Cannot access property on a non-struct type i64
+5|      foo.x = 1 // EXPECTED_ERROR
+        ^~~
+6|  
+7|      const bar = Foo { value1: 1, value2: 2 }

@@ -1,0 +1,18 @@
+import * as ffi from "ljs:ffi"
+
+function main(): ffi.c_int {
+    const i: u32 = 56
+
+    pass_if_56(i.&)
+    return 0
+}
+
+function pass_if_56(i: *u32): void {
+    if (i.* === 56) {
+        puts(ffi.c_str`PASS`)
+    } else {
+        puts(ffi.c_str`FAIL`)
+    }
+}
+
+extern function puts(msg: *ffi.c_char): ffi.c_int

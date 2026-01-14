@@ -1,4 +1,5 @@
 packages:
+  - djs
   - djs_std
   - djs_ast
   - djs_frontend

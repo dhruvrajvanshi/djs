@@ -1,0 +1,19 @@
+import { c_str, c_char, c_int } from "ljs:ffi"
+
+const c = c_str
+function main(): c_int {
+    for (let i: c_int = 0; i < 10; i++) {
+        putchar(i + 48)
+        puts(c` LOOP`)
+        if (i < 3) {
+            puts(c` < 3`)
+            continue
+        }
+        if (i > 5) {
+            puts(c` BREAKING`)
+            break
+        }
+    }
+}
+extern function puts(msg: *c_char): c_int
+extern function putchar(c: c_int): c_int

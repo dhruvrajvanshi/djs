@@ -1,0 +1,18 @@
+
+function main(): void {
+    const foo = 1
+
+    foo.x = 1 // EXPECTED_ERROR
+
+    const bar = Foo { value1: 1, value2: 2 }
+    bar.x = 1 // EXPECTED_ERROR
+
+    bar.value1 = 3
+
+    bar.value2 = true // EXPECTED_ERROR
+}
+
+struct Foo {
+    value1: u8
+    value2: u32
+}

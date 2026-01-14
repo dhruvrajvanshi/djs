@@ -1,0 +1,61 @@
+builtin const linkc
+linkc("./libc_shims.c")
+
+// TODO: Figure out how to portably get these as
+//       constants without breaking tests in CI
+extern function get_stdin(): *mut FILE
+extern function get_stdout(): *mut FILE
+extern function get_stderr(): *mut FILE
+
+export builtin const c_str
+/**
+ * Null terminated C style bytestring
+ * @example
+ * const msg: *char = str`Hello` // ['H', 'e', 'l', 'l', '0', '\0']
+ */
+export const str = c_str
+
+/**
+ * Equivalent to the c char type.
+ * Can be either i8 or u8, depending on the platform
+ */
+builtin type c_char
+export type char = c_char
+
+
+builtin type c_int
+export type int = c_int
+export type long = i64
+export type size_t = long // TODO: Add usize type
+export type off_t = long // TODO: Add isize type
+
+export extern function puts(s: *char): int
+export extern function abort(): void
+export extern function perror(s: *char): void
+
+export extern type FILE
+
+export extern function fopen(filename: *char, mode: *char): *mut FILE
+export extern function fclose(file: *mut FILE): int
+export extern function fileno(file: *mut FILE): int
+export extern function fputs(str: *char, file: *mut FILE): int
+export extern function fprintf(
+    file: *mut FILE,
+    fmt: *char,
+    ...args
+): int
+export extern function printf(fmt: *char, ...args): int
+export extern function mmap(
+    addr: *mut void,
+    len: size_t,
+    prot: int,
+    flags: int,
+    filedes: int,
+    offset: off_t
+): *mut void
+export const PROT_NONE: int  = 0x00    /* [MC2] no permissions */
+export const PROT_READ: int  = 0x01    /* [MC2] pages can be read */
+export const PROT_WRITE: int = 0x02    /* [MC2] pages can be written */
+export const PROT_EXEC: int  = 0x04    /* [MC2] pages can be executed */
+export const MAP_SHARED: int = 0x1
+export const MAP_PRIVATE: int = 0x2

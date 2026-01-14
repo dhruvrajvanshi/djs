@@ -1,0 +1,4 @@
+export builtin type c_int
+export builtin type c_char
+export builtin const c_str
+export builtin const linkc

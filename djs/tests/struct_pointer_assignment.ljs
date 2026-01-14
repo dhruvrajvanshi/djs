@@ -1,0 +1,17 @@
+import * as c from "ljs:libc"
+
+struct Foo {
+    message: *c.char
+}
+
+function main(): c.int {
+    let foo = Foo {
+        message: c.str`FAIL`
+    }
+    let foo_ptr = foo.&mut
+
+    foo_ptr.message = c.str`PASS`
+
+    c.puts(foo.message)
+    return 0
+}
