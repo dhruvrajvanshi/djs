@@ -1,5 +1,0 @@
-ERROR: ./tests/return_statement_bidir.ljs:8: Expected u8, got u32
-8|      return f + 4 // EXPECTED_ERROR
-               ^~~
-9|  }
-10|  

@@ -1,5 +1,0 @@
-import * as ffi from "ljs:ffi"
-
-export struct CStringBox {
-    value: *ffi.c_char
-}

@@ -1,4 +1,0 @@
-ERROR: ./tests/check_top_level_returns.ljs:1: Return statements are only allowed inside functions
-1|  return 2
-    ^~~
-2|  

@@ -1,9 +1,0 @@
-import * as c from "ljs:libc"
-import * as mem from "ljs:mem"
-
-function main(): void {
-    c.printf(c.str`size_of<u8>() = %zu\n`, mem.size_of<u8>())
-    c.printf(c.str`size_of<u16>() = %zu\n`, mem.size_of<u16>())
-    c.printf(c.str`size_of<u32>() = %zu\n`, mem.size_of<u32>())
-    c.printf(c.str`size_of<u64>() = %zu\n`, mem.size_of<u64>())
-}
