@@ -1,9 +1,0 @@
-import * as c from "ljs:libc"
-
-struct TenBytes {
-    bytes: u8[10]
-}
-
-function main(): c.int {
-    return 0
-}

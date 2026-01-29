@@ -1,5 +1,0 @@
-ERROR: ./tests/for_loop.ljs:6: TODO: PostIncrement cannot be inferred at the moment
-6|      for (let i = 0; i < 10; i++) {
-                                ^~~
-7|          puts(ffi.c_str`LOOP`)
-8|      }

@@ -4,7 +4,6 @@ packages:
   - djs_ast
   - djs_frontend
   - djs_il
-  - djs_ljs
   - djs_parser
 
 onlyBuiltDependencies:

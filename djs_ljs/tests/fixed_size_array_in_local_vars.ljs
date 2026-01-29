@@ -1,7 +1,0 @@
-import * as c from "ljs:libc"
-import { uninitialized } from "ljs:mem"
-
-function main(): c.int {
-    let bytes: u8[10] = uninitialized
-    return 0
-}
