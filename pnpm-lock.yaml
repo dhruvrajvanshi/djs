@@ -12,6 +12,31 @@ importers:
         specifier: ^3.6.2
         version: 3.6.2
 
+  djs:
+    dependencies:
+      djs_ast:
+        specifier: workspace:*
+        version: link:../djs_ast
+      djs_parser:
+        specifier: workspace:*
+        version: link:../djs_parser
+      djs_std:
+        specifier: workspace:*
+        version: link:../djs_std
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      '@vitest/coverage-v8':
+        specifier: 4.0.13
+        version: 4.0.13(vitest@4.0.13(@types/node@24.10.1)(tsx@4.19.4))
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.0.13
+        version: 4.0.13(@types/node@24.10.1)(tsx@4.19.4)
+
   djs_ast:
     dependencies:
       djs_std:
@@ -39,31 +64,6 @@ importers:
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
-      typescript:
-        specifier: 5.9.3
-        version: 5.9.3
-      vitest:
-        specifier: ^4.0.13
-        version: 4.0.13(@types/node@24.10.1)(tsx@4.19.4)
-
-  djs_ljs:
-    dependencies:
-      djs_ast:
-        specifier: workspace:*
-        version: link:../djs_ast
-      djs_parser:
-        specifier: workspace:*
-        version: link:../djs_parser
-      djs_std:
-        specifier: workspace:*
-        version: link:../djs_std
-    devDependencies:
-      '@types/node':
-        specifier: ^24.10.1
-        version: 24.10.1
-      '@vitest/coverage-v8':
-        specifier: 4.0.13
-        version: 4.0.13(vitest@4.0.13(@types/node@24.10.1)(tsx@4.19.4))
       typescript:
         specifier: 5.9.3
         version: 5.9.3
