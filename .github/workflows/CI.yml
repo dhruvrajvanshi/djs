@@ -45,9 +45,9 @@ jobs:
       run: pnpm vitest --coverage
       working-directory: djs_il
 
-    - name: Run tests (djs_ljs)
+    - name: Run tests (djs)
       run: pnpm vitest --coverage
-      working-directory: djs_ljs
+      working-directory: djs
 
     - name: Run tests (djs_parser)
       run: pnpm vitest --coverage
