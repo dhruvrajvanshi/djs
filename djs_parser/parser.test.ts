@@ -133,16 +133,13 @@ test("conditional operator", () => {
 
 test("is_exported should be correctly set", () => {
   const source = `
-    export extern function foo(): void;
     export function bar(): void {}
   `
   const source_file = parse_source_file(source, "test.ljs")
   expect(source_file.errors).toEqual([])
-  assert(source_file.stmts[0].kind === "LJSExternFunction")
-  expect(source_file.stmts[0].is_exported).toBe(true)
 
-  assert(source_file.stmts[1].kind === "Func")
-  expect(source_file.stmts[1].is_exported).toBe(true)
+  assert(source_file.stmts[0].kind === "Func")
+  expect(source_file.stmts[0].is_exported).toBe(true)
 })
 test("preserves leading trivia in type aliases", () => {
   const t = parse_type(`/* leading trivia comment */ Foo`)

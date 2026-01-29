@@ -44,18 +44,11 @@ export type Stmt =
   | WithStmt
   | FuncStmt
   | ClassDeclStmt
-  | StructDeclStmt
-  | UntaggedUnionDeclStmt
   | ImportStmt
   | ImportStarAsStmt
   | LabeledStmt
   | ObjectTypeDeclStmt
   | TypeAliasStmt
-  | LJSExternFunctionStmt
-  | LJSExternConstStmt
-  | LJSExternTypeStmt
-  | LJSBuiltinTypeStmt
-  | LJSBuiltinConstStmt
   | EmptyStmt
 export class ExprStmt {
   constructor(
@@ -327,38 +320,6 @@ export class ClassDeclStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
-export class StructDeclStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly struct_def: StructDef,
-    readonly is_exported: boolean,
-  ) {}
-
-  get kind(): "StructDecl" {
-    return "StructDecl"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
-export class UntaggedUnionDeclStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly untagged_union_def: UntaggedUnion,
-    readonly is_exported: boolean,
-  ) {}
-
-  get kind(): "UntaggedUnionDecl" {
-    return "UntaggedUnionDecl"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
 export class ImportStmt {
   constructor(
     readonly span: Span,
@@ -435,89 +396,6 @@ export class TypeAliasStmt {
 
   get kind(): "TypeAlias" {
     return "TypeAlias"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
-export class LJSExternFunctionStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly is_exported: boolean,
-    readonly name: Ident,
-    readonly params: readonly Param[],
-    readonly return_type: TypeAnnotation,
-  ) {}
-
-  get kind(): "LJSExternFunction" {
-    return "LJSExternFunction"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
-export class LJSExternConstStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly is_exported: boolean,
-    readonly name: Ident,
-    readonly type_annotation: TypeAnnotation,
-  ) {}
-
-  get kind(): "LJSExternConst" {
-    return "LJSExternConst"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
-export class LJSExternTypeStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly is_exported: boolean,
-    readonly name: Ident,
-  ) {}
-
-  get kind(): "LJSExternType" {
-    return "LJSExternType"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
-export class LJSBuiltinTypeStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly is_exported: boolean,
-    readonly name: Ident,
-  ) {}
-
-  get kind(): "LJSBuiltinType" {
-    return "LJSBuiltinType"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
-export class LJSBuiltinConstStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly is_exported: boolean,
-    readonly name: Ident,
-  ) {}
-
-  get kind(): "LJSBuiltinConst" {
-    return "LJSBuiltinConst"
   }
 
   toString(): string {
@@ -613,19 +491,6 @@ export const Stmt = {
     is_exported: boolean,
   ): ClassDeclStmt => new ClassDeclStmt(span, class_def, is_exported),
 
-  StructDecl: (
-    span: Span,
-    struct_def: StructDef,
-    is_exported: boolean,
-  ): StructDeclStmt => new StructDeclStmt(span, struct_def, is_exported),
-
-  UntaggedUnionDecl: (
-    span: Span,
-    untagged_union_def: UntaggedUnion,
-    is_exported: boolean,
-  ): UntaggedUnionDeclStmt =>
-    new UntaggedUnionDeclStmt(span, untagged_union_def, is_exported),
-
   Import: (
     span: Span,
     default_import: Ident | null,
@@ -657,41 +522,6 @@ export const Stmt = {
   ): TypeAliasStmt =>
     new TypeAliasStmt(span, is_exported, name, type_annotation),
 
-  LJSExternFunction: (
-    span: Span,
-    is_exported: boolean,
-    name: Ident,
-    params: readonly Param[],
-    return_type: TypeAnnotation,
-  ): LJSExternFunctionStmt =>
-    new LJSExternFunctionStmt(span, is_exported, name, params, return_type),
-
-  LJSExternConst: (
-    span: Span,
-    is_exported: boolean,
-    name: Ident,
-    type_annotation: TypeAnnotation,
-  ): LJSExternConstStmt =>
-    new LJSExternConstStmt(span, is_exported, name, type_annotation),
-
-  LJSExternType: (
-    span: Span,
-    is_exported: boolean,
-    name: Ident,
-  ): LJSExternTypeStmt => new LJSExternTypeStmt(span, is_exported, name),
-
-  LJSBuiltinType: (
-    span: Span,
-    is_exported: boolean,
-    name: Ident,
-  ): LJSBuiltinTypeStmt => new LJSBuiltinTypeStmt(span, is_exported, name),
-
-  LJSBuiltinConst: (
-    span: Span,
-    is_exported: boolean,
-    name: Ident,
-  ): LJSBuiltinConstStmt => new LJSBuiltinConstStmt(span, is_exported, name),
-
   Empty: (span: Span): EmptyStmt => new EmptyStmt(span),
 } as const
 
@@ -701,57 +531,6 @@ export interface Class {
   readonly superclass: Expr | null
   readonly body: ClassBody
 }
-
-export interface StructDef {
-  readonly span: Span
-  readonly name: Ident
-  readonly members: readonly StructMember[]
-}
-
-export type StructMember = FieldDefStructMember
-export class FieldDefStructMember {
-  constructor(
-    readonly name: Ident,
-    readonly type_annotation: TypeAnnotation,
-  ) {}
-
-  get kind(): "FieldDef" {
-    return "FieldDef"
-  }
-}
-
-export const StructMember = {
-  FieldDef: (
-    name: Ident,
-    type_annotation: TypeAnnotation,
-  ): FieldDefStructMember => new FieldDefStructMember(name, type_annotation),
-} as const
-
-export interface UntaggedUnion {
-  readonly span: Span
-  readonly name: Ident
-  readonly members: readonly UntaggedUnionMember[]
-}
-
-export type UntaggedUnionMember = VariantDefUntaggedUnionMember
-export class VariantDefUntaggedUnionMember {
-  constructor(
-    readonly name: Ident,
-    readonly type_annotation: TypeAnnotation,
-  ) {}
-
-  get kind(): "VariantDef" {
-    return "VariantDef"
-  }
-}
-
-export const UntaggedUnionMember = {
-  VariantDef: (
-    name: Ident,
-    type_annotation: TypeAnnotation,
-  ): VariantDefUntaggedUnionMember =>
-    new VariantDefUntaggedUnionMember(name, type_annotation),
-} as const
 
 export interface Block {
   readonly span: Span
@@ -1023,7 +802,6 @@ export type Expr =
   | ArrowFnExpr
   | FuncExpr
   | CallExpr
-  | StructInitExpr
   | IndexExpr
   | PropExpr
   | StringExpr
@@ -1153,22 +931,6 @@ export class CallExpr {
 
   get kind(): "Call" {
     return "Call"
-  }
-
-  toString(): string {
-    return sexpr_to_string(expr_to_sexpr(this))
-  }
-}
-export class StructInitExpr {
-  constructor(
-    readonly span: Span,
-
-    readonly lhs: Expr,
-    readonly fields: readonly StructInitItem[],
-  ) {}
-
-  get kind(): "StructInit" {
-    return "StructInit"
   }
 
   toString(): string {
@@ -1757,12 +1519,6 @@ export const Expr = {
     is_optional: boolean,
   ): CallExpr => new CallExpr(span, callee, args, spread, is_optional),
 
-  StructInit: (
-    span: Span,
-    lhs: Expr,
-    fields: readonly StructInitItem[],
-  ): StructInitExpr => new StructInitExpr(span, lhs, fields),
-
   Index: (
     span: Span,
     lhs: Expr,
@@ -1885,12 +1641,6 @@ export const Expr = {
     new AsExpr(span, expr, type_annotation),
 } as const
 
-export interface StructInitItem {
-  readonly span: Span
-  readonly Key: Ident
-  readonly value: Expr
-}
-
 export interface ObjectTypeDeclField {
   readonly is_readonly: boolean
   readonly label: Ident
@@ -1906,8 +1656,6 @@ export type TypeAnnotation =
   | ApplicationTypeAnnotation
   | StringTypeAnnotation
   | FuncTypeAnnotation
-  | LJSMutPtrTypeAnnotation
-  | LJSPtrTypeAnnotation
   | QualifiedTypeAnnotation
 export class IdentTypeAnnotation {
   constructor(
@@ -2035,36 +1783,6 @@ export class FuncTypeAnnotation {
     return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
-export class LJSMutPtrTypeAnnotation {
-  constructor(
-    readonly span: Span,
-
-    readonly to: TypeAnnotation,
-  ) {}
-
-  get kind(): "LJSMutPtr" {
-    return "LJSMutPtr"
-  }
-
-  toString(): string {
-    return sexpr_to_string(type_annotation_to_sexpr(this))
-  }
-}
-export class LJSPtrTypeAnnotation {
-  constructor(
-    readonly span: Span,
-
-    readonly to: TypeAnnotation,
-  ) {}
-
-  get kind(): "LJSPtr" {
-    return "LJSPtr"
-  }
-
-  toString(): string {
-    return sexpr_to_string(type_annotation_to_sexpr(this))
-  }
-}
 export class QualifiedTypeAnnotation {
   constructor(
     readonly span: Span,
@@ -2128,12 +1846,6 @@ export const TypeAnnotation = {
     returns: TypeAnnotation,
   ): FuncTypeAnnotation =>
     new FuncTypeAnnotation(span, type_params, params, returns),
-
-  LJSMutPtr: (span: Span, to: TypeAnnotation): LJSMutPtrTypeAnnotation =>
-    new LJSMutPtrTypeAnnotation(span, to),
-
-  LJSPtr: (span: Span, to: TypeAnnotation): LJSPtrTypeAnnotation =>
-    new LJSPtrTypeAnnotation(span, to),
 
   Qualified: (
     span: Span,

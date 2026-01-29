@@ -53,11 +53,6 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   With: { expr: () => Expr, body: () => Stmt },
   Func: { func: () => Func, is_exported: "boolean" },
   ClassDecl: { class_def: () => Class, is_exported: "boolean" },
-  StructDecl: { struct_def: () => StructDef, is_exported: "boolean" },
-  UntaggedUnionDecl: {
-    untagged_union_def: () => UntaggedUnion,
-    is_exported: "boolean",
-  },
   Import: {
     default_import: Option(Ident),
     named_imports: List(() => ImportSpecifier),
@@ -79,29 +74,6 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     is_exported: "boolean",
     name: Ident,
     type_annotation: () => TypeAnnotation,
-  },
-  LJSExternFunction: {
-    is_exported: "boolean",
-    name: Ident,
-    params: List(() => Param),
-    return_type: () => TypeAnnotation,
-  },
-  LJSExternConst: {
-    is_exported: "boolean",
-    name: Ident,
-    type_annotation: () => TypeAnnotation,
-  },
-  LJSExternType: {
-    is_exported: "boolean",
-    name: Ident,
-  },
-  LJSBuiltinType: {
-    is_exported: "boolean",
-    name: Ident,
-  },
-  LJSBuiltinConst: {
-    is_exported: "boolean",
-    name: Ident,
   },
   Empty: {},
 })
@@ -125,10 +97,6 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     args: List(() => Expr),
     spread: Option(() => Expr),
     is_optional: "boolean",
-  },
-  StructInit: {
-    lhs: () => Expr,
-    fields: List("StructInitItem"),
   },
   Index: {
     lhs: () => Expr,
@@ -208,12 +176,6 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     params: List(() => FuncTypeParam),
     returns: () => TypeAnnotation,
   },
-  LJSMutPtr: {
-    to: () => TypeAnnotation,
-  },
-  LJSPtr: {
-    to: () => TypeAnnotation,
-  },
   Qualified: {
     head: Ident,
     tail: List(Ident),
@@ -240,11 +202,6 @@ const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
   type_annotation: () => TypeAnnotation,
 })
 
-export const StructInitItem = Struct("StructInitItem", ["span"], {
-  Key: Ident,
-  value: () => Expr,
-})
-
 const FuncTypeParam = Struct("FuncTypeParam", [], {
   label: Ident,
   type_annotation: () => TypeAnnotation,
@@ -254,27 +211,13 @@ const Class = Struct("Class", ["span"], {
   superclass: Option(() => Expr),
   body: () => ClassBody,
 })
-const StructDef = Struct("StructDef", ["span"], {
-  name: Ident,
-  members: List(() => StructMember),
-})
+
 const ClassBody = Struct("ClassBody", ["span"], {
   members: List(() => ClassMember),
 })
 const ClassMember = Enum("ClassMember", [], {
   MethodDef: { method: () => MethodDef },
   FieldDef: { field: () => FieldDef },
-})
-
-const StructMember = Enum("StructMember", [], {
-  FieldDef: { name: Ident, type_annotation: () => TypeAnnotation },
-})
-const UntaggedUnionMember = Enum("UntaggedUnionMember", [], {
-  VariantDef: { name: Ident, type_annotation: () => TypeAnnotation },
-})
-const UntaggedUnion = Struct("UntaggedUnion", ["span"], {
-  name: Ident,
-  members: List(() => UntaggedUnionMember),
 })
 
 const FieldDef = Struct("FieldDef", ["span"], {
@@ -444,10 +387,6 @@ const ast_items = [
   SourceFile,
   Stmt,
   Class,
-  StructDef,
-  StructMember,
-  UntaggedUnion,
-  UntaggedUnionMember,
   Block,
   ClassBody,
   MethodDef,
@@ -462,7 +401,6 @@ const ast_items = [
   VarDeclarator,
   ForInit,
   Expr,
-  StructInitItem,
   ObjectTypeDeclField,
   TypeAnnotation,
   FuncTypeParam,

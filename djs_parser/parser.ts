@@ -35,9 +35,6 @@ import {
   Span,
   Token,
   TokenKind,
-  StructMember,
-  type StructInitItem,
-  UntaggedUnionMember,
   type QualifiedName,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
@@ -62,10 +59,6 @@ export function Parser(
   if (path.endsWith(".ts") || path.endsWith(".tsx")) {
     flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
   }
-  if (path.endsWith(".ljs")) {
-    flags |= PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS
-    flags |= PARSER_FLAGS.LJS
-  }
   return parser_impl(qualified_name, path, source, flags, config)
 }
 
@@ -76,7 +69,6 @@ const t = TokenKind
 
 const PARSER_FLAGS = {
   ALLOW_TYPE_ANNOTATIONS: 1 << 0,
-  LJS: 1 << 1,
 }
 type ParserState = {
   previous_lexer: Lexer
@@ -343,20 +335,6 @@ function parser_impl(
       switch (current_kind()) {
         case t.Dot: {
           advance()
-          if (at(t.Star) && flags & PARSER_FLAGS.LJS) {
-            const star = advance()
-            const span = Span.between(lhs.span, star.span)
-            lhs = Expr.Deref(span, lhs)
-            break
-          } else if (at(t.Amp) && flags & PARSER_FLAGS.LJS) {
-            const amp = advance()
-            const [stop_token, mut] = at_soft_keyword("mut")
-              ? [advance(), true]
-              : [amp, false]
-            const span = Span.between(lhs.span, stop_token.span)
-            lhs = Expr.AddressOf(span, lhs, mut)
-            break
-          }
           const prop = parse_member_ident_name()
           if (prop === ERR) return prop
 
@@ -424,10 +402,7 @@ function parser_impl(
           break
         }
         case t.LessThan: {
-          if (
-            flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS ||
-            flags & PARSER_FLAGS.LJS
-          ) {
+          if (flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS) {
             const restore = fork()
             const type_args = parse_type_arguments()
 
@@ -476,36 +451,10 @@ function parser_impl(
             lhs = Expr.TaggedTemplateLiteral(span, lhs, fragments)
             break
           }
-        case t.LBrace:
-          if (flags & PARSER_FLAGS.LJS) {
-            const start = advance()
-            const items = parse_comma_separated_list(
-              t.RBrace,
-              parse_struct_init_item,
-            )
-            if (items === ERR) return ERR
-            const end = expect(t.RBrace)
-            if (end === ERR) return ERR
-            const span = Span.between(lhs.span, end.span)
-            lhs = Expr.StructInit(span, lhs, items)
-
-            break
-          } else {
-            // Fallthrough
-          }
-        // Fallthrough
         default:
           return lhs
       }
     }
-  }
-  function parse_struct_init_item(): StructInitItem | Err {
-    const key = parse_ident()
-    if (key === ERR) return ERR
-    if (expect(t.Colon) === ERR) return ERR
-    const value = parse_assignment_expr()
-    if (value === ERR) return ERR
-    return { span: Span.between(key.span, value.span), Key: key, value }
   }
 
   function parse_left_hand_side_expr(): Expr | Err {
@@ -1114,16 +1063,6 @@ function parser_impl(
             const end = expect(t.RSquare)
             if (end === ERR) return ERR
             head = TypeAnnotation.Array(Span.between(head, end), head)
-          } else if (flags & PARSER_FLAGS.LJS) {
-            const size = parse_assignment_expr()
-            if (size === ERR) return ERR
-            const end = expect(t.RSquare)
-            if (end === ERR) return ERR
-            head = TypeAnnotation.FixedSizeArray(
-              Span.between(head, end),
-              head,
-              size,
-            )
           } else {
             emit_error("Array size annotations are only supported in LJS mode")
             return ERR
@@ -1193,12 +1132,6 @@ function parser_impl(
         return parse_parenthesized_or_func_type_annotation()
       case t.LessThan:
         return parse_generic_func_type_annotation()
-      case t.Star:
-        return parse_ptr_type_annotation()
-      case t.StarStar:
-        // a bit of a hack, but since ** is a valid token, we need special handling for it.
-        // **foo must be interpreted as a pointer to a pointer to foo
-        return parse_ptr_type_annotation()
       default:
         emit_error("Expected a type annotation")
         return ERR
@@ -1221,40 +1154,6 @@ function parser_impl(
       head,
       tail,
     )
-  }
-
-  function parse_ptr_type_annotation(): TypeAnnotation | Err {
-    const start = advance()
-    assert(start.kind === t.Star || start.kind === t.StarStar)
-    let was_star_star = start.kind === t.StarStar
-    const is_mut = at(t.Ident) && self.current_token.text === "mut"
-    if (is_mut) advance()
-    const type_annotation = parse_type_annotation()
-    if (type_annotation === ERR) return ERR
-    if (!(flags & PARSER_FLAGS.LJS)) {
-      emit_error("Pointer type annotations are only supported in LJS mode")
-    }
-
-    let result: TypeAnnotation
-    if (is_mut) {
-      result = TypeAnnotation.LJSMutPtr(
-        Span.between(start.span, type_annotation.span),
-        type_annotation,
-      )
-    } else {
-      result = TypeAnnotation.LJSPtr(
-        Span.between(start.span, type_annotation.span),
-        type_annotation,
-      )
-    }
-    if (was_star_star) {
-      return TypeAnnotation.LJSPtr(
-        Span.between(start.span, type_annotation.span),
-        result,
-      )
-    } else {
-      return result
-    }
   }
 
   function parse_generic_func_type_annotation(): TypeAnnotation | Err {
@@ -1835,37 +1734,7 @@ function parser_impl(
         return Stmt.VarDecl(decl.span, decl)
       }
       case t.Ident: {
-        if (
-          flags & PARSER_FLAGS.LJS &&
-          at_soft_keyword("extern") &&
-          next_is(t.Function)
-        ) {
-          return parse_extern_function(export_token)
-        } else if (
-          flags & PARSER_FLAGS.LJS &&
-          at_soft_keyword("extern") &&
-          next_is(t.Const)
-        ) {
-          return parse_extern_const(export_token)
-        } else if (
-          flags & PARSER_FLAGS.LJS &&
-          at_soft_keyword("extern") &&
-          next_is_soft_keyword("type")
-        ) {
-          return parse_extern_type(export_token)
-        } else if (
-          flags & PARSER_FLAGS.LJS &&
-          at_soft_keyword("builtin") &&
-          next_is(t.Const)
-        ) {
-          return parse_builtin_const(export_token)
-        } else if (
-          flags & PARSER_FLAGS.LJS &&
-          at_soft_keyword("builtin") &&
-          next_is_soft_keyword("type")
-        ) {
-          return parse_builtin_type(export_token)
-        } else if (next_is(t.Colon)) {
+        if (next_is(t.Colon)) {
           const label = parse_ident()
           assert(label !== ERR) // because of the lookahead above
           assert(advance().kind === t.Colon) // because of the lookahead above
@@ -1878,17 +1747,6 @@ function parser_impl(
           )
         } else if (self.current_token.text === "type") {
           return parse_type_decl(export_token)
-        } else if (
-          flags & PARSER_FLAGS.LJS &&
-          self.current_token.text === "struct"
-        ) {
-          return parse_struct_decl(export_token)
-        } else if (
-          flags & PARSER_FLAGS.LJS &&
-          at_soft_keyword("untagged") &&
-          next_is_soft_keyword("union")
-        ) {
-          return parse_untagged_union_decl(export_token)
         } else {
           return parse_expr_stmt()
         }
@@ -1986,173 +1844,6 @@ function parser_impl(
       default:
         return parse_expr_stmt()
     }
-  }
-  function parse_struct_decl(export_token: Token | null): Stmt | Err {
-    const start = advance()
-    assert.equal(t.Ident, start.kind)
-    assert.equal(start.text, "struct")
-    const name = parse_ident()
-    if (name === ERR) return ERR
-    if (expect(t.LBrace) === ERR) return ERR
-    const members = parse_comma_semi_or_newline_separated_list(
-      t.RBrace,
-      parse_struct_member,
-    )
-    if (members === ERR) return ERR
-    const last = expect(t.RBrace)
-    if (last === ERR) return ERR
-    const span = Span.between(export_token?.span ?? start, last)
-    return Stmt.StructDecl(
-      span,
-      {
-        span,
-        name,
-        members,
-      },
-      export_token !== null,
-    )
-  }
-  function parse_struct_member(): StructMember | Err {
-    const name = parse_binding_ident()
-    if (name === ERR) return ERR
-    if (expect(t.Colon) === ERR) return ERR
-    const type_annotation = parse_type_annotation()
-    if (type_annotation === ERR) return type_annotation
-    if (expect_semi() === ERR) return ERR
-    return StructMember.FieldDef(name, type_annotation)
-  }
-
-  function parse_untagged_union_decl(export_token: Token | null): Stmt | Err {
-    const start = advance()
-    assert.equal(t.Ident, start.kind)
-    assert.equal(start.text, "untagged")
-    const union_keyword = advance()
-    if (union_keyword.kind !== t.Ident || union_keyword.text !== "union") {
-      emit_error(
-        `Expected 'union' after 'untagged', got ${union_keyword.text}`,
-        union_keyword.span,
-      )
-      return ERR
-    }
-    const name = parse_ident()
-    if (name === ERR) return ERR
-    if (expect(t.LBrace) === ERR) return ERR
-    const members = parse_comma_semi_or_newline_separated_list(
-      t.RBrace,
-      parse_untagged_union_member,
-    )
-    if (members === ERR) return ERR
-    const last = expect(t.RBrace)
-    if (last === ERR) return ERR
-    const span = Span.between(start, last)
-    return Stmt.UntaggedUnionDecl(
-      span,
-      {
-        span,
-        name,
-        members,
-      },
-      export_token !== null,
-    )
-  }
-
-  function parse_untagged_union_member(): UntaggedUnionMember | Err {
-    const name = parse_binding_ident()
-    if (name === ERR) return ERR
-    if (expect(t.Colon) === ERR) return ERR
-    const type_annotation = parse_type_annotation()
-    if (type_annotation === ERR) return type_annotation
-    if (expect_semi() === ERR) return ERR
-    return UntaggedUnionMember.VariantDef(name, type_annotation)
-  }
-
-  function assert_is_soft_keyword(token: Token, text: string) {
-    assert.equal(token.kind, "Ident")
-    assert.equal(token.text, text)
-  }
-
-  function parse_extern_function(export_token: Token | null): Stmt | Err {
-    const start = advance()
-    assert.equal(t.Ident, start.kind)
-    assert.equal(start.text, "extern")
-    if (expect(t.Function) === ERR) return ERR
-    const name = parse_binding_ident()
-    if (name === ERR) return ERR
-
-    const params_result = parse_params_with_parens()
-    if (params_result === ERR) return ERR
-    const [params] = params_result
-    if (expect(t.Colon) === ERR) return ERR
-    const return_type = parse_type_annotation()
-    if (return_type === ERR) return ERR
-    if (expect_semi() === ERR) return ERR
-
-    const span = Span.between(export_token ?? start, return_type)
-    return Stmt.LJSExternFunction(
-      span,
-      export_token !== null,
-      name,
-      params,
-      return_type,
-    )
-  }
-  function parse_extern_const(export_token: Token | null): Stmt | Err {
-    const start = advance()
-    assert.equal(t.Ident, start.kind)
-    assert.equal(start.text, "extern")
-    if (expect(t.Const) === ERR) return ERR
-    const name = parse_binding_ident()
-    if (name === ERR) return ERR
-    if (expect(t.Colon) === ERR) return ERR
-    const type_annotation = parse_type_annotation()
-    if (type_annotation === ERR) return ERR
-    if (expect_semi() === ERR) return ERR
-
-    const span = Span.between(export_token ?? start, type_annotation)
-    return Stmt.LJSExternConst(
-      span,
-      export_token !== null,
-      name,
-      type_annotation,
-    )
-  }
-
-  function parse_extern_type(export_token: Token | null): Stmt | Err {
-    const start = advance()
-    assert.equal(t.Ident, start.kind)
-    assert.equal(start.text, "extern")
-    if (expect_soft_keyword("type") === ERR) return ERR
-    const name = parse_binding_ident()
-    if (name === ERR) return ERR
-    if (expect_semi() === ERR) return ERR
-
-    const span = Span.between(export_token ?? start, name)
-    return Stmt.LJSExternType(span, export_token !== null, name)
-  }
-  function parse_builtin_const(export_token: Token | null): Stmt | Err {
-    // builtin const foo;
-    const start = advance()
-    assert_is_soft_keyword(start, "builtin")
-    if (expect(t.Const) === ERR) return ERR
-    const name = parse_binding_ident()
-    if (name === ERR) return ERR
-    if (expect_semi() === ERR) return ERR
-
-    const span = Span.between(export_token ?? start, name)
-    return Stmt.LJSBuiltinConst(span, export_token !== null, name)
-  }
-  function parse_builtin_type(export_token: Token | null): Stmt | Err {
-    // builtin type Foo;
-    const start = advance()
-    assert.equal(t.Ident, start.kind)
-    assert.equal(start.text, "builtin")
-    if (expect_soft_keyword("type") === ERR) return ERR
-    const name = parse_binding_ident()
-    if (name === ERR) return ERR
-    if (expect_semi() === ERR) return ERR
-
-    const span = Span.between(export_token ?? start, name)
-    return Stmt.LJSBuiltinType(span, export_token !== null, name)
   }
 
   function expect_soft_keyword(text: string): Token | Err {

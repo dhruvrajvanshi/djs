@@ -123,14 +123,6 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_class(stmt.class_def)
         break
       }
-      case "StructDecl": {
-        this.visit_struct_def(stmt.struct_def)
-        break
-      }
-      case "UntaggedUnionDecl": {
-        this.visit_untagged_union(stmt.untagged_union_def)
-        break
-      }
       case "Import": {
         if (stmt.default_import !== null) {
           this.visit_ident(stmt.default_import)
@@ -159,31 +151,6 @@ export class ASTVisitorBase implements ASTVisitor {
       case "TypeAlias": {
         this.visit_ident(stmt.name)
         this.visit_type_annotation(stmt.type_annotation)
-        break
-      }
-      case "LJSExternFunction": {
-        this.visit_ident(stmt.name)
-        for (const param of stmt.params) {
-          this.visit_param(param)
-        }
-        this.visit_type_annotation(stmt.return_type)
-        break
-      }
-      case "LJSExternConst": {
-        this.visit_ident(stmt.name)
-        this.visit_type_annotation(stmt.type_annotation)
-        break
-      }
-      case "LJSExternType": {
-        this.visit_ident(stmt.name)
-        break
-      }
-      case "LJSBuiltinType": {
-        this.visit_ident(stmt.name)
-        break
-      }
-      case "LJSBuiltinConst": {
-        this.visit_ident(stmt.name)
         break
       }
       case "Empty": {
@@ -227,13 +194,6 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         if (expr.spread !== null) {
           this.visit_expr(expr.spread)
-        }
-        break
-      }
-      case "StructInit": {
-        this.visit_expr(expr.lhs)
-        for (const field of expr.fields) {
-          this.visit_struct_init_item(field)
         }
         break
       }
@@ -519,14 +479,6 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(type_annotation.returns)
         break
       }
-      case "LJSMutPtr": {
-        this.visit_type_annotation(type_annotation.to)
-        break
-      }
-      case "LJSPtr": {
-        this.visit_type_annotation(type_annotation.to)
-        break
-      }
       case "Qualified": {
         this.visit_ident(type_annotation.head)
         for (const tail of type_annotation.tail) {
@@ -574,10 +526,6 @@ export class ASTVisitorBase implements ASTVisitor {
     if (node.return_type !== null) {
       this.visit_type_annotation(node.return_type)
     }
-  }
-  visit_struct_init_item(node: ast.StructInitItem): void {
-    this.visit_ident(node.Key)
-    this.visit_expr(node.value)
   }
   visit_object_literal_entry(
     object_literal_entry: ast.ObjectLiteralEntry,
@@ -708,38 +656,6 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_label(node: ast.Label): void {}
-  visit_struct_def(node: ast.StructDef): void {
-    this.visit_ident(node.name)
-    for (const member of node.members) {
-      this.visit_struct_member(member)
-    }
-  }
-  visit_struct_member(struct_member: ast.StructMember): void {
-    switch (struct_member.kind) {
-      case "FieldDef": {
-        this.visit_ident(struct_member.name)
-        this.visit_type_annotation(struct_member.type_annotation)
-        break
-      }
-    }
-  }
-  visit_untagged_union(node: ast.UntaggedUnion): void {
-    this.visit_ident(node.name)
-    for (const member of node.members) {
-      this.visit_untagged_union_member(member)
-    }
-  }
-  visit_untagged_union_member(
-    untagged_union_member: ast.UntaggedUnionMember,
-  ): void {
-    switch (untagged_union_member.kind) {
-      case "VariantDef": {
-        this.visit_ident(untagged_union_member.name)
-        this.visit_type_annotation(untagged_union_member.type_annotation)
-        break
-      }
-    }
-  }
   visit_import_specifier(node: ast.ImportSpecifier): void {
     if (node.as_name !== null) {
       this.visit_ident(node.as_name)
