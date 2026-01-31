@@ -1,8 +1,11 @@
 # Overview
-This repository contains a compiler for a low level JS like language called ljs.
-Eventually, ljs will be used as a language to write a JS engine for a JS superset called djs.
-The superset aims to support all JS syntax with static types which are preserved at runtime
-for reflection and also used for optimizations, unlike Typescript which erases types at runtime.
+This is a compiler for an AOT compiled Javascript superset called DJS.
+
+Unlike typescript, the type annotations in DJS have runtime semantics. For example,
+`x as SomeType` is compiled to (psuedo) `if (!(x hasType SomeType)) throw new TypeError(...)`.
+The type assertions are elided when the type is known statically. The top type is `unknown`,
+which can hold any possible value at runtime. Values are boxed automatically to `unknown`
+when required.
 
 # Commands
 - pnpm typecheck: Typecheck the codebase
@@ -16,30 +19,7 @@ for reflection and also used for optimizations, unlike Typescript which erases t
 - Avoid using classes. Favour keeping state in objects and having free standing functions.
 
 # Packages
-
-## djs_ast
-- The generated AST nodes are in `djs_ast/ast.gen.ts`
-- Important AST nodes are
-  - `SourceFile` corresponds to a single source file
-  - `Expr`: Expressions that yield a value
-  - `Stmt`: Statements
-  - `Func`: Function like ASTs (methods, functions, arrow functions).
-            Usually wrapped inside the corresponding `Stmt` or `Expr`.
-  - `Pattern`: Things that can appear as parameters and on the lhs of
-    assignments.
-  - `Ident`: Names. Usually found inside other ast nodes
-- String and template literal nodes contain the raw text specified in the source file including the quotes and backslashes.
-
-
-## djs_ljs
-- This is a low level JS like language which compiles to C code.
-### Phases of ljs compiler
-- collect_source_files: Takes the path to an entry file and creates a
-  `PathMap` of `SourceFile` objects (AST). Calls the `djs_parser` package.
-- resolve: For each `Ident` in each `SoruceFile`, returns a
-`ValueDecl` (for expressions) or `TypeDecl` (for type annotations).
-- resolve_imports: Converts the `Import` and `ImportStarAs` declarations
-into the underlying declaration by following the imports.
-- typecheck: Assigns a `Type` to each `Expr` and `TypeAnnotation`.
-Assigns a `CheckedVarDecl` to each `VarDeclStmt`, which is a flattened
-list of `var/let/const name: Type = initializer; lhs.prop = rhs;` decls.
+- @djs_ast: Describes ast node in @djs_ast/ast.def.ts, which get codegened into @djs_ast/ast.gen.ts
+- @djs_parser: Recursive descent parser
+- @djs: Compiles djs source code to C. Has phases for name resolution, type checking and emitting C source.
+- @djs_runtime: Should contain the types and functions that the generated C code can refer to.
