@@ -15,7 +15,6 @@ import type { SourceFiles } from "./SourceFiles.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import type { FS } from "./FS.ts"
 import { assert, assert_never, Stack, TODO } from "djs_std"
-import { builtin_types, builtin_values } from "./builtins.ts"
 import { SymbolTable } from "./SymbolTable.ts"
 import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { import_stmt_path } from "./import_stmt_path.ts"
@@ -323,7 +322,6 @@ function add_pattern_bindings_to_symbol_table(
       break
     case "Assignment":
     case "Prop":
-    case "Deref":
       TODO()
     default:
       assert_never(pattern)
@@ -378,89 +376,11 @@ function add_stmt_to_symbol_table(
       )
       break
     }
-    case "LJSExternConst": {
-      symbol_table.add_value(
-        stmt.name.text,
-        {
-          kind: "LJSExternConst",
-          stmt: stmt,
-          source_file: source_file.path,
-        },
-        stmt.is_exported,
-      )
-      break
-    }
-    case "LJSExternFunction": {
-      symbol_table.add_value(
-        stmt.name.text,
-        {
-          kind: "LJSExternFunction",
-          stmt: stmt,
-          source_file: source_file.path,
-        },
-        stmt.is_exported,
-      )
-      break
-    }
-    case "LJSBuiltinConst": {
-      const builtin =
-        builtin_values[stmt.name.text as keyof typeof builtin_values]
-      if (!builtin) TODO()
-      symbol_table.add_value(stmt.name.text, builtin, stmt.is_exported)
-      break
-    }
-    case "LJSBuiltinType": {
-      const builtin =
-        builtin_types[stmt.name.text as keyof typeof builtin_types]
-      if (!builtin) TODO()
-      symbol_table.add_type(stmt.name.text, builtin, stmt.is_exported)
-      break
-    }
     case "TypeAlias": {
       symbol_table.add_type(
         stmt.name.text,
         {
           kind: "TypeAlias",
-          stmt: stmt,
-          source_file: source_file.path,
-        },
-        stmt.is_exported,
-      )
-      break
-    }
-    case "StructDecl": {
-      const decl = {
-        kind: "Struct",
-        decl: stmt,
-        source_file: source_file.path,
-      } as const
-      symbol_table.add_type(stmt.struct_def.name.text, decl, stmt.is_exported)
-      symbol_table.add_value(stmt.struct_def.name.text, decl, stmt.is_exported)
-      break
-    }
-    case "UntaggedUnionDecl": {
-      const decl = {
-        kind: "UntaggedUnion",
-        decl: stmt,
-        source_file: source_file.path,
-      } as const
-      symbol_table.add_type(
-        stmt.untagged_union_def.name.text,
-        decl,
-        stmt.is_exported,
-      )
-      symbol_table.add_value(
-        stmt.untagged_union_def.name.text,
-        decl,
-        stmt.is_exported,
-      )
-      break
-    }
-    case "LJSExternType": {
-      symbol_table.add_type(
-        stmt.name.text,
-        {
-          kind: "ExternType",
           stmt: stmt,
           source_file: source_file.path,
         },

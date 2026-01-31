@@ -7,25 +7,12 @@ export class SymbolTable {
   readonly #exported_values = new Map<string, ValueDecl>()
   readonly #exported_types = new Map<string, TypeDecl>()
   public static readonly Global = new SymbolTable()
+
   static {
-    // TODO initialize global symbols
     const ty = (name: string, type: Type) =>
       SymbolTable.Global.add_type(name, { kind: "Builtin", type }, true)
-    ty("u8", Type.u8)
-    ty("u16", Type.u16)
-    ty("u32", Type.u32)
-    ty("u64", Type.u64)
-    ty("usize", Type.usize)
-    ty("i8", Type.i8)
-    ty("i16", Type.i16)
-    ty("i32", Type.i32)
-    ty("i64", Type.i64)
-    ty("isize", Type.isize)
-    ty("f32", Type.f32)
-    ty("f64", Type.f64)
-    ty("void", Type.void)
     ty("boolean", Type.boolean)
-    ty("unknown", Type.Unknown)
+    ty("unknown", Type.unknown)
   }
 
   get_value(name: string): ValueDecl | null {

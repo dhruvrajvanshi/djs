@@ -340,14 +340,6 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
-      case "AddressOf": {
-        this.visit_expr(expr.expr)
-        break
-      }
-      case "Deref": {
-        this.visit_expr(expr.expr)
-        break
-      }
       case "TypeApplication": {
         this.visit_expr(expr.expr)
         for (const type_arg of expr.type_args) {
@@ -401,10 +393,6 @@ export class ASTVisitorBase implements ASTVisitor {
       case "Prop": {
         this.visit_expr(pattern.expr)
         this.visit_object_key(pattern.key)
-        break
-      }
-      case "Deref": {
-        this.visit_expr(pattern.expr)
         break
       }
       case "Elision": {

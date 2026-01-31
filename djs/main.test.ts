@@ -6,11 +6,11 @@ import { existsSync } from "node:fs"
 import { execSync, spawn } from "node:child_process"
 import * as Path from "node:path"
 
-const files = (await readdir("./tests")).filter((it) => it.endsWith(".ljs"))
+const files = (await readdir("./tests")).filter((it) => it.endsWith(".djs"))
 
 test.each(files)("%s", async (file) => {
   await mkdir(`./test-output`, { recursive: true })
-  const output = `./test-output/${file.replace(/\.ljs$/, "")}`
+  const output = `./test-output/${file.replace(/\.djs$/, "")}`
   let diagnostics = ""
   const file_source = await readFile(`./tests/${file}`, "utf8")
   if (process.platform === "linux" && file_source.includes("/// skip-linux")) {
@@ -31,7 +31,7 @@ test.each(files)("%s", async (file) => {
       error_exit: () => {},
     },
   )
-  if (existsSync(`./tests/${file.replace(/\.ljs$/, "")}.stdout`)) {
+  if (existsSync(`./tests/${file.replace(/\.djs$/, "")}.stdout`)) {
     expect(diagnostics).toBe("")
   }
   if (diagnostics) {

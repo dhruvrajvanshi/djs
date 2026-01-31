@@ -1,18 +1,15 @@
 import type { SourceFiles } from "./SourceFiles.ts"
-import { assert_never, assert_unreachable, defer, PANIC, TODO } from "djs_std"
+import { assert_never, defer, PANIC, TODO } from "djs_std"
 import { type TypecheckResult } from "./typecheck.ts"
-import Path from "node:path"
 import {
   type Expr,
   type Stmt,
   type FuncStmt,
-  type TaggedTemplateLiteralExpr,
   type PropExpr,
   type TypeAnnotation,
   type Block,
   type Param,
   type SourceFile,
-  type StructInitExpr,
   type ForStmt,
   type BinOp,
   type IfStmt,
@@ -22,15 +19,10 @@ import {
   type ReturnStmt,
   type ContinueStmt,
   type AssignExpr,
-  type StructDeclStmt,
-  type UntaggedUnionDeclStmt,
   QualifiedName,
-  TypeApplicationExpr,
-  CallExpr,
-  type Func,
 } from "djs_ast"
 import assert from "node:assert"
-import { Type, type_is_pointer, type_to_string } from "./type.ts"
+import { Type } from "./type.ts"
 import type { ResolveResult } from "./resolve.ts"
 import type { ModuleDecl } from "./decl.ts"
 
@@ -80,16 +72,6 @@ export function emit_c(
         let return_type = stmt.func.return_type
           ? emit_type_annotation(ctx, stmt.func.return_type)
           : ({ kind: "Ident", name: "void" } as CNode)
-        if (
-          is_main_func(stmt.func, source_file) &&
-          (!stmt.func.return_type ||
-            ctx.tc_result.types.get(stmt.func.return_type)?.kind === "void")
-        ) {
-          return_type = {
-            kind: "Ident",
-            name: "int",
-          }
-        }
 
         forward_decls.push({
           kind: "FuncForwardDecl",
@@ -97,45 +79,7 @@ export function emit_c(
           params,
           returns: return_type,
         })
-        break
-      }
-      case "LJSExternFunction": {
-        const func_name = stmt.name.text
-        const params = stmt.params.map((param) => emit_param(ctx, param))
-        const return_type = emit_type_annotation(ctx, stmt.return_type)
-
-        forward_decls.push({
-          kind: "ExternFunc",
-          name: func_name,
-          params,
-          returns: return_type,
-        })
-        break
-      }
-      case "LJSExternConst": {
-        const const_name = stmt.name.text
-        const type = emit_type_annotation(ctx, stmt.type_annotation)
-
-        forward_decls.push({
-          kind: "ExternConst",
-          name: const_name,
-          type,
-        })
-        break
-      }
-      case "LJSExternType": {
-        forward_decls.push({
-          kind: "StructDecl",
-          name: stmt.name.text,
-        })
-        break
-      }
-      case "StructDecl": {
-        forward_decls.push(emit_struct_decl(ctx, source_file, stmt))
-        break
-      }
-      case "UntaggedUnionDecl": {
-        forward_decls.push(emit_untagged_union_decl(source_file, stmt))
+        TODO()
         break
       }
     }
@@ -145,10 +89,6 @@ export function emit_c(
   for (const { stmt, source_file } of [...all_stmts].sort(types_first)) {
     if (stmt.kind === "Func") {
       defs.push(emit_func_def(ctx, source_file, stmt))
-    } else if (stmt.kind === "StructDecl") {
-      defs.push(emit_struct_def(ctx, source_file, stmt))
-    } else if (stmt.kind === "UntaggedUnionDecl") {
-      defs.push(emit_untagged_union_def(ctx, source_file, stmt))
     } else {
       defs.push(emit_stmt(ctx, source_file, stmt))
     }
@@ -163,62 +103,12 @@ export function emit_c(
     linkc_paths: ctx.link_c_paths,
   }
 }
-function emit_struct_decl(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  stmt: StructDeclStmt,
-): CNode {
-  const full_name = QualifiedName.append(
-    source_file.qualified_name,
-    stmt.struct_def.name.text,
-  )
-  return {
-    kind: "StructDecl",
-    name: mangle_struct_name(full_name),
-  }
-}
-function emit_struct_def(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  stmt: StructDeclStmt,
-): CNode {
-  const fields = stmt.struct_def.members.map((member): CStructDefField => {
-    const type_obj = ctx.tc_result.types.get(member.type_annotation)
-    assert(type_obj, "Type annotation must have resolved type")
-
-    if (type_obj.kind === "FixedSizeArray") {
-      return {
-        name: member.name.text,
-        type: emit_type(type_obj.element_type),
-        array_size: type_obj.size,
-      }
-    } else {
-      return {
-        name: member.name.text,
-        type: emit_type(type_obj),
-        array_size: null,
-      }
-    }
-  })
-  const full_name = QualifiedName.append(
-    source_file.qualified_name,
-    stmt.struct_def.name.text,
-  )
-  return {
-    kind: "StructDef",
-    name: mangle_struct_name(full_name),
-    fields,
-  }
-}
 
 function types_first(
   { stmt: a }: { stmt: Stmt },
   { stmt: b }: { stmt: Stmt },
 ): number {
-  const is_type_decl = (kind: Stmt["kind"]) =>
-    kind === "StructDecl" ||
-    kind === "UntaggedUnionDecl" ||
-    kind === "LJSExternType"
+  const is_type_decl = (kind: Stmt["kind"]) => false
   if (is_type_decl(a.kind) && !is_type_decl(b.kind)) return -1
   if (!is_type_decl(a.kind) && is_type_decl(b.kind)) return 1
   return 0
@@ -241,20 +131,11 @@ function emit_param(ctx: EmitContext, param: Param): CNode {
     const type_obj = ctx.tc_result.types.get(param.type_annotation)
     assert(type_obj, "Type annotation must have resolved type")
 
-    if (type_obj.kind === "FixedSizeArray") {
-      return {
-        kind: "Param",
-        name: param_name,
-        type: emit_type(type_obj.element_type),
-        array_size: type_obj.size,
-      }
-    } else {
-      return {
-        kind: "Param",
-        name: param_name,
-        type: emit_type(type_obj),
-        array_size: null,
-      }
+    return {
+      kind: "Param",
+      name: param_name,
+      type: emit_type(type_obj),
+      array_size: null,
     }
   } else {
     return {
@@ -278,54 +159,8 @@ function emit_type_annotation(
 
 function emit_type(type: Type): CNode {
   switch (type.kind) {
-    case "c_int":
-      return { kind: "Ident", name: "int" }
-    case "c_char":
-      return { kind: "Ident", name: "char" }
-    case "void":
-      return { kind: "Ident", name: "void" }
-    case "u8":
-      return { kind: "Ident", name: "uint8_t" }
-    case "i8":
-      return { kind: "Ident", name: "int8_t" }
-    case "u16":
-      return { kind: "Ident", name: "uint16_t" }
-    case "i16":
-      return { kind: "Ident", name: "int16_t" }
-    case "i32":
-      return { kind: "Ident", name: "int32_t" }
-    case "u32":
-      return { kind: "Ident", name: "uint32_t" }
-    case "i64":
-      return { kind: "Ident", name: "int64_t" }
-    case "u64":
-      return { kind: "Ident", name: "uint64_t" }
-    case "usize":
-      return { kind: "Ident", name: "size_t" }
-    case "isize":
-      return { kind: "Ident", name: "ssize_t" }
     case "boolean":
       return { kind: "Ident", name: "bool" }
-
-    case "Ptr":
-      return { kind: "ConstPtr", to_type: emit_type(type.type) }
-    case "MutPtr":
-      return { kind: "Ptr", to_type: emit_type(type.type) }
-    case "StructInstance":
-      return {
-        kind: "StructTypeRef",
-        name: mangle_struct_name(type.qualified_name),
-      }
-    case "Opaque":
-      return {
-        kind: "StructTypeRef",
-        name: mangle_struct_name(type.qualified_name),
-      }
-    case "UntaggedUnionInstance":
-      return {
-        kind: "UnionTypeRef",
-        name: mangle_union_name(type.qualified_name),
-      }
     default:
       TODO(`Unhandled type: ${type.kind}`)
   }
@@ -346,30 +181,7 @@ function emit_func_def(
   const return_ty =
     func_stmt.func.return_type &&
     ctx.tc_result.types.get(func_stmt.func.return_type)
-
-  const convert_void_return_to_int =
-    is_main_func(func_stmt.func, source_file) &&
-    (!return_ty || return_ty?.kind === "void")
-  if (convert_void_return_to_int) {
-    return_type = {
-      kind: "Ident",
-      name: "int",
-    }
-    ctx.implicit_return_value = {
-      kind: "IntLiteral",
-      value: 0,
-    }
-  }
   const body = emit_block(ctx, source_file, func_stmt.func.body)
-  if (convert_void_return_to_int) {
-    body.body.push({
-      kind: "Return",
-      value: {
-        kind: "IntLiteral",
-        value: 0,
-      },
-    })
-  }
   ctx.implicit_return_value = null
 
   return {
@@ -379,9 +191,6 @@ function emit_func_def(
     returns: return_type,
     body,
   }
-}
-function is_main_func(func: Func, source_file: SourceFile): boolean {
-  return func.name?.text === "main" && source_file.qualified_name.length === 0
 }
 
 function emit_block(
@@ -407,34 +216,19 @@ function emit_stmt(
       const var_decls = ctx.tc_result.var_decls.get(stmt.decl)
       assert(var_decls, "VarDeclStmt must have checked declarations")
 
-      const decl_nodes = var_decls
-        .filter((it) => it.type.kind !== "CStringConstructor")
-        .map((decl): CNode => {
-          const init_ty = ctx.tc_result.values.get(decl.init)
-          assert(init_ty, "VarDecl init must have a type")
-          const init_expr =
-            init_ty.kind === "BuiltinUninitialized"
-              ? null
-              : emit_expr(ctx, source_file, decl.init)
+      const decl_nodes = var_decls.map((decl): CNode => {
+        const init_ty = ctx.tc_result.values.get(decl.init)
+        assert(init_ty, "VarDecl init must have a type")
+        const init_expr = emit_expr(ctx, source_file, decl.init)
 
-          if (decl.type.kind === "FixedSizeArray") {
-            return {
-              kind: "VarDecl",
-              type: emit_type(decl.type.element_type),
-              name: decl.name,
-              init: init_expr,
-              array_size: decl.type.size,
-            }
-          } else {
-            return {
-              kind: "VarDecl",
-              type: emit_type(decl.type),
-              name: decl.name,
-              init: init_expr,
-              array_size: null,
-            }
-          }
-        })
+        return {
+          kind: "VarDecl",
+          type: emit_type(decl.type),
+          name: decl.name,
+          init: init_expr,
+          array_size: null,
+        }
+      })
       return {
         kind: "Many",
         nodes: decl_nodes,
@@ -458,14 +252,6 @@ function emit_stmt(
     case "Import":
     case "ImportStarAs":
     case "TypeAlias":
-      return { kind: "Empty" }
-    case "LJSExternFunction":
-    case "LJSExternConst":
-    case "LJSExternType":
-      // Emitted in the declaration phase
-      return { kind: "Empty" }
-    case "LJSBuiltinConst":
-    case "LJSBuiltinType":
       return { kind: "Empty" }
     default:
       TODO(`Unhandled statement: ${stmt.kind}`)
@@ -529,23 +315,13 @@ function emit_for_stmt(
   assert(init_var_decls, "ForStmt VarDecl must have checked declarations")
   init_var_decls.forEach((decl) => {
     const init_expr = emit_expr(ctx, source_file, decl.init)
-    if (decl.type.kind === "FixedSizeArray") {
-      stmts.push({
-        kind: "VarDecl",
-        type: emit_type(decl.type.element_type),
-        name: decl.name,
-        init: init_expr,
-        array_size: decl.type.size,
-      })
-    } else {
-      stmts.push({
-        kind: "VarDecl",
-        type: emit_type(decl.type),
-        name: decl.name,
-        init: init_expr,
-        array_size: null,
-      })
-    }
+    stmts.push({
+      kind: "VarDecl",
+      type: emit_type(decl.type),
+      name: decl.name,
+      init: init_expr,
+      array_size: null,
+    })
   })
   const actual_body: CNode =
     stmt.body.kind === "Block"
@@ -587,35 +363,6 @@ function emit_expr(
       return { kind: "Ident", name: expr.ident.text }
     }
     case "Call": {
-      if (is_builtin_linkc(ctx, expr.callee)) {
-        assert(expr.args.length === 1)
-        const arg = expr.args[0]
-        assert(arg.kind === "String")
-        const path = Path.join(
-          Path.dirname(source_file.path),
-          JSON.parse(arg.text),
-        )
-        ctx.link_c_paths.push(path)
-        return { kind: "Empty" }
-      } else if (is_builtin_size_of(ctx, expr.callee)) {
-        assert(expr.args.length === 0)
-        assert(expr.callee.kind === "TypeApplication")
-        assert(expr.callee.type_args.length === 1)
-        const type_arg = expr.callee.type_args[0]
-        const type_obj = ctx.tc_result.types.get(type_arg)
-        assert(type_obj, "Type argument must have a type object")
-        return {
-          kind: "Call",
-          func: {
-            kind: "Ident",
-            name: "sizeof",
-          },
-          args: [emit_type(type_obj)],
-        }
-      } else {
-        const node = try_emit_cast(ctx, source_file, expr)
-        if (node) return node
-      }
       const func = emit_expr(ctx, source_file, expr.callee)
       const args = expr.args.map((arg) => emit_expr(ctx, source_file, arg))
       return { kind: "Call", func, args }
@@ -631,14 +378,9 @@ function emit_expr(
     case "Boolean": {
       return { kind: "Ident", name: expr.value ? "true" : "false" }
     }
-    case "TaggedTemplateLiteral": {
-      return emit_tagged_template_literal_expr(ctx, expr)
-    }
     case "Prop": {
       return emit_prop_expr(ctx, source_file, expr)
     }
-    case "StructInit":
-      return emit_struct_init_expr(ctx, source_file, expr)
     case "BinOp": {
       const ops: Partial<Record<BinOp, string>> = {
         Lt: "<",
@@ -673,21 +415,6 @@ function emit_expr(
     case "Assign": {
       return emit_assign_expr(ctx, source_file, expr)
     }
-    case "AddressOf": {
-      assert(expr.expr.kind === "Var")
-      return {
-        kind: "AddressOf",
-        expr: emit_expr(ctx, source_file, expr.expr),
-      }
-    }
-    case "Deref": {
-      return {
-        kind: "Deref",
-        expr: emit_expr(ctx, source_file, expr.expr),
-      }
-    }
-    case "TypeApplication":
-      return emit_type_application_expr(ctx, source_file, expr)
     case "As": {
       const target_type = ctx.tc_result.types.get(expr.type_annotation)
       assert(target_type, "Target type must be available")
@@ -698,14 +425,7 @@ function emit_expr(
       }
     }
     case "Null": {
-      const ty = ctx.tc_result.values.get(expr)
-      assert(ty, "expr must have a type")
-      assert(ty.kind === "Ptr" || ty.kind === "MutPtr")
-      return {
-        kind: "Cast",
-        to: emit_type(ty),
-        expr: { kind: "IntLiteral", value: 0 },
-      }
+      TODO()
     }
     case "Not": {
       const expr_node = emit_expr(ctx, source_file, expr.expr)
@@ -748,85 +468,7 @@ function emit_expr(
       TODO(`Unhandled expression: ${expr.kind}`)
   }
 }
-function try_emit_cast(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  expr: CallExpr,
-): CNode | null {
-  // e.g. foo.cast<X>(arg)
-  //   or cast<X>(arg)
-  // This should be lowered to `((X) arg)`
-  // However, if the pattern doesn't match, this would be treated as
-  // a normal function call
-  if (expr.callee.kind !== "TypeApplication") {
-    return null
-  }
-  if (expr.callee.expr.kind !== "Prop" && expr.callee.expr.kind !== "Var") {
-    return null
-  }
 
-  const builtin_const_ref = ctx.tc_result.builtin_const_refs.get(
-    expr.callee.expr,
-  )
-  if (!builtin_const_ref) return null
-  if (builtin_const_ref.name !== "cast") return null
-
-  if (expr.callee.expr)
-    assert(
-      expr.callee.type_args.length === 1,
-      "cast must have exactly one type argument",
-    )
-  const callee_ty = ctx.tc_result.values.get(expr.callee)
-  assert(callee_ty, "Callee must have a type")
-  const to_type = ctx.tc_result.types.get(expr.callee.type_args[0])
-  assert(to_type)
-  return {
-    kind: "Cast",
-    to: emit_type(to_type),
-    expr: emit_expr(ctx, source_file, expr.args[0]),
-  }
-}
-function emit_type_application_expr(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  expr: TypeApplicationExpr,
-): CNode {
-  assert_unreachable(
-    "Type applications should be handled during emit_expr of the callee",
-  )
-}
-
-/**
- * Checks if expr refers to builtin const linkc
- * E.g.
- * builtin const linkc
- * linkc("something")
- * ^^^^^^^^^   is_builtin_linkc(ljs.linkc) === true
- * Note that expr must not inlcude the call args
- */
-function is_builtin_linkc(ctx: EmitContext, expr: Expr): boolean {
-  const ty = ctx.tc_result.values.get(expr)
-  assert(ty)
-  return ty.kind === "BuiltinLinkC"
-}
-function is_builtin_size_of(ctx: EmitContext, expr: Expr): boolean {
-  if (expr.kind !== "TypeApplication") return false
-  const callee_callee = expr.expr
-  switch (callee_callee.kind) {
-    case "Prop": {
-      const lhs = callee_callee.lhs
-      if (lhs.kind !== "Var") return false
-      const decl = ctx.resolve_result.values.get(lhs.ident)
-      if (decl?.kind !== "Module") return false
-      const prop_decl = decl.values.get(callee_callee.property.text)
-      return prop_decl?.kind === "BuiltinConst" && prop_decl.name === "size_of"
-    }
-    case "Var":
-      TODO()
-    default:
-      return false
-  }
-}
 function emit_assign_expr(
   ctx: EmitContext,
   source_file: SourceFile,
@@ -842,103 +484,16 @@ function emit_assign_expr(
       left: { kind: "Ident", name: var_name },
       right: value,
     }
-  } else if (expr.pattern.kind === "Deref") {
-    const deref_expr = emit_expr(ctx, source_file, expr.pattern.expr)
-    return {
-      kind: "BinOp",
-      op: "=",
-      left: { kind: "Deref", expr: deref_expr },
-      right: emit_expr(ctx, source_file, expr.value),
-    }
   } else if (
     expr.pattern.kind === "Prop" &&
     expr.pattern.key.kind === "Ident"
   ) {
-    const struct_ref = emit_expr(ctx, source_file, expr.pattern.expr)
-    const struct_ty = ctx.tc_result.values.get(expr.pattern.expr)
-    assert(struct_ty)
-
-    let lhs_op: "." | "->"
-    if (struct_ty.kind === "StructInstance") {
-      lhs_op = "."
-    } else if (
-      type_is_pointer(struct_ty) &&
-      struct_ty.type.kind === "StructInstance"
-    ) {
-      assert(struct_ty.kind === "MutPtr")
-      lhs_op = "->"
-    } else {
-      PANIC(`Unexpected type for assignment lhs: ${type_to_string(struct_ty)}`)
-    }
-    const lhs: CNode = {
-      kind: "BinOp",
-      left: struct_ref,
-      op: lhs_op,
-      right: { kind: "Ident", name: expr.pattern.key.ident.text },
-    }
-    return {
-      kind: "BinOp",
-      op: "=",
-      left: lhs,
-      right: emit_expr(ctx, source_file, expr.value),
-    }
+    TODO()
   } else {
     return TODO`Unsupported assignment expr ${expr}`
   }
 }
-function emit_struct_init_expr(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  expr: StructInitExpr,
-): CNode {
-  const instance_type = ctx.tc_result.values.get(expr)
-  const lhs_type = ctx.tc_result.values.get(expr.lhs)
 
-  if (
-    instance_type?.kind === "StructInstance" &&
-    lhs_type?.kind === "StructConstructor"
-  ) {
-    return {
-      kind: "Cast",
-      to: {
-        kind: "StructTypeRef",
-        name: mangle_struct_name(lhs_type.qualified_name),
-      },
-      expr: {
-        kind: "StructInit",
-        fields: expr.fields.map((field) => ({
-          key: field.Key.text,
-          value: emit_expr(ctx, source_file, field.value),
-        })),
-      },
-    }
-  } else if (
-    instance_type?.kind === "UntaggedUnionInstance" &&
-    lhs_type?.kind === "UntaggedUnionConstructor"
-  ) {
-    assert(
-      expr.fields.length === 1,
-      "Untagged union init must have exactly one field",
-    )
-    const field = expr.fields[0]
-    return {
-      kind: "Cast",
-      to: {
-        kind: "UnionTypeRef",
-        name: mangle_union_name(lhs_type.qualified_name),
-      },
-      expr: {
-        kind: "UnionInit",
-        field: field.Key.text,
-        value: emit_expr(ctx, source_file, field.value),
-      },
-    }
-  } else {
-    TODO(
-      `Unhandled struct init: instance_type=${instance_type?.kind}, lhs_type=${lhs_type?.kind}`,
-    )
-  }
-}
 function mangle_struct_name(qualified_name: readonly string[]): string {
   assert(qualified_name.length > 0, "Struct must have a name")
   return qualified_name.join("_")
@@ -954,43 +509,6 @@ function mangle_func_name(source_file: SourceFile, func_name: string): string {
     return func_name
   }
   return QualifiedName.append(source_file.qualified_name, func_name).join("_")
-}
-
-function emit_untagged_union_decl(
-  source_file: SourceFile,
-  stmt: UntaggedUnionDeclStmt,
-): CNode {
-  const full_name = QualifiedName.append(
-    source_file.qualified_name,
-    stmt.untagged_union_def.name.text,
-  )
-  return {
-    kind: "UnionDecl",
-    name: mangle_union_name(full_name),
-  }
-}
-
-function emit_untagged_union_def(
-  ctx: EmitContext,
-  source_file: SourceFile,
-  stmt: UntaggedUnionDeclStmt,
-): CNode {
-  const fields = stmt.untagged_union_def.members.map((member) => {
-    assert(member.kind === "VariantDef", "Union member must be VariantDef")
-    return {
-      name: member.name.text,
-      type: emit_type_annotation(ctx, member.type_annotation),
-    }
-  })
-  const full_name = QualifiedName.append(
-    source_file.qualified_name,
-    stmt.untagged_union_def.name.text,
-  )
-  return {
-    kind: "UnionDef",
-    name: mangle_union_name(full_name),
-    fields,
-  }
 }
 
 function get_module_of_expr(ctx: EmitContext, expr: Expr): ModuleDecl | null {
@@ -1014,10 +532,6 @@ function emit_prop_expr(
     assert(prop_decl)
     let name: string
     switch (prop_decl.kind) {
-      case "LJSExternConst":
-      case "LJSExternFunction":
-        name = prop_decl.stmt.name.text
-        break
       case "Func": {
         assert(prop_decl.func.name)
         const func_name = prop_decl.func.name.text
@@ -1031,8 +545,6 @@ function emit_prop_expr(
         name = mangle_func_name(module_source_file, func_name)
         break
       }
-      case "BuiltinConst":
-        PANIC(`${prop_decl.name} should be handled elsewhere`)
       case "VarDecl": {
         const declarator = ctx.tc_result.var_decls
           .get(prop_decl.decl)
@@ -1054,56 +566,8 @@ function emit_prop_expr(
   } else {
     const lhs_ty = ctx.tc_result.values.get(expr.lhs)
     assert(lhs_ty)
-    if (lhs_ty.kind === "StructInstance") {
-      return {
-        kind: "Prop",
-        lhs: emit_expr(ctx, source_file, expr.lhs),
-        rhs: expr.property.text,
-      }
-    } else if (
-      type_is_pointer(lhs_ty) &&
-      lhs_ty.type.kind === "StructInstance"
-    ) {
-      return {
-        kind: "BinOp",
-        op: "->",
-        left: emit_expr(ctx, source_file, expr.lhs),
-        right: { kind: "Ident", name: expr.property.text },
-      }
-    } else {
-      PANIC(`Unhandled lhs type in property access: ${lhs_ty.kind}`)
-    }
+    TODO()
   }
-}
-
-function emit_tagged_template_literal_expr(
-  ctx: EmitContext,
-  expr: TaggedTemplateLiteralExpr,
-): CNode {
-  const tag_type = ctx.tc_result.values.get(expr.tag)
-  assert(
-    tag_type?.kind === "CStringConstructor",
-    "Tagged template literal tag must be CStringConstructor",
-  )
-
-  assert(
-    expr.fragments.length === 1,
-    "Expected exactly one fragment in tagged template literal",
-  )
-  const fragment = expr.fragments[0]
-  assert(
-    fragment.kind === "Text",
-    "Expected text fragment in tagged template literal",
-  )
-
-  // Remove the backticks from the fragment text and treat as string literal
-  let text = fragment.text
-  if (text.startsWith("`") && text.endsWith("`")) {
-    text = `"${text.slice(1, -1)}"`
-  }
-
-  const content = evaluate_string_literal(text)
-  return { kind: "StringLiteral", value: content }
 }
 
 function evaluate_string_literal(raw_text: string): string {

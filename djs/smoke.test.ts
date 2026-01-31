@@ -5,21 +5,15 @@ import { prettify_diagnostics, QualifiedName } from "djs_ast"
 
 test("smoke test", async () => {
   const source = `
-     builtin const c_str
-     const c = c_str
-     extern function puts(s: *u8): void
-
-     export function main(): void {
-        puts(c\`Hello, world!\`)
-     }
+     console.log("Hello, world!")
   `
   const source_file = parse_source_file(
     QualifiedName(),
-    "test/test.ljs",
+    "test/test.djs",
     source,
   )
   assert.equal(
-    await prettify_diagnostics("test/test.ljs", source_file.errors, source),
+    await prettify_diagnostics("test/test.djs", source_file.errors, source),
     "",
   )
 })

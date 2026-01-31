@@ -591,7 +591,6 @@ export type Pattern =
   | ArrayPattern
   | ObjectPattern
   | PropPattern
-  | DerefPattern
   | ElisionPattern
   | RestPattern
 export class VarPattern {
@@ -672,21 +671,6 @@ export class PropPattern {
     return sexpr_to_string(pattern_to_sexpr(this))
   }
 }
-export class DerefPattern {
-  constructor(
-    readonly span: Span,
-
-    readonly expr: Expr,
-  ) {}
-
-  get kind(): "Deref" {
-    return "Deref"
-  }
-
-  toString(): string {
-    return sexpr_to_string(pattern_to_sexpr(this))
-  }
-}
 export class ElisionPattern {
   constructor(readonly span: Span) {}
 
@@ -734,8 +718,6 @@ export const Pattern = {
 
   Prop: (span: Span, expr: Expr, key: ObjectKey): PropPattern =>
     new PropPattern(span, expr, key),
-
-  Deref: (span: Span, expr: Expr): DerefPattern => new DerefPattern(span, expr),
 
   Elision: (span: Span): ElisionPattern => new ElisionPattern(span),
 
@@ -835,8 +817,6 @@ export type Expr =
   | ClassExpr
   | TemplateLiteralExpr
   | TaggedTemplateLiteralExpr
-  | AddressOfExpr
-  | DerefExpr
   | TypeApplicationExpr
   | AsExpr
 export class VarExpr {
@@ -1429,37 +1409,6 @@ export class TaggedTemplateLiteralExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
-export class AddressOfExpr {
-  constructor(
-    readonly span: Span,
-
-    readonly expr: Expr,
-    readonly mut: boolean,
-  ) {}
-
-  get kind(): "AddressOf" {
-    return "AddressOf"
-  }
-
-  toString(): string {
-    return sexpr_to_string(expr_to_sexpr(this))
-  }
-}
-export class DerefExpr {
-  constructor(
-    readonly span: Span,
-
-    readonly expr: Expr,
-  ) {}
-
-  get kind(): "Deref" {
-    return "Deref"
-  }
-
-  toString(): string {
-    return sexpr_to_string(expr_to_sexpr(this))
-  }
-}
 export class TypeApplicationExpr {
   constructor(
     readonly span: Span,
@@ -1625,11 +1574,6 @@ export const Expr = {
     fragments: readonly TemplateLiteralFragment[],
   ): TaggedTemplateLiteralExpr =>
     new TaggedTemplateLiteralExpr(span, tag, fragments),
-
-  AddressOf: (span: Span, expr: Expr, mut: boolean): AddressOfExpr =>
-    new AddressOfExpr(span, expr, mut),
-
-  Deref: (span: Span, expr: Expr): DerefExpr => new DerefExpr(span, expr),
 
   TypeApplication: (
     span: Span,

@@ -2755,8 +2755,6 @@ function expr_to_pattern(expr: Expr): Pattern | null {
         expr.lhs,
         ObjectKey.Computed(expr.property.span, expr.property),
       )
-    case "Deref":
-      return Pattern.Deref(expr.span, expr.expr)
     default:
       return null
   }

@@ -146,8 +146,6 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     tag: () => Expr,
     fragments: List(() => TemplateLiteralFragment),
   },
-  AddressOf: { expr: () => Expr, mut: "boolean" },
-  Deref: { expr: () => Expr },
   TypeApplication: {
     expr: () => Expr,
     type_args: List(() => TypeAnnotation),
@@ -191,7 +189,6 @@ export const Pattern = Enum("Pattern", ["span", "visit"], {
     rest: Option(() => Pattern),
   },
   Prop: { expr: () => Expr, key: () => ObjectKey },
-  Deref: { expr: () => Expr },
   Elision: {},
   Rest: { pattern: () => Pattern },
 })

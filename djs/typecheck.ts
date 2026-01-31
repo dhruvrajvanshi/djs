@@ -1,12 +1,8 @@
 import {
   DeclType,
-  LJSExternFunctionStmt,
   PropExpr,
   ReturnStmt,
   Span,
-  StructDeclStmt,
-  UntaggedUnionDeclStmt,
-  type StructInitExpr,
   TaggedTemplateLiteralExpr,
   VarExpr,
   type Expr,
@@ -27,12 +23,7 @@ import {
   WhileStmt,
   DoWhileStmt,
   AssignExpr,
-  AddressOfExpr,
-  DerefExpr,
-  LJSExternConstStmt,
   CallExpr,
-  LJSBuiltinConstStmt,
-  LJSBuiltinTypeStmt,
   TypeApplicationExpr,
   AsExpr,
   TernaryExpr,
@@ -46,9 +37,7 @@ import {
   type_is_floating_point,
   type_is_integral,
   type_is_one_of,
-  type_is_pointer,
   type_to_string,
-  type StructInstanceType,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import {
@@ -63,11 +52,6 @@ import { flatten_var_decl } from "./flatten_var_decl.ts"
 import { annotation_to_type, type TypeVarEnv } from "./annotation_to_type.ts"
 import assert from "node:assert"
 import { existsSync } from "node:fs"
-import {
-  builtin_types,
-  builtin_values,
-  type BuiltinConstDecl,
-} from "./builtins.ts"
 import { Subst } from "./subt.ts"
 import type { ResolveResult } from "./resolve.ts"
 import type { ModuleDecl, TypeDecl, ValueDecl } from "./decl.ts"
@@ -76,21 +60,6 @@ export interface TypecheckResult {
   values: Map<Expr, Type>
   types: Map<TypeAnnotation, Type>
   var_decls: Map<VarDecl, CheckedVarDecl[]>
-  /**
-   * Expressions that refer to a builtin const.
-   * e.g.
-   * builtin const linkc
-   *
-   * linkc("some.c_file")
-   * ^^^^^ This will be in the map (excluding the call)
-   *
-   * Can also be a prop expr
-   * e.g.
-   * import * as mem from "ljs:mem"
-   * mem.tranmute<X, Y>(...)
-   * ^^^^^^^^^^^^ This will be in the map (excluding the type application and call)
-   */
-  builtin_const_refs: Map<PropExpr | VarExpr, BuiltinConstDecl>
   diagnostics: Diagnostics
 }
 interface CheckedVarDecl {
@@ -113,28 +82,7 @@ export function typecheck(
   const check_func_signature_results = new Map<Func, CheckFuncSignatureResult>()
   const source_file_check_results = new Map<SourceFile, null>()
   const check_var_decl_result = new Map<VarDecl, CheckedVarDecl[]>()
-  const check_extern_function_results = new Map<LJSExternFunctionStmt, Type>()
-  const check_extern_const_results = new Map<LJSExternConstStmt, Type>()
   const loop_stack: LoopStmt[] = []
-  const builtin_const_refs = new Map<PropExpr | VarExpr, BuiltinConstDecl>()
-
-  interface CheckStructDeclResult {
-    constructor_type: Extract<Type, { kind: "StructConstructor" }>
-    instance_type: Extract<Type, { kind: "StructInstance" }>
-  }
-  const check_struct_decl_stmt_results = new Map<
-    StructDeclStmt,
-    CheckStructDeclResult
-  >()
-
-  interface CheckUntaggedUnionDeclResult {
-    constructor_type: Extract<Type, { kind: "UntaggedUnionConstructor" }>
-    instance_type: Extract<Type, { kind: "UntaggedUnionInstance" }>
-  }
-  const check_untagged_union_decl_stmt_results = new Map<
-    UntaggedUnionDeclStmt,
-    CheckUntaggedUnionDeclResult
-  >()
 
   for (const file of source_files.values()) {
     check_source_file(file)
@@ -145,7 +93,6 @@ export function typecheck(
     values,
     types,
     var_decls: check_var_decl_result,
-    builtin_const_refs,
   }
 
   function check_source_file(file: SourceFile): void {
@@ -178,21 +125,11 @@ export function typecheck(
       case "VarDecl":
         check_var_decl(ctx.source_file, stmt.decl)
         return
-      case "LJSExternFunction":
-        check_ljs_extern_function_stmt(ctx.source_file, stmt)
-        return
-      case "LJSExternConst":
-        check_ljs_extern_const_stmt(ctx.source_file, stmt)
-        return
       case "Expr":
         infer_expr(ctx.source_file, stmt.expr)
         return
       case "Return":
         return check_return_stmt(ctx, stmt)
-      case "StructDecl":
-        return check_struct_decl_stmt(ctx.source_file, stmt)
-      case "UntaggedUnionDecl":
-        return check_untagged_union_decl_stmt(ctx.source_file, stmt)
       case "For":
         return check_for_stmt(ctx, stmt)
       case "Block":
@@ -205,12 +142,6 @@ export function typecheck(
       case "Break":
       case "Continue":
         break
-      case "LJSExternType":
-        break
-      case "LJSBuiltinConst":
-        return check_builtin_const_stmt(ctx, stmt)
-      case "LJSBuiltinType":
-        return check_builtin_type_stmt(ctx, stmt)
       default:
         TODO(stmt.kind)
     }
@@ -259,95 +190,7 @@ export function typecheck(
     if (stmt.update) infer_expr(ctx.source_file, stmt.update)
     check_stmt(ctx, stmt.body)
   }
-  function check_struct_decl_stmt(
-    source_file: SourceFile,
-    stmt: StructDeclStmt,
-  ): CheckStructDeclResult {
-    const existing = check_struct_decl_stmt_results.get(stmt)
-    if (existing) return existing
-    const ctx = make_check_ctx(source_file, check_struct_decl_stmt_results)
 
-    const members: Record<string, Type> = {}
-    for (const member of stmt.struct_def.members) {
-      switch (member.kind) {
-        case "FieldDef":
-          if (member.name.text in members) {
-            emit_error(
-              ctx,
-              member.name.span,
-              `Duplicate field name ${member.name.text} in struct ${stmt.struct_def.name.text}`,
-            )
-          }
-          members[member.name.text] = check_type_annotation(
-            ctx.source_file,
-            member.type_annotation,
-          )
-          break
-        default:
-          assert_never(member.kind)
-      }
-    }
-    const qualified_name = qualified_name_of_decl(
-      stmt.struct_def.name,
-      ctx.source_file.path,
-    )
-    return {
-      constructor_type: Type.StructConstructor(qualified_name, members),
-      instance_type: Type.StructInstance(qualified_name, members),
-    }
-  }
-  function check_builtin_const_stmt(ctx: CheckCtx, stmt: LJSBuiltinConstStmt) {
-    if (!(stmt.name.text in builtin_values)) {
-      emit_error(ctx, stmt.name.span, `Unknown builtin const ${stmt.name.text}`)
-    }
-  }
-
-  function check_builtin_type_stmt(ctx: CheckCtx, stmt: LJSBuiltinTypeStmt) {
-    if (!(stmt.name.text in builtin_types)) {
-      emit_error(ctx, stmt.name.span, `Unknown builtin type ${stmt.name.text}`)
-    }
-  }
-  function check_untagged_union_decl_stmt(
-    source_file: SourceFile,
-    stmt: UntaggedUnionDeclStmt,
-  ): CheckUntaggedUnionDeclResult {
-    const existing = check_untagged_union_decl_stmt_results.get(stmt)
-    if (existing) return existing
-    const ctx = make_check_ctx(
-      source_file,
-      check_untagged_union_decl_stmt_results,
-    )
-    const variants: Record<string, Type> = {}
-    for (const member of stmt.untagged_union_def.members) {
-      switch (member.kind) {
-        case "VariantDef":
-          if (member.name.text in variants) {
-            emit_error(
-              ctx,
-              member.name.span,
-              `Duplicate variant name ${member.name.text} in untagged union ${stmt.untagged_union_def.name.text}`,
-            )
-          }
-          variants[member.name.text] = check_type_annotation(
-            ctx.source_file,
-            member.type_annotation,
-          )
-          break
-        default:
-          assert_never(member.kind)
-      }
-    }
-    const qualified_name = qualified_name_of_decl(
-      stmt.untagged_union_def.name,
-      ctx.source_file.path,
-    )
-    const result = {
-      constructor_type: Type.UntaggedUnionConstructor(qualified_name, variants),
-      instance_type: Type.UntaggedUnionInstance(qualified_name, variants),
-    }
-    check_untagged_union_decl_stmt_results.set(stmt, result)
-    return result
-  }
   function check_return_stmt(ctx: CheckCtx, stmt: ReturnStmt) {
     if (stmt.value) {
       const func = return_stmt_enclosing_func.get(stmt)
@@ -399,7 +242,7 @@ export function typecheck(
     // Temporary result to break the cycle
     check_func_signature_results.set(func, {
       params: [],
-      return_type: Type.void,
+      return_type: Type.unknown,
     })
     const ctx = make_check_ctx(source_file, check_func_signature_results)
     const params: [name: Ident, type: Type][] = []
@@ -421,12 +264,6 @@ export function typecheck(
         )
         continue
       }
-      if (
-        source_file.qualified_name.length === 0 &&
-        func.name?.text === "main"
-      ) {
-        check_main_function_signature(ctx, source_file, func)
-      }
       params.push([param.pattern.ident, type])
     }
     let return_type: Type | null = null
@@ -445,26 +282,7 @@ export function typecheck(
     check_func_signature_results.set(func, result)
     return result
   }
-  function check_main_function_signature(
-    ctx: CheckCtx,
-    source_file: SourceFile,
-    func: Func,
-  ) {
-    assert(
-      func.name,
-      "check_main_function_signature must be called for a function with a name",
-    )
-    const return_type = func.return_type
-      ? check_type_annotation(source_file, func.return_type)
-      : null
-    if (
-      return_type &&
-      return_type.kind !== Type.void.kind &&
-      return_type.kind !== Type.c_int.kind
-    ) {
-      emit_error(ctx, func.name.span, "main function must return int or void")
-    }
-  }
+
   function check_var_decl(
     source_file: SourceFile,
     decl: VarDecl,
@@ -520,67 +338,6 @@ export function typecheck(
     })
   }
 
-  function check_ljs_extern_function_stmt(
-    source_file: SourceFile,
-    stmt: LJSExternFunctionStmt,
-  ): Type {
-    const existing = check_extern_function_results.get(stmt)
-    if (existing) return existing
-
-    const ctx = make_check_ctx(source_file, check_extern_function_results)
-    const param_types: Type[] = []
-    let is_vararg = false
-    let index = -1
-    for (const param of stmt.params) {
-      index++
-      if (param.pattern.kind === "Rest") {
-        if (index !== stmt.params.length - 1) {
-          emit_error(
-            ctx,
-            param.span,
-            "Rest parameter must be the last parameter",
-          )
-        }
-        if (param.type_annotation) {
-          emit_error(
-            ctx,
-            param.span,
-            "A Rest parameter in an extern function cannot have a type annotation",
-          )
-        }
-        is_vararg = true
-        continue
-      } else if (!param.type_annotation) {
-        emit_error(
-          ctx,
-          param.span,
-          "An extern function parameter must have a type annotation",
-        )
-        continue
-      } else {
-        param_types.push(
-          check_type_annotation(ctx.source_file, param.type_annotation),
-        )
-      }
-    }
-    const return_type = check_type_annotation(ctx.source_file, stmt.return_type)
-    const ty = Type.UnboxedFunc(param_types, return_type, is_vararg)
-    check_extern_function_results.set(stmt, ty)
-    return ty
-  }
-  function check_ljs_extern_const_stmt(
-    source_file: SourceFile,
-    stmt: LJSExternConstStmt,
-  ): Type {
-    const existing = check_extern_const_results.get(stmt)
-    if (existing) return existing
-
-    const ctx = make_check_ctx(source_file, check_extern_const_results)
-    const type = check_type_annotation(ctx.source_file, stmt.type_annotation)
-    check_extern_const_results.set(stmt, type)
-    return type
-  }
-
   function check_expr(ctx: CheckCtx, expr: Expr, expected_type: Type): void {
     if (values.has(expr)) {
       return
@@ -605,13 +362,6 @@ export function typecheck(
         return
       }
       case "Null": {
-        if (!type_is_pointer(expected_type)) {
-          emit_error(
-            ctx,
-            expr.span,
-            `Expected a pointer type, got ${type_to_string(expected_type)}`,
-          )
-        }
         values.set(expr, expected_type)
         return
       }
@@ -624,10 +374,6 @@ export function typecheck(
 
       default: {
         const inferred = infer_expr(ctx.source_file, expr)
-        if (inferred.kind === "BuiltinUninitialized") {
-          values.set(expr, inferred)
-          return
-        }
         if (!is_assignable({ source: inferred, target: expected_type })) {
           emit_error(
             ctx,
@@ -654,48 +400,8 @@ export function typecheck(
     switch (target.kind) {
       case "unknown":
         return true
-      case "Ptr":
-        return (
-          (source.kind === "Ptr" || source.kind === "MutPtr") &&
-          is_assignable({ source: source.type, target: target.type })
-        )
-      case "MutPtr":
-        return (
-          source.kind === "MutPtr" &&
-          is_assignable({ source: source.type, target: target.type })
-        )
-      case "void":
-      case "c_char":
-      case "c_int":
-      case "u8":
-      case "u16":
-      case "u32":
-      case "u64":
-      case "usize":
-      case "i8":
-      case "i16":
-      case "i32":
-      case "i64":
-      case "isize":
-      case "f32":
-      case "f64":
       case "boolean":
         return target.kind === source.kind
-      case "StructInstance":
-        return (
-          source.kind === "StructInstance" &&
-          qualified_name_eq(target.qualified_name, source.qualified_name)
-        )
-      case "UntaggedUnionInstance":
-        return (
-          source.kind === "UntaggedUnionInstance" &&
-          qualified_name_eq(target.qualified_name, source.qualified_name)
-        )
-      case "Opaque":
-        return (
-          source.kind === "Opaque" &&
-          qualified_name_eq(target.qualified_name, source.qualified_name)
-        )
       default:
         return false
     }
@@ -729,11 +435,6 @@ export function typecheck(
         return infer_call_expr(ctx, expr)
       case "Var":
         return infer_var_expr(ctx, expr)
-      case "Number":
-        return Type.i64
-      case "StructInit": {
-        return infer_struct_init_expr(ctx, expr)
-      }
       case "Ternary":
         return infer_ternary_expr(ctx, expr)
       case "Boolean":
@@ -744,10 +445,6 @@ export function typecheck(
         return infer_post_increment_expr(ctx, expr)
       case "Assign":
         return infer_assign_expr(ctx, expr)
-      case "AddressOf":
-        return infer_address_of_expr(ctx, expr)
-      case "Deref":
-        return infer_deref_expr(ctx, expr)
       case "Paren":
         return infer_expr(ctx.source_file, expr.expr)
       case "TypeApplication":
@@ -812,27 +509,7 @@ export function typecheck(
   }
 
   function is_valid_cast(source_type: Type, target_type: Type): boolean {
-    if (source_type.kind === "Error" || target_type.kind === "Error") {
-      return true
-    }
-
-    if (type_is_pointer(source_type) && type_is_pointer(target_type)) {
-      return true
-    }
-
-    if (type_is_pointer(source_type) && type_is_integral(target_type)) {
-      return true
-    }
-
-    if (type_is_integral(source_type) && type_is_pointer(target_type)) {
-      return true
-    }
-
-    if (type_is_integral(source_type) && type_is_integral(target_type)) {
-      return true
-    }
-
-    return false
+    TODO()
   }
 
   function infer_as_expr(ctx: CheckCtx, expr: AsExpr): Type {
@@ -853,54 +530,6 @@ export function typecheck(
     return target_type
   }
 
-  function infer_address_of_expr(ctx: CheckCtx, expr: AddressOfExpr): Type {
-    if (expr.expr.kind !== "Var") {
-      emit_error(ctx, expr.expr.span, "Can only take the address of a variable")
-    } else if (expr.mut) {
-      check_address_of_mutability(ctx, expr.expr.ident)
-    }
-    const inner_type = infer_expr(ctx.source_file, expr.expr)
-    if (inner_type.kind === "Error") return inner_type
-    if (expr.mut) {
-      return Type.MutPtr(inner_type)
-    } else {
-      return Type.Ptr(inner_type)
-    }
-  }
-
-  /**
-   * For exprs like `foo.&mut`, check if `foo` is a `let` variable
-   * which can be converted to a mutable pointer.
-   */
-  function check_address_of_mutability(ctx: CheckCtx, ident: Ident): void {
-    const decl = resolution.values.get(ident)
-    if (!decl) return
-    if (decl.kind !== "VarDecl" || decl.decl.decl_type !== "Let") {
-      emit_error(
-        ctx,
-        ident.span,
-        "It's not possible to take the mutable address of this variable",
-        decl.kind === "VarDecl"
-          ? `${ident.text} is declared with ${decl.decl.decl_type.toLowerCase()} but you're trying to call .&mut on it.`
-          : undefined,
-      )
-    }
-  }
-  function infer_deref_expr(ctx: CheckCtx, expr: DerefExpr): Type {
-    const inner_type = infer_expr(ctx.source_file, expr.expr)
-    if (inner_type.kind === "Ptr" || inner_type.kind === "MutPtr") {
-      return inner_type.type
-    }
-    if (inner_type.kind !== "Error") {
-      emit_error(
-        ctx,
-        expr.span,
-        `Cannot dereference a ${type_to_string(inner_type)}`,
-      )
-    }
-    return Type.Error(`Cannot dereference a ${type_to_string(inner_type)}`)
-  }
-
   function infer_assign_expr(ctx: CheckCtx, expr: AssignExpr): Type {
     if (expr.pattern.kind === "Var") {
       if (expr.operator !== "Eq") {
@@ -915,63 +544,6 @@ export function typecheck(
       const lhs_type = type_of_decl(expr.pattern.ident.text, decl)
       check_expr(ctx, expr.value, lhs_type)
       return lhs_type
-    } else if (expr.pattern.kind === "Deref") {
-      const inner_type = infer_expr(ctx.source_file, expr.pattern.expr)
-      if (inner_type.kind === "Error") return inner_type
-      if (!type_is_one_of(inner_type, "Ptr", "MutPtr")) {
-        return emit_error_type(ctx, {
-          message: `Cannot assign to a dereference of a non-pointer type ${type_to_string(inner_type)}`,
-          span: expr.pattern.expr.span,
-        })
-      }
-      if (inner_type.kind !== "MutPtr") {
-        return emit_error_type(ctx, {
-          message: `Assignment needs a mutable pointer`,
-          span: expr.pattern.expr.span,
-          hint: "A let variable's address can be converted to a mutable pointer using the var_name.&mut syntax",
-        })
-      }
-      check_expr(ctx, expr.value, inner_type.type)
-      return inner_type.type
-    } else if (
-      expr.pattern.kind === "Prop" &&
-      expr.pattern.key.kind === "Ident" &&
-      expr.pattern.expr.kind === "Var"
-    ) {
-      const pattern_lhs_ty = infer_expr(ctx.source_file, expr.pattern.expr)
-      let struct_ty: StructInstanceType
-      if (pattern_lhs_ty.kind === "StructInstance") {
-        struct_ty = pattern_lhs_ty
-      } else if (
-        type_is_pointer(pattern_lhs_ty) &&
-        pattern_lhs_ty.type.kind === "StructInstance"
-      ) {
-        struct_ty = pattern_lhs_ty.type
-        if (pattern_lhs_ty.kind === "Ptr") {
-          emit_error(
-            ctx,
-            expr.pattern.expr.span,
-            "Assigning to an immutable pointer is not allowed.",
-          )
-        }
-      } else {
-        return emit_error_type(ctx, {
-          span: expr.pattern.expr.span,
-          message: `Cannot access property on a non-struct type ${type_to_string(
-            pattern_lhs_ty,
-          )}`,
-        })
-      }
-      const field_ty = struct_ty.fields[expr.pattern.key.ident.text]
-      if (!field_ty) {
-        return emit_error_type(ctx, {
-          span: expr.pattern.key.span,
-          message: `Struct ${struct_ty.qualified_name} has no field named ${expr.pattern.key.ident.text}`,
-          hint: `Available fields: ${Object.keys(struct_ty.fields).join(", ")}`,
-        })
-      }
-      check_expr(ctx, expr.value, field_ty)
-      return field_ty
     } else {
       emit_error(ctx, expr.pattern.span, "Unsupported assignment pattern")
       return infer_expr(ctx.source_file, expr.value)
@@ -1073,63 +645,6 @@ export function typecheck(
     return then_type
   }
 
-  function infer_struct_init_expr(ctx: CheckCtx, expr: StructInitExpr): Type {
-    const lhs_type = infer_expr(ctx.source_file, expr.lhs)
-
-    if (lhs_type.kind === "StructConstructor") {
-      // TODO: Check for extra and duplicate fields in the initializer
-
-      for (const [name, expected_type] of Object.entries(lhs_type.fields)) {
-        const field = expr.fields.find((f) => f.Key.text === name)
-        if (!field) {
-          emit_error(ctx, expr.lhs.span, `Missing field ${name} in struct init`)
-          continue
-        }
-        check_expr(ctx, field.value, expected_type)
-      }
-
-      return {
-        kind: "StructInstance",
-        qualified_name: lhs_type.qualified_name,
-        fields: lhs_type.fields,
-      }
-    } else if (lhs_type.kind === "UntaggedUnionConstructor") {
-      // For untagged unions, exactly one variant must be specified
-      if (expr.fields.length !== 1) {
-        return emit_error_type(ctx, {
-          message: `Untagged union initialization must have exactly one variant, got ${expr.fields.length}`,
-          span: expr.span,
-          hint: null,
-        })
-      }
-
-      const field = expr.fields[0]
-      const variant_name = field.Key.text
-      const expected_type = lhs_type.variants[variant_name]
-
-      if (!expected_type) {
-        return emit_error_type(ctx, {
-          message: `Unknown variant '${variant_name}' in untagged union`,
-          span: field.Key.span,
-          hint: `Available variants: ${Object.keys(lhs_type.variants).join(", ")}`,
-        })
-      }
-
-      check_expr(ctx, field.value, expected_type)
-      return {
-        kind: "UntaggedUnionInstance",
-        qualified_name: lhs_type.qualified_name,
-        variants: lhs_type.variants,
-      }
-    } else {
-      return emit_error_type(ctx, {
-        message:
-          "Expected a struct or untagged union constructor on the left-hand side of initialization",
-        span: expr.lhs.span,
-        hint: `Got ${type_to_string(lhs_type)}`,
-      })
-    }
-  }
   function emit_error_type(
     ctx: CheckCtx,
     error: { message: string; span: Span; hint?: string | null },
@@ -1146,10 +661,6 @@ export function typecheck(
         hint: null,
       })
     }
-    if (decl.kind === "BuiltinConst") {
-      assert(!builtin_const_refs.has(expr))
-      builtin_const_refs.set(expr, decl)
-    }
     return type_of_decl(expr.ident.text, decl)
   }
 
@@ -1158,61 +669,8 @@ export function typecheck(
     if (lhs_type.kind === "Error") {
       return lhs_type
     }
-    if (lhs_type.kind === "BuiltinLinkC") {
-      check_builtin_linkc_call_args(ctx, expr)
-      return Type.void
-    }
-    if (lhs_type.kind === "UnboxedFunc") {
-      if (lhs_type.is_vararg) {
-        if (expr.args.length < lhs_type.params.length) {
-          emit_error(
-            ctx,
-            expr.callee.span,
-            `Expected at least ${lhs_type.params.length} arguments, got ${expr.args.length}`,
-          )
-        }
-        for (const [arg, expected_type] of zip(expr.args, lhs_type.params)) {
-          check_expr(ctx, arg, expected_type)
-        }
-        for (let i = lhs_type.params.length; i < expr.args.length; i++) {
-          infer_expr(ctx.source_file, expr.args[i])
-        }
-      } else {
-        if (expr.args.length !== lhs_type.params.length) {
-          emit_error(
-            ctx,
-            expr.callee.span,
-            `Expected ${lhs_type.params.length} arguments, got ${expr.args.length}`,
-          )
-        }
-        for (const [arg, expected_type] of zip(expr.args, lhs_type.params)) {
-          check_expr(ctx, arg, expected_type)
-        }
-      }
-      return lhs_type.return_type
-    } else {
-      expr.args.map((arg) => infer_expr(ctx.source_file, arg))
-      return emit_error_type(ctx, {
-        span: expr.callee.span,
-        message: `Expected a function, got ${type_to_string(lhs_type)}`,
-      })
-    }
-  }
-  function check_builtin_linkc_call_args(ctx: CheckCtx, call: CallExpr) {
-    if (call.args.length !== 1 || call.args[0].kind !== "String") {
-      emit_error(
-        ctx,
-        call.callee.span,
-        "ljs:builtin/linkc expects a single string argument",
-      )
-      return
-    }
-    const relative = call.args[0].text.slice(1, -1)
-    const resolved = Path.join(Path.dirname(ctx.source_file.path), relative)
 
-    if (!existsSync(resolved)) {
-      emit_error(ctx, call.callee.span, `Could not read file ${resolved}`)
-    }
+    TODO()
   }
 
   function infer_prop_expr(ctx: CheckCtx, expr: PropExpr): Type {
@@ -1232,43 +690,9 @@ export function typecheck(
           hint,
         })
       }
-      if (decl.kind === "BuiltinConst") {
-        assert(!builtin_const_refs.has(expr))
-        builtin_const_refs.set(expr, decl)
-      }
       return type_of_decl(expr.property.text, decl)
     } else {
-      const lhs = infer_expr(ctx.source_file, expr.lhs)
-      if (lhs.kind === "StructInstance") {
-        return (
-          lhs.fields[expr.property.text] ??
-          emit_error_type(ctx, {
-            message: `Property ${expr.property.text} does not exist on type ${type_to_string(lhs)}`,
-            span: expr.property.span,
-            hint: `Available properties: ` + Object.keys(lhs.fields).join(", "),
-          })
-        )
-      } else if (
-        (lhs.kind === "Ptr" || lhs.kind === "MutPtr") &&
-        lhs.type.kind === "StructInstance"
-      ) {
-        return (
-          lhs.type.fields[expr.property.text] ??
-          emit_error_type(ctx, {
-            message: `Property ${expr.property.text} does not exist on type ${type_to_string(lhs)}`,
-            span: expr.property.span,
-            hint:
-              `Available properties: ` +
-              Object.keys(lhs.type.fields).join(", "),
-          })
-        )
-      } else {
-        return emit_error_type(ctx, {
-          message: `Expected a module or a struct on the left-hand side of the property access`,
-          span: expr.lhs.span,
-          hint: null,
-        })
-      }
+      TODO()
     }
   }
 
@@ -1282,36 +706,6 @@ export function typecheck(
         assert(declarator, `Expected a declarator for variable ${name}`)
         return declarator.type
       }
-      case "LJSExternFunction": {
-        const source_file = source_files.get(decl.source_file)
-        assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const ty = check_ljs_extern_function_stmt(source_file, decl.stmt)
-        return ty
-      }
-      case "LJSExternConst": {
-        const source_file = source_files.get(decl.source_file)
-        assert(source_file, `Unknown source file: ${decl.source_file}`)
-        return check_ljs_extern_const_stmt(source_file, decl.stmt)
-      }
-      case "Struct": {
-        const source_file = source_files.get(decl.source_file)
-        assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_struct_decl_stmt(source_file, decl.decl)
-        const type = result.constructor_type
-        assert(type, "Expected check_stmt to set the struct constructor's type")
-        return type
-      }
-      case "UntaggedUnion": {
-        const source_file = source_files.get(decl.source_file)
-        assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_untagged_union_decl_stmt(source_file, decl.decl)
-        const type = result.constructor_type
-        assert(
-          type,
-          "Expected check_stmt to set the untagged union constructor's type",
-        )
-        return type
-      }
       case "Param": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
@@ -1324,20 +718,10 @@ export function typecheck(
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
         const result = check_func_signature(source_file, decl.func)
-        return Type.UnboxedFunc(
-          result.params.map(([, t]) => t),
-          result.return_type,
-        )
-      }
-      case "BuiltinConst": {
-        if (name in builtin_values) {
-          return builtin_values[name as keyof typeof builtin_values].type
-        } else {
-          throw new Error(`Unknown builtin const: ${name}`)
-        }
+        TODO()
       }
       case "Module":
-        TODO()
+        return TODO()
     }
   }
   function get_module_decl(expr: Expr): ModuleDecl | null {
@@ -1358,29 +742,11 @@ export function typecheck(
   ): Type {
     const callee = expr.tag
     const callee_ty = infer_expr(ctx.source_file, expr.tag)
-    if (callee_ty.kind === "CStringConstructor") {
-      return infer_and_check_c_string_expr(ctx, expr)
-    }
     return emit_error_type(ctx, {
       message: `TODO: infer_tagged_template_literal_expr for ${callee_ty}`,
       span: callee.span,
       hint: null,
     })
-  }
-
-  function infer_and_check_c_string_expr(
-    ctx: CheckCtx,
-    expr: TaggedTemplateLiteralExpr,
-  ): Type {
-    if (expr.fragments.length !== 1 || expr.fragments[0].kind !== "Text") {
-      emit_error_type(ctx, {
-        message: `Expected a constant template literal for @builtin("c_str"), got ${expr.fragments.length}`,
-        span: expr.span,
-        hint: `@builtin("c_str") must be used like this @builtin("c_str")\`some constant string without interpolation\``,
-      })
-    }
-
-    return Type.Ptr(Type.c_char)
   }
 
   function make_type_var_env(ctx: CheckCtx): TypeVarEnv {
@@ -1463,34 +829,11 @@ export function typecheck(
 
   function type_decl_to_type(decl: TypeDecl): Type {
     switch (decl.kind) {
-      case "Builtin":
-        return decl.type
       case "TypeAlias": {
         const source_file = source_files.get(decl.source_file)
         assert(source_file, `Unknown source file: ${decl.source_file}`)
         return check_type_annotation(source_file, decl.stmt.type_annotation)
       }
-      case "ExternType": {
-        const source_file = source_files.get(decl.source_file)
-        assert(source_file, `Unknown source file: ${decl.source_file}`)
-        // Extern types should not be mangled - they refer to actual link-time names
-        const name = [decl.stmt.name.text]
-        return Type.Opaque(name)
-      }
-      case "Struct": {
-        const source_file = source_files.get(decl.source_file)
-        assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_struct_decl_stmt(source_file, decl.decl)
-        return result.instance_type
-      }
-      case "UntaggedUnion": {
-        const source_file = source_files.get(decl.source_file)
-        assert(source_file, `Unknown source file: ${decl.source_file}`)
-        const result = check_untagged_union_decl_stmt(source_file, decl.decl)
-        return result.instance_type
-      }
-      case "BuiltinType":
-        return decl.type
       case "Module":
         TODO("Using module as a type")
       default:
