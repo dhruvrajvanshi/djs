@@ -8,6 +8,11 @@ export type ValueDecl =
       name: string
       source_file: string
     }
+  | {
+      kind: "Builtin"
+      name: string
+      type: Type
+    }
   | { kind: "Func"; func: Func; source_file: string }
   | { kind: "Param"; func: Func; param_index: number; source_file: string }
   | ModuleDecl

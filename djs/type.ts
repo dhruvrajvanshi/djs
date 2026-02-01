@@ -7,16 +7,53 @@ export type Type = ReadonlyUnion<
    * Top type: Every type is assignable to this type.
    */
   | { kind: "unknown" }
+  | { kind: "undefined" }
   | { kind: "boolean" }
+  | { kind: "string" }
+  | {
+      /**
+       * Note that this doesn't include null,
+       * which makes it different from typescript.
+       * As a result, typeof something === 'object' guarantees that
+       * something.foo would not throw a null pointer error.
+       */
+      kind: "object"
+    }
+  | {
+      kind: "array"
+      element_type: Type
+    }
+  | {
+      kind: "function"
+      param_types: Type[]
+      rest_param_type: Type | null
+      return_type: Type
+    }
   | { kind: "Error"; message: string }
 >
+export type FunctionType = Extract<Type, { kind: "function" }>
+
 export type TypeParam = Readonly<{
   name: string
 }>
 
 export const Type = {
   boolean: { kind: "boolean" },
+  string: { kind: "string" },
   unknown: { kind: "unknown" },
+  object: { kind: "object" },
+  undefined: { kind: "undefined" },
+  array: (element_type: Type) => ({ kind: "array", element_type }),
+  function: (
+    param_types: Type[],
+    rest_param_type: Type | null,
+    return_type: Type,
+  ) => ({
+    kind: "function",
+    param_types,
+    rest_param_type,
+    return_type,
+  }),
   Forall: (params: readonly TypeParam[], body: Type) => ({
     kind: "Forall",
     params,
@@ -28,22 +65,42 @@ export const Type = {
 
 export function type_to_string(type: Type): string {
   switch (type.kind) {
+    case "unknown":
+    case "boolean":
+    case "undefined":
+    case "string":
+    case "object":
+      return type.kind
+
     case "Error":
       return "<Error>"
     case "Forall":
       return `forall ${type.params.map((p) => p.name).join(", ")}. ${type_to_string(type.body)}`
     case "ParamRef":
       return type.name
-    case "unknown":
-      return "unknown"
-    case "boolean":
-      return "boolean"
+    case "array":
+      return `${type_to_string(type.element_type)}[]`
+    case "function": {
+      const params = type.param_types.map((t) => type_to_string(t))
+      if (type.rest_param_type) {
+        params.push(`...${type_to_string(type.rest_param_type)}`)
+      }
+      return `(${params.join(", ")}) => ${type_to_string(type.return_type)}`
+    }
+
     default:
       return assert_never(type)
   }
 }
 export function type_to_sexpr(type: Type): string {
   switch (type.kind) {
+    case "unknown":
+    case "boolean":
+    case "undefined":
+    case "string":
+    case "object":
+      return type.kind
+
     case "Error":
       return `<Error: ${type.message}>`
     case "Forall":
@@ -52,10 +109,15 @@ export function type_to_sexpr(type: Type): string {
         .join(" ")}) ${type_to_sexpr(type.body)})`
     case "ParamRef":
       return `(ParamRef ${type.name})`
-    case "unknown":
-      return "unknown"
-    case "boolean":
-      return "boolean"
+    case "array":
+      return `(Array ${type_to_sexpr(type.element_type)})`
+    case "function": {
+      const params = type.param_types.map((t) => type_to_sexpr(t))
+      if (type.rest_param_type) {
+        params.push(`...${type_to_sexpr(type.rest_param_type)}`)
+      }
+      return `(Function (${params.join(" ")}) ${type_to_sexpr(type.return_type)})`
+    }
     default:
       return assert_never(type)
   }

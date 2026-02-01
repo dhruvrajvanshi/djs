@@ -13,6 +13,7 @@ export class SymbolTable {
       SymbolTable.Global.add_type(name, { kind: "Builtin", type }, true)
     ty("boolean", Type.boolean)
     ty("unknown", Type.unknown)
+    ty("object", Type.object)
   }
 
   get_value(name: string): ValueDecl | null {

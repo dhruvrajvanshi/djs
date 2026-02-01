@@ -38,6 +38,7 @@ import {
   type_is_integral,
   type_is_one_of,
   type_to_string,
+  type FunctionType,
 } from "./type.ts"
 import { Diagnostics } from "./diagnostics.ts"
 import {
@@ -400,6 +401,7 @@ export function typecheck(
     switch (target.kind) {
       case "unknown":
         return true
+      case "string":
       case "boolean":
         return target.kind === source.kind
       default:
@@ -439,6 +441,8 @@ export function typecheck(
         return infer_ternary_expr(ctx, expr)
       case "Boolean":
         return Type.boolean
+      case "String":
+        return Type.string
       case "BinOp":
         return infer_binop_expr(ctx, expr)
       case "PostIncrement":
@@ -471,6 +475,24 @@ export function typecheck(
         }
         values.set(expr, inner_type)
         return inner_type
+      }
+      case "DJSIntrinsic": {
+        const intrinsics: Record<string, Type | undefined> = {
+          djs_console_log: Type.function(
+            [],
+            /* rest */
+            Type.array(Type.unknown),
+            Type.unknown,
+          ),
+        }
+        const intrinsic_type = intrinsics[expr.name]
+        if (!intrinsic_type) {
+          return emit_error_type(ctx, {
+            message: `Unknown intrinsic ${expr.name}`,
+            span: expr.span,
+          })
+        }
+        return intrinsic_type
       }
       default: {
         return emit_error_type(ctx, {
@@ -667,10 +689,67 @@ export function typecheck(
   function infer_call_expr(ctx: CheckCtx, expr: CallExpr): Type {
     const lhs_type = infer_expr(ctx.source_file, expr.callee)
     if (lhs_type.kind === "Error") {
+      // Not required, but would improve type inference
+      for (const arg of expr.args) infer_expr(ctx.source_file, arg)
       return lhs_type
     }
+    if (lhs_type.kind === "Forall") TODO()
+    if (lhs_type.kind !== "function") {
+      return emit_error_type(ctx, {
+        message: `This expression is not callable`,
+        span: expr.callee.span,
+      })
+    }
 
-    TODO()
+    check_function_args(ctx, expr, lhs_type)
+
+    return lhs_type.return_type
+  }
+  function check_function_args(
+    ctx: CheckCtx,
+    call_expr: CallExpr,
+    func_type: FunctionType,
+  ): void {
+    const rest_element_type =
+      func_type.rest_param_type?.kind === "array"
+        ? func_type.rest_param_type.element_type
+        : null
+    let has_too_many_args = false
+    let first_extra_arg: Expr | null = null
+
+    for (let i = 0; i < call_expr.args.length; i++) {
+      const expected_param_type =
+        i < func_type.param_types.length
+          ? func_type.param_types[i]
+          : rest_element_type
+      if (!expected_param_type) {
+        has_too_many_args = true
+        first_extra_arg ??= call_expr.args[i]
+        continue
+      }
+      check_expr(ctx, call_expr.args[i], expected_param_type)
+    }
+
+    const min_required_args = func_type.param_types.length
+    if (call_expr.args.length < min_required_args) {
+      emit_error(
+        ctx,
+        call_expr.callee.span,
+        `Expected at least ${min_required_args} argument(s), but got ${call_expr.args.length}`,
+      )
+    }
+
+    if (has_too_many_args) {
+      assert(first_extra_arg)
+      emit_error(
+        ctx,
+        Span.between(
+          first_extra_arg,
+          call_expr.args[call_expr.args.length - 1],
+        ),
+        `Too many arguments provided in function call`,
+      )
+    }
   }
 
   function infer_prop_expr(ctx: CheckCtx, expr: PropExpr): Type {
@@ -722,6 +801,8 @@ export function typecheck(
       }
       case "Module":
         return TODO()
+      case "Builtin":
+        return decl.type
     }
   }
   function get_module_decl(expr: Expr): ModuleDecl | null {
@@ -836,6 +917,8 @@ export function typecheck(
       }
       case "Module":
         TODO("Using module as a type")
+      case "Builtin":
+        return decl.type
       default:
         return assert_never(decl)
     }
