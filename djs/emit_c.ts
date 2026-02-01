@@ -85,24 +85,53 @@ export function emit_c(
     }
   }
 
-  // Phase 2: Emit function definitions
-  for (const { stmt, source_file } of [...all_stmts].sort(types_first)) {
-    if (stmt.kind === "Func") {
-      defs.push(emit_func_def(ctx, source_file, stmt))
-    } else {
-      defs.push(emit_stmt(ctx, source_file, stmt))
-    }
+  for (const source_file of source_files.values()) {
+    const body = source_file.stmts.map((stmt) =>
+      emit_stmt(ctx, source_file, stmt),
+    )
+    defs.push({
+      kind: "FuncDef",
+      name: mangle_func_name(source_file, "module_init"),
+      params: [
+        {
+          kind: "Param",
+          name: "djs_runtime",
+          type: { kind: "Ident", name: "DJSRuntime*" } as CNode,
+          array_size: null,
+        },
+      ],
+      returns: { kind: "Ident", name: "void" },
+      body: { kind: "Block", body },
+    })
   }
+
+  defs.push({
+    kind: "FuncDef",
+    name: "main",
+    params: [],
+    returns: { kind: "Ident", name: "int" },
+    body: {
+      kind: "Block",
+      body: [{ kind: "Return", value: { kind: "IntLiteral", value: 0 } }],
+    },
+  })
 
   const c_nodes: CNode[] = [...forward_decls, ...defs]
 
   return {
-    source:
-      "#include <stdint.h>\n#include <stdbool.h>\n#include <stddef.h>\n#include <sys/types.h>\n\n" +
-      render_c_nodes(c_nodes),
+    source: PRELUDE + render_c_nodes(c_nodes),
     linkc_paths: ctx.link_c_paths,
   }
 }
+const PRELUDE = `
+#include <stdint.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include "djs.h"
+
+DJSCompletion djs_console_log(DJSRuntime* djs_runtime, DJSValue this_arg, DJSValue* args, size_t arg_count) {
+}
+`
 
 function types_first(
   { stmt: a }: { stmt: Stmt },
@@ -369,7 +398,14 @@ function emit_expr(
     }
     case "String": {
       const evaluated_string = evaluate_string_literal(expr.text)
-      return { kind: "StringLiteral", value: evaluated_string }
+      return {
+        kind: "Call",
+        func: { kind: "Ident", name: "djs_string_new" },
+        args: [
+          { kind: "Ident", name: "djs_runtime" },
+          { kind: "StringLiteral", value: evaluated_string },
+        ],
+      }
     }
     case "Number": {
       const num_value = Number(expr.text)
@@ -462,6 +498,14 @@ function emit_expr(
         kind: "PrefixOp",
         op: "+",
         expr: expr_node,
+      }
+    }
+    case "DJSIntrinsic": {
+      switch (expr.name) {
+        case "djs_console_log":
+          return { kind: "Ident", name: "djs_console_log" }
+        default:
+          PANIC(`Unhandled DJS intrinsic: ${expr.name}`)
       }
     }
     default:

@@ -113,7 +113,13 @@ export async function main(
   const output_c_path = Path.join(".ljs", args.output + ".c")
   await mkdir(Path.dirname(output_c_path), { recursive: true })
   await writeFile(output_c_path, c_source)
-  const command = `gcc -o ${args.output} ${output_c_path} ${linkc_paths.join(" ")} -Wall -Werror -Wno-parentheses-equality -Wno-unused-variable`
+  const runtime_sources = [
+    "../djs_runtime/djs_runtime.c",
+    "../djs_runtime/djs_string.c",
+  ].join(" ")
+  const command =
+    `gcc -o ${args.output} ${output_c_path} ${runtime_sources} ${linkc_paths.join(" ")} -Wall -Werror -Wno-parentheses-equality -Wno-unused-variable -I../djs_runtime -lgc -I/opt/homebrew/include` +
+    " -Wno-nullability-completeness"
   execSync(command, {
     stdio: "inherit",
   })
