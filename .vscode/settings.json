@@ -13,6 +13,5 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "esbenp.prettier-vscode",
     },
-    "C_Cpp.default.compileCommands": "/Users/dhruv/projects/djs/djs_runtime/builddir/compile_commands.json",
     "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild"
 }
