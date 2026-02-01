@@ -36,6 +36,7 @@ import {
   Token,
   TokenKind,
   type QualifiedName,
+  DJSIntrinsicExpr,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -640,10 +641,30 @@ function parser_impl(
       }
       case t.TemplateLiteralFragment:
         return parse_template_literal()
+      case t.DecoratorIdent:
+        return parse_djs_intrinsic()
       default:
         emit_error("Expected an expression")
         return ERR
     }
+  }
+
+  function parse_djs_intrinsic(): DJSIntrinsicExpr | Err {
+    const tok = advance()
+    assert(tok.kind === t.DecoratorIdent)
+    if (tok.text !== "@djs_intrinsic") {
+      emit_error("Unknown decorator intrinsic", tok.span)
+      return ERR
+    }
+    if (expect(t.LParen) === ERR) return ERR
+    const name_token = expect(t.String)
+    if (name_token === ERR) return ERR
+    const rparen = expect(t.RParen)
+    if (rparen === ERR) return ERR
+    return Expr.DJSIntrinsic(
+      Span.between(tok.span, rparen),
+      JSON.parse(name_token.text),
+    )
   }
 
   function re_lex_regex() {

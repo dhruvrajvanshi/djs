@@ -154,6 +154,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     expr: () => Expr,
     type_annotation: () => TypeAnnotation,
   },
+  DJSIntrinsic: { name: Text },
 })
 export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { leading_trivia: Text, ident: Ident },
