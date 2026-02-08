@@ -4,6 +4,7 @@
 
 typedef struct DJSRuntime DJSRuntime;
 typedef struct DJSObject DJSObject;
+typedef struct DJSArray DJSArray;
 typedef struct DJSString DJSString;
 typedef struct DJSFunction DJSFunction;
 typedef struct DJSProperty DJSProperty;
@@ -148,6 +149,7 @@ typedef struct DJSPropertyKey {
 DJSRuntime* djs_new_runtime(void);
 void djs_free_runtime(DJSRuntime*);
 DJSObject* djs_object_new(DJSRuntime* runtime);
+DJSArray* djs_array_new(DJSRuntime* runtime);
 DJSSymbol djs_symbol_new(DJSRuntime* runtime);
 DJSPropertyKey djs_property_key_from_symbol(DJSSymbol symbol);
 DJSPropertyKey djs_property_key_from_string(const DJSString* string);
