@@ -14,7 +14,7 @@
     "@vitest/coverage-v8": "4.0.13",
     "prettier": "^3.8.1",
     "typescript": "5.9.3",
-    "vitest": "^4.0.13"
+    "vitest": "^4.0.18"
   },
   "$schema": "https://json.schemastore.org/package.json"
 }
