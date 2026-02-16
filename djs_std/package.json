@@ -15,7 +15,7 @@
   "$schema": "https://json.schemastore.org/package.json",
   "packageManager": "pnpm@10.8.0",
   "devDependencies": {
-    "@types/node": "^24.10.1",
+    "@types/node": "^25.2.3",
     "typescript": "5.9.3"
   }
 }
