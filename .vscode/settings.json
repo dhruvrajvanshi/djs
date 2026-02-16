@@ -13,5 +13,10 @@
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "esbenp.prettier-vscode",
     },
-    "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild"
+    "[c]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "ms-vscode.cpptools"
+    },
+    "C_Cpp.default.configurationProvider": "mesonbuild.mesonbuild",
+    "C_Cpp.default.compileCommands": "/Users/dhruv/projects/djs/builddir/compile_commands.json"
 }
