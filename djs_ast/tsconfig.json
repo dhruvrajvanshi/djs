@@ -1,16 +1,18 @@
 {
-    "$schema": "https://json.schemastore.org/tsconfig",
-    "compilerOptions": {
-        "moduleResolution": "node",
-        "esModuleInterop": true,
-        "checkJs": true,
-        "outDir": "./dist",
-        "strict": true,
-        "target": "ES2022",
-        "module": "ESNext",
-        "rewriteRelativeImportExtensions": true,
-        "verbatimModuleSyntax": true,
-        "declaration": true,
-        "declarationMap": true
-    }
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "checkJs": true,
+    "outDir": "./dist",
+    "types": ["node"],
+    "lib": ["ESNext"],
+    "strict": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "rewriteRelativeImportExtensions": true,
+    "verbatimModuleSyntax": true,
+    "declaration": true,
+    "declarationMap": true
+  }
 }

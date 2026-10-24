@@ -43,6 +43,7 @@ export type Stmt =
   | DebuggerStmt
   | WithStmt
   | FuncStmt
+  | ExportDefaultStmt
   | ClassDeclStmt
   | ImportStmt
   | ImportStarAsStmt
@@ -304,6 +305,21 @@ export class FuncStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class ExportDefaultStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly value: Expr,
+  ) {}
+
+  get kind(): "ExportDefault" {
+    return "ExportDefault"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class ClassDeclStmt {
   constructor(
     readonly span: Span,
@@ -484,6 +500,9 @@ export const Stmt = {
 
   Func: (span: Span, func: Func, is_exported: boolean): FuncStmt =>
     new FuncStmt(span, func, is_exported),
+
+  ExportDefault: (span: Span, value: Expr): ExportDefaultStmt =>
+    new ExportDefaultStmt(span, value),
 
   ClassDecl: (
     span: Span,

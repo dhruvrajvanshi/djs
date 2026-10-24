@@ -600,7 +600,7 @@ function parser_impl(
         if (at(t.Function)) {
           const f = parse_function()
           if (f === ERR) return ERR
-          return Expr.Func(f.span, f)
+          return Expr.Func(f.span, { ...f, is_async: true })
         } else {
           return parse_arrow_fn()
         }
@@ -1729,6 +1729,14 @@ function parser_impl(
     return token.kind === t.Ident && token.text === text
   }
   function parse_stmt(export_token: Token | null = null): Stmt | Err {
+    if (!export_token && at(t.Export) && next_is(t.Default)) {
+      const start = advance()
+      advance()
+      const value = parse_expr()
+      if (value === ERR) return ERR
+      if (expect_semi() === ERR) return ERR
+      return Stmt.ExportDefault(Span.between(start.span, value.span), value)
+    }
     if (
       !export_token &&
       at(t.Export) &&
@@ -1854,7 +1862,11 @@ function parser_impl(
           advance()
           const f = parse_function()
           if (f === ERR) return ERR
-          return Stmt.Func(f.span, f, export_token !== null)
+          return Stmt.Func(
+            f.span,
+            { ...f, is_async: true },
+            export_token !== null,
+          )
         } else {
           emit_error(`Expected 'function'`)
           return ERR
@@ -1904,6 +1916,16 @@ function parser_impl(
   function parse_import_stmt(): Stmt | Err {
     const start = advance()
     assert(start.kind === t.Import)
+    if (at(t.String)) {
+      const module_specifier = advance()
+      if (expect_semi() === ERR) return ERR
+      return Stmt.Import(
+        Span.between(start, module_specifier),
+        null,
+        [],
+        module_specifier.text,
+      )
+    }
     if (at(t.Star)) return parse_import_star_as_stmt(start)
     let default_import: Ident | null = null
     if (at(t.Ident)) {

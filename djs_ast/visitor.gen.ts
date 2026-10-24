@@ -119,6 +119,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_func(stmt.func)
         break
       }
+      case "ExportDefault": {
+        this.visit_expr(stmt.value)
+        break
+      }
       case "ClassDecl": {
         this.visit_class(stmt.class_def)
         break

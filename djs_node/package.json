@@ -1,0 +1,17 @@
+{
+  "name": "djs_node",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "UNLICENSED",
+  "exports": "./djs_node.js",
+  "bin": {
+    "djs_node": "./djs_node.js"
+  },
+  "scripts": {
+    "test": "node --test unit/*.test.js && node test-runner.js"
+  },
+  "dependencies": {
+    "djs_ast": "workspace:*",
+    "djs_parser": "workspace:*"
+  }
+}

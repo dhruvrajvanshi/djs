@@ -52,6 +52,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   Debugger: {},
   With: { expr: () => Expr, body: () => Stmt },
   Func: { func: () => Func, is_exported: "boolean" },
+  ExportDefault: { value: () => Expr },
   ClassDecl: { class_def: () => Class, is_exported: "boolean" },
   Import: {
     default_import: Option(Ident),

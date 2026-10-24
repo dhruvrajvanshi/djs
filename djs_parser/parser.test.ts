@@ -141,6 +141,42 @@ test("is_exported should be correctly set", () => {
   assert(source_file.stmts[0].kind === "Func")
   expect(source_file.stmts[0].is_exported).toBe(true)
 })
+test("default export expressions are preserved in the AST", () => {
+  const source_file = parse_source_file(
+    "export default { log: function(value) { return value; } };",
+    "console.js",
+  )
+  expect(source_file.errors).toEqual([])
+  const stmt = source_file.stmts[0]
+  assert(stmt.kind === "ExportDefault")
+  expect(stmt.value.kind).toBe("Object")
+  expect(source_file_to_sexpr(source_file)).toMatchObject({
+    stmts: [{ kind: "ExportDefault", value: { kind: "Object" } }],
+  })
+})
+test("side-effect-only imports preserve the dependency specifier", () => {
+  const source_file = parse_source_file("import './dependency.js';", "entry.js")
+  expect(source_file.errors).toEqual([])
+  const stmt = source_file.stmts[0]
+  assert(stmt.kind === "Import")
+  expect(stmt.module_specifier).toBe("'./dependency.js'")
+  expect(stmt.default_import).toBeNull()
+  expect(stmt.named_imports).toEqual([])
+})
+test("async function declarations and expressions preserve their async flag", () => {
+  const source_file = parse_source_file(
+    "async function f() {} const g = async function() {};",
+    "entry.js",
+  )
+  expect(source_file.errors).toEqual([])
+  const [decl, variable] = source_file.stmts
+  assert(decl.kind === "Func")
+  expect(decl.func.is_async).toBe(true)
+  assert(variable.kind === "VarDecl")
+  const expr = variable.decl.declarators[0].init
+  assert(expr?.kind === "Func")
+  expect(expr.func.is_async).toBe(true)
+})
 test("preserves leading trivia in type aliases", () => {
   const t = parse_type(`/* leading trivia comment */ Foo`)
   assert(t.kind === "Ident")
