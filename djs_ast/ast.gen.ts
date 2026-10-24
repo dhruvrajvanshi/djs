@@ -836,6 +836,7 @@ export type Expr =
   | AwaitExpr
   | CommaExpr
   | SuperExpr
+  | ImportMetaExpr
   | ClassExpr
   | TemplateLiteralExpr
   | TaggedTemplateLiteralExpr
@@ -1400,6 +1401,17 @@ export class SuperExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
+export class ImportMetaExpr {
+  constructor(readonly span: Span) {}
+
+  get kind(): "ImportMeta" {
+    return "ImportMeta"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
 export class ClassExpr {
   constructor(
     readonly span: Span,
@@ -1599,6 +1611,8 @@ export const Expr = {
     new CommaExpr(span, items),
 
   Super: (span: Span): SuperExpr => new SuperExpr(span),
+
+  ImportMeta: (span: Span): ImportMetaExpr => new ImportMetaExpr(span),
 
   Class: (span: Span, class_def: Class): ClassExpr =>
     new ClassExpr(span, class_def),

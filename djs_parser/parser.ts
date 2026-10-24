@@ -641,6 +641,13 @@ function parser_impl(
       }
       case t.Super:
         return Expr.Super(advance().span)
+      case t.Import: {
+        const start = advance()
+        if (expect(t.Dot) === ERR) return ERR
+        const meta = expect_soft_keyword("meta")
+        if (meta === ERR) return ERR
+        return Expr.ImportMeta(Span.between(start.span, meta.span))
+      }
       case t.Class: {
         const cls = parse_class()
         if (cls === ERR) return ERR
@@ -1859,6 +1866,7 @@ function parser_impl(
         }
       }
       case t.Import:
+        if (next_is(t.Dot)) return parse_expr_stmt()
         return parse_import_stmt()
       default:
         return parse_expr_stmt()

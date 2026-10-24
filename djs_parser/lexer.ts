@@ -282,6 +282,7 @@ export function lexer_impl(self: LexerState): Lexer {
   type Trivia = string
   function skip_whitespace_and_comments(): Trivia | Err {
     let trivia: Trivia = ""
+    if (self.current_index === 0 && at("#!")) skip_hashbang()
     while (is_whitespace(current_char()) || at_comment()) {
       if (is_whitespace(current_char())) {
         skip_whitespace()
@@ -293,6 +294,18 @@ export function lexer_impl(self: LexerState): Lexer {
       }
     }
     return trivia
+  }
+
+  function skip_hashbang(): void {
+    while (
+      !is_line_terminator(current_char()) &&
+      // https://tc39.es/ecma262/#sec-line-terminators
+      current_char() !== "\u2028" /* LINE_SEPARATOR */ &&
+      current_char() !== "\u2029" /* PARAGRAPH_SEPARATOR */ &&
+      current_char() !== "\0"
+    ) {
+      advance()
+    }
   }
 
   function skip_whitespace(): void {

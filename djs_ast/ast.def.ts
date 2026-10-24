@@ -142,6 +142,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
   Await: { expr: () => Expr },
   Comma: { items: List(() => Expr) },
   Super: {},
+  ImportMeta: {},
   Class: { class_def: () => Class },
   TemplateLiteral: { fragments: List(() => TemplateLiteralFragment) },
   TaggedTemplateLiteral: {

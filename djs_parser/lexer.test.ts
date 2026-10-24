@@ -13,6 +13,9 @@ test.each([
   ["\r\n\r\n", [TokenKind.EndOfFile]],
   ["123", [TokenKind.Number, TokenKind.EndOfFile]],
   ["+=", [TokenKind.PlusEq, TokenKind.EndOfFile]],
+  ["#!/usr/bin/env node", [TokenKind.EndOfFile]],
+  ["#!/usr/bin/env node\n123", [TokenKind.Number, TokenKind.EndOfFile]],
+  [" #!", [TokenKind.Error]],
 ])("Lex test", (input, kinds) => {
   const lexer = Lexer(input)
   for (const expected_kind of kinds) {

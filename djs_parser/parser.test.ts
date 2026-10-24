@@ -142,6 +142,13 @@ test("side-effect-only imports preserve the dependency specifier", () => {
   expect(stmt.default_import).toBeNull()
   expect(stmt.named_imports).toEqual([])
 })
+test("import.meta", () => {
+  expect(parse_expr("import.meta.url")).toMatchObject({
+    kind: "Prop",
+    lhs: { kind: "ImportMeta" },
+    property: { text: "url" },
+  })
+})
 test("async function declarations and expressions preserve their async flag", () => {
   const source_file = parse_source_file(
     "async function f() {} const g = async function() {};",

@@ -332,6 +332,9 @@ export class ASTVisitorBase implements ASTVisitor {
       case "Super": {
         break
       }
+      case "ImportMeta": {
+        break
+      }
       case "Class": {
         this.visit_class(expr.class_def)
         break
