@@ -329,8 +329,7 @@ function function_value(
   name = "<anonymous>",
   flags = 0,
 ) {
-  if (func.is_async || func.is_generator)
-    unsupported(func, "async/generator functions")
+  if (func.is_generator) unsupported(func, "generator functions")
   const id = compile_function(
     state,
     fn,
@@ -339,7 +338,7 @@ function function_value(
     name,
     func.params,
     null,
-    { flags },
+    { flags: func.is_async ? flags | 8 : flags },
   )
   const dst = allocate(fn)
   emit(fn, OP.CLOSURE, dst, id)
@@ -743,7 +742,8 @@ function compile_expr(state, fn, scope, expr) {
     case "PrivateName":
       throw new SyntaxError("Private name must be used in a brand check")
     case "Await": {
-      if (fn.id !== 0) unsupported(expr, "await inside an ordinary function")
+      if (fn.id !== 0 && !(fn.flags & 8))
+        unsupported(expr, "await inside an ordinary function")
       const value = compile_expr(state, fn, scope, expr.expr)
       const dst = allocate(fn)
       emit(fn, OP.AWAIT, dst, value)

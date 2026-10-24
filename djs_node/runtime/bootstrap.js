@@ -47,5 +47,12 @@ export async function bootstrap(runtime) {
   const promise = await load_module(runtime, PROMISE)
   runtime.promise_await = alloc_root(runtime.memory)
   read_export(runtime, promise, "await_promise", runtime.promise_await)
+  runtime.promise_capability = alloc_root(runtime.memory)
+  read_export(
+    runtime,
+    promise,
+    "promise_capability",
+    runtime.promise_capability,
+  )
   await define_globals(runtime, NODE_GLOBALS)
 }

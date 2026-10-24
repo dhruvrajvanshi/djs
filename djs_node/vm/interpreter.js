@@ -278,6 +278,25 @@ function call_function(
     call_intrinsic(runtime, function_id, destination, arguments_)
     return
   }
+  if (runtime.code[code_id].unit.functions[function_id].flags & 8) {
+    call_async_function(runtime, destination, callee, receiver, arguments_)
+    return
+  }
+  enter_function(runtime, context, destination, callee, receiver, arguments_)
+}
+
+function enter_function(
+  runtime,
+  context,
+  destination,
+  callee,
+  receiver,
+  arguments_,
+) {
+  const { memory } = runtime
+  const reference = get_ref(memory, callee)
+  const code_id = read_u32(memory, reference + 8),
+    function_id = read_u32(memory, reference + 12)
   const parent = alloc_root(memory),
     environment = alloc_root(memory),
     this_value = alloc_root(memory)
@@ -549,6 +568,92 @@ export function run_task(runtime, context) {
     context_status(context) === CONTEXT_STATE.RUNNING
   )
     run_interpreter(runtime, context)
+  if (
+    context.settle &&
+    (context_status(context) === CONTEXT_STATE.DONE ||
+      context_status(context) === CONTEXT_STATE.FAILED)
+  )
+    settle_async_function(runtime, context)
+}
+
+// Each async call runs in its own context, so AWAIT suspends only that call.
+function call_async_function(
+  runtime,
+  destination,
+  callee,
+  receiver,
+  arguments_,
+) {
+  if (runtime.promise_capability === undefined)
+    throw new Error("Promise is not initialized")
+  const { memory } = runtime
+  const key = alloc_root(memory),
+    resolve = alloc_root(memory),
+    reject = alloc_root(memory)
+  let capability
+  try {
+    capability = create_call_context(
+      runtime,
+      runtime.promise_capability,
+      undefined,
+      [],
+    )
+    run_task(runtime, capability)
+    if (context_status(capability) === CONTEXT_STATE.FAILED)
+      throw new Error(to_string(memory, context_error(capability)))
+    for (const [name, target] of [
+      ["promise", destination],
+      ["resolve", resolve],
+      ["reject", reject],
+    ]) {
+      write_string(memory, key, name)
+      get_property(memory, target, context_result(capability), key)
+    }
+  } catch (error) {
+    free_root(memory, resolve)
+    free_root(memory, reject)
+    throw error
+  } finally {
+    if (capability) dispose_context(runtime, capability)
+    free_root(memory, key)
+  }
+  const context = create_empty_context(runtime)
+  context.settle = { resolve, reject }
+  try {
+    enter_function(
+      runtime,
+      context,
+      context_result(context),
+      callee,
+      receiver,
+      arguments_,
+    )
+  } catch (error) {
+    create_error(runtime, context_error(context), error.name, error.message)
+    context_view(context).setUint32(C.STATUS, CONTEXT_STATE.FAILED, true)
+  }
+  run_task(runtime, context)
+}
+
+function settle_async_function(runtime, context) {
+  const { resolve, reject } = context.settle
+  context.settle = undefined
+  const fulfilled = context_status(context) === CONTEXT_STATE.DONE
+  let settlement
+  try {
+    settlement = create_call_context(
+      runtime,
+      fulfilled ? resolve : reject,
+      undefined,
+      [fulfilled ? context_result(context) : context_error(context)],
+    )
+    run_task(runtime, settlement)
+  } finally {
+    if (settlement) dispose_context(runtime, settlement)
+    dispose_context(runtime, context)
+    free_root(runtime.memory, resolve)
+    free_root(runtime.memory, reject)
+  }
 }
 
 export async function evaluate_context(runtime, context) {
@@ -579,7 +684,7 @@ export async function evaluate_context(runtime, context) {
   }
 }
 
-export function create_call_context(runtime, callee, receiver, arguments_) {
+function create_empty_context(runtime) {
   const context = {
     id: runtime.contexts.length,
     control: new Uint8Array(32),
@@ -591,6 +696,12 @@ export function create_call_context(runtime, callee, receiver, arguments_) {
   control.setUint32(C.RESULT, alloc_root(runtime.memory), true)
   control.setUint32(C.ERROR, alloc_root(runtime.memory), true)
   runtime.contexts.push(context)
+  return context
+}
+
+export function create_call_context(runtime, callee, receiver, arguments_) {
+  const context = create_empty_context(runtime)
+  const control = context_view(context)
   try {
     call_function(
       runtime,
@@ -642,7 +753,7 @@ function construct_function(runtime, context, destination, callee, arguments_) {
   if (
     code === NATIVE_CODE ||
     code === RESUME_CODE ||
-    runtime.code[code].unit.functions[id].flags & 6
+    runtime.code[code].unit.functions[id].flags & 14
   )
     throw new TypeError("Value is not a constructor")
   const receiver = alloc_root(memory),

@@ -1726,6 +1726,7 @@ function parser_impl(
       !export_token &&
       at(t.Export) &&
       (next_is(t.Function) ||
+        next_is(t.Async) ||
         next_is(t.Class) ||
         next_is(t.Var) ||
         next_is(t.Let) ||

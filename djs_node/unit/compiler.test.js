@@ -189,12 +189,8 @@ test("invalid and unsupported syntax fails clearly", () => {
     /loop-local declarations/,
   )
   assert.throws(
-    () => compile_module("async function f() {}"),
-    /Unsupported syntax: async/,
-  )
-  assert.throws(
-    () => compile_module("const f = async function() {};"),
-    /Unsupported syntax: async/,
+    () => compile_module("function* f() {}"),
+    /Unsupported syntax: generator functions/,
   )
   assert.throws(
     () => compile_module("if (true) function f() {}"),

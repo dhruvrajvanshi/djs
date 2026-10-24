@@ -309,3 +309,13 @@ test("private names cannot be ordinary object keys", () => {
     parse_source_file("const object = { #value: 1 };").errors.length,
   ).toBeGreaterThan(0)
 })
+
+test("export async function", () => {
+  const source_file = parse_source_file("export async function f() {}")
+  expect(source_file.errors).toEqual([])
+  expect(source_file.stmts[0]).toMatchObject({
+    kind: "Func",
+    is_exported: true,
+    func: { is_async: true },
+  })
+})

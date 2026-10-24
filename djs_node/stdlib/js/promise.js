@@ -206,4 +206,8 @@ class Promise {
   }
 }
 
+export function promise_capability() {
+  return capability(Promise)
+}
+
 export default Promise

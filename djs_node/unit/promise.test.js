@@ -128,6 +128,38 @@ test("await uses internal operations and rejected await unwinds through finally"
   assert.equal(output, "17\n18\nfinally\ntrue\n")
 })
 
+test("async functions run synchronously until await and settle their promise", async () => {
+  const { output } = await execute(`
+    async function add(a, b) {
+      console.log("start", a);
+      const x = await a;
+      console.log("resumed", x);
+      return x + await Promise.resolve(b);
+    }
+    async function fail() { await null; throw "boom"; }
+    async function early() { throw "early"; }
+    const obj = { base: 10, async method(v) { return this.base + await v; } };
+    class C { async m() { return await 5; } }
+    const p = add(1, 2);
+    console.log(p instanceof Promise, typeof (async function () {}));
+    console.log("sync");
+    console.log(await p);
+    try { await fail(); } catch (e) { console.log("caught", e); }
+    early().catch((e) => console.log("rejected", e));
+    console.log(await obj.method(Promise.resolve(3)), await new C().m());
+    let order = "";
+    async function tick(name) { order = order + name + 1; await null; order = order + name + 2; }
+    tick("a"); tick("b");
+    await null;
+    console.log(order);
+    try { new add(); } catch (e) { console.log(e instanceof TypeError); }
+  `)
+  assert.equal(
+    output,
+    "start 1\ntrue function\nsync\nresumed 1\n3\ncaught boom\nrejected early\n13 5\na1b1a2b2\ntrue\n",
+  )
+})
+
 test("finally preserves outcomes and adopts cleanup results", async () => {
   const { output } = await execute(`
     console.log(await Promise.resolve(3).finally(() => Promise.resolve(4)));
