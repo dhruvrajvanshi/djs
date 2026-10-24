@@ -1,25 +1,48 @@
 #!/usr/bin/env node
 import { resolve } from "node:path"
 import { realpathSync } from "node:fs"
+import { readFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
+import { compile_module } from "./compiler/compile.js"
+import { disassemble_module } from "./compiler/disassemble.js"
 import { create_runtime, run_module } from "./runtime/modules.js"
 import { bootstrap } from "./runtime/bootstrap.js"
 
 export { create_runtime, run_module, bootstrap }
 
+const USAGE =
+  "Usage: djs_node <entry.js>\n       djs_node --dump-ir <module.js>..."
+
 export async function main(arguments_ = process.argv.slice(2)) {
   if (arguments_.length === 1 && ["--help", "-h"].includes(arguments_[0])) {
     process.stdout.write(
-      "Usage: djs_node <entry.js>\nRuns an ES module using the DJS bytecode interpreter.\n",
+      `${USAGE}\nRuns an ES module using the DJS bytecode interpreter.\n` +
+        "--dump-ir  Print bytecode for each supplied module without executing it.\n",
     )
     return
   }
-  if (arguments_.length !== 1 || arguments_[0].startsWith("-")) {
-    throw new Error("Usage: djs_node <entry.js>")
+  const modules = []
+  let dump_ir = false
+  let options = true
+  for (const argument of arguments_) {
+    if (options && argument === "--") options = false
+    else if (options && argument === "--dump-ir") dump_ir = true
+    else if (options && argument.startsWith("-")) throw new Error(USAGE)
+    else modules.push(argument)
+  }
+  if (modules.length === 0 || (!dump_ir && modules.length !== 1)) {
+    throw new Error(USAGE)
+  }
+  if (dump_ir) {
+    for (const path of modules) {
+      const source = await readFile(path, "utf8")
+      process.stdout.write(disassemble_module(compile_module(source, path)))
+    }
+    return
   }
   const runtime = create_runtime()
   await bootstrap(runtime)
-  await run_module(runtime, arguments_[0])
+  await run_module(runtime, modules[0])
 }
 
 if (
