@@ -1,0 +1,6 @@
+true
+self true
+true
+true
+cycle TypeError
+5
