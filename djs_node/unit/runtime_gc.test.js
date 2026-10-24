@@ -6,8 +6,13 @@ import { join } from "node:path"
 import { pathToFileURL } from "node:url"
 import { alloc_root, create_memory, free_root } from "../vm/memory.js"
 import { collect, heap_stats } from "../vm/heap.js"
-import { read_string, write_string } from "../vm/values.js"
-import { create_object, get_property, set_property } from "../vm/objects.js"
+import { read_number, read_string, write_string } from "../vm/values.js"
+import {
+  create_arguments_object,
+  create_object,
+  get_property,
+  set_property,
+} from "../vm/objects.js"
 import { bootstrap } from "../runtime/bootstrap.js"
 import {
   create_runtime,
@@ -59,9 +64,9 @@ test("queued callbacks retain functions and arguments across collection and queu
   const { memory } = runtime
   const fn = alloc_root(memory),
     argument = alloc_root(memory)
-  create_function(memory, fn, NATIVE_CODE, intrinsic_id("console_log"))
+  create_function(memory, fn, NATIVE_CODE, intrinsic_id("write_stdout"))
   for (let index = 0; index < 40; index++) {
-    write_string(memory, argument, `job ${index}`)
+    write_string(memory, argument, `job ${index}\n`)
     enqueue_job(runtime, fn, argument)
     collect(memory)
   }
@@ -73,6 +78,38 @@ test("queued callbacks retain functions and arguments across collection and queu
     output,
     Array.from({ length: 40 }, (_, i) => `job ${i}\n`).join(""),
   )
+  collect(memory)
+  assert.equal(heap_stats(memory).roots, 0)
+  assert.equal(heap_stats(memory).used_bytes, 0)
+})
+
+test("arguments objects retain indexed values through allocation-triggered collection", () => {
+  const memory = create_memory({ semispace_bytes: 1024, root_capacity: 2 })
+  const args = alloc_root(memory),
+    key = alloc_root(memory),
+    value = alloc_root(memory),
+    first = alloc_root(memory),
+    second = alloc_root(memory)
+  try {
+    write_string(memory, first, "first")
+    write_string(memory, second, "second")
+    for (let index = 0; index < 40; index++) {
+      create_arguments_object(memory, args, [first, second])
+      write_string(memory, key, "length")
+      get_property(memory, value, args, key)
+      assert.equal(read_number(memory, value), 2)
+      write_string(memory, key, "0")
+      get_property(memory, value, args, key)
+      assert.equal(read_string(memory, value), "first")
+      write_string(memory, key, "1")
+      get_property(memory, value, args, key)
+      assert.equal(read_string(memory, value), "second")
+    }
+    assert.ok(heap_stats(memory).collections > 2)
+  } finally {
+    for (const root of [args, key, value, first, second])
+      free_root(memory, root)
+  }
   collect(memory)
   assert.equal(heap_stats(memory).roots, 0)
   assert.equal(heap_stats(memory).used_bytes, 0)

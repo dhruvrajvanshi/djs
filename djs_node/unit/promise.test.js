@@ -238,7 +238,8 @@ test("trusted call and enqueue_job intrinsics use guest frames and preserve job 
   const source = `
     const call = @djs_intrinsic("call");
     const enqueue = @djs_intrinsic("enqueue_job");
-    const log = @djs_intrinsic("console_log");
+    const write = @djs_intrinsic("write_stdout");
+    function log(value) { write("" + value + "\\n"); }
     const fn = function(a, b) { return this.value + a + b; };
     fn.call = () => { throw "patched"; };
     log(call(fn, { value: 1 }, 2, 3));

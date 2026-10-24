@@ -245,6 +245,7 @@ function compile_function(
     name,
     params: params.length,
     parameter_slots: [],
+    arguments_slot: null,
     binding_flags: [],
     binding_count: 0,
     slot_count: 0,
@@ -274,6 +275,7 @@ function compile_function(
     binding_count: fn.binding_flags.length,
     binding_flags: fn.binding_flags,
     parameter_slots: fn.parameter_slots,
+    arguments_slot: fn.arguments_slot,
     slot_count: fn.slot_count,
     bytecode: encode_instructions(fn.instructions),
   }
@@ -504,13 +506,28 @@ const binary_operators = {
   Instanceof: "instanceof",
 }
 
+function resolve_name(scope, name) {
+  if (name === "arguments") {
+    for (let current = scope; current; current = current.parent) {
+      if (current.bindings.has(name)) break
+      const owner = current.owner
+      if (current === owner.scope && owner.parent && !(owner.flags & 4)) {
+        // Ordinary functions own arguments; arrows inherit the nearest binding.
+        owner.arguments_slot = declare_binding(current, name).slot
+        break
+      }
+    }
+  }
+  return resolve_binding(scope, name)
+}
+
 function load_name(state, fn, scope, name, allow_missing = false) {
   const dst = allocate(fn)
   if (name === "this") {
     emit(fn, OP.LOAD_THIS, dst)
     return dst
   }
-  const binding = resolve_binding(scope, name)
+  const binding = resolve_name(scope, name)
   if (binding) emit(fn, OP.LOAD_ENV, dst, binding.depth, binding.slot)
   else
     emit(fn, OP.LOAD_GLOBAL, dst, literal(state, name), allow_missing ? 1 : 0)
@@ -739,7 +756,7 @@ function compile_expr(state, fn, scope, expr) {
       if (expr.operator !== "Eq") unsupported(expr, "compound assignment")
       const pattern = expr.pattern
       if (pattern.kind === "Var") {
-        const binding = resolve_binding(scope, pattern.ident.text)
+        const binding = resolve_name(scope, pattern.ident.text)
         if (!binding)
           throw new SyntaxError(
             `Assignment to undeclared binding: ${pattern.ident.text}`,

@@ -1,12 +1,12 @@
 import { read_string, write_undefined } from "./values.js"
-import { kind_of, to_string } from "./objects.js"
+import { kind_of } from "./objects.js"
 import { KINDS } from "./memory.js"
 import { enqueue_job, start_read } from "../runtime/jobs.js"
 
 export const NATIVE_CODE = 0xffffffff
 export const RESUME_CODE = 0xfffffffe
 export const INTRINSIC_NAMES = Object.freeze([
-  "console_log",
+  "write_stdout",
   "read_file",
   "enqueue_job",
   "call",
@@ -20,10 +20,10 @@ export function intrinsic_id(name) {
 export function call_intrinsic(runtime, id, destination, arguments_) {
   const { memory } = runtime
   const name = INTRINSIC_NAMES[id]
-  if (name === "console_log") {
-    runtime.host.write_stdout(
-      arguments_.map((value) => to_string(memory, value)).join(" ") + "\n",
-    )
+  if (name === "write_stdout") {
+    if (!arguments_.length || kind_of(memory, arguments_[0]) !== KINDS.STRING)
+      throw new TypeError("write_stdout requires a string")
+    runtime.host.write_stdout(read_string(memory, arguments_[0]))
   } else if (name === "enqueue_job") {
     enqueue_job(runtime, arguments_[0])
   } else if (name === "read_file") {

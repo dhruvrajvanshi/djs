@@ -22,6 +22,7 @@ import { KINDS, TAGS } from "./memory.js"
 import {
   kind_of,
   create_object,
+  create_arguments_object,
   create_function,
   create_environment,
   environment_at,
@@ -174,6 +175,15 @@ function push_frame(
       const root = alloc_root(memory)
       allocated_roots.push(root)
       view.setUint32(offset + FRAME_BYTES + index * 4, root, true)
+    }
+    if (fn.arguments_slot !== null) {
+      const args = alloc_root(memory)
+      try {
+        create_arguments_object(memory, args, arguments_)
+        store_binding(runtime, env, fn.arguments_slot, args, true)
+      } finally {
+        free_root(memory, args)
+      }
     }
     for (let index = 0; index < fn.parameter_slots.length; index++) {
       const argument = arguments_[index]

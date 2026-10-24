@@ -34,6 +34,24 @@ export function create_object(memory, destination) {
   set_ref(memory, destination, allocate(memory, KINDS.OBJECT, 8))
 }
 
+export function create_arguments_object(memory, destination, arguments_) {
+  create_object(memory, destination)
+  const key = alloc_root(memory),
+    length = alloc_root(memory)
+  try {
+    write_string(memory, key, "length")
+    write_number(memory, length, arguments_.length)
+    define_property(memory, destination, key, length, 5)
+    for (let index = 0; index < arguments_.length; index++) {
+      write_string(memory, key, String(index))
+      define_property(memory, destination, key, arguments_[index])
+    }
+  } finally {
+    free_root(memory, key)
+    free_root(memory, length)
+  }
+}
+
 export function create_function(
   memory,
   destination,
