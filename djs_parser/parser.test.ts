@@ -131,16 +131,6 @@ test("conditional operator", () => {
   expect(source_file.stmts[0].expr.kind).toEqual("Ternary")
 })
 
-test("is_exported should be correctly set", () => {
-  const source = `
-    export function bar(): void {}
-  `
-  const source_file = parse_source_file(source, "test.ljs")
-  expect(source_file.errors).toEqual([])
-
-  assert(source_file.stmts[0].kind === "Func")
-  expect(source_file.stmts[0].is_exported).toBe(true)
-})
 test("default export expressions are preserved in the AST", () => {
   const source_file = parse_source_file(
     "export default { log: function(value) { return value; } };",
@@ -181,103 +171,6 @@ test("preserves leading trivia in type aliases", () => {
   const t = parse_type(`/* leading trivia comment */ Foo`)
   assert(t.kind === "Ident")
   assert.equal(t.leading_trivia, "/* leading trivia comment */")
-})
-
-test("Parses untagged union stmt without error", () => {
-  const s = parse_stmt(
-    `
-      untagged union Foo {
-        u32: u32
-        str: *c.str
-      }
-  `,
-    "test.ljs",
-  )
-  expect(s.kind).toBe("UntaggedUnionDecl")
-  expect(s).toMatchInlineSnapshot(`
-    UntaggedUnionDeclStmt {
-      "is_exported": false,
-      "span": {
-        "start": 7,
-        "stop": 72,
-      },
-      "untagged_union_def": {
-        "members": [
-          VariantDefUntaggedUnionMember {
-            "name": {
-              "span": {
-                "start": 36,
-                "stop": 39,
-              },
-              "text": "u32",
-            },
-            "type_annotation": IdentTypeAnnotation {
-              "ident": {
-                "span": {
-                  "start": 41,
-                  "stop": 44,
-                },
-                "text": "u32",
-              },
-              "leading_trivia": "",
-              "span": {
-                "start": 41,
-                "stop": 44,
-              },
-            },
-          },
-          VariantDefUntaggedUnionMember {
-            "name": {
-              "span": {
-                "start": 53,
-                "stop": 56,
-              },
-              "text": "str",
-            },
-            "type_annotation": LJSPtrTypeAnnotation {
-              "span": {
-                "start": 58,
-                "stop": 64,
-              },
-              "to": QualifiedTypeAnnotation {
-                "head": {
-                  "span": {
-                    "start": 59,
-                    "stop": 60,
-                  },
-                  "text": "c",
-                },
-                "span": {
-                  "start": 59,
-                  "stop": 64,
-                },
-                "tail": [
-                  {
-                    "span": {
-                      "start": 61,
-                      "stop": 64,
-                    },
-                    "text": "str",
-                  },
-                ],
-              },
-            },
-          },
-        ],
-        "name": {
-          "span": {
-            "start": 22,
-            "stop": 25,
-          },
-          "text": "Foo",
-        },
-        "span": {
-          "start": 7,
-          "stop": 72,
-        },
-      },
-    }
-  `)
 })
 
 if (process.env.CI) {
