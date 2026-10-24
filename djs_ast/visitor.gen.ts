@@ -119,6 +119,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_func(stmt.func)
         break
       }
+      case "ExportDefault": {
+        this.visit_expr(stmt.value)
+        break
+      }
       case "ClassDecl": {
         this.visit_class(stmt.class_def)
         break
@@ -136,16 +140,17 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_ident(stmt.as_name)
         break
       }
+      case "ExportNamed": {
+        for (const specifier of stmt.specifiers) {
+          this.visit_export_specifier(specifier)
+        }
+        if (stmt.module_specifier !== null) {
+        }
+        break
+      }
       case "Labeled": {
         this.visit_label(stmt.label)
         this.visit_stmt(stmt.stmt)
-        break
-      }
-      case "ObjectTypeDecl": {
-        this.visit_ident(stmt.name)
-        for (const field of stmt.fields) {
-          this.visit_object_type_decl_field(field)
-        }
         break
       }
       case "TypeAlias": {
@@ -207,6 +212,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_ident(expr.property)
         break
       }
+      case "PrivateName": {
+        this.visit_ident(expr.ident)
+        break
+      }
       case "String": {
         break
       }
@@ -256,6 +265,9 @@ export class ASTVisitorBase implements ASTVisitor {
       }
       case "New": {
         this.visit_expr(expr.expr)
+        break
+      }
+      case "NewTarget": {
         break
       }
       case "Yield": {
@@ -323,6 +335,9 @@ export class ASTVisitorBase implements ASTVisitor {
       case "Super": {
         break
       }
+      case "ImportMeta": {
+        break
+      }
       case "Class": {
         this.visit_class(expr.class_def)
         break
@@ -350,9 +365,6 @@ export class ASTVisitorBase implements ASTVisitor {
       case "As": {
         this.visit_expr(expr.expr)
         this.visit_type_annotation(expr.type_annotation)
-        break
-      }
-      case "DJSIntrinsic": {
         break
       }
     }
@@ -417,6 +429,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_ident(object_key.ident)
         break
       }
+      case "Private": {
+        this.visit_ident(object_key.ident)
+        break
+      }
       case "String": {
         break
       }
@@ -443,11 +459,6 @@ export class ASTVisitorBase implements ASTVisitor {
       }
       case "ReadonlyArray": {
         this.visit_type_annotation(type_annotation.item)
-        break
-      }
-      case "FixedSizeArray": {
-        this.visit_type_annotation(type_annotation.item)
-        this.visit_expr(type_annotation.size)
         break
       }
       case "Application": {
@@ -542,7 +553,11 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_method_def(node: ast.MethodDef): void {
+    for (const decorator of node.decorators) {
+      this.visit_expr(decorator)
+    }
     this.visit_object_key(node.name)
+
     this.visit_func(node.body)
     if (node.return_type !== null) {
       this.visit_type_annotation(node.return_type)
@@ -568,6 +583,9 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_class(node: ast.Class): void {
+    for (const decorator of node.decorators) {
+      this.visit_expr(decorator)
+    }
     if (node.name !== null) {
       this.visit_ident(node.name)
     }
@@ -594,7 +612,11 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_field_def(node: ast.FieldDef): void {
-    this.visit_ident(node.name)
+    for (const decorator of node.decorators) {
+      this.visit_expr(decorator)
+    }
+    this.visit_object_key(node.name)
+
     if (node.initializer !== null) {
       this.visit_expr(node.initializer)
     }
@@ -664,8 +686,10 @@ export class ASTVisitorBase implements ASTVisitor {
       }
     }
   }
-  visit_object_type_decl_field(node: ast.ObjectTypeDeclField): void {
-    this.visit_ident(node.label)
-    this.visit_type_annotation(node.type_annotation)
+  visit_export_specifier(node: ast.ExportSpecifier): void {
+    this.visit_module_export_name(node.local_name)
+    if (node.as_name !== null) {
+      this.visit_module_export_name(node.as_name)
+    }
   }
 }

@@ -43,11 +43,12 @@ export type Stmt =
   | DebuggerStmt
   | WithStmt
   | FuncStmt
+  | ExportDefaultStmt
   | ClassDeclStmt
   | ImportStmt
   | ImportStarAsStmt
+  | ExportNamedStmt
   | LabeledStmt
-  | ObjectTypeDeclStmt
   | TypeAliasStmt
   | EmptyStmt
 export class ExprStmt {
@@ -304,6 +305,21 @@ export class FuncStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class ExportDefaultStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly value: Expr,
+  ) {}
+
+  get kind(): "ExportDefault" {
+    return "ExportDefault"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class ClassDeclStmt {
   constructor(
     readonly span: Span,
@@ -353,6 +369,22 @@ export class ImportStarAsStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class ExportNamedStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly specifiers: readonly ExportSpecifier[],
+    readonly module_specifier: Text | null,
+  ) {}
+
+  get kind(): "ExportNamed" {
+    return "ExportNamed"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class LabeledStmt {
   constructor(
     readonly span: Span,
@@ -363,22 +395,6 @@ export class LabeledStmt {
 
   get kind(): "Labeled" {
     return "Labeled"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
-export class ObjectTypeDeclStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly name: Ident,
-    readonly fields: readonly ObjectTypeDeclField[],
-  ) {}
-
-  get kind(): "ObjectTypeDecl" {
-    return "ObjectTypeDecl"
   }
 
   toString(): string {
@@ -485,6 +501,9 @@ export const Stmt = {
   Func: (span: Span, func: Func, is_exported: boolean): FuncStmt =>
     new FuncStmt(span, func, is_exported),
 
+  ExportDefault: (span: Span, value: Expr): ExportDefaultStmt =>
+    new ExportDefaultStmt(span, value),
+
   ClassDecl: (
     span: Span,
     class_def: Class,
@@ -505,14 +524,14 @@ export const Stmt = {
     module_specifier: Text,
   ): ImportStarAsStmt => new ImportStarAsStmt(span, as_name, module_specifier),
 
+  ExportNamed: (
+    span: Span,
+    specifiers: readonly ExportSpecifier[],
+    module_specifier: Text | null,
+  ): ExportNamedStmt => new ExportNamedStmt(span, specifiers, module_specifier),
+
   Labeled: (span: Span, label: Label, stmt: Stmt): LabeledStmt =>
     new LabeledStmt(span, label, stmt),
-
-  ObjectTypeDecl: (
-    span: Span,
-    name: Ident,
-    fields: readonly ObjectTypeDeclField[],
-  ): ObjectTypeDeclStmt => new ObjectTypeDeclStmt(span, name, fields),
 
   TypeAlias: (
     span: Span,
@@ -527,6 +546,7 @@ export const Stmt = {
 
 export interface Class {
   readonly span: Span
+  readonly decorators: readonly Expr[]
   readonly name: Ident | null
   readonly superclass: Expr | null
   readonly body: ClassBody
@@ -544,7 +564,9 @@ export interface ClassBody {
 
 export interface MethodDef {
   readonly span: Span
+  readonly decorators: readonly Expr[]
   readonly name: ObjectKey
+  readonly is_static: boolean
   readonly body: Func
   readonly return_type: TypeAnnotation | null
   readonly accessor_type: AccessorType | null
@@ -576,7 +598,9 @@ export const ClassMember = {
 
 export interface FieldDef {
   readonly span: Span
-  readonly name: Ident
+  readonly decorators: readonly Expr[]
+  readonly name: ObjectKey
+  readonly is_static: boolean
   readonly initializer: Expr | null
 }
 
@@ -786,6 +810,7 @@ export type Expr =
   | CallExpr
   | IndexExpr
   | PropExpr
+  | PrivateNameExpr
   | StringExpr
   | NumberExpr
   | BooleanExpr
@@ -799,6 +824,7 @@ export type Expr =
   | PreDecrementExpr
   | ArrayExpr
   | NewExpr
+  | NewTargetExpr
   | YieldExpr
   | YieldFromExpr
   | TernaryExpr
@@ -814,12 +840,12 @@ export type Expr =
   | AwaitExpr
   | CommaExpr
   | SuperExpr
+  | ImportMetaExpr
   | ClassExpr
   | TemplateLiteralExpr
   | TaggedTemplateLiteralExpr
   | TypeApplicationExpr
   | AsExpr
-  | DJSIntrinsicExpr
 export class VarExpr {
   constructor(
     readonly span: Span,
@@ -946,6 +972,21 @@ export class PropExpr {
 
   get kind(): "Prop" {
     return "Prop"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
+export class PrivateNameExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly ident: Ident,
+  ) {}
+
+  get kind(): "PrivateName" {
+    return "PrivateName"
   }
 
   toString(): string {
@@ -1133,6 +1174,17 @@ export class NewExpr {
 
   get kind(): "New" {
     return "New"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
+export class NewTargetExpr {
+  constructor(readonly span: Span) {}
+
+  get kind(): "NewTarget" {
+    return "NewTarget"
   }
 
   toString(): string {
@@ -1364,6 +1416,17 @@ export class SuperExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
+export class ImportMetaExpr {
+  constructor(readonly span: Span) {}
+
+  get kind(): "ImportMeta" {
+    return "ImportMeta"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
 export class ClassExpr {
   constructor(
     readonly span: Span,
@@ -1442,21 +1505,6 @@ export class AsExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
-export class DJSIntrinsicExpr {
-  constructor(
-    readonly span: Span,
-
-    readonly name: Text,
-  ) {}
-
-  get kind(): "DJSIntrinsic" {
-    return "DJSIntrinsic"
-  }
-
-  toString(): string {
-    return sexpr_to_string(expr_to_sexpr(this))
-  }
-}
 
 export const Expr = {
   Var: (span: Span, leading_trivia: Text, ident: Ident): VarExpr =>
@@ -1498,6 +1546,9 @@ export const Expr = {
     is_optional: boolean,
   ): PropExpr => new PropExpr(span, lhs, property, is_optional),
 
+  PrivateName: (span: Span, ident: Ident): PrivateNameExpr =>
+    new PrivateNameExpr(span, ident),
+
   String: (span: Span, text: Text): StringExpr => new StringExpr(span, text),
 
   Number: (span: Span, text: Text): NumberExpr => new NumberExpr(span, text),
@@ -1530,6 +1581,8 @@ export const Expr = {
     new ArrayExpr(span, items),
 
   New: (span: Span, expr: Expr): NewExpr => new NewExpr(span, expr),
+
+  NewTarget: (span: Span): NewTargetExpr => new NewTargetExpr(span),
 
   Yield: (span: Span, value: Expr | null): YieldExpr =>
     new YieldExpr(span, value),
@@ -1576,6 +1629,8 @@ export const Expr = {
 
   Super: (span: Span): SuperExpr => new SuperExpr(span),
 
+  ImportMeta: (span: Span): ImportMetaExpr => new ImportMetaExpr(span),
+
   Class: (span: Span, class_def: Class): ClassExpr =>
     new ClassExpr(span, class_def),
 
@@ -1599,23 +1654,13 @@ export const Expr = {
 
   As: (span: Span, expr: Expr, type_annotation: TypeAnnotation): AsExpr =>
     new AsExpr(span, expr, type_annotation),
-
-  DJSIntrinsic: (span: Span, name: Text): DJSIntrinsicExpr =>
-    new DJSIntrinsicExpr(span, name),
 } as const
-
-export interface ObjectTypeDeclField {
-  readonly is_readonly: boolean
-  readonly label: Ident
-  readonly type_annotation: TypeAnnotation
-}
 
 export type TypeAnnotation =
   | IdentTypeAnnotation
   | UnionTypeAnnotation
   | ArrayTypeAnnotation
   | ReadonlyArrayTypeAnnotation
-  | FixedSizeArrayTypeAnnotation
   | ApplicationTypeAnnotation
   | StringTypeAnnotation
   | FuncTypeAnnotation
@@ -1676,22 +1721,6 @@ export class ReadonlyArrayTypeAnnotation {
 
   get kind(): "ReadonlyArray" {
     return "ReadonlyArray"
-  }
-
-  toString(): string {
-    return sexpr_to_string(type_annotation_to_sexpr(this))
-  }
-}
-export class FixedSizeArrayTypeAnnotation {
-  constructor(
-    readonly span: Span,
-
-    readonly item: TypeAnnotation,
-    readonly size: Expr,
-  ) {}
-
-  get kind(): "FixedSizeArray" {
-    return "FixedSizeArray"
   }
 
   toString(): string {
@@ -1784,13 +1813,6 @@ export const TypeAnnotation = {
     span: Span,
     item: TypeAnnotation,
   ): ReadonlyArrayTypeAnnotation => new ReadonlyArrayTypeAnnotation(span, item),
-
-  FixedSizeArray: (
-    span: Span,
-    item: TypeAnnotation,
-    size: Expr,
-  ): FixedSizeArrayTypeAnnotation =>
-    new FixedSizeArrayTypeAnnotation(span, item, size),
 
   Application: (
     span: Span,
@@ -1887,7 +1909,11 @@ export const ObjectLiteralEntry = {
     new SpreadObjectLiteralEntry(span, expr),
 } as const
 
-export type ObjectKey = IdentObjectKey | StringObjectKey | ComputedObjectKey
+export type ObjectKey =
+  | IdentObjectKey
+  | PrivateObjectKey
+  | StringObjectKey
+  | ComputedObjectKey
 export class IdentObjectKey {
   constructor(
     readonly span: Span,
@@ -1897,6 +1923,17 @@ export class IdentObjectKey {
 
   get kind(): "Ident" {
     return "Ident"
+  }
+}
+export class PrivateObjectKey {
+  constructor(
+    readonly span: Span,
+
+    readonly ident: Ident,
+  ) {}
+
+  get kind(): "Private" {
+    return "Private"
   }
 }
 export class StringObjectKey {
@@ -1925,6 +1962,9 @@ export class ComputedObjectKey {
 export const ObjectKey = {
   Ident: (span: Span, ident: Ident): IdentObjectKey =>
     new IdentObjectKey(span, ident),
+
+  Private: (span: Span, ident: Ident): PrivateObjectKey =>
+    new PrivateObjectKey(span, ident),
 
   String: (span: Span, text: Text): StringObjectKey =>
     new StringObjectKey(span, text),
@@ -2101,6 +2141,12 @@ export interface ImportSpecifier {
   readonly type_only: boolean
   readonly as_name: Ident | null
   readonly imported_name: ModuleExportName
+}
+
+export interface ExportSpecifier {
+  readonly span: Span
+  readonly local_name: ModuleExportName
+  readonly as_name: ModuleExportName | null
 }
 
 export type BinOp =

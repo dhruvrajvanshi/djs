@@ -28,6 +28,23 @@ importers:
         specifier: 7.0.2
         version: 7.0.2
 
+  djs_node:
+    dependencies:
+      djs_ast:
+        specifier: workspace:*
+        version: link:../djs_ast
+      djs_parser:
+        specifier: workspace:*
+        version: link:../djs_parser
+
+    devDependencies:
+      '@types/node':
+        specifier: ^24.10.1
+        version: 24.10.1
+      typescript:
+        specifier: 7.0.2
+        version: 7.0.2
+
   djs_parser:
     dependencies:
       djs_ast:

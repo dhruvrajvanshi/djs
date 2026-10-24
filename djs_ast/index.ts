@@ -15,6 +15,8 @@ export {
   type Diagnostic,
   show_diagnostics,
   prettify_diagnostics,
+  preview_lines,
+  offset_to_line_and_col,
 } from "./Diagnostic.ts"
 export { type ASTVisitor, ASTVisitorBase } from "./visitor.gen.ts"
 export { QualifiedName } from "./QualifiedName.ts"
