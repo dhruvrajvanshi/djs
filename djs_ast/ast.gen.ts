@@ -47,6 +47,7 @@ export type Stmt =
   | ClassDeclStmt
   | ImportStmt
   | ImportStarAsStmt
+  | ExportNamedStmt
   | LabeledStmt
   | ObjectTypeDeclStmt
   | TypeAliasStmt
@@ -369,6 +370,22 @@ export class ImportStarAsStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class ExportNamedStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly specifiers: readonly ExportSpecifier[],
+    readonly module_specifier: Text | null,
+  ) {}
+
+  get kind(): "ExportNamed" {
+    return "ExportNamed"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class LabeledStmt {
   constructor(
     readonly span: Span,
@@ -523,6 +540,12 @@ export const Stmt = {
     as_name: Ident,
     module_specifier: Text,
   ): ImportStarAsStmt => new ImportStarAsStmt(span, as_name, module_specifier),
+
+  ExportNamed: (
+    span: Span,
+    specifiers: readonly ExportSpecifier[],
+    module_specifier: Text | null,
+  ): ExportNamedStmt => new ExportNamedStmt(span, specifiers, module_specifier),
 
   Labeled: (span: Span, label: Label, stmt: Stmt): LabeledStmt =>
     new LabeledStmt(span, label, stmt),
@@ -2140,6 +2163,12 @@ export interface ImportSpecifier {
   readonly type_only: boolean
   readonly as_name: Ident | null
   readonly imported_name: ModuleExportName
+}
+
+export interface ExportSpecifier {
+  readonly span: Span
+  readonly local_name: ModuleExportName
+  readonly as_name: ModuleExportName | null
 }
 
 export type BinOp =

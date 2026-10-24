@@ -1,5 +1,5 @@
 import { io_open, io_read, io_close, byte_buffer } from "djs:intrinsics"
-import Utf8Decoder from "djs:utf8"
+import Utf8Decoder from "./utf8.js"
 
 function close(handle) {
   return new Promise(function (resolve, reject) {

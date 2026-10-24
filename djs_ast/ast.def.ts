@@ -63,6 +63,10 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     as_name: Ident,
     module_specifier: Text,
   },
+  ExportNamed: {
+    specifiers: List(() => ExportSpecifier),
+    module_specifier: Option(Text),
+  },
   Labeled: {
     label: () => Label,
     stmt: () => Stmt,
@@ -330,6 +334,10 @@ const ImportSpecifier = Struct("ImportSpecifier", ["span"], {
   as_name: Option(Ident),
   imported_name: () => ModuleExportName,
 })
+const ExportSpecifier = Struct("ExportSpecifier", ["span"], {
+  local_name: () => ModuleExportName,
+  as_name: Option(() => ModuleExportName),
+})
 const BinOp = StringUnion(
   "BinOp",
   // Arithmetic
@@ -417,6 +425,7 @@ const ast_items = [
   ObjectPatternProperty,
   ModuleExportName,
   ImportSpecifier,
+  ExportSpecifier,
   BinOp,
   AssignOp,
   DeclType,

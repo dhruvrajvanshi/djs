@@ -13,6 +13,7 @@ import {
   type FuncTypeParam,
   type Ident,
   type ImportSpecifier,
+  type ExportSpecifier,
   InOrOf,
   type MethodDef,
   ModuleExportName,
@@ -1764,6 +1765,8 @@ function parser_impl(
       if (expect_semi() === ERR) return ERR
       return Stmt.ExportDefault(Span.between(start.span, value.span), value)
     }
+    if (!export_token && at(t.Export) && next_is(t.LBrace))
+      return parse_export_named_stmt()
     if (
       !export_token &&
       at(t.Export) &&
@@ -2044,6 +2047,61 @@ function parser_impl(
       is_readonly,
       label,
       type_annotation,
+    }
+  }
+
+  function parse_export_named_stmt(): Stmt | Err {
+    const start = advance()
+    assert(start.kind === t.Export)
+    if (expect(t.LBrace) === ERR) return ERR
+    const specifiers = parse_comma_separated_list(
+      t.RBrace,
+      parse_export_specifier,
+    )
+    if (specifiers === ERR) return ERR
+    let end = expect(t.RBrace)
+    if (end === ERR) return ERR
+    let module_specifier: string | null = null
+    if (at_soft_keyword("from")) {
+      advance()
+      const from_clause = expect(t.String)
+      if (from_clause === ERR) return ERR
+      module_specifier = from_clause.text
+      end = from_clause
+    }
+    if (expect_semi() === ERR) return ERR
+    return Stmt.ExportNamed(
+      Span.between(start.span, end.span),
+      specifiers,
+      module_specifier,
+    )
+  }
+
+  function parse_module_export_name(): ModuleExportName | Err {
+    if (at(t.String)) {
+      const tok = advance()
+      return ModuleExportName.String(tok.text)
+    }
+    const name = parse_member_ident_name()
+    if (name === ERR) return ERR
+    return ModuleExportName.Ident(name)
+  }
+
+  function parse_export_specifier(): ExportSpecifier | Err {
+    const start = self.current_token.span
+    const local_name = parse_module_export_name()
+    if (local_name === ERR) return ERR
+    let as_name: ModuleExportName | null = null
+    if (at(t.As)) {
+      advance()
+      const alias = parse_module_export_name()
+      if (alias === ERR) return ERR
+      as_name = alias
+    }
+    return {
+      span: Span.between(start, self.last_token?.span ?? start),
+      local_name,
+      as_name,
     }
   }
 

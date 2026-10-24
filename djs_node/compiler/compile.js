@@ -146,7 +146,12 @@ function export_binding(state, name, slot) {
   state.unit.exports.push({ name, slot })
 }
 
+function export_name(name) {
+  return name.kind === "Ident" ? name.ident.text : decode_string(name.text)
+}
+
 function prepare_statements(state, fn, scope, stmts) {
+  const local_exports = []
   for (const stmt of stmts) {
     state.prepared.add(stmt)
     switch (stmt.kind) {
@@ -222,6 +227,43 @@ function prepare_statements(state, fn, scope, stmts) {
         })
         break
       }
+      case "ExportNamed": {
+        if (fn.id !== 0 || scope !== fn.scope)
+          unsupported(stmt, "nested export")
+        if (stmt.module_specifier === null) {
+          // Local exports may name bindings declared later in the module.
+          local_exports.push(stmt)
+          break
+        }
+        const bindings = []
+        for (const item of stmt.specifiers) {
+          const exported = export_name(item.as_name ?? item.local_name)
+          // A re-export is an import into a slot no source name can reach.
+          const slot = declare_binding(scope, `*export ${exported}*`, true).slot
+          bindings.push({ imported: export_name(item.local_name), slot })
+          export_binding(state, exported, slot)
+        }
+        state.unit.imports.push({
+          specifier: decode_string(stmt.module_specifier),
+          bindings,
+        })
+        break
+      }
+    }
+  }
+  for (const stmt of local_exports) {
+    for (const item of stmt.specifiers) {
+      if (item.local_name.kind !== "Ident")
+        throw new SyntaxError("A local export must name a binding")
+      const name = item.local_name.ident.text
+      const binding = scope.bindings.get(name)
+      if (!binding)
+        throw new SyntaxError(`Cannot export unknown binding: ${name}`)
+      export_binding(
+        state,
+        export_name(item.as_name ?? item.local_name),
+        binding.slot,
+      )
     }
   }
 }
@@ -325,7 +367,11 @@ function compile_statements(state, fn, scope, stmts) {
     }
   }
   for (const stmt of stmts) {
-    if (stmt.kind !== "Func" && stmt.kind !== "Import")
+    if (
+      stmt.kind !== "Func" &&
+      stmt.kind !== "Import" &&
+      stmt.kind !== "ExportNamed"
+    )
       compile_stmt(state, fn, scope, stmt)
   }
 }

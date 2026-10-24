@@ -140,6 +140,14 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_ident(stmt.as_name)
         break
       }
+      case "ExportNamed": {
+        for (const specifier of stmt.specifiers) {
+          this.visit_export_specifier(specifier)
+        }
+        if (stmt.module_specifier !== null) {
+        }
+        break
+      }
       case "Labeled": {
         this.visit_label(stmt.label)
         this.visit_stmt(stmt.stmt)
@@ -673,6 +681,12 @@ export class ASTVisitorBase implements ASTVisitor {
       case "String": {
         break
       }
+    }
+  }
+  visit_export_specifier(node: ast.ExportSpecifier): void {
+    this.visit_module_export_name(node.local_name)
+    if (node.as_name !== null) {
+      this.visit_module_export_name(node.as_name)
     }
   }
   visit_object_type_decl_field(node: ast.ObjectTypeDeclField): void {

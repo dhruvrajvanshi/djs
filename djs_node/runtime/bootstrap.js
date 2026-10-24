@@ -3,9 +3,22 @@ import { write_string, get_ref } from "../vm/values.js"
 import { get_property, set_prototype } from "../vm/objects.js"
 import { load_module, evaluate_module, read_export } from "./modules.js"
 
+const JS_GLOBALS = new URL("../stdlib/js/index.js", import.meta.url).href
+const NODE_GLOBALS = new URL("../stdlib/node/index.js", import.meta.url).href
+const PROMISE = new URL("../stdlib/js/promise.js", import.meta.url).href
+
+async function define_globals(runtime, identity) {
+  const module = await load_module(runtime, identity)
+  await evaluate_module(runtime, module)
+  for (const name of module.exports.keys()) {
+    const value = alloc_root(runtime.memory)
+    read_export(runtime, module, name, value)
+    runtime.globals.set(name, value)
+  }
+}
+
 export async function bootstrap(runtime) {
-  const errors = await load_module(runtime, "djs:errors")
-  await evaluate_module(runtime, errors)
+  await define_globals(runtime, JS_GLOBALS)
   runtime.error_prototypes = new Map()
   const key = alloc_root(runtime.memory)
   try {
@@ -17,11 +30,8 @@ export async function bootstrap(runtime) {
       "ReferenceError",
       "SyntaxError",
     ]) {
-      const value = alloc_root(runtime.memory),
-        prototype = alloc_root(runtime.memory)
-      read_export(runtime, errors, name, value)
-      runtime.globals.set(name, value)
-      get_property(runtime.memory, prototype, value, key)
+      const prototype = alloc_root(runtime.memory)
+      get_property(runtime.memory, prototype, runtime.globals.get(name), key)
       runtime.error_prototypes.set(name, prototype)
       write_u32(runtime.memory, get_ref(runtime.memory, prototype), KINDS.ERROR)
       if (name !== "Error")
@@ -34,18 +44,8 @@ export async function bootstrap(runtime) {
   } finally {
     free_root(runtime.memory, key)
   }
-  for (const [name, identity] of [
-    ["console", "node:console"],
-    ["Promise", "djs:promise"],
-  ]) {
-    const module = await load_module(runtime, identity)
-    await evaluate_module(runtime, module)
-    const value = alloc_root(runtime.memory)
-    read_export(runtime, module, "default", value)
-    runtime.globals.set(name, value)
-    if (name === "Promise") {
-      runtime.promise_await = alloc_root(runtime.memory)
-      read_export(runtime, module, "await_promise", runtime.promise_await)
-    }
-  }
+  const promise = await load_module(runtime, PROMISE)
+  runtime.promise_await = alloc_root(runtime.memory)
+  read_export(runtime, promise, "await_promise", runtime.promise_await)
+  await define_globals(runtime, NODE_GLOBALS)
 }

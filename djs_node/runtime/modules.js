@@ -44,9 +44,6 @@ const BUILTINS = new Map([
     "node:fs/promises",
     new URL("../stdlib/node/fs/promises.js", import.meta.url),
   ],
-  ["djs:errors", new URL("../js/errors.js", import.meta.url)],
-  ["djs:promise", new URL("../js/promise.js", import.meta.url)],
-  ["djs:utf8", new URL("../js/utf8.js", import.meta.url)],
 ])
 
 export function create_runtime({
