@@ -1,10 +1,6 @@
 export const tokens: (string | [string, string])[] = [
   "Ident",
 
-  /**
-   * like `@foo`
-   */
-  "DecoratorIdent",
   "PrivateIdent",
 
   ["True", "true"],

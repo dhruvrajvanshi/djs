@@ -14,7 +14,6 @@ export const OP = Object.freeze(
       "SET_PROP",
       "OBJECT",
       "CLOSURE",
-      "INTRINSIC",
       "CALL",
       "RETURN",
       "AWAIT",

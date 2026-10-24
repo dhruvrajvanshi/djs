@@ -1,5 +1,4 @@
-const enqueue_job = @djs_intrinsic("enqueue_job")
-const call = @djs_intrinsic("call")
+import { enqueue_job, call } from "djs:intrinsics"
 
 export let await_promise
 

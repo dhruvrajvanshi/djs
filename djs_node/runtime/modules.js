@@ -1,7 +1,12 @@
 import { resolve, isAbsolute } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { compile_module } from "../compiler/compile.js"
-import { create_memory, alloc_root, copy_value } from "../vm/memory.js"
+import {
+  create_memory,
+  alloc_root,
+  free_root,
+  copy_value,
+} from "../vm/memory.js"
 import {
   write_number,
   write_null,
@@ -9,7 +14,13 @@ import {
   write_string,
   write_undefined,
 } from "../vm/values.js"
-import { create_environment, load_binding } from "../vm/objects.js"
+import {
+  create_environment,
+  create_function,
+  load_binding,
+  store_binding,
+} from "../vm/objects.js"
+import { INTRINSIC_NAMES, NATIVE_CODE } from "../vm/intrinsics.js"
 import {
   create_context,
   evaluate_context,
@@ -108,8 +119,8 @@ function link_code(runtime, unit) {
 }
 
 export function resolve_specifier(specifier, importer) {
-  if (specifier.startsWith("node:")) {
-    if (!BUILTINS.has(specifier))
+  if (specifier.startsWith("node:") || specifier.startsWith("djs:")) {
+    if (specifier !== "djs:intrinsics" && !BUILTINS.has(specifier))
       throw new SyntaxError(`Unsupported builtin module: ${specifier}`)
     return specifier
   }
@@ -123,16 +134,11 @@ export function resolve_specifier(specifier, importer) {
   throw new SyntaxError(`Package imports are not implemented: ${specifier}`)
 }
 
-export async function load_module(runtime, identity) {
-  const cached = runtime.identities.get(identity)
-  if (cached !== undefined) return runtime.modules[cached]
-  const builtin = BUILTINS.get(identity)
-  const path = fileURLToPath(builtin ?? new URL(identity))
-  const source = await runtime.host.read_text(path, "utf8")
-  const unit = compile_module(source, path, {
-    allow_intrinsics: Boolean(builtin),
-  })
-  const code_id = link_code(runtime, unit)
+function instantiate_module(
+  runtime,
+  identity,
+  { unit = null, code_id = null, scope_id, exports },
+) {
   const state = new Uint8Array(16)
   const module = {
     id: runtime.modules.length,
@@ -141,7 +147,7 @@ export async function load_module(runtime, identity) {
     code_id,
     state,
     dependencies: [],
-    exports: new Map(unit.exports.map((item) => [item.name, item.slot])),
+    exports: new Map(exports.map((item) => [item.name, item.slot])),
     get environment() {
       return state_view(module).getUint32(4, true)
     },
@@ -151,18 +157,62 @@ export async function load_module(runtime, identity) {
   }
   for (const offset of [4, 12])
     state_view(module).setUint32(offset, alloc_root(runtime.memory), true)
-  const fn = unit.functions[unit.entry]
   create_environment(
     runtime.memory,
     module.environment,
     undefined,
-    fn.binding_count,
-    runtime.code[code_id].scope_ids[unit.entry],
+    runtime.scopes[scope_id].binding_flags.length,
+    scope_id,
   )
   runtime.modules.push(module)
   runtime.identities.set(identity, module.id)
-  const imports =
-    runtime.scopes[runtime.code[code_id].scope_ids[unit.entry]].import_bindings
+  return module
+}
+
+function load_intrinsics(runtime) {
+  const scope_id = runtime.scopes.length
+  runtime.scopes.push({
+    binding_flags: INTRINSIC_NAMES.map(() => true),
+    import_bindings: new Map(),
+  })
+  const module = instantiate_module(runtime, "djs:intrinsics", {
+    scope_id,
+    exports: INTRINSIC_NAMES.map((name, slot) => ({ name, slot })),
+  })
+  const value = alloc_root(runtime.memory)
+  try {
+    for (let slot = 0; slot < INTRINSIC_NAMES.length; slot++) {
+      create_function(runtime.memory, value, NATIVE_CODE, slot)
+      store_binding(runtime, module.environment, slot, value, true)
+    }
+    set_module_status(module, MODULE_STATE.EVALUATED)
+    return module
+  } catch (error) {
+    set_module_status(module, MODULE_STATE.ERRORED)
+    write_string(runtime.memory, module.error, error.message)
+    throw error
+  } finally {
+    free_root(runtime.memory, value)
+  }
+}
+
+export async function load_module(runtime, identity) {
+  const cached = runtime.identities.get(identity)
+  if (cached !== undefined) return runtime.modules[cached]
+  if (identity === "djs:intrinsics") return load_intrinsics(runtime)
+  const builtin = BUILTINS.get(identity)
+  const path = fileURLToPath(builtin ?? new URL(identity))
+  const source = await runtime.host.read_text(path, "utf8")
+  const unit = compile_module(source, path)
+  const code_id = link_code(runtime, unit)
+  const scope_id = runtime.code[code_id].scope_ids[unit.entry]
+  const module = instantiate_module(runtime, identity, {
+    unit,
+    code_id,
+    scope_id,
+    exports: unit.exports,
+  })
+  const imports = runtime.scopes[scope_id].import_bindings
   try {
     for (const declaration of unit.imports) {
       const target = await load_module(

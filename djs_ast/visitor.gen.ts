@@ -360,9 +360,6 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(expr.type_annotation)
         break
       }
-      case "DJSIntrinsic": {
-        break
-      }
     }
   }
   visit_ident(node: ast.Ident): void {}

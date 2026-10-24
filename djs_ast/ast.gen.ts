@@ -841,7 +841,6 @@ export type Expr =
   | TaggedTemplateLiteralExpr
   | TypeApplicationExpr
   | AsExpr
-  | DJSIntrinsicExpr
 export class VarExpr {
   constructor(
     readonly span: Span,
@@ -1479,21 +1478,6 @@ export class AsExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
-export class DJSIntrinsicExpr {
-  constructor(
-    readonly span: Span,
-
-    readonly name: Text,
-  ) {}
-
-  get kind(): "DJSIntrinsic" {
-    return "DJSIntrinsic"
-  }
-
-  toString(): string {
-    return sexpr_to_string(expr_to_sexpr(this))
-  }
-}
 
 export const Expr = {
   Var: (span: Span, leading_trivia: Text, ident: Ident): VarExpr =>
@@ -1639,9 +1623,6 @@ export const Expr = {
 
   As: (span: Span, expr: Expr, type_annotation: TypeAnnotation): AsExpr =>
     new AsExpr(span, expr, type_annotation),
-
-  DJSIntrinsic: (span: Span, name: Text): DJSIntrinsicExpr =>
-    new DJSIntrinsicExpr(span, name),
 } as const
 
 export interface ObjectTypeDeclField {

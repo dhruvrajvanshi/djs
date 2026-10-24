@@ -40,7 +40,6 @@ import {
   to_string,
 } from "./objects.js"
 import {
-  intrinsic_id,
   call_intrinsic,
   NATIVE_CODE,
   RESUME_CODE,
@@ -451,14 +450,6 @@ export function run_interpreter(runtime, context) {
             code.unit.functions[b].flags & 4
               ? view.getUint32(frame + F.THIS, true)
               : undefined,
-          )
-          break
-        case OP.INTRINSIC:
-          create_function(
-            memory,
-            reg(a),
-            NATIVE_CODE,
-            intrinsic_id(code.unit.literals[b]),
           )
           break
         case OP.CALL:

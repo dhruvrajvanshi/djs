@@ -63,11 +63,7 @@ export function decode_string(text) {
   return result
 }
 
-export function compile_module(
-  source,
-  path = "<module>",
-  { allow_intrinsics = false } = {},
-) {
+export function compile_module(source, path = "<module>") {
   const ast = parse_source_file(QualifiedName(), path, source)
   if (ast.errors.length) {
     throw new SyntaxError(
@@ -82,7 +78,7 @@ export function compile_module(
     exports: [],
     entry: 0,
   }
-  const state = { unit, allow_intrinsics, prepared: new WeakSet() }
+  const state = { unit, prepared: new WeakSet() }
   compile_function(state, null, null, ast.stmts, "<module>", [])
   for (const fn of unit.functions) {
     Object.freeze(fn.binding_flags)
@@ -700,15 +696,6 @@ function compile_expr(state, fn, scope, expr) {
     }
     case "PrivateName":
       throw new SyntaxError("Private name must be used in a brand check")
-    case "DJSIntrinsic": {
-      if (!state.allow_intrinsics)
-        throw new SyntaxError(
-          "@djs_intrinsic is restricted to trusted builtin modules",
-        )
-      const dst = allocate(fn)
-      emit(fn, OP.INTRINSIC, dst, literal(state, expr.name))
-      return dst
-    }
     case "Await": {
       if (fn.id !== 0) unsupported(expr, "await inside an ordinary function")
       const value = compile_expr(state, fn, scope, expr.expr)

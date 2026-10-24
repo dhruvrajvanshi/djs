@@ -144,14 +144,17 @@ test("method calls preserve receiver and reserve consecutive argument slots", ()
   assert.equal(outer.c, property.b)
 })
 
-test("trusted intrinsic functions compile as guest function values", () => {
-  const source =
-    'const write = @djs_intrinsic("write_stdout"); export default { log: function(value) { write(value); } };'
-  assert.throws(() => compile_module(source), /restricted to trusted/)
-  const code = compile_module(source, "console.js", { allow_intrinsics: true })
-  assert.ok(
-    instructions(code.functions[0]).some((op) => op.opcode === OP.INTRINSIC),
+test("intrinsic values compile as ordinary named imports", () => {
+  const code = compile_module(
+    'import { write_stdout as write } from "djs:intrinsics"; export default { log: function(value) { write(value); } };',
+    "console.js",
   )
+  assert.deepEqual(code.imports, [
+    {
+      specifier: "djs:intrinsics",
+      bindings: [{ imported: "write_stdout", slot: 0 }],
+    },
+  ])
   assert.equal(code.functions[1].params, 1)
 })
 

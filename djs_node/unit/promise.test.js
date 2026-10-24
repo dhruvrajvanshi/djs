@@ -233,12 +233,10 @@ test("promise chains and private values survive repeated moving collections", as
   assert.ok(heap_stats(runtime.memory).used_bytes < 65536)
 })
 
-test("trusted call and enqueue_job intrinsics use guest frames and preserve job order", async () => {
+test("imported call and enqueue_job intrinsics use guest frames and preserve job order", async () => {
   let output = ""
   const source = `
-    const call = @djs_intrinsic("call");
-    const enqueue = @djs_intrinsic("enqueue_job");
-    const write = @djs_intrinsic("write_stdout");
+    import { call, enqueue_job as enqueue, write_stdout as write } from "djs:intrinsics";
     function log(value) { write("" + value + "\\n"); }
     const fn = function(a, b) { return this.value + a + b; };
     fn.call = () => { throw "patched"; };

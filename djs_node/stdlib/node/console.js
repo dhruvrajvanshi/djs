@@ -1,4 +1,4 @@
-const write = @djs_intrinsic("write_stdout")
+import { write_stdout as write } from "djs:intrinsics"
 const ErrorConstructor = Error
 const error_prototype = ErrorConstructor.prototype
 

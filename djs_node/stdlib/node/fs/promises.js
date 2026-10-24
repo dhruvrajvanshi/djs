@@ -1,4 +1,4 @@
-const read = @djs_intrinsic("read_file")
+import { read_file as read } from "djs:intrinsics"
 
 export function readFile(path, encoding) {
   return new Promise(function (resolve, reject) {
