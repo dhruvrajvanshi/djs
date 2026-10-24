@@ -1,13 +1,13 @@
-import { QualifiedName } from "djs_ast"
+import { QualifiedName, offset_to_line_and_col, preview_lines } from "djs_ast"
 import { parse_source_file } from "djs_parser"
 import { OP, INSTRUCTION_BYTES, encode_instructions } from "./bytecode.js"
 import { create_scope, declare_binding, resolve_binding } from "./scopes.js"
 
 // Decode source literals without running source on the host.
-export function decode_string(text) {
+export function decode_string(text, node) {
   const quote = text[0]
   if ((quote !== '"' && quote !== "'") || text.at(-1) !== quote) {
-    throw new SyntaxError("Invalid string literal")
+    throw syntax_error(node, "Invalid string literal")
   }
   let result = ""
   for (let i = 1; i < text.length - 1; i++) {
@@ -28,7 +28,7 @@ export function decode_string(text) {
     }
     if (escape in simple) {
       if (escape === "0" && /[0-9]/.test(text[i + 1]))
-        throw new SyntaxError("Legacy octal escape")
+        throw syntax_error(node, "Legacy octal escape")
       result += simple[escape]
     } else if (escape === "\n" || escape === "\u2028" || escape === "\u2029") {
       continue
@@ -38,25 +38,26 @@ export function decode_string(text) {
       let digits
       if (escape === "u" && text[i + 1] === "{") {
         const end = text.indexOf("}", i + 2)
-        if (end === -1) throw new SyntaxError("Invalid Unicode escape")
+        if (end === -1) throw syntax_error(node, "Invalid Unicode escape")
         digits = text.slice(i + 2, end)
         i = end
       } else {
         const count = escape === "x" ? 2 : 4
         digits = text.slice(i + 1, i + count + 1)
         if (digits.length !== count)
-          throw new SyntaxError("Invalid string escape")
+          throw syntax_error(node, "Invalid string escape")
         i += count
       }
       if (
         !/^[0-9a-f]+$/i.test(digits) ||
         Number.parseInt(digits, 16) > 0x10ffff
       ) {
-        throw new SyntaxError("Invalid Unicode escape")
+        throw syntax_error(node, "Invalid Unicode escape")
       }
       result += String.fromCodePoint(Number.parseInt(digits, 16))
     } else {
-      if (/[1-9]/.test(escape)) throw new SyntaxError("Legacy numeric escape")
+      if (/[1-9]/.test(escape))
+        throw syntax_error(node, "Legacy numeric escape")
       result += escape
     }
   }
@@ -65,11 +66,7 @@ export function decode_string(text) {
 
 export function compile_module(source, path = "<module>") {
   const ast = parse_source_file(QualifiedName(), path, source)
-  if (ast.errors.length) {
-    throw new SyntaxError(
-      `${path}: ${ast.errors.map((error) => error.message).join("; ")}`,
-    )
-  }
+  if (ast.errors.length) throw located_error(path, source, ast.errors)
   const unit = {
     path,
     functions: [],
@@ -79,7 +76,12 @@ export function compile_module(source, path = "<module>") {
     entry: 0,
   }
   const state = { unit, prepared: new WeakSet() }
-  compile_function(state, null, null, ast.stmts, "<module>", [])
+  try {
+    compile_function(state, null, null, ast.stmts, "<module>", [])
+  } catch (error) {
+    if (!(error instanceof SyntaxError) || !error.span) throw error
+    throw located_error(path, source, [error])
+  }
   for (const fn of unit.functions) {
     Object.freeze(fn.binding_flags)
     Object.freeze(fn.parameter_slots)
@@ -103,8 +105,23 @@ export function compile_module(source, path = "<module>") {
   return Object.freeze(unit)
 }
 
+function located_error(path, source, errors) {
+  const message = [...errors]
+    .sort((a, b) => a.span.start - b.span.start)
+    .map((error) => {
+      const [line, col] = offset_to_line_and_col(source, error.span.start)
+      return `${path}:${line}:${col}: ${error.message}\n${preview_lines(source, error.span, false)}`
+    })
+    .join("\n\n")
+  return new SyntaxError(message)
+}
+
 function unsupported(node, description = node.kind) {
-  throw new SyntaxError(`Unsupported syntax: ${description}`)
+  throw syntax_error(node, `Unsupported syntax: ${description}`)
+}
+
+function syntax_error(node, message) {
+  return Object.assign(new SyntaxError(message), { span: node?.span })
 }
 
 function literal(state, value) {
@@ -140,14 +157,16 @@ function declare_pattern(scope, pattern, readonly) {
   return declare_binding(scope, pattern.ident.text, readonly)
 }
 
-function export_binding(state, name, slot) {
+function export_binding(state, node, name, slot) {
   if (state.unit.exports.some((item) => item.name === name))
-    throw new SyntaxError(`Duplicate export: ${name}`)
+    throw syntax_error(node, `Duplicate export: ${name}`)
   state.unit.exports.push({ name, slot })
 }
 
-function export_name(name) {
-  return name.kind === "Ident" ? name.ident.text : decode_string(name.text)
+function export_name(node, name) {
+  return name.kind === "Ident"
+    ? name.ident.text
+    : decode_string(name.text, node)
 }
 
 function prepare_statements(state, fn, scope, stmts) {
@@ -166,29 +185,29 @@ function prepare_statements(state, fn, scope, stmts) {
           if (stmt.decl.is_exported) {
             if (fn.id !== 0 || scope !== fn.scope)
               unsupported(stmt, "nested export")
-            export_binding(state, binding.name, binding.slot)
+            export_binding(state, stmt, binding.name, binding.slot)
           }
         }
         break
       case "ClassDecl": {
         const name = stmt.class_def.name?.text
-        if (!name) throw new SyntaxError("A class declaration needs a name")
+        if (!name) throw syntax_error(stmt, "A class declaration needs a name")
         const binding = declare_binding(scope, name)
         if (stmt.is_exported) {
           if (fn.id !== 0 || scope !== fn.scope)
             unsupported(stmt, "nested export")
-          export_binding(state, name, binding.slot)
+          export_binding(state, stmt, name, binding.slot)
         }
         break
       }
       case "Func": {
         if (!stmt.func.name)
-          throw new SyntaxError("A function declaration needs a name")
+          throw syntax_error(stmt, "A function declaration needs a name")
         const binding = declare_binding(scope, stmt.func.name.text)
         if (stmt.is_exported) {
           if (fn.id !== 0 || scope !== fn.scope)
             unsupported(stmt, "nested export")
-          export_binding(state, binding.name, binding.slot)
+          export_binding(state, stmt, binding.name, binding.slot)
         }
         break
       }
@@ -196,7 +215,7 @@ function prepare_statements(state, fn, scope, stmts) {
         if (fn.id !== 0 || scope !== fn.scope)
           unsupported(stmt, "nested export")
         const binding = declare_binding(scope, "*default*", true)
-        export_binding(state, "default", binding.slot)
+        export_binding(state, stmt, "default", binding.slot)
         break
       }
       case "Import": {
@@ -214,7 +233,7 @@ function prepare_statements(state, fn, scope, stmts) {
           const imported =
             item.imported_name.kind === "Ident"
               ? item.imported_name.ident.text
-              : decode_string(item.imported_name.text)
+              : decode_string(item.imported_name.text, item)
           const local = item.as_name?.text ?? imported
           bindings.push({
             imported,
@@ -222,7 +241,7 @@ function prepare_statements(state, fn, scope, stmts) {
           })
         }
         state.unit.imports.push({
-          specifier: decode_string(stmt.module_specifier),
+          specifier: decode_string(stmt.module_specifier, stmt),
           bindings,
         })
         break
@@ -237,14 +256,14 @@ function prepare_statements(state, fn, scope, stmts) {
         }
         const bindings = []
         for (const item of stmt.specifiers) {
-          const exported = export_name(item.as_name ?? item.local_name)
+          const exported = export_name(item, item.as_name ?? item.local_name)
           // A re-export is an import into a slot no source name can reach.
           const slot = declare_binding(scope, `*export ${exported}*`, true).slot
-          bindings.push({ imported: export_name(item.local_name), slot })
-          export_binding(state, exported, slot)
+          bindings.push({ imported: export_name(item, item.local_name), slot })
+          export_binding(state, item, exported, slot)
         }
         state.unit.imports.push({
-          specifier: decode_string(stmt.module_specifier),
+          specifier: decode_string(stmt.module_specifier, stmt),
           bindings,
         })
         break
@@ -254,14 +273,15 @@ function prepare_statements(state, fn, scope, stmts) {
   for (const stmt of local_exports) {
     for (const item of stmt.specifiers) {
       if (item.local_name.kind !== "Ident")
-        throw new SyntaxError("A local export must name a binding")
+        throw syntax_error(item, "A local export must name a binding")
       const name = item.local_name.ident.text
       const binding = scope.bindings.get(name)
       if (!binding)
-        throw new SyntaxError(`Cannot export unknown binding: ${name}`)
+        throw syntax_error(item, `Cannot export unknown binding: ${name}`)
       export_binding(
         state,
-        export_name(item.as_name ?? item.local_name),
+        item,
+        export_name(item, item.as_name ?? item.local_name),
         binding.slot,
       )
     }
@@ -400,7 +420,7 @@ function compile_stmt(state, fn, scope, stmt) {
           ? compile_expr(state, fn, scope, item.init)
           : constant(state, fn, undefined)
         if (!item.init && stmt.decl.decl_type === "Const")
-          throw new SyntaxError("Missing const initializer")
+          throw syntax_error(stmt, "Missing const initializer")
         emit(
           fn,
           OP.INIT_ENV,
@@ -459,7 +479,7 @@ function compile_stmt(state, fn, scope, stmt) {
       return
     case "Return":
       if (fn.id === 0)
-        throw new SyntaxError("Illegal return at module top level")
+        throw syntax_error(stmt, "Illegal return at module top level")
       emit(
         fn,
         OP.RETURN,
@@ -577,7 +597,8 @@ function load_name(state, fn, scope, name, allow_missing = false) {
 
 function property_key(state, fn, scope, key) {
   if (key.kind === "Ident") return constant(state, fn, key.ident.text)
-  if (key.kind === "String") return constant(state, fn, decode_string(key.text))
+  if (key.kind === "String")
+    return constant(state, fn, decode_string(key.text, key))
   if (key.kind === "Computed") return compile_expr(state, fn, scope, key.expr)
   unsupported(key)
 }
@@ -588,7 +609,7 @@ function property_reference(state, fn, scope, expr) {
   const key =
     expr.kind === "Prop"
       ? expr.property.text.startsWith("#")
-        ? private_name(state, fn, scope, expr.property.text)
+        ? private_name(state, fn, scope, expr.property)
         : constant(state, fn, expr.property.text)
       : compile_expr(state, fn, scope, expr.property)
   return {
@@ -601,11 +622,12 @@ function property_reference(state, fn, scope, expr) {
 function compile_expr(state, fn, scope, expr) {
   switch (expr.kind) {
     case "String":
-      return constant(state, fn, decode_string(expr.text))
+      return constant(state, fn, decode_string(expr.text, expr))
     case "Number": {
       if (expr.text.endsWith("n")) unsupported(expr, "bigint literals")
       const value = Number(expr.text.replaceAll("_", ""))
-      if (Number.isNaN(value)) throw new SyntaxError("Invalid number literal")
+      if (Number.isNaN(value))
+        throw syntax_error(expr, "Invalid number literal")
       return constant(state, fn, value)
     }
     case "Boolean":
@@ -740,7 +762,7 @@ function compile_expr(state, fn, scope, expr) {
       return dst
     }
     case "PrivateName":
-      throw new SyntaxError("Private name must be used in a brand check")
+      throw syntax_error(expr, "Private name must be used in a brand check")
     case "Await": {
       if (fn.id !== 0 && !(fn.flags & 8))
         unsupported(expr, "await inside an ordinary function")
@@ -770,8 +792,8 @@ function compile_expr(state, fn, scope, expr) {
       }
       if (expr.lhs.kind === "PrivateName") {
         if (expr.operator !== "In")
-          throw new SyntaxError("Private name must be used in a brand check")
-        const key = private_name(state, fn, scope, expr.lhs.ident.text)
+          throw syntax_error(expr, "Private name must be used in a brand check")
+        const key = private_name(state, fn, scope, expr.lhs.ident)
         const object = compile_expr(state, fn, scope, expr.rhs)
         const dst = allocate(fn)
         emit(fn, OP.PRIVATE_HAS, dst, object, key)
@@ -791,7 +813,8 @@ function compile_expr(state, fn, scope, expr) {
       if (pattern.kind === "Var") {
         const binding = resolve_name(scope, pattern.ident.text)
         if (!binding)
-          throw new SyntaxError(
+          throw syntax_error(
+            pattern,
             `Assignment to undeclared binding: ${pattern.ident.text}`,
           )
         const value = compile_expr(state, fn, scope, expr.value)
@@ -802,7 +825,7 @@ function compile_expr(state, fn, scope, expr) {
         const object = compile_expr(state, fn, scope, pattern.expr)
         const is_private = pattern.key.kind === "Private"
         const key = is_private
-          ? private_name(state, fn, scope, pattern.key.ident.text)
+          ? private_name(state, fn, scope, pattern.key.ident)
           : property_key(state, fn, scope, pattern.key)
         const value = compile_expr(state, fn, scope, expr.value)
         emit(fn, is_private ? OP.PRIVATE_SET : OP.SET_PROP, object, key, value)
@@ -857,12 +880,12 @@ function compile_expr(state, fn, scope, expr) {
   }
 }
 
-function private_name(state, fn, scope, name) {
+function private_name(state, fn, scope, ident) {
   for (let current = scope; current; current = current.parent) {
-    const binding = current.private_names?.get(name)
+    const binding = current.private_names?.get(ident.text)
     if (binding) return load_name(state, fn, scope, binding)
   }
-  throw new SyntaxError(`Undeclared private name: ${name}`)
+  throw syntax_error(ident, `Undeclared private name: ${ident.text}`)
 }
 
 function class_value(state, parent, parent_scope, cls) {
@@ -889,17 +912,20 @@ function class_value(state, parent, parent_scope, cls) {
             member.name.kind === "Ident"
               ? member.name.ident.text
               : member.name.kind === "String"
-                ? decode_string(member.name.text)
+                ? decode_string(member.name.text, member.name)
                 : null
           if (
             (member.is_static && public_name === "prototype") ||
             (!member.is_static && !member.body && public_name === "constructor")
           )
-            throw new SyntaxError(`Invalid class element: ${public_name}`)
+            throw syntax_error(member, `Invalid class element: ${public_name}`)
           if (member.name.kind !== "Private") continue
           const name = member.name.ident.text
           if (name === "#constructor" || scope.private_names.has(name))
-            throw new SyntaxError(`Duplicate or invalid private name: ${name}`)
+            throw syntax_error(
+              member,
+              `Duplicate or invalid private name: ${name}`,
+            )
           if (member.accessor_type) unsupported(member, "private accessors")
           const hidden = `*private:${name}*`
           scope.private_names.set(name, hidden)
@@ -932,7 +958,7 @@ function class_value(state, parent, parent_scope, cls) {
         }
         const key_of = (owner, current, member) =>
           member.name.kind === "Private"
-            ? private_name(state, owner, current, member.name.ident.text)
+            ? private_name(state, owner, current, member.name.ident)
             : keys.has(member)
               ? load_name(state, owner, current, keys.get(member))
               : property_key(state, owner, current, member.name)
@@ -943,18 +969,18 @@ function class_value(state, parent, parent_scope, cls) {
             member.name.kind !== "Private" &&
             (member.name.ident?.text ??
               (member.name.kind === "String"
-                ? decode_string(member.name.text)
+                ? decode_string(member.name.text, member.name)
                 : null)) === "constructor",
         )
         if (constructors.length > 1)
-          throw new SyntaxError("Duplicate constructor")
+          throw syntax_error(constructors[1], "Duplicate constructor")
         const constructor = constructors[0]
         if (
           constructor?.accessor_type ||
           constructor?.body.is_async ||
           constructor?.body.is_generator
         )
-          throw new SyntaxError("Invalid constructor")
+          throw syntax_error(constructor, "Invalid constructor")
         const constructor_id = compile_function(
           state,
           fn,
@@ -984,7 +1010,7 @@ function class_value(state, parent, parent_scope, cls) {
                   member.name.kind !== "Private" &&
                   member.name.ident?.text === "constructor"
                 )
-                  throw new SyntaxError("Invalid field name: constructor")
+                  throw syntax_error(member, "Invalid field name: constructor")
                 const key = key_of(owner, field_scope, member)
                 const value = member.initializer
                   ? compile_expr(state, owner, field_scope, member.initializer)
