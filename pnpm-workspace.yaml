@@ -1,10 +1,7 @@
 packages:
-  - djs
-  - djs_std
   - djs_ast
-  - djs_frontend
-  - djs_il
   - djs_parser
+  - djs_std
 
 onlyBuiltDependencies:
   - esbuild

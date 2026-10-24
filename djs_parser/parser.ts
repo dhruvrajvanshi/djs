@@ -40,7 +40,7 @@ import {
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
-import { defer, TODO } from "djs_std"
+import { defer } from "djs_std"
 
 type Parser = {
   parse_source_file: () => SourceFile
