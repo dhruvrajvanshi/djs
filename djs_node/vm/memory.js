@@ -18,8 +18,8 @@ export const KINDS = Object.freeze({
   PROPERTY: 3,
   FUNCTION: 4,
   ENVIRONMENT: 5,
-  PROMISE: 6,
   VALUE_ARRAY: 7,
+  ERROR: 8,
 })
 export const CONTROL = Object.freeze({
   SEMISPACE_BYTES: 0,

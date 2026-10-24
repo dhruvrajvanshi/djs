@@ -5,6 +5,7 @@ export const tokens: (string | [string, string])[] = [
    * like `@foo`
    */
   "DecoratorIdent",
+  "PrivateIdent",
 
   ["True", "true"],
   ["False", "false"],

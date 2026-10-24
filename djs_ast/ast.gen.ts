@@ -564,6 +564,7 @@ export interface ClassBody {
 export interface MethodDef {
   readonly span: Span
   readonly name: ObjectKey
+  readonly is_static: boolean
   readonly body: Func
   readonly return_type: TypeAnnotation | null
   readonly accessor_type: AccessorType | null
@@ -595,7 +596,8 @@ export const ClassMember = {
 
 export interface FieldDef {
   readonly span: Span
-  readonly name: Ident
+  readonly name: ObjectKey
+  readonly is_static: boolean
   readonly initializer: Expr | null
 }
 
@@ -805,6 +807,7 @@ export type Expr =
   | CallExpr
   | IndexExpr
   | PropExpr
+  | PrivateNameExpr
   | StringExpr
   | NumberExpr
   | BooleanExpr
@@ -965,6 +968,21 @@ export class PropExpr {
 
   get kind(): "Prop" {
     return "Prop"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
+export class PrivateNameExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly ident: Ident,
+  ) {}
+
+  get kind(): "PrivateName" {
+    return "PrivateName"
   }
 
   toString(): string {
@@ -1517,6 +1535,9 @@ export const Expr = {
     is_optional: boolean,
   ): PropExpr => new PropExpr(span, lhs, property, is_optional),
 
+  PrivateName: (span: Span, ident: Ident): PrivateNameExpr =>
+    new PrivateNameExpr(span, ident),
+
   String: (span: Span, text: Text): StringExpr => new StringExpr(span, text),
 
   Number: (span: Span, text: Text): NumberExpr => new NumberExpr(span, text),
@@ -1906,7 +1927,11 @@ export const ObjectLiteralEntry = {
     new SpreadObjectLiteralEntry(span, expr),
 } as const
 
-export type ObjectKey = IdentObjectKey | StringObjectKey | ComputedObjectKey
+export type ObjectKey =
+  | IdentObjectKey
+  | PrivateObjectKey
+  | StringObjectKey
+  | ComputedObjectKey
 export class IdentObjectKey {
   constructor(
     readonly span: Span,
@@ -1916,6 +1941,17 @@ export class IdentObjectKey {
 
   get kind(): "Ident" {
     return "Ident"
+  }
+}
+export class PrivateObjectKey {
+  constructor(
+    readonly span: Span,
+
+    readonly ident: Ident,
+  ) {}
+
+  get kind(): "Private" {
+    return "Private"
   }
 }
 export class StringObjectKey {
@@ -1944,6 +1980,9 @@ export class ComputedObjectKey {
 export const ObjectKey = {
   Ident: (span: Span, ident: Ident): IdentObjectKey =>
     new IdentObjectKey(span, ident),
+
+  Private: (span: Span, ident: Ident): PrivateObjectKey =>
+    new PrivateObjectKey(span, ident),
 
   String: (span: Span, text: Text): StringObjectKey =>
     new StringObjectKey(span, text),

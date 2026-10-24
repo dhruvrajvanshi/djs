@@ -379,3 +379,51 @@ function parse_stmt(input: string, name = "test.js"): Stmt {
 function parse_source_file(source: string, name = "test.js"): SourceFile {
   return Parser(QualifiedName(), name, source).parse_source_file()
 }
+
+test("class members preserve static and private metadata and field initializers", () => {
+  const parsed = parse_source_file(`class Box {
+    #value = 1;
+    static #read(box) { return box.#value; }
+    static value = this;
+    get value() { return this.#value; }
+    set value(next) { this.#value = next; }
+    static has(box) { return #value in box; }
+  }`)
+  expect(parsed.errors).toEqual([])
+  const stmt = parsed.stmts[0]
+  assert(stmt.kind === "ClassDecl")
+  const members = stmt.class_def.body.members
+  assert(members[0].kind === "FieldDef")
+  expect(members[0].field.name.kind).toBe("Private")
+  expect(members[0].field.is_static).toBe(false)
+  expect(members[0].field.initializer?.kind).toBe("Number")
+  assert(members[1].kind === "MethodDef")
+  expect(members[1].method.is_static).toBe(true)
+  expect(members[1].method.name.kind).toBe("Private")
+  assert(members[2].kind === "FieldDef")
+  expect(members[2].field.is_static).toBe(true)
+  assert(members[5].kind === "MethodDef")
+  const returned = members[5].method.body.body.stmts[0]
+  assert(returned.kind === "Return" && returned.value?.kind === "BinOp")
+  expect(returned.value.lhs.kind).toBe("PrivateName")
+})
+
+test("keyword property names retain their spelling", () => {
+  const expr = parse_expr("promise.catch")
+  assert(expr.kind === "Prop")
+  expect(expr.property.text).toBe("catch")
+})
+
+test("logical and binds more tightly than logical or", () => {
+  const expr = parse_expr("a || b && c")
+  assert(expr.kind === "BinOp")
+  expect(expr.operator).toBe("Or")
+  assert(expr.rhs.kind === "BinOp")
+  expect(expr.rhs.operator).toBe("And")
+})
+
+test("private names cannot be ordinary object keys", () => {
+  expect(
+    parse_source_file("const object = { #value: 1 };").errors.length,
+  ).toBeGreaterThan(0)
+})

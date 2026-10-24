@@ -122,13 +122,14 @@ test("Cheney tracing updates nested raw pointers, tagged fields, aliases and cyc
   const result = alloc_root(memory)
   write_string(memory, key, "key")
   write_string(memory, result, "result")
-  const promise = record(memory, KINDS.PROMISE, 16)
-  copy_root_to_heap_value(memory, get_ref(memory, promise) + 16, result)
+  const private_values = record(memory, KINDS.VALUE_ARRAY, 16)
+  write_u32(memory, get_ref(memory, private_values) + 8, 1)
+  copy_root_to_heap_value(memory, get_ref(memory, private_values) + 16, result)
   const parent = record(memory, KINDS.ENVIRONMENT, 16)
   const environment = record(memory, KINDS.ENVIRONMENT, 32)
   write_u32(memory, get_ref(memory, environment) + 16, 2)
   copy_root_to_heap_value(memory, get_ref(memory, environment) + 8, parent)
-  const fn = record(memory, KINDS.FUNCTION, 16)
+  const fn = record(memory, KINDS.FUNCTION, 48)
   write_u32(memory, get_ref(memory, fn) + 8, 123)
   write_u32(memory, get_ref(memory, fn) + 12, 456)
   copy_root_to_heap_value(memory, get_ref(memory, fn) + 16, environment)
@@ -141,13 +142,17 @@ test("Cheney tracing updates nested raw pointers, tagged fields, aliases and cyc
   const array = record(memory, KINDS.VALUE_ARRAY, 24)
   write_u32(memory, get_ref(memory, array) + 8, 2)
   copy_root_to_heap_value(memory, get_ref(memory, array) + 16, object)
-  copy_root_to_heap_value(memory, get_ref(memory, array) + 24, promise)
+  copy_root_to_heap_value(memory, get_ref(memory, array) + 24, private_values)
   copy_root_to_heap_value(memory, get_ref(memory, environment) + 24, array)
-  copy_root_to_heap_value(memory, get_ref(memory, environment) + 32, promise)
+  copy_root_to_heap_value(
+    memory,
+    get_ref(memory, environment) + 32,
+    private_values,
+  )
   for (const root of [
     key,
     result,
-    promise,
+    private_values,
     parent,
     environment,
     fn,
@@ -179,10 +184,10 @@ test("Cheney tracing updates nested raw pointers, tagged fields, aliases and cyc
     copy_heap_value_to_root(memory, scratch, moved_environment + 24)
     assert.equal(get_ref(memory, scratch), get_ref(memory, array))
     copy_heap_value_to_root(memory, scratch, moved_environment + 32)
-    const moved_promise = get_ref(memory, scratch)
+    const moved_private_values = get_ref(memory, scratch)
     copy_heap_value_to_root(memory, scratch, get_ref(memory, array) + 24)
-    assert.equal(get_ref(memory, scratch), moved_promise)
-    copy_heap_value_to_root(memory, scratch, moved_promise + 16)
+    assert.equal(get_ref(memory, scratch), moved_private_values)
+    copy_heap_value_to_root(memory, scratch, moved_private_values + 16)
     assert.equal(read_string(memory, scratch), "result")
   }
 })

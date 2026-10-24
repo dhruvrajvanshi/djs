@@ -186,10 +186,6 @@ test("invalid and unsupported syntax fails clearly", () => {
     /loop-local declarations/,
   )
   assert.throws(
-    () => compile_module("const x = false && missing();"),
-    /Unsupported syntax: binary And/,
-  )
-  assert.throws(
     () => compile_module("async function f() {}"),
     /Unsupported syntax: async/,
   )

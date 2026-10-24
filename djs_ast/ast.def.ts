@@ -105,6 +105,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     is_optional: "boolean",
   },
   Prop: { lhs: () => Expr, property: Ident, is_optional: "boolean" },
+  PrivateName: { ident: Ident },
   String: { text: Text },
   Number: { text: Text },
   Boolean: { value: "boolean" },
@@ -220,11 +221,13 @@ const ClassMember = Enum("ClassMember", [], {
 })
 
 const FieldDef = Struct("FieldDef", ["span"], {
-  name: Ident,
+  name: () => ObjectKey,
+  is_static: "boolean",
   initializer: Option(() => Expr),
 })
 const MethodDef = Struct("MethodDef", ["span"], {
   name: () => ObjectKey,
+  is_static: "boolean",
   body: () => Func,
   return_type: Option(() => TypeAnnotation),
   accessor_type: Option(() => AccessorType),
@@ -232,6 +235,7 @@ const MethodDef = Struct("MethodDef", ["span"], {
 
 const ObjectKey = Enum("ObjectKey", ["span"], {
   Ident: { ident: Ident },
+  Private: { ident: Ident },
   String: { text: Text },
   Computed: { expr: () => Expr },
 })

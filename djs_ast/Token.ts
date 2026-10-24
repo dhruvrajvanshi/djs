@@ -13,6 +13,7 @@ export const Token = {
   can_start_object_property_name: (self: Token): boolean => {
     return (
       Token.is_valid_property_name(self) ||
+      self.kind === TokenKind.PrivateIdent ||
       self.kind === TokenKind.LSquare ||
       self.kind === TokenKind.String
     )

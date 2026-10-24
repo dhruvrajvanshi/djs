@@ -169,6 +169,17 @@ function prepare_statements(state, fn, scope, stmts) {
           }
         }
         break
+      case "ClassDecl": {
+        const name = stmt.class_def.name?.text
+        if (!name) throw new SyntaxError("A class declaration needs a name")
+        const binding = declare_binding(scope, name)
+        if (stmt.is_exported) {
+          if (fn.id !== 0 || scope !== fn.scope)
+            unsupported(stmt, "nested export")
+          export_binding(state, name, binding.slot)
+        }
+        break
+      }
       case "Func": {
         if (!stmt.func.name)
           throw new SyntaxError("A function declaration needs a name")
@@ -227,6 +238,7 @@ function compile_function(
   name,
   params,
   expression_body = null,
+  options = {},
 ) {
   const fn = {
     id: state.unit.functions.length,
@@ -239,6 +251,7 @@ function compile_function(
     instructions: [],
     parent,
     scope: null,
+    flags: options.flags ?? 0,
   }
   state.unit.functions.push(null)
   const scope = create_scope(parent_scope, fn)
@@ -247,6 +260,7 @@ function compile_function(
     if (param.initializer) unsupported(param, "default parameters")
     fn.parameter_slots.push(declare_pattern(scope, param.pattern, false).slot)
   }
+  if (options.build) options.build(fn, scope)
   prepare_statements(state, fn, scope, stmts)
   compile_statements(state, fn, scope, stmts)
   if (expression_body)
@@ -256,6 +270,7 @@ function compile_function(
     id: fn.id,
     name: fn.name,
     params: fn.params,
+    flags: fn.flags,
     binding_count: fn.binding_flags.length,
     binding_flags: fn.binding_flags,
     parameter_slots: fn.parameter_slots,
@@ -266,7 +281,14 @@ function compile_function(
   return fn.id
 }
 
-function function_value(state, fn, scope, func, name = "<anonymous>") {
+function function_value(
+  state,
+  fn,
+  scope,
+  func,
+  name = "<anonymous>",
+  flags = 0,
+) {
   if (func.is_async || func.is_generator)
     unsupported(func, "async/generator functions")
   const id = compile_function(
@@ -276,6 +298,8 @@ function function_value(state, fn, scope, func, name = "<anonymous>") {
     func.body.stmts,
     name,
     func.params,
+    null,
+    { flags },
   )
   const dst = allocate(fn)
   emit(fn, OP.CLOSURE, dst, id)
@@ -310,7 +334,7 @@ function compile_statements(state, fn, scope, stmts) {
 
 function compile_stmt(state, fn, scope, stmt) {
   if (
-    ["VarDecl", "ExportDefault"].includes(stmt.kind) &&
+    ["VarDecl", "ExportDefault", "ClassDecl"].includes(stmt.kind) &&
     !state.prepared.has(stmt)
   ) {
     unsupported(stmt, "declaration outside a block")
@@ -343,6 +367,44 @@ function compile_stmt(state, fn, scope, stmt) {
         )
       }
       return
+    case "ClassDecl": {
+      const value = class_value(state, fn, scope, stmt.class_def)
+      emit(
+        fn,
+        OP.INIT_ENV,
+        0,
+        scope.bindings.get(stmt.class_def.name.text).slot,
+        value,
+      )
+      return
+    }
+    case "Try": {
+      const exception = allocate(fn)
+      const start = emit(fn, OP.TRY, 0xffffffff, 0xffffffff, 0, exception)
+      compile_stmt(state, fn, scope, { kind: "Block", block: stmt.try_block })
+      emit(fn, OP.LEAVE_TRY)
+      if (stmt.catch_block) {
+        fn.instructions[start][1] = position(fn)
+        const child = create_scope(scope, fn)
+        if (stmt.catch_pattern) {
+          const binding = declare_pattern(child, stmt.catch_pattern, false)
+          emit(fn, OP.INIT_ENV, 0, binding.slot, exception)
+        }
+        prepare_statements(state, fn, child, stmt.catch_block.stmts)
+        compile_statements(state, fn, child, stmt.catch_block.stmts)
+        emit(fn, OP.LEAVE_TRY)
+      }
+      if (stmt.finally_block) {
+        fn.instructions[start][2] = position(fn)
+        compile_stmt(state, fn, scope, {
+          kind: "Block",
+          block: stmt.finally_block,
+        })
+        emit(fn, OP.END_FINALLY)
+      }
+      fn.instructions[start][3] = position(fn)
+      return
+    }
     case "ExportDefault":
       emit(
         fn,
@@ -400,7 +462,7 @@ function compile_stmt(state, fn, scope, stmt) {
 }
 
 function contains_declaration(stmt) {
-  if (["VarDecl", "Func"].includes(stmt.kind)) return true
+  if (["VarDecl", "Func", "ClassDecl"].includes(stmt.kind)) return true
   if (stmt.kind === "Block") return stmt.block.stmts.some(contains_declaration)
   if (stmt.kind === "If")
     return (
@@ -408,6 +470,13 @@ function contains_declaration(stmt) {
       (stmt.if_false && contains_declaration(stmt.if_false))
     )
   if (stmt.kind === "While") return contains_declaration(stmt.body)
+  if (stmt.kind === "Try")
+    return (
+      Boolean(stmt.catch_pattern) ||
+      [stmt.try_block, stmt.catch_block, stmt.finally_block].some((block) =>
+        block?.stmts.some(contains_declaration),
+      )
+    )
   return false
 }
 
@@ -432,6 +501,7 @@ const binary_operators = {
   LeftShift: "<<",
   RightShift: ">>",
   UnsignedRightShift: ">>>",
+  Instanceof: "instanceof",
 }
 
 function load_name(state, fn, scope, name, allow_missing = false) {
@@ -459,9 +529,15 @@ function property_reference(state, fn, scope, expr) {
   const object = compile_expr(state, fn, scope, expr.lhs)
   const key =
     expr.kind === "Prop"
-      ? constant(state, fn, expr.property.text)
+      ? expr.property.text.startsWith("#")
+        ? private_name(state, fn, scope, expr.property.text)
+        : constant(state, fn, expr.property.text)
       : compile_expr(state, fn, scope, expr.property)
-  return { object, key }
+  return {
+    object,
+    key,
+    private: expr.kind === "Prop" && expr.property.text.startsWith("#"),
+  }
 }
 
 function compile_expr(state, fn, scope, expr) {
@@ -486,9 +562,15 @@ function compile_expr(state, fn, scope, expr) {
       return compile_expr(state, fn, scope, expr.expr)
     case "Prop":
     case "Index": {
-      const { object, key } = property_reference(state, fn, scope, expr)
+      const reference = property_reference(state, fn, scope, expr)
       const dst = allocate(fn)
-      emit(fn, OP.GET_PROP, dst, object, key)
+      emit(
+        fn,
+        reference.private ? OP.PRIVATE_GET : OP.GET_PROP,
+        dst,
+        reference.object,
+        reference.key,
+      )
       return dst
     }
     case "Call": {
@@ -497,11 +579,21 @@ function compile_expr(state, fn, scope, expr) {
       let callee, receiver
       let target = expr.callee
       while (target.kind === "Paren") target = target.expr
-      if (target.kind === "Prop" || target.kind === "Index") {
+      const construct = target.kind === "New"
+      if (construct) {
+        callee = compile_expr(state, fn, scope, target.expr)
+        receiver = constant(state, fn, undefined)
+      } else if (target.kind === "Prop" || target.kind === "Index") {
         const reference = property_reference(state, fn, scope, target)
         receiver = reference.object
         callee = allocate(fn)
-        emit(fn, OP.GET_PROP, callee, receiver, reference.key)
+        emit(
+          fn,
+          reference.private ? OP.PRIVATE_GET : OP.GET_PROP,
+          callee,
+          receiver,
+          reference.key,
+        )
       } else {
         callee = compile_expr(state, fn, scope, expr.callee)
         receiver = constant(state, fn, undefined)
@@ -516,7 +608,15 @@ function compile_expr(state, fn, scope, expr) {
         )
       }
       const dst = allocate(fn)
-      emit(fn, OP.CALL, dst, callee, receiver, args, expr.args.length)
+      emit(
+        fn,
+        construct ? OP.CONSTRUCT : OP.CALL,
+        dst,
+        callee,
+        receiver,
+        args,
+        expr.args.length,
+      )
       return dst
     }
     case "Object": {
@@ -531,20 +631,58 @@ function compile_expr(state, fn, scope, expr) {
           key = property_key(state, fn, scope, entry.key)
           value = compile_expr(state, fn, scope, entry.value)
         } else if (entry.kind === "Method") {
-          if (entry.method.accessor_type) unsupported(entry, "accessors")
           key = property_key(state, fn, scope, entry.method.name)
-          value = function_value(state, fn, scope, entry.method.body)
+          value = function_value(
+            state,
+            fn,
+            scope,
+            entry.method.body,
+            "<method>",
+            2,
+          )
         } else unsupported(entry)
-        emit(fn, OP.SET_PROP, dst, key, value)
+        if (entry.kind === "Method" && entry.method.accessor_type)
+          emit(
+            fn,
+            OP.DEFINE_PROP,
+            dst,
+            key,
+            value,
+            7 | 16,
+            entry.method.accessor_type === "Set" ? 1 : 0,
+          )
+        else emit(fn, OP.DEFINE_PROP, dst, key, value, 7)
       }
       return dst
     }
     case "Func":
       if (expr.func.name) unsupported(expr, "named function expressions")
       return function_value(state, fn, scope, expr.func)
-    case "ArrowFn":
-      unsupported(expr, "arrow functions")
-      break
+    case "ArrowFn": {
+      const id = compile_function(
+        state,
+        fn,
+        scope,
+        expr.body.kind === "Block" ? expr.body.block.stmts : [],
+        "<arrow>",
+        expr.params,
+        expr.body.kind === "Expr" ? expr.body.expr : null,
+        { flags: 4 },
+      )
+      const dst = allocate(fn)
+      emit(fn, OP.CLOSURE, dst, id)
+      return dst
+    }
+    case "Class":
+      return class_value(state, fn, scope, expr.class_def)
+    case "New": {
+      const callee = compile_expr(state, fn, scope, expr.expr)
+      const dst = allocate(fn)
+      emit(fn, OP.CONSTRUCT, dst, callee, constant(state, fn, undefined), 0, 0)
+      return dst
+    }
+    case "PrivateName":
+      throw new SyntaxError("Private name must be used in a brand check")
     case "DJSIntrinsic": {
       if (!state.allow_intrinsics)
         throw new SyntaxError(
@@ -567,6 +705,28 @@ function compile_expr(state, fn, scope, expr) {
       return value
     }
     case "BinOp": {
+      if (expr.operator === "And" || expr.operator === "Or") {
+        const dst = allocate(fn)
+        emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.lhs))
+        const branch = emit(fn, OP.JUMP_IF_FALSE, dst, 0)
+        let end
+        if (expr.operator === "Or") {
+          end = emit(fn, OP.JUMP, 0)
+          fn.instructions[branch][2] = position(fn)
+        }
+        emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.rhs))
+        fn.instructions[end ?? branch][end === undefined ? 2 : 1] = position(fn)
+        return dst
+      }
+      if (expr.lhs.kind === "PrivateName") {
+        if (expr.operator !== "In")
+          throw new SyntaxError("Private name must be used in a brand check")
+        const key = private_name(state, fn, scope, expr.lhs.ident.text)
+        const object = compile_expr(state, fn, scope, expr.rhs)
+        const dst = allocate(fn)
+        emit(fn, OP.PRIVATE_HAS, dst, object, key)
+        return dst
+      }
       const operator = binary_operators[expr.operator]
       if (!operator) unsupported(expr, `binary ${expr.operator}`)
       const left = compile_expr(state, fn, scope, expr.lhs)
@@ -590,9 +750,12 @@ function compile_expr(state, fn, scope, expr) {
       }
       if (pattern.kind === "Prop") {
         const object = compile_expr(state, fn, scope, pattern.expr)
-        const key = property_key(state, fn, scope, pattern.key)
+        const is_private = pattern.key.kind === "Private"
+        const key = is_private
+          ? private_name(state, fn, scope, pattern.key.ident.text)
+          : property_key(state, fn, scope, pattern.key)
         const value = compile_expr(state, fn, scope, expr.value)
-        emit(fn, OP.SET_PROP, object, key, value)
+        emit(fn, is_private ? OP.PRIVATE_SET : OP.SET_PROP, object, key, value)
         return value
       }
       unsupported(pattern, "assignment destructuring")
@@ -642,4 +805,265 @@ function compile_expr(state, fn, scope, expr) {
     default:
       unsupported(expr)
   }
+}
+
+function private_name(state, fn, scope, name) {
+  for (let current = scope; current; current = current.parent) {
+    const binding = current.private_names?.get(name)
+    if (binding) return load_name(state, fn, scope, binding)
+  }
+  throw new SyntaxError(`Undeclared private name: ${name}`)
+}
+
+function class_value(state, parent, parent_scope, cls) {
+  if (cls.superclass) unsupported(cls, "class inheritance")
+  const id = compile_function(
+    state,
+    parent,
+    parent_scope,
+    [],
+    "<class>",
+    [],
+    null,
+    {
+      flags: 4,
+      build(fn, scope) {
+        const name = cls.name?.text ?? "*class*"
+        declare_binding(scope, name, true)
+        scope.private_names = new Map()
+        const members = cls.body.members.map(
+          (member) => member.method ?? member.field,
+        )
+        for (const member of members) {
+          const public_name =
+            member.name.kind === "Ident"
+              ? member.name.ident.text
+              : member.name.kind === "String"
+                ? decode_string(member.name.text)
+                : null
+          if (
+            (member.is_static && public_name === "prototype") ||
+            (!member.is_static && !member.body && public_name === "constructor")
+          )
+            throw new SyntaxError(`Invalid class element: ${public_name}`)
+          if (member.name.kind !== "Private") continue
+          const name = member.name.ident.text
+          if (name === "#constructor" || scope.private_names.has(name))
+            throw new SyntaxError(`Duplicate or invalid private name: ${name}`)
+          if (member.accessor_type) unsupported(member, "private accessors")
+          const hidden = `*private:${name}*`
+          scope.private_names.set(name, hidden)
+          const binding = declare_binding(scope, hidden, true)
+          const token = allocate(fn)
+          emit(fn, OP.OBJECT, token)
+          emit(fn, OP.INIT_ENV, 0, binding.slot, token)
+        }
+        const keys = new Map()
+        const private_methods = new Map()
+        for (let i = 0; i < members.length; i++) {
+          const member = members[i]
+          if (member.name.kind === "Computed") {
+            const hidden = `*key:${i}*`
+            const binding = declare_binding(scope, hidden, true)
+            emit(
+              fn,
+              OP.INIT_ENV,
+              0,
+              binding.slot,
+              property_key(state, fn, scope, member.name),
+            )
+            keys.set(member, hidden)
+          }
+          if (member.body && member.name.kind === "Private") {
+            const hidden = `*method:${i}*`
+            declare_binding(scope, hidden, true)
+            private_methods.set(member, hidden)
+          }
+        }
+        const key_of = (owner, current, member) =>
+          member.name.kind === "Private"
+            ? private_name(state, owner, current, member.name.ident.text)
+            : keys.has(member)
+              ? load_name(state, owner, current, keys.get(member))
+              : property_key(state, owner, current, member.name)
+        const constructors = members.filter(
+          (member) =>
+            member.body &&
+            !member.is_static &&
+            member.name.kind !== "Private" &&
+            (member.name.ident?.text ??
+              (member.name.kind === "String"
+                ? decode_string(member.name.text)
+                : null)) === "constructor",
+        )
+        if (constructors.length > 1)
+          throw new SyntaxError("Duplicate constructor")
+        const constructor = constructors[0]
+        if (
+          constructor?.accessor_type ||
+          constructor?.body.is_async ||
+          constructor?.body.is_generator
+        )
+          throw new SyntaxError("Invalid constructor")
+        const constructor_id = compile_function(
+          state,
+          fn,
+          scope,
+          constructor?.body.body.stmts ?? [],
+          name,
+          constructor?.body.params ?? [],
+          null,
+          {
+            flags: 1,
+            build(owner) {
+              const field_scope = create_scope(scope, owner)
+              const receiver = load_name(state, owner, field_scope, "this")
+              for (const [member, hidden] of private_methods)
+                if (!member.is_static)
+                  emit(
+                    owner,
+                    OP.PRIVATE_INIT,
+                    receiver,
+                    key_of(owner, field_scope, member),
+                    load_name(state, owner, field_scope, hidden),
+                    1,
+                  )
+              for (const member of members) {
+                if (member.body || member.is_static) continue
+                if (
+                  member.name.kind !== "Private" &&
+                  member.name.ident?.text === "constructor"
+                )
+                  throw new SyntaxError("Invalid field name: constructor")
+                const key = key_of(owner, field_scope, member)
+                const value = member.initializer
+                  ? compile_expr(state, owner, field_scope, member.initializer)
+                  : constant(state, owner, undefined)
+                emit(
+                  owner,
+                  member.name.kind === "Private"
+                    ? OP.PRIVATE_INIT
+                    : OP.DEFINE_PROP,
+                  receiver,
+                  key,
+                  value,
+                  member.name.kind === "Private" ? 0 : 7,
+                )
+              }
+            },
+          },
+        )
+        const ctor = allocate(fn),
+          prototype = allocate(fn)
+        emit(fn, OP.CLOSURE, ctor, constructor_id)
+        emit(fn, OP.INIT_ENV, 0, scope.bindings.get(name).slot, ctor)
+        emit(fn, OP.OBJECT, prototype)
+        emit(
+          fn,
+          OP.DEFINE_PROP,
+          ctor,
+          constant(state, fn, "prototype"),
+          prototype,
+          0,
+        )
+        emit(
+          fn,
+          OP.DEFINE_PROP,
+          ctor,
+          constant(state, fn, "name"),
+          constant(state, fn, cls.name?.text ?? ""),
+          4,
+        )
+        emit(
+          fn,
+          OP.DEFINE_PROP,
+          ctor,
+          constant(state, fn, "length"),
+          constant(state, fn, constructor?.body.params.length ?? 0),
+          4,
+        )
+        emit(
+          fn,
+          OP.DEFINE_PROP,
+          prototype,
+          constant(state, fn, "constructor"),
+          ctor,
+          5,
+        )
+        for (const member of members) {
+          if (!member.body || member === constructor) continue
+          const value = function_value(
+            state,
+            fn,
+            scope,
+            member.body,
+            member.name.ident?.text ?? "<method>",
+            2,
+          )
+          if (member.name.kind === "Private") {
+            emit(
+              fn,
+              OP.INIT_ENV,
+              0,
+              scope.bindings.get(private_methods.get(member)).slot,
+              value,
+            )
+            if (member.is_static)
+              emit(
+                fn,
+                OP.PRIVATE_INIT,
+                ctor,
+                key_of(fn, scope, member),
+                value,
+                1,
+              )
+          } else {
+            const flags = 5 | (member.accessor_type ? 16 : 0)
+            emit(
+              fn,
+              OP.DEFINE_PROP,
+              member.is_static ? ctor : prototype,
+              key_of(fn, scope, member),
+              value,
+              flags,
+              member.accessor_type === "Set" ? 1 : 0,
+            )
+          }
+        }
+        for (const member of members)
+          if (!member.body && member.is_static) {
+            // Static field initializers receive the class as this, through a guest call.
+            const init_id = compile_function(
+              state,
+              fn,
+              scope,
+              [],
+              "<static field>",
+              [],
+              member.initializer,
+              { flags: 2 },
+            )
+            const init = allocate(fn),
+              value = allocate(fn)
+            emit(fn, OP.CLOSURE, init, init_id)
+            const key = key_of(fn, scope, member)
+            emit(fn, OP.CALL, value, init, ctor, 0, 0)
+            emit(
+              fn,
+              member.name.kind === "Private" ? OP.PRIVATE_INIT : OP.DEFINE_PROP,
+              ctor,
+              key,
+              value,
+              member.name.kind === "Private" ? 0 : 7,
+            )
+          }
+        emit(fn, OP.RETURN, ctor)
+      },
+    },
+  )
+  const closure = allocate(parent),
+    dst = allocate(parent)
+  emit(parent, OP.CLOSURE, closure, id)
+  emit(parent, OP.CALL, dst, closure, constant(state, parent, undefined), 0, 0)
+  return dst
 }

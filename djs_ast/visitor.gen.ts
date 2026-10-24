@@ -211,6 +211,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_ident(expr.property)
         break
       }
+      case "PrivateName": {
+        this.visit_ident(expr.ident)
+        break
+      }
       case "String": {
         break
       }
@@ -421,6 +425,10 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_ident(object_key.ident)
         break
       }
+      case "Private": {
+        this.visit_ident(object_key.ident)
+        break
+      }
       case "String": {
         break
       }
@@ -547,6 +555,7 @@ export class ASTVisitorBase implements ASTVisitor {
   }
   visit_method_def(node: ast.MethodDef): void {
     this.visit_object_key(node.name)
+
     this.visit_func(node.body)
     if (node.return_type !== null) {
       this.visit_type_annotation(node.return_type)
@@ -598,7 +607,8 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_field_def(node: ast.FieldDef): void {
-    this.visit_ident(node.name)
+    this.visit_object_key(node.name)
+
     if (node.initializer !== null) {
       this.visit_expr(node.initializer)
     }

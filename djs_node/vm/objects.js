@@ -40,11 +40,16 @@ export function create_function(
   code_id,
   function_id,
   environment,
+  flags = 0,
+  receiver,
 ) {
-  const reference = allocate(memory, KINDS.FUNCTION, 16)
+  const reference = allocate(memory, KINDS.FUNCTION, 48)
   set_ref(memory, destination, reference)
   write_u32(memory, reference + 8, code_id)
   write_u32(memory, reference + 12, function_id)
+  write_u32(memory, reference + 32, flags)
+  if (receiver !== undefined)
+    copy_root_to_heap_value(memory, reference + 40, receiver)
   if (environment !== undefined)
     copy_root_to_heap_value(memory, reference + 16, environment)
 }
@@ -137,20 +142,49 @@ export function store_binding(
   }
 }
 
-function find_property(memory, object, name) {
+// Object and function records have separate payloads but share property semantics.
+function object_offsets(memory, object) {
+  const kind = kind_of(memory, object)
+  if (kind === KINDS.FUNCTION) return [24, 28]
+  if (kind === KINDS.OBJECT || kind === KINDS.ERROR) return [8, 12]
+  throw new TypeError("Expected an object")
+}
+
+export function find_property(
+  memory,
+  object,
+  name,
+  own = false,
+  private_key = false,
+) {
+  const [head, prototype] = object_offsets(memory, object)
   let reference = get_ref(memory, object)
+  let property_head = head,
+    prototype_offset = prototype
   const key = alloc_root(memory)
   try {
     while (reference !== 0) {
-      if (read_u32(memory, reference) !== KINDS.OBJECT)
-        throw new TypeError("Expected an object")
-      let property = read_u32(memory, reference + 8)
+      let property = read_u32(memory, reference + property_head)
       while (property !== 0) {
-        copy_heap_value_to_root(memory, key, property + 16)
-        if (read_string(memory, key) === name) return property
+        const flags = read_u32(memory, property + 12)
+        if (Boolean(flags & 8) === private_key) {
+          copy_heap_value_to_root(memory, key, property + 16)
+          if (
+            private_key
+              ? get_ref(memory, key) === get_ref(memory, name)
+              : read_string(memory, key) === name
+          )
+            return property
+        }
         property = read_u32(memory, property + 8)
       }
-      reference = read_u32(memory, reference + 12)
+      if (own || private_key) break
+      reference = read_u32(memory, reference + prototype_offset)
+      if (reference !== 0) {
+        const kind = read_u32(memory, reference)
+        property_head = kind === KINDS.FUNCTION ? 24 : 8
+        prototype_offset = kind === KINDS.FUNCTION ? 28 : 12
+      }
     }
     return 0
   } finally {
@@ -160,43 +194,185 @@ function find_property(memory, object, name) {
 
 export function get_property(memory, destination, object, key) {
   const name = to_string(memory, key)
-  if (kind_of(memory, object) === KINDS.STRING && name === "length") {
-    write_number(
-      memory,
-      destination,
-      read_u32(memory, get_ref(memory, object) + 8),
-    )
-    return
+  if (kind_of(memory, object) === KINDS.STRING) {
+    if (name === "length")
+      write_number(
+        memory,
+        destination,
+        read_u32(memory, get_ref(memory, object) + 8),
+      )
+    else write_undefined(memory, destination)
+    return 0
   }
   const property = find_property(memory, object, name)
   if (property === 0) write_undefined(memory, destination)
   else copy_heap_value_to_root(memory, destination, property + 24)
+  // The interpreter invokes getters; the memory layer never executes guest code.
+  return property !== 0 && read_u32(memory, property + 12) & 16 ? 1 : 0
+}
+
+export function define_property(memory, object, key, value, flags = 7, setter) {
+  const [head] = object_offsets(memory, object)
+  const private_key = Boolean(flags & 8)
+  const property = find_property(
+    memory,
+    object,
+    private_key ? key : to_string(memory, key),
+    true,
+    private_key,
+  )
+  if (property !== 0) {
+    const previous_flags = read_u32(memory, property + 12)
+    if (!(previous_flags & 4)) throw new TypeError("Cannot redefine property")
+    if (flags & 16) {
+      if (!(previous_flags & 16)) {
+        write_u32(memory, property + 12, flags)
+        const empty = alloc_root(memory)
+        try {
+          copy_root_to_heap_value(memory, property + 24, empty)
+          copy_root_to_heap_value(memory, property + 32, empty)
+        } finally {
+          free_root(memory, empty)
+        }
+      }
+      copy_root_to_heap_value(
+        memory,
+        property + (setter === undefined ? 24 : 32),
+        value,
+      )
+      return
+    }
+    write_u32(memory, property + 12, flags)
+    copy_root_to_heap_value(memory, property + 24, value)
+    if (previous_flags & 16) {
+      const empty = alloc_root(memory)
+      try {
+        copy_root_to_heap_value(memory, property + 32, empty)
+      } finally {
+        free_root(memory, empty)
+      }
+    }
+    return
+  }
+  const normalized = alloc_root(memory)
+  try {
+    if (private_key || kind_of(memory, key) === KINDS.STRING)
+      copy_value(memory, normalized, key)
+    else write_string(memory, normalized, to_string(memory, key))
+    const reference = allocate(memory, KINDS.PROPERTY, private_key ? 24 : 32)
+    const object_reference = get_ref(memory, object)
+    write_u32(memory, reference + 8, read_u32(memory, object_reference + head))
+    write_u32(memory, reference + 12, flags)
+    copy_root_to_heap_value(memory, reference + 16, normalized)
+    copy_root_to_heap_value(
+      memory,
+      reference + (flags & 16 && setter !== undefined ? 32 : 24),
+      value,
+    )
+    write_u32(memory, object_reference + head, reference)
+  } finally {
+    free_root(memory, normalized)
+  }
 }
 
 export function set_property(memory, object, key, value) {
-  if (kind_of(memory, object) !== KINDS.OBJECT)
-    throw new TypeError("Expected an object")
   const property = find_property(memory, object, to_string(memory, key))
   if (property !== 0) {
-    copy_root_to_heap_value(memory, property + 24, value)
+    const flags = read_u32(memory, property + 12)
+    if (flags & 16) return property
+    if (!(flags & 1)) throw new TypeError("Cannot assign to readonly property")
+    if (find_property(memory, object, to_string(memory, key), true) !== 0) {
+      copy_root_to_heap_value(memory, property + 24, value)
+      return 0
+    }
+  }
+  define_property(memory, object, key, value)
+  return 0
+}
+
+export function private_property(
+  memory,
+  destination,
+  object,
+  key,
+  value,
+  initialize = false,
+  has = false,
+  readonly = false,
+) {
+  if (
+    has &&
+    ![KINDS.OBJECT, KINDS.FUNCTION, KINDS.ERROR].includes(
+      kind_of(memory, object),
+    )
+  )
+    throw new TypeError("Private brand check requires an object")
+  const property = find_property(memory, object, key, true, true)
+  if (has) {
+    write_boolean(memory, destination, property !== 0)
     return
   }
-  const normalized_key = alloc_root(memory)
-  try {
-    if (kind_of(memory, key) === KINDS.STRING)
-      copy_value(memory, normalized_key, key)
-    else write_string(memory, normalized_key, to_string(memory, key))
-    // All inputs are root handles; allocation may relocate every input object.
-    const reference = allocate(memory, KINDS.PROPERTY, 24)
-    const object_reference = get_ref(memory, object)
-    write_u32(memory, reference + 8, read_u32(memory, object_reference + 8))
-    write_u32(memory, reference + 12, 7) // writable, enumerable, configurable
-    copy_root_to_heap_value(memory, reference + 16, normalized_key)
-    copy_root_to_heap_value(memory, reference + 24, value)
-    write_u32(memory, object_reference + 8, reference)
-  } finally {
-    free_root(memory, normalized_key)
+  if (initialize) {
+    if (property !== 0)
+      throw new TypeError("Private field is already initialized")
+    define_property(memory, object, key, value, readonly ? 8 : 9)
+  } else {
+    if (property === 0) throw new TypeError("Invalid private field receiver")
+    if (value === undefined)
+      copy_heap_value_to_root(memory, destination, property + 24)
+    else {
+      if (!(read_u32(memory, property + 12) & 1))
+        throw new TypeError("Private method is readonly")
+      copy_root_to_heap_value(memory, property + 24, value)
+    }
   }
+}
+
+export function set_prototype(memory, object, prototype) {
+  const [, offset] = object_offsets(memory, object)
+  write_u32(
+    memory,
+    get_ref(memory, object) + offset,
+    get_ref(memory, prototype),
+  )
+}
+
+export function create_value_array(memory, destination, values) {
+  const reference = allocate(memory, KINDS.VALUE_ARRAY, 8 + values.length * 8)
+  set_ref(memory, destination, reference)
+  write_u32(memory, reference + 8, values.length)
+  for (let i = 0; i < values.length; i++)
+    copy_root_to_heap_value(memory, reference + 16 + i * 8, values[i])
+}
+
+export function create_error(runtime, destination, name, message) {
+  const { memory } = runtime
+  create_object(memory, destination)
+  write_u32(memory, get_ref(memory, destination), KINDS.ERROR)
+  const prototype = runtime.error_prototypes?.get(name)
+  if (prototype !== undefined) set_prototype(memory, destination, prototype)
+  const key = alloc_root(memory),
+    value = alloc_root(memory)
+  try {
+    write_string(memory, key, "name")
+    write_string(memory, value, name)
+    define_property(memory, destination, key, value, 5)
+    write_string(memory, key, "message")
+    write_string(memory, value, message)
+    define_property(memory, destination, key, value, 5)
+  } finally {
+    free_root(memory, key)
+    free_root(memory, value)
+  }
+}
+
+function has_error_prototype(memory, value) {
+  let reference = get_ref(memory, value)
+  while (reference !== 0) {
+    if (read_u32(memory, reference) === KINDS.ERROR) return true
+    reference = read_u32(memory, reference + 12)
+  }
+  return false
 }
 
 export function to_string(memory, value) {
@@ -215,8 +391,23 @@ export function to_string(memory, value) {
           return read_string(memory, value)
         case KINDS.FUNCTION:
           return "[Function]"
-        case KINDS.PROMISE:
-          return "[object Promise]"
+        case KINDS.OBJECT:
+          if (!has_error_prototype(memory, value)) return "[object Object]"
+        case KINDS.ERROR: {
+          const key = alloc_root(memory),
+            text = alloc_root(memory)
+          try {
+            write_string(memory, key, "name")
+            get_property(memory, text, value, key)
+            const name = to_string(memory, text)
+            write_string(memory, key, "message")
+            get_property(memory, text, value, key)
+            return name + ": " + to_string(memory, text)
+          } finally {
+            free_root(memory, key)
+            free_root(memory, text)
+          }
+        }
         default:
           return "[object Object]"
       }
@@ -272,6 +463,41 @@ export function write_primitive(memory, destination, value) {
 }
 
 export function binary_operation(memory, destination, left, right, operator) {
+  if (operator === "instanceof") {
+    if (kind_of(memory, right) !== KINDS.FUNCTION)
+      throw new TypeError("Expected a constructor")
+    const key = alloc_root(memory),
+      prototype = alloc_root(memory)
+    try {
+      write_string(memory, key, "prototype")
+      get_property(memory, prototype, right, key)
+      object_offsets(memory, prototype)
+      let found = false
+      if (
+        [KINDS.OBJECT, KINDS.FUNCTION, KINDS.ERROR].includes(
+          kind_of(memory, left),
+        )
+      ) {
+        let reference = get_ref(memory, left)
+        while (reference !== 0) {
+          reference = read_u32(
+            memory,
+            reference +
+              (read_u32(memory, reference) === KINDS.FUNCTION ? 28 : 12),
+          )
+          if (reference === get_ref(memory, prototype)) {
+            found = true
+            break
+          }
+        }
+      }
+      write_boolean(memory, destination, found)
+      return
+    } finally {
+      free_root(memory, key)
+      free_root(memory, prototype)
+    }
+  }
   if (
     ["===", "!==", "==", "!="].includes(operator) &&
     (kind_of(memory, left) > KINDS.STRING ||

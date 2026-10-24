@@ -203,12 +203,12 @@ function parser_impl(
 
   const parse_logical_and_expr = define_binop_parser(
     parse_bitwise_or_expr,
-    t.VBarVBar,
+    t.AmpAmp,
   )
 
   const parse_logical_or_expr = define_binop_parser(
     parse_logical_and_expr,
-    t.AmpAmp,
+    t.VBarVBar,
   )
 
   return { parse_source_file }
@@ -463,6 +463,10 @@ function parser_impl(
   }
 
   function parse_member_ident_name(): Ident | Err {
+    if (at(t.PrivateIdent)) {
+      const token = advance()
+      return { span: token.span, text: token.text }
+    }
     if (TokenKind.is_keyword(self.current_token.kind)) {
       const token = advance()
       return { span: token.span, text: token.text }
@@ -565,6 +569,10 @@ function parser_impl(
         const ident = parse_ident()
         if (ident === ERR) return ERR
         return Expr.Var(ident.span, leading_trivia, ident)
+      }
+      case t.PrivateIdent: {
+        const tok = advance()
+        return Expr.PrivateName(tok.span, { span: tok.span, text: tok.text })
       }
       case t.True:
         return Expr.Boolean(advance().span, true)
@@ -726,6 +734,10 @@ function parser_impl(
 
     const members: ClassMember[] = []
     while (!at(t.RBrace) && !at(t.EndOfFile)) {
+      if (at(t.Semi)) {
+        advance()
+        continue
+      }
       const member = parse_class_member()
       if (member === ERR) return ERR
       members.push(member)
@@ -756,14 +768,17 @@ function parser_impl(
   }
 
   function parse_class_member(): ClassMember | Err {
-    const method = parse_method_def()
-    if (method === ERR) return ERR
-    return ClassMember.MethodDef(method)
+    return parse_method_def()
   }
 
-  function parse_method_def(): MethodDef | Err {
+  function parse_method_def(): ClassMember | Err {
     let static_token: Token | null = null
-    if (at(t.Static)) {
+    if (
+      at(t.Static) &&
+      !next_is(t.LParen) &&
+      !next_is(t.Eq) &&
+      !next_is(t.Semi)
+    ) {
       static_token = advance()
     }
 
@@ -791,10 +806,36 @@ function parser_impl(
       advance()
     }
 
-    const name = parse_object_key()
-    if (name === ERR) return ERR
-
+    let name: ObjectKey
+    if (at(t.PrivateIdent)) {
+      const tok = advance()
+      name = ObjectKey.Private(tok.span, { span: tok.span, text: tok.text })
+    } else {
+      const key = parse_object_key()
+      if (key === ERR) return ERR
+      name = key
+    }
     const start = static_token ? static_token.span : name.span
+    if (!at(t.LParen) && !at(t.LessThan)) {
+      if (accessor_type || is_async || is_generator) {
+        emit_error("Expected a method")
+        return ERR
+      }
+      let initializer: Expr | null = null
+      if (at(t.Eq)) {
+        advance()
+        const value = parse_assignment_expr()
+        if (value === ERR) return ERR
+        initializer = value
+      }
+      if (expect_semi() === ERR) return ERR
+      return ClassMember.FieldDef({
+        span: Span.between(start, initializer?.span ?? name.span),
+        name,
+        is_static: static_token !== null,
+        initializer,
+      })
+    }
 
     const type_params = parse_optional_type_params()
     if (type_params === ERR) return ERR
@@ -809,9 +850,10 @@ function parser_impl(
 
     const span = Span.between(start, body.span)
 
-    return {
+    return ClassMember.MethodDef({
       span,
       name,
+      is_static: static_token !== null,
       accessor_type,
       return_type,
       body: {
@@ -826,7 +868,7 @@ function parser_impl(
         is_generator,
         is_async,
       },
-    }
+    })
   }
   function parse_object_literal_entry(): ObjectLiteralEntry | Err {
     if (at(t.DotDotDot)) {
@@ -877,6 +919,7 @@ function parser_impl(
           const method: MethodDef = {
             span,
             name,
+            is_static: false,
             accessor_type: null,
             return_type,
             body: {
@@ -956,6 +999,7 @@ function parser_impl(
     const method: MethodDef = {
       span,
       name,
+      is_static: false,
       accessor_type,
       return_type,
       body: {
@@ -985,6 +1029,10 @@ function parser_impl(
   }
 
   function parse_object_key(): ObjectKey | Err {
+    if (at(t.PrivateIdent)) {
+      emit_error("Private names are only allowed in class bodies")
+      return ERR
+    }
     switch (self.current_token.kind) {
       case t.String: {
         const tok = advance()
@@ -2790,7 +2838,9 @@ function expr_to_pattern(expr: Expr): Pattern | null {
       return Pattern.Prop(
         expr.span,
         expr.lhs,
-        ObjectKey.Ident(expr.property.span, expr.property),
+        expr.property.text.startsWith("#")
+          ? ObjectKey.Private(expr.property.span, expr.property)
+          : ObjectKey.Ident(expr.property.span, expr.property),
       )
     case "Index":
       return Pattern.Prop(

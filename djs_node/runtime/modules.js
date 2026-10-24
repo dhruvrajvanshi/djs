@@ -16,7 +16,7 @@ import {
   dispose_context,
   context_error,
 } from "../vm/interpreter.js"
-import { create_scheduler, create_promise, settle_promise } from "./jobs.js"
+import { create_scheduler } from "./jobs.js"
 import { create_node_host } from "../host/node.js"
 
 export const MODULE_STATE = Object.freeze({
@@ -33,6 +33,7 @@ const BUILTINS = new Map([
     "node:fs/promises",
     new URL("../stdlib/node/fs/promises.js", import.meta.url),
   ],
+  ["djs:errors", new URL("../js/errors.js", import.meta.url)],
   ["djs:promise", new URL("../js/promise.js", import.meta.url)],
 ])
 
@@ -144,14 +145,11 @@ export async function load_module(runtime, identity) {
     get environment() {
       return state_view(module).getUint32(4, true)
     },
-    get evaluation_promise() {
-      return state_view(module).getUint32(8, true)
-    },
     get error() {
       return state_view(module).getUint32(12, true)
     },
   }
-  for (const offset of [4, 8, 12])
+  for (const offset of [4, 12])
     state_view(module).setUint32(offset, alloc_root(runtime.memory), true)
   const fn = unit.functions[unit.entry]
   create_environment(
@@ -161,7 +159,6 @@ export async function load_module(runtime, identity) {
     fn.binding_count,
     runtime.code[code_id].scope_ids[unit.entry],
   )
-  create_promise(runtime, module.evaluation_promise)
   runtime.modules.push(module)
   runtime.identities.set(identity, module.id)
   const imports =
@@ -190,7 +187,6 @@ export async function load_module(runtime, identity) {
   } catch (error) {
     set_module_status(module, MODULE_STATE.ERRORED)
     write_string(runtime.memory, module.error, error.message)
-    settle_promise(runtime, module.evaluation_promise, module.error, true)
     throw error
   }
 }
@@ -213,14 +209,12 @@ export async function evaluate_module(runtime, module, ancestors = new Set()) {
     set_module_status(module, MODULE_STATE.EVALUATED)
     // Module evaluation fulfills with undefined; exports live in its environment.
     write_undefined(runtime.memory, module.error)
-    settle_promise(runtime, module.evaluation_promise, module.error)
     return module
   } catch (error) {
     set_module_status(module, MODULE_STATE.ERRORED)
     if (context)
       copy_value(runtime.memory, module.error, context_error(context))
     else write_string(runtime.memory, module.error, error.message)
-    settle_promise(runtime, module.evaluation_promise, module.error, true)
     throw error
   } finally {
     if (context) dispose_context(runtime, context)

@@ -262,6 +262,7 @@ export function lexer_impl(self: LexerState): Lexer {
     // _ if at!("0b") || at!("0b") => self.lex_binary_number(),
     else if (at("0b") || at("0B")) return lex_binary_number()
     else if (at("@")) return lex_decorator_ident()
+    else if (at("#")) return lex_private_ident()
     // c if c.is_ascii_digit() => self.lex_number(),
     else if (is_ascii_digit(current_char())) return lex_number()
     else {
@@ -724,6 +725,14 @@ export function lexer_impl(self: LexerState): Lexer {
     }
   }
 
+  function lex_private_ident(): Token {
+    advance()
+    if (!is_identifier_start(current_char()))
+      return error_token("Expected identifier after #")
+    while (is_identifier_char(current_char())) advance()
+    return make_token(TokenKind.PrivateIdent)
+  }
+
   function lex_decorator_ident(): Token {
     assert(current_char() === "@", "Expected '@' at the start of a decorator")
     advance()
@@ -763,6 +772,8 @@ export function lexer_impl(self: LexerState): Lexer {
         kind === TokenKind.Number ||
         kind === TokenKind.TemplateLiteralFragment ||
         kind === TokenKind.DecoratorIdent ||
+        kind === TokenKind.PrivateIdent ||
+        TokenKind.is_keyword(kind) ||
         kind === TokenKind.Regex
           ? current_text()
           : "",
@@ -794,7 +805,7 @@ function is_alphabet(c: string): boolean {
   return (c >= "a" && c <= "z") || (c >= "A" && c <= "Z")
 }
 function is_identifier_start(c: string): boolean {
-  return is_alphabet(c) || c === "_" || c === "$" || c === "#"
+  return is_alphabet(c) || c === "_" || c === "$"
 }
 
 function is_identifier_char(c: string): boolean {

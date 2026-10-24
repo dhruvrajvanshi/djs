@@ -15,44 +15,13 @@ import {
   load_module,
 } from "../runtime/modules.js"
 import {
-  CONTEXT_STATE,
-  await_value,
-  create_promise,
   create_scheduler,
-  drain_completions,
+  enqueue_job,
   drain_jobs,
   pending_operations,
-  settle_promise,
-  start_read,
-  wait_for_completion,
 } from "../runtime/jobs.js"
-
-function scheduler_runtime(host = {}) {
-  return {
-    memory: create_memory({ semispace_bytes: 4096, root_capacity: 2 }),
-    scheduler: create_scheduler(),
-    contexts: [],
-    host,
-  }
-}
-
-// These contexts contain the same byte control fields used by the interpreter.
-// Scheduler tests isolate guest-value lifetimes from compilation and linking.
-function scheduler_context(runtime) {
-  const context = {
-    id: runtime.contexts.length,
-    control: new Uint8Array(32),
-  }
-  const destination = alloc_root(runtime.memory)
-  const error = alloc_root(runtime.memory)
-  new DataView(context.control.buffer).setUint32(16, error, true)
-  runtime.contexts.push(context)
-  return { context, destination, error }
-}
-
-function status(context) {
-  return new DataView(context.control.buffer).getUint32(0, true)
-}
+import { create_function } from "../vm/objects.js"
+import { NATIVE_CODE, intrinsic_id } from "../vm/intrinsics.js"
 
 test("property creation re-reads object and value roots after allocation collects", () => {
   const memory = create_memory({ semispace_bytes: 128 })
@@ -75,92 +44,35 @@ test("property creation re-reads object and value roots after allocation collect
   assert.equal(read_string(memory, value), "value")
 })
 
-for (const rejected of [false, true]) {
-  test(`host ${rejected ? "rejection" : "fulfillment"} survives collection while suspended and queued`, async () => {
-    let finish
-    const runtime = scheduler_runtime({
-      read_text: () =>
-        new Promise((resolve, reject) => {
-          finish = rejected ? reject : resolve
-        }),
-    })
-    const { memory } = runtime
-    const { context, destination, error } = scheduler_context(runtime)
-    const promise = alloc_root(memory)
-    start_read(runtime, promise, "fixture", "utf8")
-    await_value(runtime, context, destination, promise)
-    free_root(memory, promise)
-    assert.equal(status(context), CONTEXT_STATE.WAITING)
-    assert.equal(pending_operations(runtime), 1)
-    collect(memory)
-    await Promise.resolve()
-    finish(rejected ? new Error("read failed") : "file contents")
-    await wait_for_completion(runtime)
-    collect(memory)
-    drain_completions(runtime)
-    assert.equal(pending_operations(runtime), 0)
-    assert.equal(heap_stats(memory).roots, 3) // destination, error, queued value
-    collect(memory)
-    drain_jobs(runtime)
-    assert.equal(
-      status(context),
-      rejected ? CONTEXT_STATE.FAILED : CONTEXT_STATE.READY,
-    )
-    assert.equal(
-      read_string(memory, rejected ? error : destination),
-      rejected ? "read failed" : "file contents",
-    )
-    assert.equal(heap_stats(memory).roots, 2)
-    free_root(memory, destination)
-    free_root(memory, error)
-    collect(memory)
-    assert.equal(heap_stats(memory).used_bytes, 0)
-  })
-}
-
-test("settled Promise result is rooted by its resume job after callers release it", () => {
-  const runtime = scheduler_runtime()
+test("queued callbacks retain functions and arguments across collection and queue growth", () => {
+  let output = ""
+  const runtime = {
+    memory: create_memory({ semispace_bytes: 16384, root_capacity: 2 }),
+    scheduler: create_scheduler(),
+    contexts: [],
+    host: {
+      write_stdout: (text) => {
+        output += text
+      },
+    },
+  }
   const { memory } = runtime
-  const { context, destination, error } = scheduler_context(runtime)
-  const promise = alloc_root(memory)
-  const value = alloc_root(memory)
-  create_promise(runtime, promise)
-  write_string(memory, value, "already settled")
-  settle_promise(runtime, promise, value)
-  await_value(runtime, context, destination, promise)
-  free_root(memory, promise)
-  free_root(memory, value)
-  collect(memory)
-  drain_jobs(runtime)
-  assert.equal(read_string(memory, destination), "already settled")
-  free_root(memory, destination)
-  free_root(memory, error)
-  collect(memory)
-  assert.equal(heap_stats(memory).roots, 0)
-  assert.equal(heap_stats(memory).used_bytes, 0)
-})
-
-test("resume jobs retain values across queue and root table growth", () => {
-  const runtime = scheduler_runtime()
-  const { memory } = runtime
-  const contexts = []
-  for (let index = 0; index < 24; index++) {
-    const current = scheduler_context(runtime)
-    const value = alloc_root(memory)
-    write_string(memory, value, `job ${index}`)
-    await_value(runtime, current.context, current.destination, value)
-    free_root(memory, value)
-    contexts.push(current)
+  const fn = alloc_root(memory),
+    argument = alloc_root(memory)
+  create_function(memory, fn, NATIVE_CODE, intrinsic_id("console_log"))
+  for (let index = 0; index < 40; index++) {
+    write_string(memory, argument, `job ${index}`)
+    enqueue_job(runtime, fn, argument)
     collect(memory)
   }
+  free_root(memory, fn)
+  free_root(memory, argument)
+  collect(memory)
   drain_jobs(runtime)
-  for (let index = 0; index < contexts.length; index++) {
-    const { context, destination, error } = contexts[index]
-    assert.equal(status(context), CONTEXT_STATE.READY)
-    assert.equal(read_string(memory, destination), `job ${index}`)
-    free_root(memory, destination)
-    free_root(memory, error)
-  }
+  assert.equal(
+    output,
+    Array.from({ length: 40 }, (_, i) => `job ${i}\n`).join(""),
+  )
   collect(memory)
   assert.equal(heap_stats(memory).roots, 0)
   assert.equal(heap_stats(memory).used_bytes, 0)
@@ -192,7 +104,7 @@ test("guest closures survive repeated calls and allocation-triggered collection"
     )
     let output = ""
     const runtime = create_runtime({
-      semispace_bytes: 4096,
+      semispace_bytes: 16384,
       root_capacity: 2,
       host: {
         read_text: readFile,
@@ -204,12 +116,14 @@ test("guest closures survive repeated calls and allocation-triggered collection"
     await bootstrap(runtime)
     const module = await load_module(runtime, pathToFileURL(path).href)
     const roots_before = heap_stats(runtime.memory).roots
+    collect(runtime.memory)
+    const bytes_before = heap_stats(runtime.memory).used_bytes
     await evaluate_module(runtime, module)
     assert.equal(output, "item1010 1011\n")
     assert.ok(heap_stats(runtime.memory).collections > 10)
     assert.equal(heap_stats(runtime.memory).roots, roots_before)
     collect(runtime.memory)
-    assert.ok(heap_stats(runtime.memory).used_bytes < 3072)
+    assert.ok(heap_stats(runtime.memory).used_bytes < bytes_before + 4096)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -241,7 +155,7 @@ test(
       })
       let output = ""
       const runtime = create_runtime({
-        semispace_bytes: 4096,
+        semispace_bytes: 16384,
         root_capacity: 2,
         host: {
           read_text: (requested, encoding) => {
@@ -260,6 +174,8 @@ test(
       await bootstrap(runtime)
       const module = await load_module(runtime, pathToFileURL(path).href)
       const roots_before = heap_stats(runtime.memory).roots
+      collect(runtime.memory)
+      const bytes_before = heap_stats(runtime.memory).used_bytes
       const evaluation = evaluate_module(runtime, module)
       await Promise.race([
         read_started,
@@ -270,7 +186,9 @@ test(
       assert.equal(pending_operations(runtime), 1)
       assert.ok(
         runtime.contexts.some(
-          (context) => context && status(context) === CONTEXT_STATE.WAITING,
+          (context) =>
+            context &&
+            new DataView(context.control.buffer).getUint32(0, true) === 2,
         ),
       )
       collect(runtime.memory)
@@ -282,9 +200,58 @@ test(
       assert.equal(pending_operations(runtime), 0)
       assert.equal(heap_stats(runtime.memory).roots, roots_before)
       collect(runtime.memory)
-      assert.ok(heap_stats(runtime.memory).used_bytes < 3072)
+      assert.ok(heap_stats(runtime.memory).used_bytes < bytes_before + 4096)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
   },
 )
+
+for (const rejected of [false, true]) {
+  test(`host ${rejected ? "rejection" : "fulfillment"} retains guest callbacks while suspended`, async () => {
+    let finish, started
+    const began = new Promise((resolve) => {
+      started = resolve
+    })
+    let output = ""
+    const source = `
+      import { readFile } from "node:fs/promises";
+      try { console.log(await readFile("/pending", "utf8")); }
+      catch (error) { console.log(error.name, error.message, error instanceof Error); }
+      finally { console.log("finished"); }
+    `
+    const runtime = create_runtime({
+      semispace_bytes: 16384,
+      root_capacity: 2,
+      host: {
+        read_text: (path, encoding) => {
+          if (path === "/entry") return source
+          if (path !== "/pending") return readFile(path, encoding)
+          started()
+          return new Promise((resolve, reject) => {
+            finish = rejected ? reject : resolve
+          })
+        },
+        write_stdout: (text) => {
+          output += text
+        },
+      },
+    })
+    await bootstrap(runtime)
+    const module = await load_module(runtime, "file:///entry")
+    const roots = heap_stats(runtime.memory).roots
+    const evaluation = evaluate_module(runtime, module)
+    await began
+    assert.equal(pending_operations(runtime), 1)
+    collect(runtime.memory)
+    collect(runtime.memory)
+    finish(rejected ? new Error("read failed") : "contents")
+    await evaluation
+    assert.equal(
+      output,
+      rejected ? "Error read failed true\nfinished\n" : "contents\nfinished\n",
+    )
+    assert.equal(pending_operations(runtime), 0)
+    assert.equal(heap_stats(runtime.memory).roots, roots)
+  })
+}
