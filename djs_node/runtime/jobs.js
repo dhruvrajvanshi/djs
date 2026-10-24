@@ -11,7 +11,10 @@ import {
   create_error,
   kind_of,
   to_string,
+  define_property,
+  write_primitive,
 } from "../vm/objects.js"
+import { byte_buffer_view } from "../vm/bytes.js"
 import { KINDS } from "../vm/memory.js"
 import { RESUME_CODE } from "../vm/intrinsics.js"
 import {
@@ -32,13 +35,15 @@ export const CONTEXT_STATE = Object.freeze({
   DISPOSED: 5,
 })
 const RECORD_BYTES = 16
+const OPERATION_BYTES = 24
+const NO_ROOT = 0xffffffff
 
 export function create_scheduler() {
   return {
     control: new Uint8Array(32),
     jobs: new Uint8Array(RECORD_BYTES * 16),
-    operations: new Uint8Array(RECORD_BYTES * 16),
-    // Host completions contain text/errors and numeric operation IDs only.
+    operations: new Uint8Array(OPERATION_BYTES * 16),
+    // Host completions contain host values and operation IDs, never heap pointers.
     completions: [],
     wake: null,
   }
@@ -126,7 +131,13 @@ export function await_value(runtime, context, destination, source) {
   }
 }
 
-export function start_read(runtime, path, encoding, resolve, reject) {
+export function start_operation(
+  runtime,
+  resolve,
+  reject,
+  begin,
+  { buffer, offset = 0, length = 0, syscall, path } = {},
+) {
   const { memory, scheduler } = runtime
   if (
     resolve === undefined ||
@@ -134,56 +145,118 @@ export function start_read(runtime, path, encoding, resolve, reject) {
     kind_of(memory, resolve) !== KINDS.FUNCTION ||
     kind_of(memory, reject) !== KINDS.FUNCTION
   )
-    throw new TypeError("read_file requires resolve and reject callbacks")
+    throw new TypeError("I/O operation requires resolve and reject callbacks")
   const resolve_root = alloc_root(memory),
-    reject_root = alloc_root(memory)
+    reject_root = alloc_root(memory),
+    buffer_root = buffer === undefined ? NO_ROOT : alloc_root(memory)
   copy_value(memory, resolve_root, resolve)
   copy_value(memory, reject_root, reject)
-  const id = control(scheduler).getUint32(8, true)
-  control(scheduler).setUint32(8, id + 1, true)
+  if (buffer !== undefined) copy_value(memory, buffer_root, buffer)
+  // Reuse completed slots so chunked I/O does not grow this table forever.
+  const available = control(scheduler).getUint32(20, true)
+  const id = available ? available - 1 : control(scheduler).getUint32(8, true)
+  if (available)
+    control(scheduler).setUint32(
+      20,
+      new DataView(scheduler.operations.buffer).getUint32(
+        id * OPERATION_BYTES,
+        true,
+      ),
+      true,
+    )
+  else control(scheduler).setUint32(8, id + 1, true)
   control(scheduler).setUint32(12, pending_operations(runtime) + 1, true)
-  grow(scheduler, "operations", (id + 1) * RECORD_BYTES)
+  grow(scheduler, "operations", (id + 1) * OPERATION_BYTES)
   const operations = new DataView(scheduler.operations.buffer)
-  operations.setUint32(id * RECORD_BYTES, 1, true)
-  operations.setUint32(id * RECORD_BYTES + 4, resolve_root, true)
-  operations.setUint32(id * RECORD_BYTES + 8, reject_root, true)
+  const record = id * OPERATION_BYTES
+  operations.setUint32(record, NO_ROOT, true)
+  operations.setUint32(record + 4, resolve_root, true)
+  operations.setUint32(record + 8, reject_root, true)
+  operations.setUint32(record + 12, buffer_root, true)
+  operations.setUint32(record + 16, offset, true)
+  operations.setUint32(record + 20, length, true)
   Promise.resolve()
-    .then(() => runtime.host.read_text(path, encoding))
+    .then(begin)
     .then(
-      (text) => {
-        scheduler.completions.push({ id, text })
+      (result) => {
+        scheduler.completions.push({ id, result, syscall, path })
         notify(runtime)
       },
       (error) => {
-        scheduler.completions.push({ id, error, rejected: true })
+        scheduler.completions.push({ id, error, rejected: true, syscall, path })
         notify(runtime)
       },
     )
 }
 
+function operation_error(runtime, destination, error, syscall, path) {
+  const { memory } = runtime
+  create_error(runtime, destination, "Error", String(error?.message ?? error))
+  const key = alloc_root(memory),
+    value = alloc_root(memory)
+  try {
+    for (const [name, item] of Object.entries({
+      code: error?.code,
+      syscall,
+      path,
+    })) {
+      if (item === undefined) continue
+      write_string(memory, key, name)
+      write_primitive(memory, value, item)
+      define_property(memory, destination, key, value)
+    }
+  } finally {
+    free_root(memory, key)
+    free_root(memory, value)
+  }
+}
+
 export function drain_completions(runtime) {
   const { memory, scheduler } = runtime
-  for (const completion of scheduler.completions.splice(0)) {
-    const offset = completion.id * RECORD_BYTES
+  while (scheduler.completions.length) {
+    const completion = scheduler.completions.shift()
+    const offset = completion.id * OPERATION_BYTES
     const operations = new DataView(scheduler.operations.buffer)
     const resolve = operations.getUint32(offset + 4, true),
-      reject = operations.getUint32(offset + 8, true)
+      reject = operations.getUint32(offset + 8, true),
+      buffer = operations.getUint32(offset + 12, true)
     const value = alloc_root(memory)
     try {
-      if (completion.rejected)
-        create_error(
+      let rejected = completion.rejected
+      try {
+        if (rejected) throw completion.error
+        if (buffer !== NO_ROOT) {
+          const bytes = completion.result
+          const start = operations.getUint32(offset + 16, true)
+          const length = operations.getUint32(offset + 20, true)
+          if (!(bytes instanceof Uint8Array) || bytes.length > length)
+            throw new TypeError("Host read returned invalid bytes")
+          // Resolve the rooted buffer again here; it may have moved while waiting.
+          byte_buffer_view(memory, buffer).set(bytes, start)
+          write_number(memory, value, bytes.length)
+        } else write_primitive(memory, value, completion.result)
+      } catch (error) {
+        rejected = true
+        operation_error(
           runtime,
           value,
-          "Error",
-          String(completion.error?.message ?? completion.error),
+          error,
+          completion.syscall,
+          completion.path,
         )
-      else write_string(memory, value, completion.text)
-      enqueue_job(runtime, completion.rejected ? reject : resolve, value)
+      }
+      enqueue_job(runtime, rejected ? reject : resolve, value)
     } finally {
       free_root(memory, value)
       free_root(memory, resolve)
       free_root(memory, reject)
-      new DataView(scheduler.operations.buffer).setUint32(offset, 0, true)
+      if (buffer !== NO_ROOT) free_root(memory, buffer)
+      new DataView(scheduler.operations.buffer).setUint32(
+        offset,
+        control(scheduler).getUint32(20, true),
+        true,
+      )
+      control(scheduler).setUint32(20, completion.id + 1, true)
       control(scheduler).setUint32(12, pending_operations(runtime) - 1, true)
     }
   }

@@ -20,7 +20,7 @@ import { kind_of, store_binding } from "../vm/objects.js"
 
 test("djs:intrinsics is a cached virtual module whose exports survive moving GC", async () => {
   const runtime = create_runtime({
-    semispace_bytes: 512,
+    semispace_bytes: 1024,
     root_capacity: 1,
     host: {
       read_text() {

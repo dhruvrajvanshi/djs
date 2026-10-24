@@ -18,6 +18,7 @@ const MIN_PAYLOAD_BYTES = Object.freeze({
   [KINDS.PROPERTY]: 24,
   [KINDS.FUNCTION]: 48,
   [KINDS.ENVIRONMENT]: 16,
+  [KINDS.BYTE_BUFFER]: 4,
   [KINDS.ERROR]: 8,
   [KINDS.VALUE_ARRAY]: 8,
 })
@@ -153,7 +154,7 @@ export function collect(memory) {
       for (let index = 0; index < count; index++) {
         trace_value(memory.heap_view, values_start + index * 8)
       }
-    } else if (kind !== KINDS.STRING) {
+    } else if (kind !== KINDS.STRING && kind !== KINDS.BYTE_BUFFER) {
       throw new Error(`Unknown heap kind: ${kind}`)
     }
     scan += size

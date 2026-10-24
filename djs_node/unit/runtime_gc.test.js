@@ -191,17 +191,26 @@ test(
         started = resolve
       })
       let output = ""
+      let reads = 0
+      let closed = false
       const runtime = create_runtime({
-        semispace_bytes: 16384,
+        semispace_bytes: 32768,
         root_capacity: 2,
         host: {
-          read_text: (requested, encoding) => {
-            if (requested !== "/pending-data")
-              return readFile(requested, encoding)
+          read_text: readFile,
+          open: (path) => {
+            assert.equal(path, "/pending-data")
+            return 1
+          },
+          read: () => {
+            if (reads++ > 0) return new Uint8Array()
             started()
             return new Promise((resolve) => {
               finish = resolve
             })
+          },
+          close: () => {
+            closed = true
           },
           write_stdout: (text) => {
             output += text
@@ -231,10 +240,11 @@ test(
       collect(runtime.memory)
       collect(runtime.memory)
       assert.equal(output, "")
-      finish("contents")
+      finish(new TextEncoder().encode("contents"))
       await evaluation
       assert.equal(output, "read: contents\n")
       assert.equal(pending_operations(runtime), 0)
+      assert.equal(closed, true)
       assert.equal(heap_stats(runtime.memory).roots, roots_before)
       collect(runtime.memory)
       assert.ok(heap_stats(runtime.memory).used_bytes < bytes_before + 4096)
@@ -251,6 +261,8 @@ for (const rejected of [false, true]) {
       started = resolve
     })
     let output = ""
+    let reads = 0
+    let closed = false
     const source = `
       import { readFile } from "node:fs/promises";
       try { console.log(await readFile("/pending", "utf8")); }
@@ -258,16 +270,26 @@ for (const rejected of [false, true]) {
       finally { console.log("finished"); }
     `
     const runtime = create_runtime({
-      semispace_bytes: 16384,
+      semispace_bytes: 32768,
       root_capacity: 2,
       host: {
         read_text: (path, encoding) => {
           if (path === "/entry") return source
-          if (path !== "/pending") return readFile(path, encoding)
+          return readFile(path, encoding)
+        },
+        open: (path) => {
+          assert.equal(path, "/pending")
+          return 1
+        },
+        read: () => {
+          if (reads++ > 0) return new Uint8Array()
           started()
           return new Promise((resolve, reject) => {
             finish = rejected ? reject : resolve
           })
+        },
+        close: () => {
+          closed = true
         },
         write_stdout: (text) => {
           output += text
@@ -282,13 +304,18 @@ for (const rejected of [false, true]) {
     assert.equal(pending_operations(runtime), 1)
     collect(runtime.memory)
     collect(runtime.memory)
-    finish(rejected ? new Error("read failed") : "contents")
+    finish(
+      rejected
+        ? new Error("read failed")
+        : new TextEncoder().encode("contents"),
+    )
     await evaluation
     assert.equal(
       output,
       rejected ? "Error read failed true\nfinished\n" : "contents\nfinished\n",
     )
     assert.equal(pending_operations(runtime), 0)
+    assert.equal(closed, true)
     assert.equal(heap_stats(runtime.memory).roots, roots)
   })
 }

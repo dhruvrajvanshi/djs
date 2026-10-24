@@ -18,6 +18,7 @@ export const KINDS = Object.freeze({
   PROPERTY: 3,
   FUNCTION: 4,
   ENVIRONMENT: 5,
+  BYTE_BUFFER: 6,
   VALUE_ARRAY: 7,
   ERROR: 8,
 })

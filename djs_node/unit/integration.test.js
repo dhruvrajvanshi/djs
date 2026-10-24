@@ -6,6 +6,7 @@ import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { spawnSync } from "node:child_process"
 import { bootstrap } from "../runtime/bootstrap.js"
+import { create_node_host } from "../host/node.js"
 import {
   create_runtime,
   module_status,
@@ -25,6 +26,7 @@ async function fixture(t, files) {
   const writes = []
   const runtime = create_runtime({
     host: {
+      ...create_node_host(),
       read_text: readFile,
       write_stdout: (text) => {
         output += text
@@ -294,9 +296,9 @@ test("guest modules share intrinsic function values through ordinary imports", a
     `,
     "entry.js": `
       import "djs:intrinsics";
-      import { write_stdout as write, read_file, enqueue_job, call } from "djs:intrinsics";
+      import { write_stdout as write, io_read, enqueue_job, call } from "djs:intrinsics";
       import { saved } from "./dependency.js";
-      console.log(typeof write, typeof read_file, typeof enqueue_job, typeof call, write === saved);
+      console.log(typeof write, typeof io_read, typeof enqueue_job, typeof call, write === saved);
       const emit = write;
       emit("direct\\n");
       const holder = { write };
@@ -324,15 +326,13 @@ test("top-level await receives asynchronous file text with explicit utf8 encodin
     `
     import fs from "node:fs/promises";
     import { readFile } from "node:fs/promises";
-    import { read_file } from "djs:intrinsics";
     const path = ${JSON.stringify(join(app.directory, "contents.txt"))};
     console.log(await fs.readFile(path, "utf8"));
     console.log(await readFile(path, "utf-8"));
-    console.log(await new Promise((resolve, reject) => read_file(path, "utf8", resolve, reject)));
   `,
   )
   await app.run()
-  assert.equal(app.output, "file contents\nfile contents\nfile contents\n")
+  assert.equal(app.output, "file contents\nfile contents\n")
 })
 
 test("failed host file reads reject top-level module evaluation", async (t) => {

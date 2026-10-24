@@ -23,6 +23,7 @@ import {
   write_boolean,
 } from "./values.js"
 import { allocate } from "./heap.js"
+import { byte_buffer_view } from "./bytes.js"
 
 export function kind_of(memory, value) {
   return tag_of(memory, value) === TAGS.REF
@@ -212,6 +213,22 @@ export function find_property(
 
 export function get_property(memory, destination, object, key) {
   const name = to_string(memory, key)
+  if (kind_of(memory, object) === KINDS.BYTE_BUFFER) {
+    const bytes = byte_buffer_view(memory, object)
+    if (name === "length") write_number(memory, destination, bytes.length)
+    else {
+      const index = Number(name)
+      if (
+        String(index) === name &&
+        Number.isInteger(index) &&
+        index >= 0 &&
+        index < bytes.length
+      )
+        write_number(memory, destination, bytes[index])
+      else write_undefined(memory, destination)
+    }
+    return 0
+  }
   if (kind_of(memory, object) === KINDS.STRING) {
     if (name === "length")
       write_number(
@@ -294,6 +311,21 @@ export function define_property(memory, object, key, value, flags = 7, setter) {
 }
 
 export function set_property(memory, object, key, value) {
+  if (kind_of(memory, object) === KINDS.BYTE_BUFFER) {
+    const name = to_string(memory, key),
+      index = Number(name),
+      bytes = byte_buffer_view(memory, object)
+    if (name === "length") throw new TypeError("Byte buffer length is readonly")
+    if (
+      String(index) !== name ||
+      !Number.isInteger(index) ||
+      index < 0 ||
+      index >= bytes.length
+    )
+      throw new RangeError("Invalid byte buffer index")
+    bytes[index] = read_number(memory, value)
+    return 0
+  }
   const property = find_property(memory, object, to_string(memory, key))
   if (property !== 0) {
     const flags = read_u32(memory, property + 12)
@@ -318,6 +350,10 @@ export function private_property(
   has = false,
   readonly = false,
 ) {
+  if (has && kind_of(memory, object) === KINDS.BYTE_BUFFER) {
+    write_boolean(memory, destination, false)
+    return
+  }
   if (
     has &&
     ![KINDS.OBJECT, KINDS.FUNCTION, KINDS.ERROR].includes(
