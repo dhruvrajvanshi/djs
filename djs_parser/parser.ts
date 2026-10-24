@@ -25,7 +25,6 @@ import {
   Pattern,
   type SourceFile,
   Stmt,
-  type ObjectTypeDeclField,
   type SwitchCase,
   TemplateLiteralFragment,
   TypeAnnotation,
@@ -1108,14 +1107,9 @@ function parser_impl(
       switch (self.current_token.kind) {
         case t.LSquare: {
           advance()
-          if (at(t.RSquare)) {
-            const end = expect(t.RSquare)
-            if (end === ERR) return ERR
-            head = TypeAnnotation.Array(Span.between(head, end), head)
-          } else {
-            emit_error("Array size annotations are only supported in LJS mode")
-            return ERR
-          }
+          const end = expect(t.RSquare)
+          if (end === ERR) return ERR
+          head = TypeAnnotation.Array(Span.between(head, end), head)
           break
         }
         case t.LessThan: {
@@ -1274,45 +1268,6 @@ function parser_impl(
           advance()
         } else {
           emit_error(`Expected a comma or ${end_token}`)
-          return ERR
-        }
-      } else {
-        first = false
-      }
-
-      const entry = parse_item()
-      if (entry === ERR) return ERR
-      items.push(entry)
-
-      if (at(t.Comma) && next_is(end_token)) {
-        advance()
-        break
-      }
-    }
-
-    return items
-  }
-
-  function parse_comma_semi_or_newline_separated_list<T>(
-    end_token: TokenKind,
-    parse_item: () => T | Err,
-  ): T[] | Err {
-    const items: T[] = []
-    let first = true
-
-    while (
-      self.current_token.kind !== t.EndOfFile &&
-      self.current_token.kind !== end_token
-    ) {
-      if (!first) {
-        if (at(t.Comma) || at(t.Semi)) {
-          advance()
-        } else if (
-          self.last_token &&
-          self.last_token.line < self.current_token.line
-        ) {
-        } else {
-          emit_error(`Expected a comma, ; a newline or ${end_token}`)
           return ERR
         }
       } else {
@@ -1775,11 +1730,8 @@ function parser_impl(
         next_is(t.Var) ||
         next_is(t.Let) ||
         next_is(t.Const) ||
-        next_is_soft_keyword("extern") ||
-        next_is_soft_keyword("type") ||
-        next_is_soft_keyword("builtin") ||
-        next_is_soft_keyword("struct") ||
-        next_is_soft_keyword("untagged"))
+        (flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+          next_is_soft_keyword("type")))
     ) {
       const export_token = advance()
       return parse_stmt(export_token)
@@ -1804,7 +1756,10 @@ function parser_impl(
             { span: label.span, name: label.text },
             stmt,
           )
-        } else if (self.current_token.text === "type") {
+        } else if (
+          flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+          self.current_token.text === "type"
+        ) {
           return parse_type_decl(export_token)
         } else {
           return parse_expr_stmt()
@@ -2006,48 +1961,15 @@ function parser_impl(
     const ident = parse_ident()
     if (ident === ERR) return ERR
     if (expect(t.Eq) === ERR) return ERR
-    if (at(t.LBrace)) {
-      advance()
-      const fields = parse_comma_semi_or_newline_separated_list(
-        t.RBrace,
-        parse_object_type_decl_field,
-      )
-      if (fields === ERR) return ERR
-      const last = expect(t.RBrace)
-      if (last === ERR) return ERR
-      return Stmt.ObjectTypeDecl(Span.between(start, last), ident, fields)
-    } else {
-      const type_annotation = parse_type_annotation()
-      if (type_annotation === ERR) return ERR
-      if (expect_semi() === ERR) return ERR
-      return Stmt.TypeAlias(
-        Span.between(export_token?.span ?? ident.span, type_annotation),
-        export_token !== null,
-        ident,
-        type_annotation,
-      )
-    }
-  }
-  function parse_object_type_decl_field(): ObjectTypeDeclField | Err {
-    let is_readonly = false
-    if (
-      at(t.Ident) &&
-      next_is(t.Ident) &&
-      self.current_token.text === "readonly"
-    ) {
-      advance()
-      is_readonly = true
-    }
-    const label = parse_binding_ident()
-    if (label === ERR) return ERR
-    if (expect(t.Colon) === ERR) return ERR
     const type_annotation = parse_type_annotation()
-    if (type_annotation === ERR) return type_annotation
-    return {
-      is_readonly,
-      label,
+    if (type_annotation === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+    return Stmt.TypeAlias(
+      Span.between(export_token?.span ?? ident.span, type_annotation),
+      export_token !== null,
+      ident,
       type_annotation,
-    }
+    )
   }
 
   function parse_export_named_stmt(): Stmt | Err {

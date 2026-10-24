@@ -71,10 +71,6 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     label: () => Label,
     stmt: () => Stmt,
   },
-  ObjectTypeDecl: {
-    name: Ident,
-    fields: List("ObjectTypeDeclField"),
-  },
   TypeAlias: {
     is_exported: "boolean",
     name: Ident,
@@ -169,7 +165,6 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   },
   Array: { item: () => TypeAnnotation },
   ReadonlyArray: { item: () => TypeAnnotation },
-  FixedSizeArray: { item: () => TypeAnnotation, size: () => Expr },
   Application: {
     callee: () => TypeAnnotation,
     args: List(() => TypeAnnotation),
@@ -197,12 +192,6 @@ export const Pattern = Enum("Pattern", ["span", "visit"], {
   Prop: { expr: () => Expr, key: () => ObjectKey },
   Elision: {},
   Rest: { pattern: () => Pattern },
-})
-
-const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
-  is_readonly: "boolean",
-  label: Ident,
-  type_annotation: () => TypeAnnotation,
 })
 
 const FuncTypeParam = Struct("FuncTypeParam", [], {
@@ -411,7 +400,6 @@ const ast_items = [
   VarDeclarator,
   ForInit,
   Expr,
-  ObjectTypeDeclField,
   TypeAnnotation,
   FuncTypeParam,
   ObjectLiteralEntry,

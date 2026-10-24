@@ -49,7 +49,6 @@ export type Stmt =
   | ImportStarAsStmt
   | ExportNamedStmt
   | LabeledStmt
-  | ObjectTypeDeclStmt
   | TypeAliasStmt
   | EmptyStmt
 export class ExprStmt {
@@ -402,22 +401,6 @@ export class LabeledStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
-export class ObjectTypeDeclStmt {
-  constructor(
-    readonly span: Span,
-
-    readonly name: Ident,
-    readonly fields: readonly ObjectTypeDeclField[],
-  ) {}
-
-  get kind(): "ObjectTypeDecl" {
-    return "ObjectTypeDecl"
-  }
-
-  toString(): string {
-    return sexpr_to_string(stmt_to_sexpr(this))
-  }
-}
 export class TypeAliasStmt {
   constructor(
     readonly span: Span,
@@ -549,12 +532,6 @@ export const Stmt = {
 
   Labeled: (span: Span, label: Label, stmt: Stmt): LabeledStmt =>
     new LabeledStmt(span, label, stmt),
-
-  ObjectTypeDecl: (
-    span: Span,
-    name: Ident,
-    fields: readonly ObjectTypeDeclField[],
-  ): ObjectTypeDeclStmt => new ObjectTypeDeclStmt(span, name, fields),
 
   TypeAlias: (
     span: Span,
@@ -1648,18 +1625,11 @@ export const Expr = {
     new AsExpr(span, expr, type_annotation),
 } as const
 
-export interface ObjectTypeDeclField {
-  readonly is_readonly: boolean
-  readonly label: Ident
-  readonly type_annotation: TypeAnnotation
-}
-
 export type TypeAnnotation =
   | IdentTypeAnnotation
   | UnionTypeAnnotation
   | ArrayTypeAnnotation
   | ReadonlyArrayTypeAnnotation
-  | FixedSizeArrayTypeAnnotation
   | ApplicationTypeAnnotation
   | StringTypeAnnotation
   | FuncTypeAnnotation
@@ -1720,22 +1690,6 @@ export class ReadonlyArrayTypeAnnotation {
 
   get kind(): "ReadonlyArray" {
     return "ReadonlyArray"
-  }
-
-  toString(): string {
-    return sexpr_to_string(type_annotation_to_sexpr(this))
-  }
-}
-export class FixedSizeArrayTypeAnnotation {
-  constructor(
-    readonly span: Span,
-
-    readonly item: TypeAnnotation,
-    readonly size: Expr,
-  ) {}
-
-  get kind(): "FixedSizeArray" {
-    return "FixedSizeArray"
   }
 
   toString(): string {
@@ -1828,13 +1782,6 @@ export const TypeAnnotation = {
     span: Span,
     item: TypeAnnotation,
   ): ReadonlyArrayTypeAnnotation => new ReadonlyArrayTypeAnnotation(span, item),
-
-  FixedSizeArray: (
-    span: Span,
-    item: TypeAnnotation,
-    size: Expr,
-  ): FixedSizeArrayTypeAnnotation =>
-    new FixedSizeArrayTypeAnnotation(span, item, size),
 
   Application: (
     span: Span,

@@ -153,13 +153,6 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_stmt(stmt.stmt)
         break
       }
-      case "ObjectTypeDecl": {
-        this.visit_ident(stmt.name)
-        for (const field of stmt.fields) {
-          this.visit_object_type_decl_field(field)
-        }
-        break
-      }
       case "TypeAlias": {
         this.visit_ident(stmt.name)
         this.visit_type_annotation(stmt.type_annotation)
@@ -462,11 +455,6 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(type_annotation.item)
         break
       }
-      case "FixedSizeArray": {
-        this.visit_type_annotation(type_annotation.item)
-        this.visit_expr(type_annotation.size)
-        break
-      }
       case "Application": {
         this.visit_type_annotation(type_annotation.callee)
         for (const arg of type_annotation.args) {
@@ -688,9 +676,5 @@ export class ASTVisitorBase implements ASTVisitor {
     if (node.as_name !== null) {
       this.visit_module_export_name(node.as_name)
     }
-  }
-  visit_object_type_decl_field(node: ast.ObjectTypeDeclField): void {
-    this.visit_ident(node.label)
-    this.visit_type_annotation(node.type_annotation)
   }
 }
