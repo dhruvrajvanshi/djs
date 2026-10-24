@@ -315,11 +315,31 @@ function compile_function(
   state.unit.functions.push(null)
   const scope = create_scope(parent_scope, fn)
   fn.scope = scope
+  const defaults = []
   for (const param of params) {
-    if (param.initializer) unsupported(param, "default parameters")
-    fn.parameter_slots.push(declare_pattern(scope, param.pattern, false).slot)
+    const { pattern, initializer } =
+      param.pattern.kind === "Assignment" ? param.pattern : param
+    const slot = declare_pattern(scope, pattern, false).slot
+    fn.parameter_slots.push(slot)
+    if (initializer) defaults.push({ slot, initializer })
   }
   if (options.build) options.build(fn, scope)
+  for (const { slot, initializer } of defaults) {
+    const value = allocate(fn)
+    emit(fn, OP.LOAD_ENV, value, 0, slot)
+    const missing = allocate(fn)
+    emit(
+      fn,
+      OP.BINARY,
+      missing,
+      value,
+      constant(state, fn, undefined),
+      literal(state, "==="),
+    )
+    const skip = emit(fn, OP.JUMP_IF_FALSE, missing, 0)
+    emit(fn, OP.STORE_ENV, 0, slot, compile_expr(state, fn, scope, initializer))
+    fn.instructions[skip][2] = position(fn)
+  }
   prepare_statements(state, fn, scope, stmts)
   compile_statements(state, fn, scope, stmts)
   if (expression_body)
