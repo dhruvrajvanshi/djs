@@ -73,7 +73,7 @@ export function preview_lines(
     .join("\n")
 }
 
-function offset_to_line_and_col(
+export function offset_to_line_and_col(
   source: string,
   offset: number,
 ): [number, number] {

@@ -6,7 +6,9 @@
   "scripts": {
     "build-ast": "(cd djs_ast && pnpm run gen && pnpm run build)",
     "build-parser": "cd djs_parser && pnpm build",
-    "typecheck": "pnpm run --recursive typecheck"
+    "typecheck": "pnpm run --recursive typecheck",
+    "test:node": "./build.sh && pnpm --filter djs_node test",
+    "test-node": "pnpm run test:node"
   },
   "volta": {
     "node": "26.12.1"

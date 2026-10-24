@@ -87,17 +87,6 @@ test("assignment bitwise or equal |=", () => {
   assert("Assign" === expr.kind)
   assert.equal(expr.operator, AssignOp.BitOrEq)
 })
-test("struct type decl", () => {
-  const source = `type ParserState = {
-    previous_lexer: Lexer
-    lexer: Lexer
-    last_token: Token | null
-    current_token: Token
-    errors: ParseError[]
-  }`
-  const source_file = parse_source_file(source)
-  expect(source_file.errors).toEqual([])
-})
 test("function with if stmt", () => {
   const source = `
   function parse_optional_binding_ident(): Ident | null | Err {
@@ -131,117 +120,67 @@ test("conditional operator", () => {
   expect(source_file.stmts[0].expr.kind).toEqual("Ternary")
 })
 
-test("is_exported should be correctly set", () => {
-  const source = `
-    export function bar(): void {}
-  `
-  const source_file = parse_source_file(source, "test.ljs")
+test("default export expressions are preserved in the AST", () => {
+  const source_file = parse_source_file(
+    "export default { log: function(value) { return value; } };",
+    "console.js",
+  )
   expect(source_file.errors).toEqual([])
-
-  assert(source_file.stmts[0].kind === "Func")
-  expect(source_file.stmts[0].is_exported).toBe(true)
+  const stmt = source_file.stmts[0]
+  assert(stmt.kind === "ExportDefault")
+  expect(stmt.value.kind).toBe("Object")
+  expect(source_file_to_sexpr(source_file)).toMatchObject({
+    stmts: [{ kind: "ExportDefault", value: { kind: "Object" } }],
+  })
+})
+test("side-effect-only imports preserve the dependency specifier", () => {
+  const source_file = parse_source_file("import './dependency.js';", "entry.js")
+  expect(source_file.errors).toEqual([])
+  const stmt = source_file.stmts[0]
+  assert(stmt.kind === "Import")
+  expect(stmt.module_specifier).toBe("'./dependency.js'")
+  expect(stmt.default_import).toBeNull()
+  expect(stmt.named_imports).toEqual([])
+})
+test("new.target supports member access and arrow bodies", () => {
+  expect(parse_expr("new.target.prototype")).toMatchObject({
+    kind: "Prop",
+    lhs: { kind: "NewTarget" },
+    property: { text: "prototype" },
+  })
+  expect(parse_expr("() => new.target")).toMatchObject({
+    kind: "ArrowFn",
+    body: { kind: "Expr", expr: { kind: "NewTarget" } },
+  })
+  expect(
+    parse_source_file("new.other", "entry.js").errors.length,
+  ).toBeGreaterThan(0)
+})
+test("import.meta", () => {
+  expect(parse_expr("import.meta.url")).toMatchObject({
+    kind: "Prop",
+    lhs: { kind: "ImportMeta" },
+    property: { text: "url" },
+  })
+})
+test("async function declarations and expressions preserve their async flag", () => {
+  const source_file = parse_source_file(
+    "async function f() {} const g = async function() {};",
+    "entry.js",
+  )
+  expect(source_file.errors).toEqual([])
+  const [decl, variable] = source_file.stmts
+  assert(decl.kind === "Func")
+  expect(decl.func.is_async).toBe(true)
+  assert(variable.kind === "VarDecl")
+  const expr = variable.decl.declarators[0].init
+  assert(expr?.kind === "Func")
+  expect(expr.func.is_async).toBe(true)
 })
 test("preserves leading trivia in type aliases", () => {
   const t = parse_type(`/* leading trivia comment */ Foo`)
   assert(t.kind === "Ident")
   assert.equal(t.leading_trivia, "/* leading trivia comment */")
-})
-
-test("Parses untagged union stmt without error", () => {
-  const s = parse_stmt(
-    `
-      untagged union Foo {
-        u32: u32
-        str: *c.str
-      }
-  `,
-    "test.ljs",
-  )
-  expect(s.kind).toBe("UntaggedUnionDecl")
-  expect(s).toMatchInlineSnapshot(`
-    UntaggedUnionDeclStmt {
-      "is_exported": false,
-      "span": {
-        "start": 7,
-        "stop": 72,
-      },
-      "untagged_union_def": {
-        "members": [
-          VariantDefUntaggedUnionMember {
-            "name": {
-              "span": {
-                "start": 36,
-                "stop": 39,
-              },
-              "text": "u32",
-            },
-            "type_annotation": IdentTypeAnnotation {
-              "ident": {
-                "span": {
-                  "start": 41,
-                  "stop": 44,
-                },
-                "text": "u32",
-              },
-              "leading_trivia": "",
-              "span": {
-                "start": 41,
-                "stop": 44,
-              },
-            },
-          },
-          VariantDefUntaggedUnionMember {
-            "name": {
-              "span": {
-                "start": 53,
-                "stop": 56,
-              },
-              "text": "str",
-            },
-            "type_annotation": LJSPtrTypeAnnotation {
-              "span": {
-                "start": 58,
-                "stop": 64,
-              },
-              "to": QualifiedTypeAnnotation {
-                "head": {
-                  "span": {
-                    "start": 59,
-                    "stop": 60,
-                  },
-                  "text": "c",
-                },
-                "span": {
-                  "start": 59,
-                  "stop": 64,
-                },
-                "tail": [
-                  {
-                    "span": {
-                      "start": 61,
-                      "stop": 64,
-                    },
-                    "text": "str",
-                  },
-                ],
-              },
-            },
-          },
-        ],
-        "name": {
-          "span": {
-            "start": 22,
-            "stop": 25,
-          },
-          "text": "Foo",
-        },
-        "span": {
-          "start": 7,
-          "stop": 72,
-        },
-      },
-    }
-  `)
 })
 
 if (process.env.CI) {
@@ -343,3 +282,92 @@ function parse_stmt(input: string, name = "test.js"): Stmt {
 function parse_source_file(source: string, name = "test.js"): SourceFile {
   return Parser(QualifiedName(), name, source).parse_source_file()
 }
+
+test("class members preserve static and private metadata and field initializers", () => {
+  const parsed = parse_source_file(`class Box {
+    #value = 1;
+    static #read(box) { return box.#value; }
+    static value = this;
+    get value() { return this.#value; }
+    set value(next) { this.#value = next; }
+    static has(box) { return #value in box; }
+  }`)
+  expect(parsed.errors).toEqual([])
+  const stmt = parsed.stmts[0]
+  assert(stmt.kind === "ClassDecl")
+  const members = stmt.class_def.body.members
+  assert(members[0].kind === "FieldDef")
+  expect(members[0].field.name.kind).toBe("Private")
+  expect(members[0].field.is_static).toBe(false)
+  expect(members[0].field.initializer?.kind).toBe("Number")
+  assert(members[1].kind === "MethodDef")
+  expect(members[1].method.is_static).toBe(true)
+  expect(members[1].method.name.kind).toBe("Private")
+  assert(members[2].kind === "FieldDef")
+  expect(members[2].field.is_static).toBe(true)
+  assert(members[5].kind === "MethodDef")
+  const returned = members[5].method.body.body.stmts[0]
+  assert(returned.kind === "Return" && returned.value?.kind === "BinOp")
+  expect(returned.value.lhs.kind).toBe("PrivateName")
+})
+
+test("keyword property names retain their spelling", () => {
+  const expr = parse_expr("promise.catch")
+  assert(expr.kind === "Prop")
+  expect(expr.property.text).toBe("catch")
+})
+
+test("logical and binds more tightly than logical or", () => {
+  const expr = parse_expr("a || b && c")
+  assert(expr.kind === "BinOp")
+  expect(expr.operator).toBe("Or")
+  assert(expr.rhs.kind === "BinOp")
+  expect(expr.rhs.operator).toBe("And")
+})
+
+test("private names cannot be ordinary object keys", () => {
+  expect(
+    parse_source_file("const object = { #value: 1 };").errors.length,
+  ).toBeGreaterThan(0)
+})
+
+test("export async function", () => {
+  const source_file = parse_source_file("export async function f() {}")
+  expect(source_file.errors).toEqual([])
+  expect(source_file.stmts[0]).toMatchObject({
+    kind: "Func",
+    is_exported: true,
+    func: { is_async: true },
+  })
+})
+
+test("intrinsic decorators are retained on classes and methods", () => {
+  const source = parse_source_file(
+    `
+    @builtin({name:"Array",prototype:"array"})
+    class Array {
+      @internalMethod("Call") static #call(receiver,args) {return args}
+      @internalMethod("DefineOwnProperty") #define(key,descriptor) {return false}
+    }
+  `,
+    "entry.js",
+  )
+  expect(source.errors).toEqual([])
+  const declaration = source.stmts[0]
+  assert(declaration.kind === "ClassDecl")
+  expect(declaration.class_def.decorators).toHaveLength(1)
+  const [call, define] = declaration.class_def.body.members
+  assert(call.kind === "MethodDef" && define.kind === "MethodDef")
+  expect(call.method.decorators).toHaveLength(1)
+  expect(call.method.is_static).toBe(true)
+  expect(define.method.is_static).toBe(false)
+  const exported = parse_source_file(
+    "export @builtin({}) class Box {}",
+    "entry.js",
+  )
+  expect(exported.errors).toEqual([])
+  expect(parse_expr("(@builtin({name:'Box'}) class {})")).toMatchObject({
+    kind: "Paren",
+    expr: { kind: "Class" },
+  })
+})

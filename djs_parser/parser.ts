@@ -13,6 +13,7 @@ import {
   type FuncTypeParam,
   type Ident,
   type ImportSpecifier,
+  type ExportSpecifier,
   InOrOf,
   type MethodDef,
   ModuleExportName,
@@ -24,7 +25,6 @@ import {
   Pattern,
   type SourceFile,
   Stmt,
-  type ObjectTypeDeclField,
   type SwitchCase,
   TemplateLiteralFragment,
   TypeAnnotation,
@@ -36,7 +36,6 @@ import {
   Token,
   TokenKind,
   type QualifiedName,
-  DJSIntrinsicExpr,
 } from "djs_ast"
 import { Lexer } from "./lexer.ts"
 import assert, { AssertionError } from "node:assert"
@@ -203,12 +202,12 @@ function parser_impl(
 
   const parse_logical_and_expr = define_binop_parser(
     parse_bitwise_or_expr,
-    t.VBarVBar,
+    t.AmpAmp,
   )
 
   const parse_logical_or_expr = define_binop_parser(
     parse_logical_and_expr,
-    t.AmpAmp,
+    t.VBarVBar,
   )
 
   return { parse_source_file }
@@ -322,11 +321,21 @@ function parser_impl(
 
     if (at(t.New)) {
       const start = advance()
-      // When parsing something like "new Foo()", we don't want to allow calls when parsing Foo
-      // since new Foo() means `new (Foo)()` and not (new (Foo()))
-      const expr = parse_member_or_call_expr(/* allow_calls */ false)
-      if (expr === ERR) return expr
-      lhs = Expr.New(Span.between(start.span, expr.span), expr)
+      if (at(t.Dot)) {
+        advance()
+        const target = parse_member_ident_name()
+        if (target === ERR) return ERR
+        if (target.text !== "target") {
+          emit_error("Expected new.target")
+          return ERR
+        }
+        lhs = Expr.NewTarget(Span.between(start.span, target.span))
+      } else {
+        // Parse the constructor without consuming its argument list.
+        const expr = parse_member_or_call_expr(/* allow_calls */ false)
+        if (expr === ERR) return expr
+        lhs = Expr.New(Span.between(start.span, expr.span), expr)
+      }
     } else {
       const expr = parse_primary_expr()
       if (expr === ERR) return expr
@@ -463,6 +472,10 @@ function parser_impl(
   }
 
   function parse_member_ident_name(): Ident | Err {
+    if (at(t.PrivateIdent)) {
+      const token = advance()
+      return { span: token.span, text: token.text }
+    }
     if (TokenKind.is_keyword(self.current_token.kind)) {
       const token = advance()
       return { span: token.span, text: token.text }
@@ -566,6 +579,10 @@ function parser_impl(
         if (ident === ERR) return ERR
         return Expr.Var(ident.span, leading_trivia, ident)
       }
+      case t.PrivateIdent: {
+        const tok = advance()
+        return Expr.PrivateName(tok.span, { span: tok.span, text: tok.text })
+      }
       case t.True:
         return Expr.Boolean(advance().span, true)
       case t.False:
@@ -600,7 +617,7 @@ function parser_impl(
         if (at(t.Function)) {
           const f = parse_function()
           if (f === ERR) return ERR
-          return Expr.Func(f.span, f)
+          return Expr.Func(f.span, { ...f, is_async: true })
         } else {
           return parse_arrow_fn()
         }
@@ -634,6 +651,14 @@ function parser_impl(
       }
       case t.Super:
         return Expr.Super(advance().span)
+      case t.Import: {
+        const start = advance()
+        if (expect(t.Dot) === ERR) return ERR
+        const meta = expect_soft_keyword("meta")
+        if (meta === ERR) return ERR
+        return Expr.ImportMeta(Span.between(start.span, meta.span))
+      }
+      case t.At:
       case t.Class: {
         const cls = parse_class()
         if (cls === ERR) return ERR
@@ -641,30 +666,10 @@ function parser_impl(
       }
       case t.TemplateLiteralFragment:
         return parse_template_literal()
-      case t.DecoratorIdent:
-        return parse_djs_intrinsic()
       default:
         emit_error("Expected an expression")
         return ERR
     }
-  }
-
-  function parse_djs_intrinsic(): DJSIntrinsicExpr | Err {
-    const tok = advance()
-    assert(tok.kind === t.DecoratorIdent)
-    if (tok.text !== "@djs_intrinsic") {
-      emit_error("Unknown decorator intrinsic", tok.span)
-      return ERR
-    }
-    if (expect(t.LParen) === ERR) return ERR
-    const name_token = expect(t.String)
-    if (name_token === ERR) return ERR
-    const rparen = expect(t.RParen)
-    if (rparen === ERR) return ERR
-    return Expr.DJSIntrinsic(
-      Span.between(tok.span, rparen),
-      JSON.parse(name_token.text),
-    )
   }
 
   function re_lex_regex() {
@@ -706,7 +711,20 @@ function parser_impl(
     }
     return fragments
   }
+  function parse_decorators(): Expr[] | Err {
+    const decorators: Expr[] = []
+    while (at(t.At)) {
+      advance()
+      const decorator = parse_member_or_call_expr(true)
+      if (decorator === ERR) return ERR
+      decorators.push(decorator)
+    }
+    return decorators
+  }
+
   function parse_class(): Class | Err {
+    const decorators = parse_decorators()
+    if (decorators === ERR) return ERR
     const first = expect(t.Class)
     if (first === ERR) return ERR
 
@@ -726,6 +744,10 @@ function parser_impl(
 
     const members: ClassMember[] = []
     while (!at(t.RBrace) && !at(t.EndOfFile)) {
+      if (at(t.Semi)) {
+        advance()
+        continue
+      }
       const member = parse_class_member()
       if (member === ERR) return ERR
       members.push(member)
@@ -739,6 +761,7 @@ function parser_impl(
     return {
       span,
       name,
+      decorators,
       superclass,
       body: {
         span: Span.between(body_start.span, body_end.span),
@@ -756,14 +779,19 @@ function parser_impl(
   }
 
   function parse_class_member(): ClassMember | Err {
-    const method = parse_method_def()
-    if (method === ERR) return ERR
-    return ClassMember.MethodDef(method)
+    return parse_method_def()
   }
 
-  function parse_method_def(): MethodDef | Err {
+  function parse_method_def(): ClassMember | Err {
+    const decorators = parse_decorators()
+    if (decorators === ERR) return ERR
     let static_token: Token | null = null
-    if (at(t.Static)) {
+    if (
+      at(t.Static) &&
+      !next_is(t.LParen) &&
+      !next_is(t.Eq) &&
+      !next_is(t.Semi)
+    ) {
       static_token = advance()
     }
 
@@ -791,10 +819,37 @@ function parser_impl(
       advance()
     }
 
-    const name = parse_object_key()
-    if (name === ERR) return ERR
-
+    let name: ObjectKey
+    if (at(t.PrivateIdent)) {
+      const tok = advance()
+      name = ObjectKey.Private(tok.span, { span: tok.span, text: tok.text })
+    } else {
+      const key = parse_object_key()
+      if (key === ERR) return ERR
+      name = key
+    }
     const start = static_token ? static_token.span : name.span
+    if (!at(t.LParen) && !at(t.LessThan)) {
+      if (accessor_type || is_async || is_generator) {
+        emit_error("Expected a method")
+        return ERR
+      }
+      let initializer: Expr | null = null
+      if (at(t.Eq)) {
+        advance()
+        const value = parse_assignment_expr()
+        if (value === ERR) return ERR
+        initializer = value
+      }
+      if (expect_semi() === ERR) return ERR
+      return ClassMember.FieldDef({
+        decorators,
+        span: Span.between(start, initializer?.span ?? name.span),
+        name,
+        is_static: static_token !== null,
+        initializer,
+      })
+    }
 
     const type_params = parse_optional_type_params()
     if (type_params === ERR) return ERR
@@ -809,9 +864,11 @@ function parser_impl(
 
     const span = Span.between(start, body.span)
 
-    return {
+    return ClassMember.MethodDef({
+      decorators,
       span,
       name,
+      is_static: static_token !== null,
       accessor_type,
       return_type,
       body: {
@@ -826,7 +883,7 @@ function parser_impl(
         is_generator,
         is_async,
       },
-    }
+    })
   }
   function parse_object_literal_entry(): ObjectLiteralEntry | Err {
     if (at(t.DotDotDot)) {
@@ -875,8 +932,10 @@ function parser_impl(
           if (body === ERR) return ERR
           const span = Span.between(start, body.span)
           const method: MethodDef = {
+            decorators: [],
             span,
             name,
+            is_static: false,
             accessor_type: null,
             return_type,
             body: {
@@ -954,8 +1013,10 @@ function parser_impl(
     }
 
     const method: MethodDef = {
+      decorators: [],
       span,
       name,
+      is_static: false,
       accessor_type,
       return_type,
       body: {
@@ -985,6 +1046,10 @@ function parser_impl(
   }
 
   function parse_object_key(): ObjectKey | Err {
+    if (at(t.PrivateIdent)) {
+      emit_error("Private names are only allowed in class bodies")
+      return ERR
+    }
     switch (self.current_token.kind) {
       case t.String: {
         const tok = advance()
@@ -1080,14 +1145,9 @@ function parser_impl(
       switch (self.current_token.kind) {
         case t.LSquare: {
           advance()
-          if (at(t.RSquare)) {
-            const end = expect(t.RSquare)
-            if (end === ERR) return ERR
-            head = TypeAnnotation.Array(Span.between(head, end), head)
-          } else {
-            emit_error("Array size annotations are only supported in LJS mode")
-            return ERR
-          }
+          const end = expect(t.RSquare)
+          if (end === ERR) return ERR
+          head = TypeAnnotation.Array(Span.between(head, end), head)
           break
         }
         case t.LessThan: {
@@ -1246,45 +1306,6 @@ function parser_impl(
           advance()
         } else {
           emit_error(`Expected a comma or ${end_token}`)
-          return ERR
-        }
-      } else {
-        first = false
-      }
-
-      const entry = parse_item()
-      if (entry === ERR) return ERR
-      items.push(entry)
-
-      if (at(t.Comma) && next_is(end_token)) {
-        advance()
-        break
-      }
-    }
-
-    return items
-  }
-
-  function parse_comma_semi_or_newline_separated_list<T>(
-    end_token: TokenKind,
-    parse_item: () => T | Err,
-  ): T[] | Err {
-    const items: T[] = []
-    let first = true
-
-    while (
-      self.current_token.kind !== t.EndOfFile &&
-      self.current_token.kind !== end_token
-    ) {
-      if (!first) {
-        if (at(t.Comma) || at(t.Semi)) {
-          advance()
-        } else if (
-          self.last_token &&
-          self.last_token.line < self.current_token.line
-        ) {
-        } else {
-          emit_error(`Expected a comma, ; a newline or ${end_token}`)
           return ERR
         }
       } else {
@@ -1729,19 +1750,28 @@ function parser_impl(
     return token.kind === t.Ident && token.text === text
   }
   function parse_stmt(export_token: Token | null = null): Stmt | Err {
+    if (!export_token && at(t.Export) && next_is(t.Default)) {
+      const start = advance()
+      advance()
+      const value = parse_expr()
+      if (value === ERR) return ERR
+      if (expect_semi() === ERR) return ERR
+      return Stmt.ExportDefault(Span.between(start.span, value.span), value)
+    }
+    if (!export_token && at(t.Export) && next_is(t.LBrace))
+      return parse_export_named_stmt()
     if (
       !export_token &&
       at(t.Export) &&
       (next_is(t.Function) ||
+        next_is(t.Async) ||
         next_is(t.Class) ||
+        next_is(t.At) ||
         next_is(t.Var) ||
         next_is(t.Let) ||
         next_is(t.Const) ||
-        next_is_soft_keyword("extern") ||
-        next_is_soft_keyword("type") ||
-        next_is_soft_keyword("builtin") ||
-        next_is_soft_keyword("struct") ||
-        next_is_soft_keyword("untagged"))
+        (flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+          next_is_soft_keyword("type")))
     ) {
       const export_token = advance()
       return parse_stmt(export_token)
@@ -1766,7 +1796,10 @@ function parser_impl(
             { span: label.span, name: label.text },
             stmt,
           )
-        } else if (self.current_token.text === "type") {
+        } else if (
+          flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+          self.current_token.text === "type"
+        ) {
           return parse_type_decl(export_token)
         } else {
           return parse_expr_stmt()
@@ -1844,6 +1877,7 @@ function parser_impl(
         if (f === ERR) return ERR
         return Stmt.Func(f.span, f, export_token !== null)
       }
+      case t.At:
       case t.Class: {
         const c = parse_class()
         if (c === ERR) return ERR
@@ -1854,13 +1888,18 @@ function parser_impl(
           advance()
           const f = parse_function()
           if (f === ERR) return ERR
-          return Stmt.Func(f.span, f, export_token !== null)
+          return Stmt.Func(
+            f.span,
+            { ...f, is_async: true },
+            export_token !== null,
+          )
         } else {
           emit_error(`Expected 'function'`)
           return ERR
         }
       }
       case t.Import:
+        if (next_is(t.Dot)) return parse_expr_stmt()
         return parse_import_stmt()
       default:
         return parse_expr_stmt()
@@ -1904,6 +1943,16 @@ function parser_impl(
   function parse_import_stmt(): Stmt | Err {
     const start = advance()
     assert(start.kind === t.Import)
+    if (at(t.String)) {
+      const module_specifier = advance()
+      if (expect_semi() === ERR) return ERR
+      return Stmt.Import(
+        Span.between(start, module_specifier),
+        null,
+        [],
+        module_specifier.text,
+      )
+    }
     if (at(t.Star)) return parse_import_star_as_stmt(start)
     let default_import: Ident | null = null
     if (at(t.Ident)) {
@@ -1954,47 +2003,69 @@ function parser_impl(
     const ident = parse_ident()
     if (ident === ERR) return ERR
     if (expect(t.Eq) === ERR) return ERR
-    if (at(t.LBrace)) {
-      advance()
-      const fields = parse_comma_semi_or_newline_separated_list(
-        t.RBrace,
-        parse_object_type_decl_field,
-      )
-      if (fields === ERR) return ERR
-      const last = expect(t.RBrace)
-      if (last === ERR) return ERR
-      return Stmt.ObjectTypeDecl(Span.between(start, last), ident, fields)
-    } else {
-      const type_annotation = parse_type_annotation()
-      if (type_annotation === ERR) return ERR
-      if (expect_semi() === ERR) return ERR
-      return Stmt.TypeAlias(
-        Span.between(export_token?.span ?? ident.span, type_annotation),
-        export_token !== null,
-        ident,
-        type_annotation,
-      )
-    }
-  }
-  function parse_object_type_decl_field(): ObjectTypeDeclField | Err {
-    let is_readonly = false
-    if (
-      at(t.Ident) &&
-      next_is(t.Ident) &&
-      self.current_token.text === "readonly"
-    ) {
-      advance()
-      is_readonly = true
-    }
-    const label = parse_binding_ident()
-    if (label === ERR) return ERR
-    if (expect(t.Colon) === ERR) return ERR
     const type_annotation = parse_type_annotation()
-    if (type_annotation === ERR) return type_annotation
-    return {
-      is_readonly,
-      label,
+    if (type_annotation === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+    return Stmt.TypeAlias(
+      Span.between(export_token?.span ?? ident.span, type_annotation),
+      export_token !== null,
+      ident,
       type_annotation,
+    )
+  }
+
+  function parse_export_named_stmt(): Stmt | Err {
+    const start = advance()
+    assert(start.kind === t.Export)
+    if (expect(t.LBrace) === ERR) return ERR
+    const specifiers = parse_comma_separated_list(
+      t.RBrace,
+      parse_export_specifier,
+    )
+    if (specifiers === ERR) return ERR
+    let end = expect(t.RBrace)
+    if (end === ERR) return ERR
+    let module_specifier: string | null = null
+    if (at_soft_keyword("from")) {
+      advance()
+      const from_clause = expect(t.String)
+      if (from_clause === ERR) return ERR
+      module_specifier = from_clause.text
+      end = from_clause
+    }
+    if (expect_semi() === ERR) return ERR
+    return Stmt.ExportNamed(
+      Span.between(start.span, end.span),
+      specifiers,
+      module_specifier,
+    )
+  }
+
+  function parse_module_export_name(): ModuleExportName | Err {
+    if (at(t.String)) {
+      const tok = advance()
+      return ModuleExportName.String(tok.text)
+    }
+    const name = parse_member_ident_name()
+    if (name === ERR) return ERR
+    return ModuleExportName.Ident(name)
+  }
+
+  function parse_export_specifier(): ExportSpecifier | Err {
+    const start = self.current_token.span
+    const local_name = parse_module_export_name()
+    if (local_name === ERR) return ERR
+    let as_name: ModuleExportName | null = null
+    if (at(t.As)) {
+      advance()
+      const alias = parse_module_export_name()
+      if (alias === ERR) return ERR
+      as_name = alias
+    }
+    return {
+      span: Span.between(start, self.last_token?.span ?? start),
+      local_name,
+      as_name,
     }
   }
 
@@ -2768,7 +2839,9 @@ function expr_to_pattern(expr: Expr): Pattern | null {
       return Pattern.Prop(
         expr.span,
         expr.lhs,
-        ObjectKey.Ident(expr.property.span, expr.property),
+        expr.property.text.startsWith("#")
+          ? ObjectKey.Private(expr.property.span, expr.property)
+          : ObjectKey.Ident(expr.property.span, expr.property),
       )
     case "Index":
       return Pattern.Prop(

@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "useUnknownInCatchVariables": false,
+    "types": ["node"]
+  },
+  "include": ["*.ts", "compiler/**/*.ts", "vm/**/*.ts", "runtime/**/*.ts", "host/**/*.ts"]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "djs_node",
+  "version": "1.0.0",
+  "type": "module",
+  "license": "UNLICENSED",
+  "exports": "./djs_node.ts",
+  "bin": {
+    "djs_node": "./djs_node.ts"
+  },
+  "scripts": {
+    "test": "node --test unit/*.test.js e2e/*.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "djs_ast": "workspace:*",
+    "djs_parser": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "typescript": "7.0.2"
+  },
+  "volta": {
+    "node": "26.12.1"
+  }
+}

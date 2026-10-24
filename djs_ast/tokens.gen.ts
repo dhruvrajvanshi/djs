@@ -5,7 +5,8 @@
 
 const TokenKinds = Object.freeze({
   Ident: "Ident",
-  DecoratorIdent: "DecoratorIdent",
+  PrivateIdent: "PrivateIdent",
+  At: "At",
   True: "True",
   False: "False",
   Null: "Null",

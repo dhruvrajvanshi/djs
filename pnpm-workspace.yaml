@@ -2,6 +2,7 @@ packages:
   - djs_ast
   - djs_parser
   - djs_std
+  - djs_node
 
 onlyBuiltDependencies:
   - esbuild

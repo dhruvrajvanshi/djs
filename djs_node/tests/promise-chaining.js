@@ -1,0 +1,12 @@
+const reason = { message: "reason" };
+const p = Promise.resolve(2);
+console.log(Promise.resolve(p) === p);
+p.then(value => value + 3).then().then(value => console.log(value));
+Promise.reject(reason).then().catch(error => console.log(error === reason));
+p.then(() => { throw reason; }).catch(error => console.log(error === reason));
+const self = Promise.withResolvers();
+self.resolve(self.promise);
+self.promise.catch(error => console.log("self", error instanceof TypeError));
+let cycle;
+cycle = p.then(() => cycle);
+cycle.catch(error => console.log("cycle", error.name));

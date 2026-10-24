@@ -52,6 +52,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   Debugger: {},
   With: { expr: () => Expr, body: () => Stmt },
   Func: { func: () => Func, is_exported: "boolean" },
+  ExportDefault: { value: () => Expr },
   ClassDecl: { class_def: () => Class, is_exported: "boolean" },
   Import: {
     default_import: Option(Ident),
@@ -62,13 +63,13 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     as_name: Ident,
     module_specifier: Text,
   },
+  ExportNamed: {
+    specifiers: List(() => ExportSpecifier),
+    module_specifier: Option(Text),
+  },
   Labeled: {
     label: () => Label,
     stmt: () => Stmt,
-  },
-  ObjectTypeDecl: {
-    name: Ident,
-    fields: List("ObjectTypeDeclField"),
   },
   TypeAlias: {
     is_exported: "boolean",
@@ -104,6 +105,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     is_optional: "boolean",
   },
   Prop: { lhs: () => Expr, property: Ident, is_optional: "boolean" },
+  PrivateName: { ident: Ident },
   String: { text: Text },
   Number: { text: Text },
   Boolean: { value: "boolean" },
@@ -117,6 +119,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
   PreDecrement: { value: () => Expr },
   Array: { items: List(() => ArrayLiteralMember) },
   New: { expr: () => Expr },
+  NewTarget: {},
   Yield: { value: Option(() => Expr) },
   YieldFrom: { expr: () => Expr },
   Ternary: {
@@ -140,6 +143,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
   Await: { expr: () => Expr },
   Comma: { items: List(() => Expr) },
   Super: {},
+  ImportMeta: {},
   Class: { class_def: () => Class },
   TemplateLiteral: { fragments: List(() => TemplateLiteralFragment) },
   TaggedTemplateLiteral: {
@@ -154,7 +158,6 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     expr: () => Expr,
     type_annotation: () => TypeAnnotation,
   },
-  DJSIntrinsic: { name: Text },
 })
 export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { leading_trivia: Text, ident: Ident },
@@ -164,7 +167,6 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   },
   Array: { item: () => TypeAnnotation },
   ReadonlyArray: { item: () => TypeAnnotation },
-  FixedSizeArray: { item: () => TypeAnnotation, size: () => Expr },
   Application: {
     callee: () => TypeAnnotation,
     args: List(() => TypeAnnotation),
@@ -194,17 +196,12 @@ export const Pattern = Enum("Pattern", ["span", "visit"], {
   Rest: { pattern: () => Pattern },
 })
 
-const ObjectTypeDeclField = Struct("ObjectTypeDeclField", [], {
-  is_readonly: "boolean",
-  label: Ident,
-  type_annotation: () => TypeAnnotation,
-})
-
 const FuncTypeParam = Struct("FuncTypeParam", [], {
   label: Ident,
   type_annotation: () => TypeAnnotation,
 })
 const Class = Struct("Class", ["span"], {
+  decorators: List(() => Expr),
   name: Option(Ident),
   superclass: Option(() => Expr),
   body: () => ClassBody,
@@ -219,11 +216,15 @@ const ClassMember = Enum("ClassMember", [], {
 })
 
 const FieldDef = Struct("FieldDef", ["span"], {
-  name: Ident,
+  decorators: List(() => Expr),
+  name: () => ObjectKey,
+  is_static: "boolean",
   initializer: Option(() => Expr),
 })
 const MethodDef = Struct("MethodDef", ["span"], {
+  decorators: List(() => Expr),
   name: () => ObjectKey,
+  is_static: "boolean",
   body: () => Func,
   return_type: Option(() => TypeAnnotation),
   accessor_type: Option(() => AccessorType),
@@ -231,6 +232,7 @@ const MethodDef = Struct("MethodDef", ["span"], {
 
 const ObjectKey = Enum("ObjectKey", ["span"], {
   Ident: { ident: Ident },
+  Private: { ident: Ident },
   String: { text: Text },
   Computed: { expr: () => Expr },
 })
@@ -326,6 +328,10 @@ const ImportSpecifier = Struct("ImportSpecifier", ["span"], {
   as_name: Option(Ident),
   imported_name: () => ModuleExportName,
 })
+const ExportSpecifier = Struct("ExportSpecifier", ["span"], {
+  local_name: () => ModuleExportName,
+  as_name: Option(() => ModuleExportName),
+})
 const BinOp = StringUnion(
   "BinOp",
   // Arithmetic
@@ -399,7 +405,6 @@ const ast_items = [
   VarDeclarator,
   ForInit,
   Expr,
-  ObjectTypeDeclField,
   TypeAnnotation,
   FuncTypeParam,
   ObjectLiteralEntry,
@@ -413,6 +418,7 @@ const ast_items = [
   ObjectPatternProperty,
   ModuleExportName,
   ImportSpecifier,
+  ExportSpecifier,
   BinOp,
   AssignOp,
   DeclType,
