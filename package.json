@@ -9,7 +9,7 @@
     "typecheck": "pnpm run --recursive typecheck"
   },
   "volta": {
-    "node": "24.8.0"
+    "node": "26.12.1"
   },
   "$schema": "https://json.schemastore.org/package.json",
   "devDependencies": {
