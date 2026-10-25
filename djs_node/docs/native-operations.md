@@ -105,5 +105,5 @@ These are implemented in [vm/slots.ts](../vm/slots.ts). Rules:
 | `process_cwd()` | Returns the current working directory |
 | `io_open(path, flags, mode, resolve, reject)`, `io_read(…)`, `io_close(…)` | Asynchronous file I/O. The result is passed to `resolve` or `reject` later. Used by [stdlib/node/fs/promises.js](../stdlib/node/fs/promises.js) |
 
-The VM forwards these to the host object passed to `create_runtime`. By
+The VM forwards these to the host object passed to `new Runtime`. By
 default that's [host/node.ts](../host/node.ts), which uses Node's APIs.

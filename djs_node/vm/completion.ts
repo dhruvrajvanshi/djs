@@ -1,6 +1,5 @@
 import type { Root } from "./memory.ts"
 import type { Runtime } from "../runtime/modules.ts"
-import { alloc_root, copy_value, free_root } from "./memory.ts"
 import { write_string, write_undefined } from "./values.ts"
 import { invoke_sync } from "./interpreter.ts"
 import { panic } from "../utils.ts"
@@ -18,12 +17,12 @@ export function throw_error(
   name: string,
   message: string,
 ): typeof THROW {
-  const error = alloc_root(runtime.memory)
+  const error = runtime.memory.alloc_root()
   try {
     create_error(runtime, error, name, message)
     return throw_value(runtime, error)
   } finally {
-    free_root(runtime.memory, error)
+    runtime.memory.free_root(error)
   }
 }
 
@@ -37,7 +36,7 @@ export function create_error(
   const constructor = runtime.intrinsics.get(`%${name}%`)
   // Errors can only reach guest code once the stdlib has registered them.
   if (constructor === undefined) panic(`${name}: ${message}`)
-  const text = alloc_root(runtime.memory)
+  const text = runtime.memory.alloc_root()
   try {
     write_string(runtime.memory, text, message)
     if (
@@ -46,17 +45,17 @@ export function create_error(
     )
       take_exception(runtime, destination)
   } finally {
-    free_root(runtime.memory, text)
+    runtime.memory.free_root(text)
   }
 }
 
 export function throw_value(runtime: Runtime, value: Root): typeof THROW {
-  copy_value(runtime.memory, runtime.pending_exception, value)
+  runtime.memory.copy_value(runtime.pending_exception, value)
   return THROW
 }
 
 export function take_exception(runtime: Runtime, destination: Root) {
-  copy_value(runtime.memory, destination, runtime.pending_exception)
+  runtime.memory.copy_value(destination, runtime.pending_exception)
   clear_exception(runtime)
 }
 

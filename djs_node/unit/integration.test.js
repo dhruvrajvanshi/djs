@@ -6,7 +6,7 @@ import { join } from "node:path"
 import { bootstrap } from "../runtime/bootstrap.ts"
 import { create_node_host } from "../host/node.ts"
 import {
-  create_runtime,
+  Runtime,
   module_status,
   MODULE_STATE,
   run_module,
@@ -22,7 +22,7 @@ async function fixture(t, files) {
   )
   let output = ""
   const writes = []
-  const runtime = create_runtime({
+  const runtime = new Runtime({
     host: {
       ...create_node_host(),
       read_text: readFile,

@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { alloc_root, create_memory } from "../vm/memory.ts"
+import { Memory } from "../vm/memory.ts"
 import {
   create_scheduler,
   scheduler_enqueue_job,
@@ -15,11 +15,11 @@ import {
 } from "../runtime/scheduler.ts"
 
 test("jobs retain FIFO order through partial drains, growth and queue restart", () => {
-  const memory = create_memory()
+  const memory = new Memory()
   const scheduler = create_scheduler()
   const jobs = Array.from({ length: 48 }, (_, index) => ({
-    callee: alloc_root(memory),
-    value: alloc_root(memory),
+    callee: memory.alloc_root(),
+    value: memory.alloc_root(),
     has_argument: index % 2 === 0,
   }))
   for (const job of jobs.slice(0, 16)) scheduler_enqueue_job(scheduler, job)
@@ -36,13 +36,13 @@ test("jobs retain FIFO order through partial drains, growth and queue restart", 
 })
 
 test("operation reuse preserves active records, optional root zero and task budgets", () => {
-  const memory = create_memory()
+  const memory = new Memory()
   const scheduler = create_scheduler()
-  const buffer = alloc_root(memory)
+  const buffer = memory.alloc_root()
   assert.equal(buffer, 0)
   const operations = Array.from({ length: 40 }, (_, index) => ({
-    resolve: alloc_root(memory),
-    reject: alloc_root(memory),
+    resolve: memory.alloc_root(),
+    reject: memory.alloc_root(),
     buffer: index % 2 === 0 ? buffer : null,
     offset: index * 3,
     length: index + 1,

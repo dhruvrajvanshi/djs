@@ -5,17 +5,7 @@ import type {
   FunctionDescriptor,
 } from "../compiler/compile.ts"
 import type { Runtime, CodeId } from "../runtime/modules.ts"
-import {
-  KINDS,
-  TAGS,
-  alloc_root,
-  free_root,
-  copy_value,
-  read_u32,
-  write_u32,
-  copy_heap_value_to_root,
-  copy_root_to_heap_value,
-} from "./memory.ts"
+import { KINDS, TAGS } from "./memory.ts"
 import {
   get_ref,
   set_ref,
@@ -40,15 +30,14 @@ import type { Status } from "./completion.ts"
 
 export function kind_of(memory: Memory, value: Root) {
   return tag_of(memory, value) === TAGS.REF
-    ? read_u32(memory, get_ref(memory, value))
+    ? memory.read_u32(get_ref(memory, value))
     : 0
 }
 
 export function create_object(memory: Memory, destination: Root) {
   set_ref(memory, destination, allocate(memory, KINDS.OBJECT, 8))
   if (memory.object_prototype !== undefined)
-    write_u32(
-      memory,
+    memory.write_u32(
       get_ref(memory, destination) + 12,
       get_ref(memory, memory.object_prototype),
     )
@@ -60,8 +49,8 @@ export function create_arguments_object(
   arguments_: Root[],
 ) {
   create_object(memory, destination)
-  const key = alloc_root(memory),
-    length = alloc_root(memory)
+  const key = memory.alloc_root(),
+    length = memory.alloc_root()
   try {
     write_string(memory, key, "length")
     write_number(memory, length, arguments_.length)
@@ -71,8 +60,8 @@ export function create_arguments_object(
       define_property(memory, destination, key, arguments_[index])
     }
   } finally {
-    free_root(memory, key)
-    free_root(memory, length)
+    memory.free_root(key)
+    memory.free_root(length)
   }
 }
 
@@ -89,24 +78,20 @@ export function create_function(
 ) {
   const reference = allocate(memory, KINDS.FUNCTION, 48)
   set_ref(memory, destination, reference)
-  write_u32(memory, reference + 8, code_id)
-  write_u32(memory, reference + 12, function_id)
-  write_u32(memory, reference + 32, flags)
+  memory.write_u32(reference + 8, code_id)
+  memory.write_u32(reference + 12, function_id)
+  memory.write_u32(reference + 32, flags)
   if (memory.function_prototype !== undefined)
-    write_u32(
-      memory,
-      reference + 28,
-      get_ref(memory, memory.function_prototype),
-    )
+    memory.write_u32(reference + 28, get_ref(memory, memory.function_prototype))
   if (receiver !== undefined)
-    copy_root_to_heap_value(memory, reference + 40, receiver)
+    memory.copy_root_to_heap_value(reference + 40, receiver)
   if (environment !== undefined)
-    copy_root_to_heap_value(memory, reference + 16, environment)
+    memory.copy_root_to_heap_value(reference + 16, environment)
   if (new_target !== undefined)
-    copy_root_to_heap_value(memory, reference + 48, new_target)
+    memory.copy_root_to_heap_value(reference + 48, new_target)
   if (metadata) {
-    const key = alloc_root(memory),
-      value = alloc_root(memory)
+    const key = memory.alloc_root(),
+      value = memory.alloc_root()
     try {
       write_string(memory, key, "length")
       write_number(memory, value, metadata.length)
@@ -115,18 +100,18 @@ export function create_function(
       write_string(memory, value, metadata.name)
       define_property(memory, destination, key, value, 4)
     } finally {
-      free_root(memory, key)
-      free_root(memory, value)
+      memory.free_root(key)
+      memory.free_root(value)
     }
   }
 }
 
 export function function_code_id(memory: Memory, callee: Root): CodeId {
-  return read_u32(memory, get_ref(memory, callee) + 8) as CodeId
+  return memory.read_u32(get_ref(memory, callee) + 8) as CodeId
 }
 
 export function function_id(memory: Memory, callee: Root): FunctionId {
-  return read_u32(memory, get_ref(memory, callee) + 12) as FunctionId
+  return memory.read_u32(get_ref(memory, callee) + 12) as FunctionId
 }
 
 /** A built-in function whose steps also implement [[Construct]]. */
@@ -140,12 +125,11 @@ export function set_builtin_steps(
   constructor: boolean,
 ) {
   const reference = get_ref(memory, callee)
-  write_u32(memory, reference + 36, get_ref(memory, steps))
+  memory.write_u32(reference + 36, get_ref(memory, steps))
   if (constructor)
-    write_u32(
-      memory,
+    memory.write_u32(
       reference + 32,
-      read_u32(memory, reference + 32) | BUILTIN_CONSTRUCTOR,
+      memory.read_u32(reference + 32) | BUILTIN_CONSTRUCTOR,
     )
 }
 
@@ -154,13 +138,13 @@ export function load_builtin_steps(
   destination: Root,
   callee: Root,
 ) {
-  const steps = read_u32(memory, get_ref(memory, callee) + 36)
+  const steps = memory.read_u32(get_ref(memory, callee) + 36)
   if (steps !== 0) set_ref(memory, destination, steps)
   return steps !== 0
 }
 
 export function function_flags(memory: Memory, callee: Root): number {
-  return read_u32(memory, get_ref(memory, callee) + 32)
+  return memory.read_u32(get_ref(memory, callee) + 32)
 }
 
 export function load_function_environment(
@@ -168,7 +152,7 @@ export function load_function_environment(
   destination: Root,
   callee: Root,
 ) {
-  copy_heap_value_to_root(memory, destination, get_ref(memory, callee) + 16)
+  memory.copy_heap_value_to_root(destination, get_ref(memory, callee) + 16)
 }
 
 export function load_function_receiver(
@@ -176,7 +160,7 @@ export function load_function_receiver(
   destination: Root,
   callee: Root,
 ) {
-  copy_heap_value_to_root(memory, destination, get_ref(memory, callee) + 40)
+  memory.copy_heap_value_to_root(destination, get_ref(memory, callee) + 40)
 }
 
 export function load_function_new_target(
@@ -184,7 +168,7 @@ export function load_function_new_target(
   destination: Root,
   callee: Root,
 ) {
-  copy_heap_value_to_root(memory, destination, get_ref(memory, callee) + 48)
+  memory.copy_heap_value_to_root(destination, get_ref(memory, callee) + 48)
 }
 
 export function create_environment(
@@ -197,17 +181,17 @@ export function create_environment(
   const reference = allocate(memory, KINDS.ENVIRONMENT, 16 + binding_count * 8)
   set_ref(memory, destination, reference)
   if (parent !== undefined)
-    copy_root_to_heap_value(memory, reference + 8, parent)
-  write_u32(memory, reference + 16, binding_count)
-  write_u32(memory, reference + 20, scope_id)
-  const temporary = alloc_root(memory)
+    memory.copy_root_to_heap_value(reference + 8, parent)
+  memory.write_u32(reference + 16, binding_count)
+  memory.write_u32(reference + 20, scope_id)
+  const temporary = memory.alloc_root()
   try {
     write_uninitialized(memory, temporary)
     for (let slot = 0; slot < binding_count; slot++) {
-      copy_root_to_heap_value(memory, reference + 24 + slot * 8, temporary)
+      memory.copy_root_to_heap_value(reference + 24 + slot * 8, temporary)
     }
   } finally {
-    free_root(memory, temporary)
+    memory.free_root(temporary)
   }
 }
 
@@ -216,23 +200,21 @@ export function copy_environment_bindings(
   destination: Root,
   source: Root,
 ) {
-  const count = read_u32(memory, get_ref(memory, source) + 16)
-  const temporary = alloc_root(memory)
+  const count = memory.read_u32(get_ref(memory, source) + 16)
+  const temporary = memory.alloc_root()
   try {
     for (let slot = 0; slot < count; slot++) {
-      copy_heap_value_to_root(
-        memory,
+      memory.copy_heap_value_to_root(
         temporary,
         get_ref(memory, source) + 24 + slot * 8,
       )
-      copy_root_to_heap_value(
-        memory,
+      memory.copy_root_to_heap_value(
         get_ref(memory, destination) + 24 + slot * 8,
         temporary,
       )
     }
   } finally {
-    free_root(memory, temporary)
+    memory.free_root(temporary)
   }
 }
 
@@ -242,10 +224,9 @@ export function environment_at(
   environment: Root,
   depth: number,
 ) {
-  copy_value(memory, destination, environment)
+  memory.copy_value(destination, environment)
   for (let index = 0; index < depth; index++) {
-    copy_heap_value_to_root(
-      memory,
+    memory.copy_heap_value_to_root(
       destination,
       get_ref(memory, destination) + 8,
     )
@@ -262,8 +243,8 @@ export function load_binding(
 ): Status {
   const { memory } = runtime
   const reference = get_ref(memory, environment)
-  if (slot >= read_u32(memory, reference + 16)) panic("Invalid binding slot")
-  const scope = runtime.scopes[read_u32(memory, reference + 20)]
+  if (slot >= memory.read_u32(reference + 16)) panic("Invalid binding slot")
+  const scope = runtime.scopes[memory.read_u32(reference + 20)]
   const imported = scope.import_bindings?.get(slot)
   if (imported)
     return load_binding(
@@ -272,7 +253,7 @@ export function load_binding(
       runtime.modules[imported.module_id].environment,
       imported.slot,
     )
-  copy_heap_value_to_root(memory, destination, reference + 24 + slot * 8)
+  memory.copy_heap_value_to_root(destination, reference + 24 + slot * 8)
   if (tag_of(memory, destination) === TAGS.UNINITIALIZED)
     return throw_error(
       runtime,
@@ -283,12 +264,12 @@ export function load_binding(
 }
 
 function binding_uninitialized(memory: Memory, offset: number) {
-  const previous = alloc_root(memory)
+  const previous = memory.alloc_root()
   try {
-    copy_heap_value_to_root(memory, previous, offset)
+    memory.copy_heap_value_to_root(previous, offset)
     return tag_of(memory, previous) === TAGS.UNINITIALIZED
   } finally {
-    free_root(memory, previous)
+    memory.free_root(previous)
   }
 }
 
@@ -300,14 +281,14 @@ export function initialize_binding(
 ) {
   const { memory } = runtime
   const reference = get_ref(memory, environment)
-  if (slot >= read_u32(memory, reference + 16)) panic("Invalid binding slot")
-  const scope = runtime.scopes[read_u32(memory, reference + 20)]
+  if (slot >= memory.read_u32(reference + 16)) panic("Invalid binding slot")
+  const scope = runtime.scopes[memory.read_u32(reference + 20)]
   if (scope.import_bindings?.has(slot))
     panic("Cannot initialize an imported binding")
   const offset = reference + 24 + slot * 8
   if (!binding_uninitialized(memory, offset))
     panic("Binding is already initialized")
-  copy_root_to_heap_value(memory, offset, source)
+  memory.copy_root_to_heap_value(offset, source)
   const intrinsic = scope.intrinsic_bindings?.get(slot)
   if (intrinsic !== undefined) set_realm_intrinsic(runtime, intrinsic, source)
 }
@@ -320,8 +301,8 @@ export function store_binding(
 ): Status {
   const { memory } = runtime
   const reference = get_ref(memory, environment)
-  if (slot >= read_u32(memory, reference + 16)) panic("Invalid binding slot")
-  const scope = runtime.scopes[read_u32(memory, reference + 20)]
+  if (slot >= memory.read_u32(reference + 16)) panic("Invalid binding slot")
+  const scope = runtime.scopes[memory.read_u32(reference + 20)]
   if (scope.import_bindings?.has(slot))
     return throw_error(
       runtime,
@@ -337,7 +318,7 @@ export function store_binding(
     )
   if (scope.binding_flags[slot])
     return throw_error(runtime, "TypeError", "Assignment to constant binding")
-  copy_root_to_heap_value(memory, offset, source)
+  memory.copy_root_to_heap_value(offset, source)
   return OK
 }
 
@@ -393,29 +374,29 @@ export function find_property(
   let reference = get_ref(memory, object)
   let property_head = head,
     prototype_offset = prototype
-  const key = alloc_root(memory)
+  const key = memory.alloc_root()
   try {
     while (reference !== 0) {
-      let property = read_u32(memory, reference + property_head)
+      let property = memory.read_u32(reference + property_head)
       while (property !== 0) {
-        const flags = read_u32(memory, property + 12)
+        const flags = memory.read_u32(property + 12)
         if (Boolean(flags & 8) === private_key) {
-          copy_heap_value_to_root(memory, key, property + 16)
+          memory.copy_heap_value_to_root(key, property + 16)
           if (key_matches(memory, key, name)) return property
         }
-        property = read_u32(memory, property + 8)
+        property = memory.read_u32(property + 8)
       }
       if (own || private_key) break
-      reference = read_u32(memory, reference + prototype_offset)
+      reference = memory.read_u32(reference + prototype_offset)
       if (reference !== 0) {
-        const kind = read_u32(memory, reference)
+        const kind = memory.read_u32(reference)
         property_head = kind === KINDS.FUNCTION ? 24 : 8
         prototype_offset = kind === KINDS.FUNCTION ? 28 : 12
       }
     }
     return 0
   } finally {
-    free_root(memory, key)
+    memory.free_root(key)
   }
 }
 
@@ -436,7 +417,7 @@ function string_reference(memory: Memory, value: Root) {
   const kind = kind_of(memory, value)
   if (kind === KINDS.STRING) return get_ref(memory, value)
   if (kind === KINDS.STRING_OBJECT)
-    return read_u32(memory, get_ref(memory, value) + 16)
+    return memory.read_u32(get_ref(memory, value) + 16)
   return 0
 }
 
@@ -463,7 +444,7 @@ export function load_property_value(
   destination: Root,
   property: HeapRef,
 ) {
-  copy_heap_value_to_root(memory, destination, property + 24)
+  memory.copy_heap_value_to_root(destination, property + 24)
 }
 
 export function load_property_setter(
@@ -471,7 +452,7 @@ export function load_property_setter(
   destination: Root,
   property: HeapRef,
 ) {
-  copy_heap_value_to_root(memory, destination, property + 32)
+  memory.copy_heap_value_to_root(destination, property + 32)
 }
 
 export function store_property_setter(
@@ -479,7 +460,7 @@ export function store_property_setter(
   property: HeapRef,
   setter: Root,
 ) {
-  copy_root_to_heap_value(memory, property + 32, setter)
+  memory.copy_root_to_heap_value(property + 32, setter)
 }
 
 // Virtual descriptors contain only host numbers/strings, never unrooted VM refs.
@@ -526,7 +507,7 @@ export function own_property(
     return undefined
   const property = find_property(memory, object, name, true)
   return property
-    ? { property, flags: read_u32(memory, property + 12) }
+    ? { property, flags: memory.read_u32(property + 12) }
     : undefined
 }
 
@@ -541,7 +522,7 @@ function prototype_reference(memory: Memory, object: Root) {
       : get_ref(memory, memory.symbol_prototype)
   if (kind_of(memory, object) === KINDS.BYTE_BUFFER) return 0
   const [, offset] = object_offsets(memory, object)
-  return read_u32(memory, get_ref(memory, object) + offset)
+  return memory.read_u32(get_ref(memory, object) + offset)
 }
 
 // Return an accessor flag; only the interpreter invokes guest getters.
@@ -552,14 +533,14 @@ export function get_property(
   key: Root,
 ) {
   const name = property_key(memory, key)
-  const current = alloc_root(memory)
+  const current = memory.alloc_root()
   try {
-    copy_value(memory, current, object)
+    memory.copy_value(current, object)
     while (true) {
       const descriptor = own_property(memory, current, name)
       if (descriptor) {
         if (descriptor.property)
-          copy_heap_value_to_root(memory, destination, descriptor.property + 24)
+          memory.copy_heap_value_to_root(destination, descriptor.property + 24)
         else write_primitive(memory, destination, descriptor.value)
         return descriptor.flags & 16 ? 1 : 0
       }
@@ -570,7 +551,7 @@ export function get_property(
     write_undefined(memory, destination)
     return 0
   } finally {
-    free_root(memory, current)
+    memory.free_root(current)
   }
 }
 
@@ -581,9 +562,9 @@ export function has_property(
   own: boolean = false,
 ) {
   const name = property_key(memory, key),
-    current = alloc_root(memory)
+    current = memory.alloc_root()
   try {
-    copy_value(memory, current, object)
+    memory.copy_value(current, object)
     while (true) {
       if (own_property(memory, current, name)) return true
       if (own) return false
@@ -592,7 +573,7 @@ export function has_property(
       set_ref(memory, current, prototype)
     }
   } finally {
-    free_root(memory, current)
+    memory.free_root(current)
   }
 }
 
@@ -604,24 +585,24 @@ export function delete_property(memory: Memory, object: Root, key: Root) {
   if (!has_property_list(memory, object)) return true
   const [head] = object_offsets(memory, object)
   let link = get_ref(memory, object) + head
-  let property = read_u32(memory, link)
-  const temporary = alloc_root(memory)
+  let property = memory.read_u32(link)
+  const temporary = memory.alloc_root()
   try {
     while (property) {
-      if (!(read_u32(memory, property + 12) & 8)) {
-        copy_heap_value_to_root(memory, temporary, property + 16)
+      if (!(memory.read_u32(property + 12) & 8)) {
+        memory.copy_heap_value_to_root(temporary, property + 16)
         if (key_matches(memory, temporary, name)) {
-          if (!(read_u32(memory, property + 12) & 4)) return false
-          write_u32(memory, link, read_u32(memory, property + 8))
+          if (!(memory.read_u32(property + 12) & 4)) return false
+          memory.write_u32(link, memory.read_u32(property + 8))
           return true
         }
       }
       link = property + 8
-      property = read_u32(memory, link)
+      property = memory.read_u32(link)
     }
     return true
   } finally {
-    free_root(memory, temporary)
+    memory.free_root(temporary)
   }
 }
 
@@ -649,15 +630,15 @@ export function create_array(
   set_ref(memory, destination, allocate(memory, KINDS.ARRAY, 8))
   if (prototype === undefined) prototype = memory.array_prototype
   if (prototype !== undefined) set_prototype(memory, destination, prototype)
-  const key = alloc_root(memory),
-    value = alloc_root(memory)
+  const key = memory.alloc_root(),
+    value = memory.alloc_root()
   try {
     write_string(memory, key, "length")
     write_number(memory, value, length >>> 0)
     ordinary_define_property(memory, destination, key, value, 1)
   } finally {
-    free_root(memory, key)
-    free_root(memory, value)
+    memory.free_root(key)
+    memory.free_root(value)
   }
 }
 
@@ -669,15 +650,15 @@ export function create_string_object(
 ) {
   if (kind_of(memory, value) !== KINDS.STRING) panic("Expected a string")
   // Root the source separately when the destination aliases the argument.
-  const source = alloc_root(memory)
+  const source = memory.alloc_root()
   try {
-    copy_value(memory, source, value)
+    memory.copy_value(source, value)
     set_ref(memory, destination, allocate(memory, KINDS.STRING_OBJECT, 16))
-    copy_root_to_heap_value(memory, get_ref(memory, destination) + 16, source)
+    memory.copy_root_to_heap_value(get_ref(memory, destination) + 16, source)
     if (prototype === undefined) prototype = memory.string_prototype
     if (prototype !== undefined) set_prototype(memory, destination, prototype)
   } finally {
-    free_root(memory, source)
+    memory.free_root(source)
   }
 }
 
@@ -687,21 +668,20 @@ export function string_object_set_value(
   value: Root,
 ) {
   if (kind_of(memory, value) !== KINDS.STRING) panic("Expected a string")
-  copy_root_to_heap_value(memory, get_ref(memory, object) + 16, value)
+  memory.copy_root_to_heap_value(get_ref(memory, object) + 16, value)
 }
 
 export function object_prototype_reference(memory: Memory, object: Root) {
-  return read_u32(
-    memory,
+  return memory.read_u32(
     get_ref(memory, object) + object_offsets(memory, object)[1],
   )
 }
 
 export function string_value(memory: Memory, destination: Root, value: Root) {
   if (kind_of(memory, value) === KINDS.STRING)
-    copy_value(memory, destination, value)
+    memory.copy_value(destination, value)
   else if (kind_of(memory, value) === KINDS.STRING_OBJECT)
-    copy_heap_value_to_root(memory, destination, get_ref(memory, value) + 16)
+    memory.copy_heap_value_to_root(destination, get_ref(memory, value) + 16)
   else panic("Receiver is not a string or String object")
 }
 
@@ -730,12 +710,12 @@ export function try_define_property(
   const virtual =
     name === undefined ? undefined : virtual_property(memory, object, name)
   if (virtual) {
-    const previous = alloc_root(memory)
+    const previous = memory.alloc_root()
     try {
       write_primitive(memory, previous, virtual.value)
       return flags === virtual.flags && same_value(memory, previous, value)
     } finally {
-      free_root(memory, previous)
+      memory.free_root(previous)
     }
   }
   return ordinary_define_property(memory, object, key, value, flags, setter)
@@ -759,7 +739,7 @@ function ordinary_define_property(
     private_key,
   )
   if (property !== 0) {
-    const previous_flags = read_u32(memory, property + 12)
+    const previous_flags = memory.read_u32(property + 12)
     if (!(previous_flags & 4)) {
       if (
         (flags & (2 | 4 | 16)) !== (previous_flags & (2 | 16)) ||
@@ -767,73 +747,70 @@ function ordinary_define_property(
       )
         return false
       if (previous_flags & 16 || !(previous_flags & 1)) {
-        const previous = alloc_root(memory)
+        const previous = memory.alloc_root()
         try {
-          copy_heap_value_to_root(
-            memory,
+          memory.copy_heap_value_to_root(
             previous,
             property + (flags & 16 && setter !== undefined ? 32 : 24),
           )
           if (!same_value(memory, previous, value)) return false
         } finally {
-          free_root(memory, previous)
+          memory.free_root(previous)
         }
       }
     }
     if (flags & 16) {
       if (!(previous_flags & 16)) {
-        write_u32(memory, property + 12, flags)
-        const empty = alloc_root(memory)
+        memory.write_u32(property + 12, flags)
+        const empty = memory.alloc_root()
         try {
-          copy_root_to_heap_value(memory, property + 24, empty)
-          copy_root_to_heap_value(memory, property + 32, empty)
+          memory.copy_root_to_heap_value(property + 24, empty)
+          memory.copy_root_to_heap_value(property + 32, empty)
         } finally {
-          free_root(memory, empty)
+          memory.free_root(empty)
         }
       }
-      copy_root_to_heap_value(
-        memory,
+      memory.copy_root_to_heap_value(
         property + (setter === undefined ? 24 : 32),
         value,
       )
-      write_u32(memory, property + 12, flags)
+      memory.write_u32(property + 12, flags)
       return true
     }
-    write_u32(memory, property + 12, flags)
-    copy_root_to_heap_value(memory, property + 24, value)
+    memory.write_u32(property + 12, flags)
+    memory.copy_root_to_heap_value(property + 24, value)
     if (previous_flags & 16) {
-      const empty = alloc_root(memory)
+      const empty = memory.alloc_root()
       try {
-        copy_root_to_heap_value(memory, property + 32, empty)
+        memory.copy_root_to_heap_value(property + 32, empty)
       } finally {
-        free_root(memory, empty)
+        memory.free_root(empty)
       }
     }
     return true
   }
-  const normalized = alloc_root(memory)
+  const normalized = memory.alloc_root()
   try {
     if (
       private_key ||
       kind_of(memory, key) === KINDS.STRING ||
       kind_of(memory, key) === KINDS.SYMBOL
     )
-      copy_value(memory, normalized, key)
+      memory.copy_value(normalized, key)
     else write_string(memory, normalized, to_string(memory, key))
     const reference = allocate(memory, KINDS.PROPERTY, private_key ? 24 : 32)
     const object_reference = get_ref(memory, object)
-    write_u32(memory, reference + 8, read_u32(memory, object_reference + head))
-    write_u32(memory, reference + 12, flags)
-    copy_root_to_heap_value(memory, reference + 16, normalized)
-    copy_root_to_heap_value(
-      memory,
+    memory.write_u32(reference + 8, memory.read_u32(object_reference + head))
+    memory.write_u32(reference + 12, flags)
+    memory.copy_root_to_heap_value(reference + 16, normalized)
+    memory.copy_root_to_heap_value(
       reference + (flags & 16 && setter !== undefined ? 32 : 24),
       value,
     )
-    write_u32(memory, object_reference + head, reference)
+    memory.write_u32(object_reference + head, reference)
     return true
   } finally {
-    free_root(memory, normalized)
+    memory.free_root(normalized)
   }
 }
 
@@ -899,9 +876,9 @@ export function set_property(
       "TypeError",
       "Cannot assign to readonly string property",
     )
-  const current = alloc_root(memory)
+  const current = memory.alloc_root()
   try {
-    copy_value(memory, current, object)
+    memory.copy_value(current, object)
     while (true) {
       const descriptor = own_property(memory, current, name)
       if (descriptor) {
@@ -936,7 +913,7 @@ export function set_property(
       Boolean(own),
     )
   } finally {
-    free_root(memory, current)
+    memory.free_root(current)
   }
 }
 
@@ -978,11 +955,11 @@ export function private_property(
     if (property === 0)
       return throw_error(runtime, "TypeError", "Invalid private field receiver")
     if (value === undefined)
-      copy_heap_value_to_root(memory, destination, property + 24)
+      memory.copy_heap_value_to_root(destination, property + 24)
     else {
-      if (!(read_u32(memory, property + 12) & 1))
+      if (!(memory.read_u32(property + 12) & 1))
         return throw_error(runtime, "TypeError", "Private method is readonly")
-      copy_root_to_heap_value(memory, property + 24, value)
+      memory.copy_root_to_heap_value(property + 24, value)
     }
   }
   return OK
@@ -1005,12 +982,11 @@ export function try_set_prototype(
   let current = reference
   while (current) {
     if (current === get_ref(memory, object)) return false
-    current = read_u32(
-      memory,
-      current + (read_u32(memory, current) === KINDS.FUNCTION ? 28 : 12),
+    current = memory.read_u32(
+      current + (memory.read_u32(current) === KINDS.FUNCTION ? 28 : 12),
     )
   }
-  write_u32(memory, get_ref(memory, object) + offset, reference)
+  memory.write_u32(get_ref(memory, object) + offset, reference)
   return true
 }
 
@@ -1021,9 +997,9 @@ export function create_value_array(
 ) {
   const reference = allocate(memory, KINDS.VALUE_ARRAY, 8 + values.length * 8)
   set_ref(memory, destination, reference)
-  write_u32(memory, reference + 8, values.length)
+  memory.write_u32(reference + 8, values.length)
   for (let i = 0; i < values.length; i++)
-    copy_root_to_heap_value(memory, reference + 16 + i * 8, values[i])
+    memory.copy_root_to_heap_value(reference + 16 + i * 8, values[i])
 }
 
 export function load_value_array_element(
@@ -1036,22 +1012,22 @@ export function load_value_array_element(
   if (
     !Number.isInteger(index) ||
     index < 0 ||
-    index >= read_u32(memory, reference + 8)
+    index >= memory.read_u32(reference + 8)
   )
     panic("Invalid value array index")
-  copy_heap_value_to_root(memory, destination, reference + 16 + index * 8)
+  memory.copy_heap_value_to_root(destination, reference + 16 + index * 8)
 }
 
 export function mark_error_object(memory: Memory, object: Root) {
   object_offsets(memory, object)
-  write_u32(memory, get_ref(memory, object), KINDS.ERROR)
+  memory.write_u32(get_ref(memory, object), KINDS.ERROR)
 }
 
 function has_error_prototype(memory: Memory, value: Root) {
   let reference = get_ref(memory, value)
   while (reference !== 0) {
-    if (read_u32(memory, reference) === KINDS.ERROR) return true
-    reference = read_u32(memory, reference + 12)
+    if (memory.read_u32(reference) === KINDS.ERROR) return true
+    reference = memory.read_u32(reference + 12)
   }
   return false
 }
@@ -1077,8 +1053,8 @@ export function to_string(memory: Memory, value: Root): string {
         case KINDS.OBJECT:
           if (!has_error_prototype(memory, value)) return "[object Object]"
         case KINDS.ERROR: {
-          const key = alloc_root(memory),
-            text = alloc_root(memory)
+          const key = memory.alloc_root(),
+            text = memory.alloc_root()
           try {
             write_string(memory, key, "name")
             get_property(memory, text, value, key)
@@ -1087,8 +1063,8 @@ export function to_string(memory: Memory, value: Root): string {
             get_property(memory, text, value, key)
             return name + ": " + to_string(memory, text)
           } finally {
-            free_root(memory, key)
-            free_root(memory, text)
+            memory.free_root(key)
+            memory.free_root(text)
           }
         }
         default:
@@ -1179,8 +1155,8 @@ export function binary_operation(
   if (operator === "instanceof") {
     if (kind_of(memory, right) !== KINDS.FUNCTION)
       return throw_error(runtime, "TypeError", "Expected a constructor")
-    const key = alloc_root(memory),
-      prototype = alloc_root(memory)
+    const key = memory.alloc_root(),
+      prototype = memory.alloc_root()
     try {
       write_string(memory, key, "prototype")
       get_property(memory, prototype, right, key)
@@ -1200,10 +1176,9 @@ export function binary_operation(
       ) {
         let reference = get_ref(memory, left)
         while (reference !== 0) {
-          reference = read_u32(
-            memory,
+          reference = memory.read_u32(
             reference +
-              (read_u32(memory, reference) === KINDS.FUNCTION ? 28 : 12),
+              (memory.read_u32(reference) === KINDS.FUNCTION ? 28 : 12),
           )
           if (reference === get_ref(memory, prototype)) {
             found = true
@@ -1214,8 +1189,8 @@ export function binary_operation(
       write_boolean(memory, destination, found)
       return OK
     } finally {
-      free_root(memory, key)
-      free_root(memory, prototype)
+      memory.free_root(key)
+      memory.free_root(prototype)
     }
   }
   if (
@@ -1358,25 +1333,25 @@ function own_property_keys(memory: Memory, object: Root) {
   const names = []
   // Symbol keys are rooted individually since creating the result moves them.
   const symbols: Root[] = []
-  const key = alloc_root(memory)
+  const key = memory.alloc_root()
   try {
-    let property = read_u32(memory, get_ref(memory, object) + head)
+    let property = memory.read_u32(get_ref(memory, object) + head)
     while (property) {
-      if (!(read_u32(memory, property + 12) & 8)) {
-        copy_heap_value_to_root(memory, key, property + 16)
+      if (!(memory.read_u32(property + 12) & 8)) {
+        memory.copy_heap_value_to_root(key, property + 16)
         if (kind_of(memory, key) === KINDS.SYMBOL) {
-          const symbol = alloc_root(memory)
-          copy_value(memory, symbol, key)
+          const symbol = memory.alloc_root()
+          memory.copy_value(symbol, key)
           symbols.push(symbol)
         } else names.push(read_string(memory, key))
       }
-      property = read_u32(memory, property + 8)
+      property = memory.read_u32(property + 8)
     }
   } catch (error) {
-    for (const symbol of symbols) free_root(memory, symbol)
+    for (const symbol of symbols) memory.free_root(symbol)
     throw error
   } finally {
-    free_root(memory, key)
+    memory.free_root(key)
   }
   names.reverse()
   symbols.reverse()
@@ -1401,8 +1376,8 @@ export function ordinary_own_property_keys(
   object: Root,
 ) {
   const { names: ordered, symbols } = own_property_keys(memory, object)
-  const key = alloc_root(memory),
-    value = alloc_root(memory)
+  const key = memory.alloc_root(),
+    value = memory.alloc_root()
   try {
     create_array(memory, destination, ordered.length + symbols.length)
     for (let index = 0; index < ordered.length; index++) {
@@ -1415,9 +1390,9 @@ export function ordinary_own_property_keys(
       ordinary_define_property(memory, destination, key, symbols[index], 7)
     }
   } finally {
-    free_root(memory, key)
-    free_root(memory, value)
-    for (const symbol of symbols) free_root(memory, symbol)
+    memory.free_root(key)
+    memory.free_root(value)
+    for (const symbol of symbols) memory.free_root(symbol)
   }
 }
 
@@ -1428,13 +1403,13 @@ export function ordinary_own_property_keys(
 export function for_in_keys(memory: Memory, destination: Root, object: Root) {
   const visited = new Set<string>()
   const keys = []
-  const current = alloc_root(memory),
-    value = alloc_root(memory)
+  const current = memory.alloc_root(),
+    value = memory.alloc_root()
   try {
-    copy_value(memory, current, object)
+    memory.copy_value(current, object)
     while (true) {
       const { names, symbols } = own_property_keys(memory, current)
-      for (const symbol of symbols) free_root(memory, symbol)
+      for (const symbol of symbols) memory.free_root(symbol)
       for (const name of names) {
         if (visited.has(name)) continue
         visited.add(name)
@@ -1452,7 +1427,7 @@ export function for_in_keys(memory: Memory, destination: Root, object: Root) {
       ordinary_define_property(memory, destination, current, value, 7)
     }
   } finally {
-    free_root(memory, current)
-    free_root(memory, value)
+    memory.free_root(current)
+    memory.free_root(value)
   }
 }

@@ -1,6 +1,6 @@
 import type { Root } from "./memory.ts"
 import type { Runtime } from "../runtime/modules.ts"
-import { KINDS, alloc_root } from "./memory.ts"
+import { KINDS } from "./memory.ts"
 import { set_ref, write_boolean, write_null } from "./values.ts"
 import {
   kind_of,
@@ -14,7 +14,6 @@ import {
   string_value,
   object_prototype_reference,
 } from "./objects.ts"
-import { copy_heap_value_to_root, copy_root_to_heap_value } from "./memory.ts"
 import { OK, throw_error } from "./completion.ts"
 import type { Status } from "./completion.ts"
 
@@ -30,7 +29,7 @@ const VM_SLOTS = new Set([
 function slot_key(runtime: Runtime, name: string): Root {
   let key = runtime.slot_keys.get(name)
   if (key === undefined) {
-    key = alloc_root(runtime.memory)
+    key = runtime.memory.alloc_root()
     create_object(runtime.memory, key)
     runtime.slot_keys.set(name, key)
   }
@@ -87,7 +86,7 @@ export function get_slot(
     true,
     true,
   )
-  copy_heap_value_to_root(memory, destination, property + 24)
+  memory.copy_heap_value_to_root(destination, property + 24)
   return OK
 }
 
@@ -109,7 +108,7 @@ export function set_slot(
     true,
     true,
   )
-  copy_root_to_heap_value(memory, property + 24, value)
+  memory.copy_root_to_heap_value(property + 24, value)
   return OK
 }
 

@@ -1,22 +1,6 @@
 import { panic } from "../utils.ts"
 import type { Memory } from "./memory.ts"
-import {
-  KINDS,
-  memory_semispace_bytes,
-  memory_active_start,
-  memory_allocation_cursor,
-  memory_set_allocation_cursor,
-  memory_record_allocation,
-  memory_finish_collection,
-  memory_collections,
-  memory_allocations,
-  memory_root_count,
-  memory_relocate_roots,
-  relocate_heap_value,
-  read_u32,
-  write_u32,
-  write_heap_undefined,
-} from "./memory.ts"
+import { KINDS } from "./memory.ts"
 
 export { KINDS } from "./memory.ts"
 const FORWARDED = 0xffffffff
@@ -45,51 +29,51 @@ export function allocate(memory: Memory, kind: number, payload_bytes: number) {
     panic("Invalid heap payload size")
   }
   const size = Math.ceil((8 + payload_bytes) / 8) * 8
-  const semispace_bytes = memory_semispace_bytes(memory)
+  const semispace_bytes = memory.semispace_bytes
   if (size > semispace_bytes) panic("VM heap out of memory")
-  let cursor = memory_allocation_cursor(memory)
-  if (cursor + size > memory_active_start(memory) + semispace_bytes) {
+  let cursor = memory.allocation_cursor
+  if (cursor + size > memory.active_start + semispace_bytes) {
     collect(memory)
-    cursor = memory_allocation_cursor(memory)
-    if (cursor + size > memory_active_start(memory) + semispace_bytes) {
+    cursor = memory.allocation_cursor
+    if (cursor + size > memory.active_start + semispace_bytes) {
       panic("VM heap out of memory")
     }
   }
   memory.heap.fill(0, cursor, cursor + size)
-  write_u32(memory, cursor, kind)
-  write_u32(memory, cursor + 4, size)
+  memory.write_u32(cursor, kind)
+  memory.write_u32(cursor + 4, size)
   // Empty reference-bearing fields must contain valid values even if a caller
   // allocates another record before filling all of this record's fields.
   if (kind === KINDS.PROPERTY) {
-    write_heap_undefined(memory, cursor + 16)
-    write_heap_undefined(memory, cursor + 24)
-    if (size >= 40) write_heap_undefined(memory, cursor + 32)
+    memory.write_heap_undefined(cursor + 16)
+    memory.write_heap_undefined(cursor + 24)
+    if (size >= 40) memory.write_heap_undefined(cursor + 32)
   } else if (kind === KINDS.FUNCTION) {
-    write_heap_undefined(memory, cursor + 16)
-    write_heap_undefined(memory, cursor + 40)
-    write_heap_undefined(memory, cursor + 48)
+    memory.write_heap_undefined(cursor + 16)
+    memory.write_heap_undefined(cursor + 40)
+    memory.write_heap_undefined(cursor + 48)
   } else if (kind === KINDS.STRING_OBJECT) {
-    write_heap_undefined(memory, cursor + 16)
+    memory.write_heap_undefined(cursor + 16)
   } else if (kind === KINDS.ENVIRONMENT || kind === KINDS.SYMBOL) {
-    write_heap_undefined(memory, cursor + 8)
+    memory.write_heap_undefined(cursor + 8)
   }
   if (kind === KINDS.ENVIRONMENT || kind === KINDS.VALUE_ARRAY) {
     const values_start = kind === KINDS.ENVIRONMENT ? 24 : 16
     for (let offset = values_start; offset + 8 <= size; offset += 8) {
-      write_heap_undefined(memory, cursor + offset)
+      memory.write_heap_undefined(cursor + offset)
     }
   }
-  memory_set_allocation_cursor(memory, cursor + size)
-  memory_record_allocation(memory)
+  memory.allocation_cursor = cursor + size
+  memory.allocations++
   return cursor
 }
 
 // Cheney collection uses forwarding headers in from-space and a scan cursor in
 // to-space. No host collection retains guest references across allocations.
 export function collect(memory: Memory) {
-  const semispace_bytes = memory_semispace_bytes(memory)
-  const from_start = memory_active_start(memory)
-  const from_end = memory_allocation_cursor(memory)
+  const semispace_bytes = memory.semispace_bytes
+  const from_start = memory.active_start
+  const from_end = memory.allocation_cursor
   const to_start = from_start === 8 ? 8 + semispace_bytes : 8
   let to_cursor = to_start
 
@@ -102,9 +86,9 @@ export function collect(memory: Memory) {
     ) {
       panic(`Invalid heap reference: ${reference}`)
     }
-    const kind = read_u32(memory, reference)
-    if (kind === FORWARDED) return read_u32(memory, reference + 4)
-    const size = read_u32(memory, reference + 4)
+    const kind = memory.read_u32(reference)
+    if (kind === FORWARDED) return memory.read_u32(reference + 4)
+    const size = memory.read_u32(reference + 4)
     if (size < 8 || size % 8 !== 0 || reference + size > from_end) {
       panic("Invalid heap record size")
     }
@@ -112,24 +96,24 @@ export function collect(memory: Memory) {
     to_cursor += size
     if (to_cursor > to_start + semispace_bytes) panic("VM heap out of memory")
     memory.heap.copyWithin(destination, reference, reference + size)
-    write_u32(memory, reference, FORWARDED)
-    write_u32(memory, reference + 4, destination)
+    memory.write_u32(reference, FORWARDED)
+    memory.write_u32(reference + 4, destination)
     return destination
   }
 
   function trace_value(offset: number) {
-    relocate_heap_value(memory, offset, copy_reference)
+    memory.relocate_heap_value(offset, copy_reference)
   }
 
   function trace_raw(offset: number) {
-    write_u32(memory, offset, copy_reference(read_u32(memory, offset)))
+    memory.write_u32(offset, copy_reference(memory.read_u32(offset)))
   }
 
-  memory_relocate_roots(memory, copy_reference)
+  memory.relocate_roots(copy_reference)
   let scan = to_start
   while (scan < to_cursor) {
-    const kind = read_u32(memory, scan)
-    const size = read_u32(memory, scan + 4)
+    const kind = memory.read_u32(scan)
+    const size = memory.read_u32(scan + 4)
     if (
       (
         [
@@ -160,7 +144,7 @@ export function collect(memory: Memory) {
     } else if (kind === KINDS.ENVIRONMENT || kind === KINDS.VALUE_ARRAY) {
       const environment = kind === KINDS.ENVIRONMENT
       if (environment) trace_value(scan + 8)
-      const count = read_u32(memory, scan + (environment ? 16 : 8))
+      const count = memory.read_u32(scan + (environment ? 16 : 8))
       const values_start = scan + (environment ? 24 : 16)
       if (values_start + count * 8 > scan + size)
         panic("Invalid heap value array length")
@@ -172,15 +156,15 @@ export function collect(memory: Memory) {
     }
     scan += size
   }
-  memory_finish_collection(memory, to_start, to_cursor)
+  memory.finish_collection(to_start, to_cursor)
 }
 
 export function heap_stats(memory: Memory) {
   return {
-    used_bytes: memory_allocation_cursor(memory) - memory_active_start(memory),
-    semispace_bytes: memory_semispace_bytes(memory),
-    collections: memory_collections(memory),
-    allocations: memory_allocations(memory),
-    roots: memory_root_count(memory),
+    used_bytes: memory.allocation_cursor - memory.active_start,
+    semispace_bytes: memory.semispace_bytes,
+    collections: memory.collections,
+    allocations: memory.allocations,
+    roots: memory.root_count,
   }
 }

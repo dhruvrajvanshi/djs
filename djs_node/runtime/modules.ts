@@ -1,19 +1,13 @@
 import type { Brand } from "../utils.ts"
-import type { Root, MemoryOptions, Memory } from "../vm/memory.ts"
+import type { Root, MemoryOptions } from "../vm/memory.ts"
 import type { ExportBinding, CompiledModule } from "../compiler/compile.ts"
 import type { Context } from "../vm/context.ts"
-import { context_error } from "../vm/context.ts"
 import type { NodeHost } from "../host/node.ts"
 import type { Scheduler } from "./scheduler.ts"
 import { resolve, isAbsolute } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { compile_module } from "../compiler/compile.ts"
-import {
-  create_memory,
-  alloc_root,
-  free_root,
-  copy_value,
-} from "../vm/memory.ts"
+import { Memory } from "../vm/memory.ts"
 import {
   write_number,
   write_null,
@@ -93,60 +87,47 @@ export interface RuntimeOptions extends MemoryOptions {
   max_steps?: number
 }
 
-export interface Runtime {
-  memory: Memory
-  host: NodeHost
-  max_steps: number
-  code: LinkedCode[]
-  scopes: RuntimeScope[]
-  modules: ModuleRecord[]
-  identities: Map<string, number>
-  globals: Map<string, Root>
-  contexts: Context[]
-  scheduler: Scheduler
+export class Runtime {
+  readonly memory: Memory
+  readonly host: NodeHost
+  readonly max_steps: number
+  code: LinkedCode[] = []
+  scopes: RuntimeScope[] = []
+  modules: ModuleRecord[] = []
+  identities = new Map<string, number>()
+  globals = new Map<string, Root>()
+  contexts: Context[] = []
+  scheduler: Scheduler = create_scheduler()
   /** The realm's well-known objects, abstract operations and internal methods by name. */
-  intrinsics: Map<string, Root>
+  intrinsics = new Map<string, Root>()
   /** Private keys of internal slots the VM does not represent itself. */
-  slot_keys: Map<string, Root>
+  slot_keys = new Map<string, Root>()
   /** Keyed by name without the "Symbol." prefix. */
   well_known_symbols?: Map<string, Root>
   /** Property keys the VM reads itself, such as iterator result fields. */
   property_names?: Map<string, Root>
-  pending_exception: Root
-}
+  readonly pending_exception: Root
 
-export function create_runtime({
-  host = create_node_host(),
-  max_steps = 1000000,
-  ...memory_options
-}: RuntimeOptions = {}): Runtime {
-  const memory = create_memory(memory_options)
-  const runtime: Runtime = {
-    memory,
-    host,
-    max_steps,
-    code: [],
-    scopes: [],
-    modules: [],
-    identities: new Map(),
-    globals: new Map(),
-    contexts: [],
-    scheduler: create_scheduler(),
-    intrinsics: new Map(),
-    slot_keys: new Map(),
-    pending_exception: alloc_root(memory),
+  constructor({
+    host = create_node_host(),
+    max_steps = 1000000,
+    ...memory_options
+  }: RuntimeOptions = {}) {
+    this.memory = new Memory(memory_options)
+    this.host = host
+    this.max_steps = max_steps
+    this.pending_exception = this.memory.alloc_root()
+    for (const [name, value] of [
+      ["undefined", undefined],
+      ["NaN", NaN],
+      ["Infinity", Infinity],
+    ] as [string, number | undefined][]) {
+      const root = this.memory.alloc_root()
+      if (value === undefined) write_undefined(this.memory, root)
+      else write_number(this.memory, root, value)
+      this.globals.set(name, root)
+    }
   }
-  for (const [name, value] of [
-    ["undefined", undefined],
-    ["NaN", NaN],
-    ["Infinity", Infinity],
-  ] as [string, number | undefined][]) {
-    const root = alloc_root(runtime.memory)
-    if (value === undefined) write_undefined(runtime.memory, root)
-    else write_number(runtime.memory, root, value)
-    runtime.globals.set(name, root)
-  }
-  return runtime
 }
 
 export function module_status(module: ModuleRecord): ModuleStatus {
@@ -159,7 +140,7 @@ export function set_module_status(module: ModuleRecord, status: ModuleStatus) {
 function link_code(runtime: Runtime, unit: CompiledModule) {
   const constants = []
   for (const literal of unit.literals) {
-    const root = alloc_root(runtime.memory)
+    const root = runtime.memory.alloc_root()
     if (typeof literal === "string") write_string(runtime.memory, root, literal)
     else if (typeof literal === "number")
       write_number(runtime.memory, root, literal)
@@ -226,8 +207,8 @@ function instantiate_module(
   },
 ): ModuleRecord {
   const state = create_module_state(
-    alloc_root(runtime.memory),
-    alloc_root(runtime.memory),
+    runtime.memory.alloc_root(),
+    runtime.memory.alloc_root(),
   )
   const module: ModuleRecord = {
     id: runtime.modules.length,
@@ -272,7 +253,7 @@ function load_native_module(
     scope_id,
     exports: names.map((name, slot) => ({ name, slot })),
   })
-  const value = alloc_root(runtime.memory)
+  const value = runtime.memory.alloc_root()
   try {
     for (let slot = 0; slot < names.length; slot++) {
       create_function(runtime.memory, value, NATIVE_CODE, ids.get(names[slot])!)
@@ -285,7 +266,7 @@ function load_native_module(
     write_string(runtime.memory, module.error, error.message)
     throw error
   } finally {
-    free_root(runtime.memory, value)
+    runtime.memory.free_root(value)
   }
 }
 
@@ -363,8 +344,7 @@ export async function evaluate_module(
     return module
   } catch (error) {
     set_module_status(module, MODULE_STATE.ERRORED)
-    if (context)
-      copy_value(runtime.memory, module.error, context_error(context))
+    if (context) runtime.memory.copy_value(module.error, context.error)
     else write_string(runtime.memory, module.error, error.message)
     throw error
   } finally {

@@ -4,8 +4,8 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { alloc_root, create_memory, free_root } from "../vm/memory.ts"
-import { CONTEXT_STATE, context_status } from "../vm/context.ts"
+import { Memory } from "../vm/memory.ts"
+import { CONTEXT_STATE } from "../vm/context.ts"
 import { collect, heap_stats } from "../vm/heap.ts"
 import { read_number, read_string, write_string } from "../vm/values.ts"
 import {
@@ -15,11 +15,7 @@ import {
   set_property,
 } from "../vm/objects.ts"
 import { bootstrap } from "../runtime/bootstrap.ts"
-import {
-  create_runtime,
-  evaluate_module,
-  load_module,
-} from "../runtime/modules.ts"
+import { Runtime, evaluate_module, load_module } from "../runtime/modules.ts"
 import {
   create_scheduler,
   enqueue_job,
@@ -30,17 +26,17 @@ import { create_function } from "../vm/objects.ts"
 import { NATIVE_CODE, intrinsic_id } from "../vm/intrinsics.ts"
 
 test("property creation re-reads object and value roots after allocation collects", () => {
-  const memory = create_memory({ semispace_bytes: 128 })
-  const object = alloc_root(memory)
-  const key = alloc_root(memory)
-  const value = alloc_root(memory)
-  const garbage = alloc_root(memory)
-  const setter = alloc_root(memory)
+  const memory = new Memory({ semispace_bytes: 128 })
+  const object = memory.alloc_root()
+  const key = memory.alloc_root()
+  const value = memory.alloc_root()
+  const garbage = memory.alloc_root()
+  const setter = memory.alloc_root()
   create_object(memory, object)
   write_string(memory, key, "key")
   write_string(memory, value, "value")
   write_string(memory, garbage, "abcdefghijklmnopqrst")
-  free_root(memory, garbage)
+  memory.free_root(garbage)
   assert.equal(heap_stats(memory).collections, 0)
   set_property({ memory }, setter, object, key, value)
   assert.equal(heap_stats(memory).collections, 1)
@@ -54,7 +50,7 @@ test("property creation re-reads object and value roots after allocation collect
 test("queued callbacks retain functions and arguments across collection and queue growth", () => {
   let output = ""
   const runtime = {
-    memory: create_memory({ semispace_bytes: 16384, root_capacity: 2 }),
+    memory: new Memory({ semispace_bytes: 16384, root_capacity: 2 }),
     scheduler: create_scheduler(),
     contexts: [],
     host: {
@@ -64,16 +60,16 @@ test("queued callbacks retain functions and arguments across collection and queu
     },
   }
   const { memory } = runtime
-  const fn = alloc_root(memory),
-    argument = alloc_root(memory)
+  const fn = memory.alloc_root(),
+    argument = memory.alloc_root()
   create_function(memory, fn, NATIVE_CODE, intrinsic_id("write_stdout"))
   for (let index = 0; index < 40; index++) {
     write_string(memory, argument, `job ${index}\n`)
     enqueue_job(runtime, fn, argument)
     collect(memory)
   }
-  free_root(memory, fn)
-  free_root(memory, argument)
+  memory.free_root(fn)
+  memory.free_root(argument)
   collect(memory)
   drain_jobs(runtime)
   assert.equal(
@@ -86,12 +82,12 @@ test("queued callbacks retain functions and arguments across collection and queu
 })
 
 test("arguments objects retain indexed values through allocation-triggered collection", () => {
-  const memory = create_memory({ semispace_bytes: 1024, root_capacity: 2 })
-  const args = alloc_root(memory),
-    key = alloc_root(memory),
-    value = alloc_root(memory),
-    first = alloc_root(memory),
-    second = alloc_root(memory)
+  const memory = new Memory({ semispace_bytes: 1024, root_capacity: 2 })
+  const args = memory.alloc_root(),
+    key = memory.alloc_root(),
+    value = memory.alloc_root(),
+    first = memory.alloc_root(),
+    second = memory.alloc_root()
   try {
     write_string(memory, first, "first")
     write_string(memory, second, "second")
@@ -109,8 +105,7 @@ test("arguments objects retain indexed values through allocation-triggered colle
     }
     assert.ok(heap_stats(memory).collections > 2)
   } finally {
-    for (const root of [args, key, value, first, second])
-      free_root(memory, root)
+    for (const root of [args, key, value, first, second]) memory.free_root(root)
   }
   collect(memory)
   assert.equal(heap_stats(memory).roots, 0)
@@ -142,7 +137,7 @@ test("guest closures survive repeated calls and allocation-triggered collection"
     `,
     )
     let output = ""
-    const runtime = create_runtime({
+    const runtime = new Runtime({
       // Include the standard name/length properties now owned by guest functions.
       semispace_bytes: 65536,
       root_capacity: 2,
@@ -196,7 +191,7 @@ test(
       let output = ""
       let reads = 0
       let closed = false
-      const runtime = create_runtime({
+      const runtime = new Runtime({
         semispace_bytes: 65536,
         root_capacity: 2,
         host: {
@@ -235,8 +230,7 @@ test(
       assert.equal(pending_operations(runtime), 1)
       assert.ok(
         runtime.contexts.some(
-          (context) =>
-            context && context_status(context) === CONTEXT_STATE.WAITING,
+          (context) => context && context.status === CONTEXT_STATE.WAITING,
         ),
       )
       collect(runtime.memory)
@@ -271,7 +265,7 @@ for (const rejected of [false, true]) {
       catch (error) { console.log(error.name, error.message, error instanceof Error); }
       finally { console.log("finished"); }
     `
-    const runtime = create_runtime({
+    const runtime = new Runtime({
       semispace_bytes: 65536,
       root_capacity: 2,
       host: {

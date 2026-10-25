@@ -1,47 +1,7 @@
 import {
-  context_create_storage,
-  context_status,
-  context_set_status,
-  context_current_frame,
-  context_commit_frame,
-  context_pop_frame,
-  context_result,
-  context_error,
-  context_increment_steps,
-  context_set_await_rejection,
-  context_take_await_rejection,
-  context_reserve_frame,
-  context_top_handler,
-  context_push_handler,
-  context_pop_handler,
-  context_initialize_frame,
-  context_frame_caller,
-  context_frame_code_id,
-  context_frame_function_id,
-  context_frame_pc,
-  context_frame_return_root,
-  context_frame_environment_root,
-  context_frame_this_root,
-  context_frame_new_target_root,
-  context_frame_register_count,
-  context_frame_is_construct_call,
-  context_set_frame_pc,
-  context_advance_frame_pc,
-  context_set_frame_construct_call,
-  context_frame_register_root,
-  context_set_frame_register_root,
-  handler_frame,
-  handler_catch_pc,
-  handler_finally_pc,
-  handler_end_pc,
-  handler_exception_register,
-  handler_phase,
-  handler_completion_kind,
-  handler_completion_value_root,
-  handler_enter_catch,
-  handler_save_completion,
-  handler_environment_root,
-  handler_start_pc,
+  Context,
+  Frame,
+  Handler,
   CONTEXT_STATE,
   HANDLER_PHASE,
   COMPLETION_KIND,
@@ -54,12 +14,7 @@ import type { Root, Memory } from "./memory.ts"
 import type { Runtime, CodeId, LinkedCode } from "../runtime/modules.ts"
 import type { FunctionId } from "../compiler/compile.ts"
 import type { BytecodeOffset, RegisterIndex } from "../compiler/bytecode.ts"
-import type {
-  Context,
-  Frame,
-  CompletionKind,
-  HandlerOffset,
-} from "./context.ts"
+import type { CompletionKind, ContextStatus } from "./context.ts"
 import type { HostError } from "../host/node.ts"
 import {
   OP,
@@ -69,7 +24,6 @@ import {
   bytecode_offset,
   optional_bytecode_offset,
 } from "../compiler/bytecode.ts"
-import { alloc_root, free_root, copy_value } from "./memory.ts"
 import {
   read_number,
   write_number,
@@ -159,10 +113,10 @@ export function create_context(
   code_id: CodeId,
   environment: Root,
 ): Context {
-  const context = context_create_storage(
+  const context = new Context(
     runtime.contexts.length,
-    alloc_root(runtime.memory),
-    alloc_root(runtime.memory),
+    runtime.memory.alloc_root(),
+    runtime.memory.alloc_root(),
   )
   push_frame(
     runtime,
@@ -192,54 +146,48 @@ function push_frame(
   const { memory } = runtime
   const fn = runtime.code[code_id].unit.functions[function_id]
   if (!fn) panic("Invalid function descriptor")
-  const offset = context_reserve_frame(context, fn.slot_count)
-  const env = alloc_root(memory)
-  const this_value = alloc_root(memory)
-  copy_value(memory, env, environment)
-  if (receiver !== undefined) copy_value(memory, this_value, receiver)
-  const target = alloc_root(memory)
-  if (new_target !== undefined) copy_value(memory, target, new_target)
-  context_initialize_frame(context, offset, {
-    caller: context_current_frame(context),
+  const env = memory.alloc_root()
+  const this_value = memory.alloc_root()
+  memory.copy_value(env, environment)
+  if (receiver !== undefined) memory.copy_value(this_value, receiver)
+  const target = memory.alloc_root()
+  if (new_target !== undefined) memory.copy_value(target, new_target)
+  const registers: Root[] = []
+  for (let index = 0; index < fn.slot_count; index++)
+    registers.push(memory.alloc_root())
+  const frame = new Frame({
+    caller: context.frame,
     code_id,
     function_id,
     return_root: destination,
     environment_root: env,
     this_root: this_value,
     new_target_root: target,
-    register_count: fn.slot_count,
+    registers,
   })
-  for (let index = 0; index < fn.slot_count; index++) {
-    context_set_frame_register_root(
-      context,
-      offset,
-      register_index(index),
-      alloc_root(memory),
-    )
-  }
   if (fn.arguments_slot !== null) {
-    const args = alloc_root(memory)
+    const args = memory.alloc_root()
     try {
       create_arguments_object(memory, args, arguments_)
       initialize_binding(runtime, env, fn.arguments_slot, args)
     } finally {
-      free_root(memory, args)
+      memory.free_root(args)
     }
   }
   for (let index = 0; index < fn.parameter_slots.length; index++) {
     const argument = arguments_[index]
     if (argument === undefined) {
-      const empty = alloc_root(memory)
+      const empty = memory.alloc_root()
       try {
         initialize_binding(runtime, env, fn.parameter_slots[index], empty)
       } finally {
-        free_root(memory, empty)
+        memory.free_root(empty)
       }
     } else initialize_binding(runtime, env, fn.parameter_slots[index], argument)
   }
   if (fn.rest_slot !== null) {
-    const rest = alloc_root(memory),
-      key = alloc_root(memory)
+    const rest = memory.alloc_root(),
+      key = memory.alloc_root()
     try {
       const start = fn.parameter_slots.length
       const count = Math.max(0, arguments_.length - start)
@@ -250,38 +198,29 @@ function push_frame(
       }
       initialize_binding(runtime, env, fn.rest_slot, rest)
     } finally {
-      free_root(memory, rest)
-      free_root(memory, key)
+      memory.free_root(rest)
+      memory.free_root(key)
     }
   }
-  context_commit_frame(context, offset)
+  context.frame = frame
 }
 
 function pop_frame(runtime: Runtime, context: Context) {
-  const frame = context_current_frame(context)!
-  for (
-    let index = 0;
-    index < context_frame_register_count(context, frame);
-    index++
-  ) {
-    free_root(
-      runtime.memory,
-      context_frame_register_root(context, frame, register_index(index)),
-    )
-  }
-  free_root(runtime.memory, context_frame_environment_root(context, frame))
-  free_root(runtime.memory, context_frame_this_root(context, frame))
-  free_root(runtime.memory, context_frame_new_target_root(context, frame))
-  context_pop_frame(context)
+  const frame = context.frame!
+  for (const register of frame.registers) runtime.memory.free_root(register)
+  runtime.memory.free_root(frame.environment_root)
+  runtime.memory.free_root(frame.this_root)
+  runtime.memory.free_root(frame.new_target_root)
+  context.frame = frame.caller
 }
 
 export function dispose_context(runtime: Runtime, context: Context) {
-  if (context_status(context) === CONTEXT_STATE.DISPOSED) return
-  while (context_top_handler(context) !== null) pop_handler(runtime, context)
-  while (context_current_frame(context) !== null) pop_frame(runtime, context)
-  free_root(runtime.memory, context_result(context))
-  free_root(runtime.memory, context_error(context))
-  context_set_status(context, CONTEXT_STATE.DISPOSED)
+  if (context.status === CONTEXT_STATE.DISPOSED) return
+  while (context.top_handler() !== null) pop_handler(runtime, context)
+  while (context.frame !== null) pop_frame(runtime, context)
+  runtime.memory.free_root(context.result)
+  runtime.memory.free_root(context.error)
+  context.status = CONTEXT_STATE.DISPOSED
 }
 
 function call_function(
@@ -298,8 +237,8 @@ function call_function(
   const code_id = function_code_id(memory, callee),
     function_id = callee_function_id(memory, callee)
   if (code_id === RESUME_CODE) {
-    const captured = alloc_root(memory),
-      value = alloc_root(memory)
+    const captured = memory.alloc_root(),
+      value = memory.alloc_root()
     try {
       load_function_environment(memory, captured, callee)
       load_value_array_element(memory, value, captured, 0)
@@ -314,8 +253,8 @@ function call_function(
       )
       write_undefined(memory, destination)
     } finally {
-      free_root(memory, captured)
-      free_root(memory, value)
+      memory.free_root(captured)
+      memory.free_root(value)
     }
     return OK
   }
@@ -369,10 +308,10 @@ function enter_function(
   const { memory } = runtime
   const code_id = function_code_id(memory, callee),
     function_id = callee_function_id(memory, callee)
-  const parent = alloc_root(memory),
-    environment = alloc_root(memory),
-    this_value = alloc_root(memory),
-    new_target = alloc_root(memory)
+  const parent = memory.alloc_root(),
+    environment = memory.alloc_root(),
+    this_value = memory.alloc_root(),
+    new_target = memory.alloc_root()
   try {
     load_function_environment(memory, parent, callee)
     const fn = runtime.code[code_id].unit.functions[function_id]
@@ -384,7 +323,7 @@ function enter_function(
       receiver = this_value
       load_function_new_target(memory, new_target, callee)
     }
-    if (target !== undefined) copy_value(memory, new_target, target)
+    if (target !== undefined) memory.copy_value(new_target, target)
     create_environment(
       memory,
       environment,
@@ -405,10 +344,10 @@ function enter_function(
     )
     return OK
   } finally {
-    free_root(memory, new_target)
-    free_root(memory, parent)
-    free_root(memory, environment)
-    free_root(memory, this_value)
+    memory.free_root(new_target)
+    memory.free_root(parent)
+    memory.free_root(environment)
+    memory.free_root(this_value)
   }
 }
 
@@ -444,8 +383,8 @@ function get_value(
 
 function close_iterator(runtime: Runtime, iterator: Root): Status {
   const { memory } = runtime
-  const method = alloc_root(memory),
-    result = alloc_root(memory)
+  const method = memory.alloc_root(),
+    result = memory.alloc_root()
   try {
     const key = runtime.property_names!.get("return")!
     if (get_value(runtime, method, iterator, key) === THROW) return THROW
@@ -460,8 +399,8 @@ function close_iterator(runtime: Runtime, iterator: Root): Status {
       )
     return OK
   } finally {
-    free_root(memory, method)
-    free_root(memory, result)
+    memory.free_root(method)
+    memory.free_root(result)
   }
 }
 
@@ -474,10 +413,10 @@ export function coerce_value(
 ): Status {
   const helper = runtime.intrinsics.get(operation)
   if (helper === undefined) {
-    copy_value(runtime.memory, destination, source)
+    runtime.memory.copy_value(destination, source)
     return OK
   }
-  const hint_value = alloc_root(runtime.memory)
+  const hint_value = runtime.memory.alloc_root()
   try {
     if (hint !== undefined) write_string(runtime.memory, hint_value, hint)
     return invoke_sync(runtime, destination, helper, undefined, [
@@ -485,7 +424,7 @@ export function coerce_value(
       hint_value,
     ])
   } finally {
-    free_root(runtime.memory, hint_value)
+    runtime.memory.free_root(hint_value)
   }
 }
 
@@ -499,11 +438,11 @@ export function invoke_sync(
   const context = create_call_context(runtime, callee, receiver, args)
   try {
     run_task(runtime, context)
-    if (context_status(context) === CONTEXT_STATE.FAILED)
-      return throw_value(runtime, context_error(context))
-    if (context_status(context) !== CONTEXT_STATE.DONE)
+    if (context.status === CONTEXT_STATE.FAILED)
+      return throw_value(runtime, context.error)
+    if (context.status !== CONTEXT_STATE.DONE)
       panic("Internal operations must complete synchronously")
-    copy_value(runtime.memory, destination, context_result(context))
+    runtime.memory.copy_value(destination, context.result)
     return OK
   } finally {
     dispose_context(runtime, context)
@@ -515,7 +454,7 @@ function load_property_key(
   destination: Root,
   source: Root,
 ): Status {
-  copy_value(runtime.memory, destination, source)
+  runtime.memory.copy_value(destination, source)
   if (is_object(runtime.memory, destination))
     return coerce_value(runtime, destination, destination, "ToString")
   return OK
@@ -540,10 +479,10 @@ function create_block_environment(
 
 const op = {
   LOAD_CONST(memory: Memory, destination: Root, constant: Root) {
-    copy_value(memory, destination, constant)
+    memory.copy_value(destination, constant)
   },
   MOVE(memory: Memory, destination: Root, source: Root) {
-    copy_value(memory, destination, source)
+    memory.copy_value(destination, source)
   },
   LOAD_BINDING(
     runtime: Runtime,
@@ -590,7 +529,7 @@ const op = {
         write_undefined(runtime.memory, destination) // typeof unresolvable name
       else
         return throw_error(runtime, "ReferenceError", `${name} is not defined`)
-    } else copy_value(runtime.memory, destination, global)
+    } else runtime.memory.copy_value(destination, global)
     return OK
   },
   // Iteration ops call guest methods synchronously, like coercions.
@@ -653,7 +592,7 @@ const op = {
     const done = runtime.property_names!.get("done")!
     if (get_value(runtime, operand, temporary, done) === THROW) return THROW
     if (truthy(memory, operand)) {
-      context_set_frame_pc(context, frame, bytecode_offset(done_target))
+      frame.pc = bytecode_offset(done_target)
       return OK
     }
     return get_value(
@@ -681,7 +620,7 @@ const op = {
     write_number(memory, index, 0)
     if (kind_of(memory, source) === KINDS.STRING)
       create_string_object(memory, object, source)
-    else copy_value(memory, object, source)
+    else memory.copy_value(object, source)
     if (!is_object(memory, object)) create_array(memory, keys, 0)
     else if (has_property_list(memory, object))
       for_in_keys(memory, keys, object)
@@ -716,13 +655,12 @@ const op = {
       index++
       get_property(memory, temporary, keys, operand)
       if (has_property(memory, object, temporary)) {
-        copy_value(memory, destination, temporary)
+        memory.copy_value(destination, temporary)
         found = true
       }
     }
     write_number(memory, index_root, index)
-    if (!found)
-      context_set_frame_pc(context, frame, bytecode_offset(end_target))
+    if (!found) frame.pc = bytecode_offset(end_target)
   },
   LOAD_NEW_TARGET(
     memory: Memory,
@@ -730,11 +668,7 @@ const op = {
     context: Context,
     frame: Frame,
   ) {
-    copy_value(
-      memory,
-      destination,
-      context_frame_new_target_root(context, frame),
-    )
+    memory.copy_value(destination, frame.new_target_root)
   },
   TO_PROPERTY_KEY(
     runtime: Runtime,
@@ -744,7 +678,7 @@ const op = {
   ): Status {
     if (load_property_key(runtime, property_key, source) === THROW) return THROW
     if (kind_of(runtime.memory, property_key) === KINDS.SYMBOL)
-      copy_value(runtime.memory, destination, property_key)
+      runtime.memory.copy_value(destination, property_key)
     else
       write_string(
         runtime.memory,
@@ -812,7 +746,7 @@ const op = {
     const { memory } = runtime
     if (load_property_key(runtime, property_key, key) === THROW) return THROW
     if (check_properties(runtime, object) === THROW) return THROW
-    copy_value(memory, operand, value)
+    memory.copy_value(operand, value)
     if (
       set_property(
         runtime,
@@ -825,14 +759,9 @@ const op = {
     )
       return THROW
     if (tag_of(memory, temporary) === TAGS.UNDEFINED) return OK
-    return call_function(
-      runtime,
-      context,
-      context_result(context),
-      temporary,
-      object,
-      [value],
-    )
+    return call_function(runtime, context, context.result, temporary, object, [
+      value,
+    ])
   },
   DEFINE_PROP(
     runtime: Runtime,
@@ -845,7 +774,7 @@ const op = {
     operand: Root,
   ): Status {
     if (load_property_key(runtime, property_key, key) === THROW) return THROW
-    copy_value(runtime.memory, operand, value)
+    runtime.memory.copy_value(operand, value)
     return define_value_property(
       runtime,
       object,
@@ -928,8 +857,8 @@ const op = {
       function_id,
       env,
       fn.flags,
-      lexical ? context_frame_this_root(context, frame) : undefined,
-      lexical ? context_frame_new_target_root(context, frame) : undefined,
+      lexical ? frame.this_root : undefined,
+      lexical ? frame.new_target_root : undefined,
       fn,
     )
   },
@@ -968,7 +897,7 @@ const op = {
     temporary: Root,
   ) {
     create_block_environment(memory, temporary, env, code, function_id, block)
-    copy_value(memory, env, temporary)
+    memory.copy_value(env, temporary)
   },
   // Replaces the current environment with a sibling holding the same values,
   // giving each loop iteration fresh bindings.
@@ -991,11 +920,11 @@ const op = {
       block,
     )
     copy_environment_bindings(memory, temporary, env)
-    copy_value(memory, env, temporary)
+    memory.copy_value(env, temporary)
   },
   POP_ENV(memory: Memory, env: Root, depth: number, temporary: Root) {
     environment_at(memory, temporary, env, depth)
-    copy_value(memory, env, temporary)
+    memory.copy_value(env, temporary)
   },
   JUMP_OUT(
     runtime: Runtime,
@@ -1037,22 +966,21 @@ const op = {
     frame: Frame,
     temporary: Root,
   ): boolean {
-    const handler = context_top_handler(context)!
-    const type = handler_completion_kind(context.handlers, handler),
-      value = handler_completion_value_root(context.handlers, handler),
-      end = handler_end_pc(context.handlers, handler)
-    copy_value(runtime.memory, temporary, value)
+    const handler = context.top_handler()!
+    const type = handler.completion_kind,
+      value = handler.completion_value_root,
+      end = handler.end_pc
+    runtime.memory.copy_value(temporary, value)
     pop_handler(runtime, context)
-    if (type === COMPLETION_KIND.NORMAL)
-      context_set_frame_pc(context, frame, end)
+    if (type === COMPLETION_KIND.NORMAL) frame.pc = end
     else complete(runtime, context, type, temporary)
     return ([CONTEXT_STATE.DONE, CONTEXT_STATE.FAILED] as number[]).includes(
-      context_status(context),
+      context.status,
     )
   },
   RETURN(runtime: Runtime, context: Context, value: Root): boolean {
     complete(runtime, context, COMPLETION_KIND.RETURN, value)
-    return context_status(context) === CONTEXT_STATE.DONE
+    return context.status === CONTEXT_STATE.DONE
   },
   AWAIT(runtime: Runtime, context: Context, destination: Root, value: Root) {
     await_value(runtime, context, destination, value)
@@ -1060,10 +988,10 @@ const op = {
   },
   THROW(runtime: Runtime, context: Context, value: Root): boolean {
     complete(runtime, context, COMPLETION_KIND.THROW, value)
-    return context_status(context) === CONTEXT_STATE.FAILED
+    return context.status === CONTEXT_STATE.FAILED
   },
   JUMP(context: Context, frame: Frame, target: number) {
-    context_set_frame_pc(context, frame, bytecode_offset(target))
+    frame.pc = bytecode_offset(target)
   },
   JUMP_IF_FALSY(
     memory: Memory,
@@ -1072,8 +1000,7 @@ const op = {
     condition: Root,
     target: number,
   ) {
-    if (!truthy(memory, condition))
-      context_set_frame_pc(context, frame, bytecode_offset(target))
+    if (!truthy(memory, condition)) frame.pc = bytecode_offset(target)
   },
   BINARY_OP(
     runtime: Runtime,
@@ -1085,8 +1012,8 @@ const op = {
     operand: Root,
   ): Status {
     const { memory } = runtime
-    copy_value(memory, temporary, left)
-    copy_value(memory, operand, right)
+    memory.copy_value(temporary, left)
+    memory.copy_value(operand, right)
     if (operator === "in") {
       if (!is_object(memory, operand))
         return throw_error(
@@ -1129,7 +1056,7 @@ const op = {
     operator: string,
     operand: Root,
   ): Status {
-    copy_value(runtime.memory, operand, source)
+    runtime.memory.copy_value(operand, source)
     if (
       ["+", "-", "~"].includes(operator) &&
       is_object(runtime.memory, operand) &&
@@ -1139,43 +1066,43 @@ const op = {
     return unary_operation(runtime, destination, operand, operator)
   },
   LOAD_THIS(memory: Memory, destination: Root, context: Context, frame: Frame) {
-    copy_value(memory, destination, context_frame_this_root(context, frame))
+    memory.copy_value(destination, frame.this_root)
   },
 }
 
 export function run_interpreter(runtime: Runtime, context: Context) {
   const { memory } = runtime
-  context_set_status(context, CONTEXT_STATE.RUNNING)
+  // Widened so TS doesn't keep the narrowed status across calls that change it.
+  context.status = CONTEXT_STATE.RUNNING as ContextStatus
   if (context.module_state)
     module_state_set_status(context.module_state, MODULE_STATE.EVALUATING)
-  const temporary = alloc_root(memory),
-    operand = alloc_root(memory),
-    property_key = alloc_root(memory)
+  const temporary = memory.alloc_root(),
+    operand = memory.alloc_root(),
+    property_key = memory.alloc_root()
   try {
-    if (context_take_await_rejection(context)) {
-      complete(runtime, context, COMPLETION_KIND.THROW, context_error(context))
-      if (context_status(context) === CONTEXT_STATE.FAILED) return
+    if (context.take_await_rejection()) {
+      complete(runtime, context, COMPLETION_KIND.THROW, context.error)
+      if (context.status === CONTEXT_STATE.FAILED) return
     }
     // run_task preserves run-to-completion across these bounded slices.
     for (let slice = 0; slice < 10000; slice++) {
-      const steps = context_increment_steps(context)
+      const steps = ++context.steps
       const task_steps = scheduler_increment_task_steps(runtime.scheduler)
       if (steps > runtime.max_steps || task_steps > runtime.max_steps)
         panic("VM instruction limit exceeded")
-      const frame = context_current_frame(context)
+      const frame = context.frame
       if (frame === null) panic("No active frame")
-      const code_id = context_frame_code_id(context, frame)
-      const function_id = context_frame_function_id(context, frame)
+      const code_id = frame.code_id
+      const function_id = frame.function_id
       const code = runtime.code[code_id]
-      const pc = context_frame_pc(context, frame)
+      const pc = frame.pc
       const { opcode, a, b, c, d, e } = decode_instruction(
         code.bytecodes[function_id],
         pc,
       )
-      context_advance_frame_pc(context, frame, INSTRUCTION_BYTES)
-      const reg = (index: number) =>
-        context_frame_register_root(context, frame, register_index(index))
-      const env = context_frame_environment_root(context, frame)
+      frame.advance_pc(INSTRUCTION_BYTES)
+      const reg = (index: number) => frame.register(register_index(index))
+      const env = frame.environment_root
       let status: Status = OK
       switch (opcode) {
         case OP.LOAD_CONST:
@@ -1423,31 +1350,31 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           runtime.pending_exception,
         )
         clear_exception(runtime)
-        if (context_status(context) === CONTEXT_STATE.FAILED) return
+        if (context.status === CONTEXT_STATE.FAILED) return
       }
       // The helper root must not retain environments after the instruction.
       write_undefined(memory, temporary)
       write_undefined(memory, operand)
       write_undefined(memory, property_key)
     }
-    context_set_status(context, CONTEXT_STATE.READY)
+    context.status = CONTEXT_STATE.READY
   } finally {
-    free_root(memory, temporary)
-    free_root(memory, operand)
-    free_root(memory, property_key)
+    memory.free_root(temporary)
+    memory.free_root(operand)
+    memory.free_root(property_key)
   }
 }
 
 export function run_task(runtime: Runtime, context: Context) {
   while (
-    context_status(context) === CONTEXT_STATE.READY ||
-    context_status(context) === CONTEXT_STATE.RUNNING
+    context.status === CONTEXT_STATE.READY ||
+    context.status === CONTEXT_STATE.RUNNING
   )
     run_interpreter(runtime, context)
   if (
     context.settle &&
-    (context_status(context) === CONTEXT_STATE.DONE ||
-      context_status(context) === CONTEXT_STATE.FAILED)
+    (context.status === CONTEXT_STATE.DONE ||
+      context.status === CONTEXT_STATE.FAILED)
   )
     settle_async_function(runtime, context)
 }
@@ -1463,16 +1390,16 @@ function call_async_function(
   const new_capability = runtime.intrinsics.get("NewPromiseCapability")
   if (new_capability === undefined) panic("Promise is not initialized")
   const { memory } = runtime
-  const key = alloc_root(memory),
-    resolve = alloc_root(memory),
-    reject = alloc_root(memory)
+  const key = memory.alloc_root(),
+    resolve = memory.alloc_root(),
+    reject = memory.alloc_root()
   const capability = create_call_context(runtime, new_capability, undefined, [])
   try {
     run_task(runtime, capability)
-    if (context_status(capability) === CONTEXT_STATE.FAILED) {
-      free_root(memory, resolve)
-      free_root(memory, reject)
-      return throw_value(runtime, context_error(capability))
+    if (capability.status === CONTEXT_STATE.FAILED) {
+      memory.free_root(resolve)
+      memory.free_root(reject)
+      return throw_value(runtime, capability.error)
     }
     for (const [name, target] of [
       ["promise", destination],
@@ -1480,11 +1407,11 @@ function call_async_function(
       ["reject", reject],
     ] as [string, Root][]) {
       write_string(memory, key, name)
-      get_property(memory, target, context_result(capability), key)
+      get_property(memory, target, capability.result, key)
     }
   } finally {
     dispose_context(runtime, capability)
-    free_root(memory, key)
+    memory.free_root(key)
   }
   const context = create_empty_context(runtime)
   context.settle = { resolve, reject }
@@ -1492,14 +1419,14 @@ function call_async_function(
     enter_function(
       runtime,
       context,
-      context_result(context),
+      context.result,
       callee,
       receiver,
       arguments_,
     ) === THROW
   ) {
-    take_exception(runtime, context_error(context))
-    context_set_status(context, CONTEXT_STATE.FAILED)
+    take_exception(runtime, context.error)
+    context.status = CONTEXT_STATE.FAILED
   }
   run_task(runtime, context)
   return OK
@@ -1508,21 +1435,21 @@ function call_async_function(
 function settle_async_function(runtime: Runtime, context: Context) {
   const { resolve, reject } = context.settle!
   context.settle = undefined
-  const fulfilled = context_status(context) === CONTEXT_STATE.DONE
+  const fulfilled = context.status === CONTEXT_STATE.DONE
   let settlement
   try {
     settlement = create_call_context(
       runtime,
       fulfilled ? resolve : reject,
       undefined,
-      [fulfilled ? context_result(context) : context_error(context)],
+      [fulfilled ? context.result : context.error],
     )
     run_task(runtime, settlement)
   } finally {
     if (settlement) dispose_context(runtime, settlement)
     dispose_context(runtime, context)
-    free_root(runtime.memory, resolve)
-    free_root(runtime.memory, reject)
+    runtime.memory.free_root(resolve)
+    runtime.memory.free_root(reject)
   }
 }
 
@@ -1533,10 +1460,9 @@ export async function evaluate_context(runtime: Runtime, context: Context) {
   while (true) {
     drain_completions(runtime)
     drain_jobs(runtime)
-    if (context_status(context) === CONTEXT_STATE.READY)
-      run_task(runtime, context)
-    if (context_status(context) === CONTEXT_STATE.FAILED)
-      throw new Error(to_string(runtime.memory, context_error(context)))
+    if (context.status === CONTEXT_STATE.READY) run_task(runtime, context)
+    if (context.status === CONTEXT_STATE.FAILED)
+      throw new Error(to_string(runtime.memory, context.error))
     if (
       scheduler_has_jobs(runtime.scheduler) ||
       runtime.scheduler.completions.length !== 0
@@ -1546,7 +1472,7 @@ export async function evaluate_context(runtime: Runtime, context: Context) {
       await wait_for_completion(runtime)
       continue
     }
-    if (context_status(context) === CONTEXT_STATE.DONE) return
+    if (context.status === CONTEXT_STATE.DONE) return
     const error: HostError = new Error("Top-level await did not settle")
     error.exit_code = 13
     throw error
@@ -1554,10 +1480,10 @@ export async function evaluate_context(runtime: Runtime, context: Context) {
 }
 
 function create_empty_context(runtime: Runtime): Context {
-  const context = context_create_storage(
+  const context = new Context(
     runtime.contexts.length,
-    alloc_root(runtime.memory),
-    alloc_root(runtime.memory),
+    runtime.memory.alloc_root(),
+    runtime.memory.alloc_root(),
   )
   runtime.contexts.push(context)
   return context
@@ -1574,16 +1500,15 @@ export function create_call_context(
     call_function(
       runtime,
       context,
-      context_result(context),
+      context.result,
       callee,
       receiver,
       arguments_,
     ) === THROW
   ) {
-    take_exception(runtime, context_error(context))
-    context_set_status(context, CONTEXT_STATE.FAILED)
-  } else if (context_current_frame(context) === null)
-    context_set_status(context, CONTEXT_STATE.DONE)
+    take_exception(runtime, context.error)
+    context.status = CONTEXT_STATE.FAILED
+  } else if (context.frame === null) context.status = CONTEXT_STATE.DONE
   return context
 }
 
@@ -1594,20 +1519,12 @@ export function resume_context(
   argument: Root | undefined,
   rejected: boolean,
 ) {
-  if (context_status(context) !== CONTEXT_STATE.WAITING) return
+  if (context.status !== CONTEXT_STATE.WAITING) return
   if (argument !== undefined)
-    copy_value(
-      runtime.memory,
-      rejected ? context_error(context) : destination,
-      argument,
-    )
-  else
-    write_undefined(
-      runtime.memory,
-      rejected ? context_error(context) : destination,
-    )
-  context_set_await_rejection(context, rejected)
-  context_set_status(context, CONTEXT_STATE.READY)
+    runtime.memory.copy_value(rejected ? context.error : destination, argument)
+  else write_undefined(runtime.memory, rejected ? context.error : destination)
+  context.await_rejected = rejected
+  context.status = CONTEXT_STATE.READY
 }
 
 // [[Call]] and [[Construct]] of built-in function objects (ECMA-262 10.3.1,
@@ -1622,7 +1539,7 @@ function enter_builtin(
   arguments_: Root[],
   new_target?: Root,
 ): Status {
-  const steps = alloc_root(runtime.memory)
+  const steps = runtime.memory.alloc_root()
   try {
     if (!load_builtin_steps(runtime.memory, steps, callee))
       panic("Built-in function has no steps")
@@ -1636,7 +1553,7 @@ function enter_builtin(
       new_target,
     )
   } finally {
-    free_root(runtime.memory, steps)
+    runtime.memory.free_root(steps)
   }
 }
 
@@ -1671,11 +1588,11 @@ function construct_function(
     runtime.code[code].unit.functions[id].flags & 14
   )
     return throw_error(runtime, "TypeError", "Value is not a constructor")
-  const receiver = alloc_root(memory),
-    key = alloc_root(memory),
-    prototype = alloc_root(memory),
-    parent = alloc_root(memory),
-    environment = alloc_root(memory)
+  const receiver = memory.alloc_root(),
+    key = memory.alloc_root(),
+    prototype = memory.alloc_root(),
+    parent = memory.alloc_root(),
+    environment = memory.alloc_root()
   try {
     load_function_environment(memory, parent, callee)
     const { unit, scope_ids } = runtime.code[code],
@@ -1704,11 +1621,11 @@ function construct_function(
       destination,
       callee,
     )
-    context_set_frame_construct_call(context, context_current_frame(context)!)
+    context.frame!.is_construct_call = true
     return OK
   } finally {
     for (const root of [receiver, key, prototype, parent, environment])
-      free_root(memory, root)
+      memory.free_root(root)
   }
 }
 
@@ -1722,33 +1639,28 @@ function push_handler(
   end_pc: BytecodeOffset,
   exception_register: RegisterIndex,
 ) {
-  const completion_value_root = alloc_root(runtime.memory)
-  const environment_root = alloc_root(runtime.memory)
-  copy_value(
-    runtime.memory,
-    environment_root,
-    context_frame_environment_root(context, frame),
+  const completion_value_root = runtime.memory.alloc_root()
+  const environment_root = runtime.memory.alloc_root()
+  runtime.memory.copy_value(environment_root, frame.environment_root)
+  context.handlers.push(
+    new Handler({
+      frame,
+      start_pc,
+      catch_pc,
+      finally_pc,
+      end_pc,
+      exception_register,
+      completion_value_root,
+      environment_root,
+    }),
   )
-  context_push_handler(context, {
-    frame,
-    start_pc,
-    catch_pc,
-    finally_pc,
-    end_pc,
-    exception_register,
-    completion_value_root,
-    environment_root,
-  })
 }
 
 function pop_handler(runtime: Runtime, context: Context) {
-  const handler = context_top_handler(context)!
-  free_root(
-    runtime.memory,
-    handler_completion_value_root(context.handlers, handler),
-  )
-  free_root(runtime.memory, handler_environment_root(context.handlers, handler))
-  context_pop_handler(context)
+  const handler = context.top_handler()!
+  runtime.memory.free_root(handler.completion_value_root)
+  runtime.memory.free_root(handler.environment_root)
+  context.handlers.pop()
 }
 
 // Catch and finally blocks run in the environment of their try statement.
@@ -1756,26 +1668,22 @@ function restore_handler_environment(
   runtime: Runtime,
   context: Context,
   frame: Frame,
-  handler: HandlerOffset,
+  handler: Handler,
 ) {
-  copy_value(
-    runtime.memory,
-    context_frame_environment_root(context, frame),
-    handler_environment_root(context.handlers, handler),
-  )
+  runtime.memory.copy_value(frame.environment_root, handler.environment_root)
 }
 
 function leave_handler(runtime: Runtime, context: Context) {
-  const handler = context_top_handler(context)!
-  const frame = handler_frame(context.handlers, handler)
-  const finally_pc = handler_finally_pc(context.handlers, handler)
+  const handler = context.top_handler()!
+  const frame = handler.frame
+  const finally_pc = handler.finally_pc
   if (finally_pc !== null) {
-    handler_save_completion(context.handlers, handler, COMPLETION_KIND.NORMAL)
-    context_set_frame_pc(context, frame, finally_pc)
+    handler.save_completion(COMPLETION_KIND.NORMAL)
+    frame.pc = finally_pc
   } else {
-    const end = handler_end_pc(context.handlers, handler)
+    const end = handler.end_pc
     pop_handler(runtime, context)
-    context_set_frame_pc(context, frame, end)
+    frame.pc = end
   }
 }
 
@@ -1788,96 +1696,68 @@ function complete(
   source: Root,
 ) {
   const { memory } = runtime
-  const value = alloc_root(memory)
-  copy_value(memory, value, source)
+  const value = memory.alloc_root()
+  memory.copy_value(value, source)
   try {
     while (true) {
-      const frame = context_current_frame(context)
-      const handler = context_top_handler(context)
-      if (
-        frame !== null &&
-        handler !== null &&
-        handler_frame(context.handlers, handler) === frame
-      ) {
+      const frame = context.frame
+      const handler = context.top_handler()
+      if (frame !== null && handler !== null && handler.frame === frame) {
         if (type === COMPLETION_KIND.JUMP) {
           const target = read_number(memory, value)
-          if (
-            target >= handler_start_pc(context.handlers, handler) &&
-            target < handler_end_pc(context.handlers, handler)
-          ) {
-            context_set_frame_pc(context, frame, bytecode_offset(target))
+          if (target >= handler.start_pc && target < handler.end_pc) {
+            frame.pc = bytecode_offset(target)
             return
           }
           restore_handler_environment(runtime, context, frame, handler)
         }
-        const phase = handler_phase(context.handlers, handler)
-        const catch_pc = handler_catch_pc(context.handlers, handler)
+        const phase = handler.phase
+        const catch_pc = handler.catch_pc
         if (
           type === COMPLETION_KIND.THROW &&
           phase === HANDLER_PHASE.TRY &&
           catch_pc !== null
         ) {
-          handler_enter_catch(context.handlers, handler)
+          handler.enter_catch()
           restore_handler_environment(runtime, context, frame, handler)
-          copy_value(
-            memory,
-            context_frame_register_root(
-              context,
-              frame,
-              handler_exception_register(context.handlers, handler),
-            ),
-            value,
-          )
-          context_set_frame_pc(context, frame, catch_pc)
+          memory.copy_value(frame.register(handler.exception_register), value)
+          frame.pc = catch_pc
           return
         }
-        const finally_pc = handler_finally_pc(context.handlers, handler)
+        const finally_pc = handler.finally_pc
         if (phase !== HANDLER_PHASE.FINALLY && finally_pc !== null) {
-          handler_save_completion(context.handlers, handler, type)
+          handler.save_completion(type)
           restore_handler_environment(runtime, context, frame, handler)
-          copy_value(
-            memory,
-            handler_completion_value_root(context.handlers, handler),
-            value,
-          )
-          context_set_frame_pc(context, frame, finally_pc)
+          memory.copy_value(handler.completion_value_root, value)
+          frame.pc = finally_pc
           return
         }
         pop_handler(runtime, context)
         continue
       }
       if (type === COMPLETION_KIND.JUMP) {
-        context_set_frame_pc(
-          context,
-          frame!,
-          bytecode_offset(read_number(memory, value)),
-        )
+        frame!.pc = bytecode_offset(read_number(memory, value))
         return
       }
       if (frame === null) {
-        copy_value(memory, context_error(context), value)
-        context_set_status(context, CONTEXT_STATE.FAILED)
+        memory.copy_value(context.error, value)
+        context.status = CONTEXT_STATE.FAILED
         return
       }
-      const caller = context_frame_caller(context, frame)
+      const caller = frame.caller
       if (type === COMPLETION_KIND.RETURN) {
-        if (
-          context_frame_is_construct_call(context, frame) &&
-          !is_object(memory, value)
-        )
-          copy_value(memory, value, context_frame_this_root(context, frame))
+        if (frame.is_construct_call && !is_object(memory, value))
+          memory.copy_value(value, frame.this_root)
         const destination =
-          caller === null
-            ? context_result(context)
-            : context_frame_return_root(context, frame)!
-        copy_value(memory, destination, value)
+          caller === null ? context.result : frame.return_root!
+        memory.copy_value(destination, value)
         pop_frame(runtime, context)
-        if (caller === null) context_set_status(context, CONTEXT_STATE.DONE)
+        if (caller === null) context.status = CONTEXT_STATE.DONE
         return
       }
       pop_frame(runtime, context)
     }
   } finally {
-    free_root(memory, value)
+    memory.free_root(value)
   }
 }

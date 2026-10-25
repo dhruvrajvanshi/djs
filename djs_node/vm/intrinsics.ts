@@ -42,14 +42,7 @@ import {
   get_own_property_descriptor,
   define_own_property,
 } from "./properties.ts"
-import {
-  KINDS,
-  TAGS,
-  read_u32,
-  copy_value,
-  alloc_root,
-  free_root,
-} from "./memory.ts"
+import { KINDS, TAGS } from "./memory.ts"
 import { has_slot, get_slot, set_slot, init_slot } from "./slots.ts"
 import { NATIVE_MARKERS } from "../compiler/bytecode.ts"
 import { enqueue_job, start_operation } from "../runtime/jobs.ts"
@@ -70,8 +63,8 @@ export function set_realm_intrinsic(
   name: string,
   value: Root,
 ) {
-  const root = alloc_root(runtime.memory)
-  copy_value(runtime.memory, root, value)
+  const root = runtime.memory.alloc_root()
+  runtime.memory.copy_value(root, value)
   runtime.intrinsics.set(name, root)
   const field = PROTOTYPE_FIELDS[name as keyof typeof PROTOTYPE_FIELDS]
   if (field) runtime.memory[field] = root
@@ -209,7 +202,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
     const symbol = runtime.well_known_symbols?.get(name)
     if (symbol === undefined)
       return throw_error(runtime, "TypeError", "Unknown well-known symbol")
-    copy_value(runtime.memory, destination, symbol)
+    runtime.memory.copy_value(destination, symbol)
     return OK
   },
   string_code_unit_at(runtime, destination, arguments_) {
@@ -264,8 +257,8 @@ const INTRINSICS: Record<string, Intrinsic> = {
       kind_of(memory, arguments_[0]) === KINDS.FUNCTION
     ) {
       const reference = get_ref(memory, arguments_[0])
-      const code = read_u32(memory, reference + 8)
-      const flags = read_u32(memory, reference + 32)
+      const code = memory.read_u32(reference + 8)
+      const flags = memory.read_u32(reference + 32)
       result =
         code === BUILTIN_CODE
           ? Boolean(flags & BUILTIN_CONSTRUCTOR)
@@ -347,9 +340,9 @@ const INTRINSICS: Record<string, Intrinsic> = {
     if (length < 0) return THROW
     const name = string(runtime, arguments_[2], "name")
     if (name === undefined) return THROW
-    const result = alloc_root(memory),
-      key = alloc_root(memory),
-      value = alloc_root(memory)
+    const result = memory.alloc_root(),
+      key = memory.alloc_root(),
+      value = memory.alloc_root()
     try {
       create_function(memory, result, BUILTIN_CODE, 0)
       set_builtin_steps(memory, result, behaviour, false)
@@ -359,20 +352,20 @@ const INTRINSICS: Record<string, Intrinsic> = {
       write_string(memory, key, "name")
       write_string(memory, value, name)
       define_property(memory, result, key, value, 4)
-      copy_value(memory, destination, result)
+      memory.copy_value(destination, result)
       return OK
     } finally {
-      for (const root of [result, key, value]) free_root(memory, root)
+      for (const root of [result, key, value]) memory.free_root(root)
     }
   },
   ordinary_object_create(runtime, destination, arguments_) {
     const { memory } = runtime
     if (arguments_[0] === undefined || !is_prototype(memory, arguments_[0]))
       return throw_error(runtime, "TypeError", "Expected an object")
-    const object = alloc_root(memory),
-      key = alloc_root(memory),
-      name = alloc_root(memory),
-      empty = alloc_root(memory)
+    const object = memory.alloc_root(),
+      key = memory.alloc_root(),
+      name = memory.alloc_root(),
+      empty = memory.alloc_root()
     try {
       create_object(memory, object)
       set_prototype(memory, object, arguments_[0])
@@ -395,10 +388,10 @@ const INTRINSICS: Record<string, Intrinsic> = {
             return THROW
         }
       }
-      copy_value(memory, destination, object)
+      memory.copy_value(destination, object)
       return OK
     } finally {
-      for (const root of [object, key, name, empty]) free_root(memory, root)
+      for (const root of [object, key, name, empty]) memory.free_root(root)
     }
   },
   ordinary_set_prototype_of(runtime, destination, arguments_) {
@@ -448,8 +441,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
     if (!has_property_list(memory, arguments_[0]))
       return throw_error(runtime, "TypeError", "Expected an ordinary object")
     const reference = get_ref(memory, arguments_[0])
-    const prototype = read_u32(
-      memory,
+    const prototype = memory.read_u32(
       reference + (kind_of(memory, arguments_[0]) === KINDS.FUNCTION ? 28 : 12),
     )
     if (prototype) set_ref(memory, destination, prototype)

@@ -1,18 +1,9 @@
 import { panic } from "../utils.ts"
 import type { Root, HeapRef, Memory } from "./memory.ts"
-import {
-  KINDS,
-  NAN_HIGH,
-  TAGS,
-  assert_root,
-  read_u32,
-  write_u32,
-  copy_heap_value_to_root,
-  copy_root_to_heap_value,
-} from "./memory.ts"
+import { KINDS, NAN_HIGH, TAGS } from "./memory.ts"
 import { allocate } from "./heap.ts"
 
-export { TAGS, KINDS, copy_value } from "./memory.ts"
+export { TAGS, KINDS } from "./memory.ts"
 
 function write_tag(
   memory: Memory,
@@ -20,20 +11,20 @@ function write_tag(
   tag: number,
   payload: number = 0,
 ) {
-  assert_root(memory, root)
+  memory.assert_root(root)
   memory.roots_view.setUint32(root * 8, payload, true)
   memory.roots_view.setUint32(root * 8 + 4, NAN_HIGH | tag, true)
 }
 
 export function tag_of(memory: Memory, root: Root) {
-  assert_root(memory, root)
+  memory.assert_root(root)
   const high = memory.roots_view.getUint32(root * 8 + 4, true)
   const tag = high - NAN_HIGH
   return tag > 0 && tag <= TAGS.HOLE ? tag : TAGS.NUMBER
 }
 
 export function write_number(memory: Memory, root: Root, value: number) {
-  assert_root(memory, root)
+  memory.assert_root(root)
   if (typeof value !== "number") panic("Expected a host number")
   if (Number.isNaN(value)) {
     memory.roots_view.setUint32(root * 8, 0, true)
@@ -83,11 +74,11 @@ export function get_ref(memory: Memory, root: Root) {
 }
 
 export function write_string(memory: Memory, root: Root, text: string) {
-  assert_root(memory, root)
+  memory.assert_root(root)
   if (typeof text !== "string") panic("Expected a host string")
   const reference = allocate(memory, KINDS.STRING, 4 + text.length * 2)
   set_ref(memory, root, reference)
-  write_u32(memory, reference + 8, text.length)
+  memory.write_u32(reference + 8, text.length)
   for (let index = 0; index < text.length; index++) {
     memory.heap_view.setUint16(
       reference + 12 + index * 2,
@@ -99,9 +90,9 @@ export function write_string(memory: Memory, root: Root, text: string) {
 
 export function read_string(memory: Memory, root: Root) {
   const reference = get_ref(memory, root)
-  if (read_u32(memory, reference) !== KINDS.STRING)
+  if (memory.read_u32(reference) !== KINDS.STRING)
     panic("Expected a string value")
-  const length = read_u32(memory, reference + 8)
+  const length = memory.read_u32(reference + 8)
   let text = ""
   for (let index = 0; index < length; index++) {
     text += String.fromCharCode(
@@ -117,8 +108,8 @@ export function string_length(memory: Memory, value: Root) {
 
 /** Heap references are temporary; these accessors never allocate. */
 export function heap_string_length(memory: Memory, reference: HeapRef) {
-  if (read_u32(memory, reference) !== KINDS.STRING) panic("Expected a string")
-  return read_u32(memory, reference + 8)
+  if (memory.read_u32(reference) !== KINDS.STRING) panic("Expected a string")
+  return memory.read_u32(reference + 8)
 }
 
 export function string_code_unit_at(
@@ -161,7 +152,7 @@ export function slice_string(
   // an aliased destination. copyWithin also handles overlapping storage safely.
   const source = get_ref(memory, value) + 12 + start * 2
   memory.heap.copyWithin(reference + 12, source, source + (end - start) * 2)
-  write_u32(memory, reference + 8, end - start)
+  memory.write_u32(reference + 8, end - start)
   set_ref(memory, destination, reference)
 }
 
@@ -189,7 +180,7 @@ export function create_symbol(
   const reference = allocate(memory, KINDS.SYMBOL, 8)
   // Copy before writing the destination, which may alias the description.
   if (description !== undefined)
-    copy_root_to_heap_value(memory, reference + 8, description)
+    memory.copy_root_to_heap_value(reference + 8, description)
   set_ref(memory, destination, reference)
 }
 
@@ -199,6 +190,6 @@ export function load_symbol_description(
   symbol: Root,
 ) {
   const reference = get_ref(memory, symbol)
-  if (read_u32(memory, reference) !== KINDS.SYMBOL) panic("Expected a symbol")
-  copy_heap_value_to_root(memory, destination, reference + 8)
+  if (memory.read_u32(reference) !== KINDS.SYMBOL) panic("Expected a symbol")
+  memory.copy_heap_value_to_root(destination, reference + 8)
 }

@@ -3,14 +3,9 @@ import test from "node:test"
 import { readFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { bootstrap } from "../runtime/bootstrap.ts"
-import {
-  create_runtime,
-  load_module,
-  evaluate_module,
-} from "../runtime/modules.ts"
+import { Runtime, load_module, evaluate_module } from "../runtime/modules.ts"
 import { create_node_host } from "../host/node.ts"
 import { collect, heap_stats } from "../vm/heap.ts"
-import { alloc_root, free_root } from "../vm/memory.ts"
 import { create_function } from "../vm/objects.ts"
 import { NATIVE_CODE, intrinsic_id } from "../vm/intrinsics.ts"
 import {
@@ -22,7 +17,7 @@ import {
 
 async function prepare(source, host = {}, options = {}) {
   let output = ""
-  const runtime = create_runtime({
+  const runtime = new Runtime({
     ...options,
     host: {
       ...create_node_host(),
@@ -163,7 +158,7 @@ test(
 
 test("completion slots are reused and concurrent results retain callbacks across moving GC", async () => {
   let output = ""
-  const runtime = create_runtime({
+  const runtime = new Runtime({
     semispace_bytes: 16384,
     root_capacity: 1,
     host: {
@@ -172,7 +167,7 @@ test("completion slots are reused and concurrent results retain callbacks across
       },
     },
   })
-  const callback = alloc_root(runtime.memory)
+  const callback = runtime.memory.alloc_root()
   create_function(
     runtime.memory,
     callback,
@@ -219,7 +214,7 @@ test("completion slots are reused and concurrent results retain callbacks across
       .map((n) => n + ",")
       .join(""),
   )
-  free_root(runtime.memory, callback)
+  runtime.memory.free_root(callback)
   collect(runtime.memory)
   assert.equal(heap_stats(runtime.memory).used_bytes, 0)
 })

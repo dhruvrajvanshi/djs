@@ -1,6 +1,5 @@
 import type { Root, Memory } from "./memory.ts"
 import type { Runtime } from "../runtime/modules.ts"
-import { alloc_root, free_root, copy_value } from "./memory.ts"
 import {
   write_string,
   write_boolean,
@@ -41,9 +40,9 @@ export function get_own_property_descriptor(
     write_undefined(memory, destination)
     return
   }
-  const value = alloc_root(memory),
-    setter = alloc_root(memory),
-    name = alloc_root(memory)
+  const value = memory.alloc_root(),
+    setter = memory.alloc_root(),
+    name = memory.alloc_root()
   try {
     // Snapshot referenced values before allocating the result object.
     if (descriptor.property) {
@@ -72,9 +71,9 @@ export function get_own_property_descriptor(
       define_property(memory, destination, name, value)
     }
   } finally {
-    free_root(memory, value)
-    free_root(memory, setter)
-    free_root(memory, name)
+    memory.free_root(value)
+    memory.free_root(setter)
+    memory.free_root(name)
   }
 }
 
@@ -96,10 +95,10 @@ export function define_own_property(
     return throw_error(runtime, "TypeError", "Expected an object")
   if (!is_object(memory, descriptor))
     return throw_error(runtime, "TypeError", "Expected a property descriptor")
-  const name = alloc_root(memory),
-    value = alloc_root(memory),
-    getter = alloc_root(memory),
-    setter = alloc_root(memory)
+  const name = memory.alloc_root(),
+    value = memory.alloc_root(),
+    getter = memory.alloc_root(),
+    setter = memory.alloc_root()
   try {
     const previous = own_property(memory, object, property_key(memory, key))
     let flags = previous?.flags ?? 0
@@ -133,7 +132,7 @@ export function define_own_property(
     if (has_setter === THROW) return THROW
     const has_value = field("value", value)
     if (has_value === THROW) return THROW
-    const writable = alloc_root(memory)
+    const writable = memory.alloc_root()
     try {
       const has_writable = field("writable", writable)
       if (has_writable === THROW) return THROW
@@ -210,10 +209,10 @@ export function define_own_property(
         return throw_error(runtime, "TypeError", "Cannot redefine property")
       return OK
     } finally {
-      free_root(memory, writable)
+      memory.free_root(writable)
     }
   } finally {
-    for (const root of [name, value, getter, setter]) free_root(memory, root)
+    for (const root of [name, value, getter, setter]) memory.free_root(root)
   }
 }
 
@@ -232,14 +231,14 @@ function invoke_define(
   key: Root,
   descriptor: Root,
 ): Status {
-  const result = alloc_root(runtime.memory),
-    normalized = alloc_root(runtime.memory)
+  const result = runtime.memory.alloc_root(),
+    normalized = runtime.memory.alloc_root()
   try {
     if (
       kind_of(runtime.memory, key) === KINDS.STRING ||
       kind_of(runtime.memory, key) === KINDS.SYMBOL
     )
-      copy_value(runtime.memory, normalized, key)
+      runtime.memory.copy_value(normalized, key)
     else if (is_object(runtime.memory, key)) {
       if (coerce_value(runtime, normalized, key, "ToString") === THROW)
         return THROW
@@ -260,8 +259,8 @@ function invoke_define(
       return throw_error(runtime, "TypeError", "Cannot define property")
     return OK
   } finally {
-    free_root(runtime.memory, result)
-    free_root(runtime.memory, normalized)
+    runtime.memory.free_root(result)
+    runtime.memory.free_root(normalized)
   }
 }
 
@@ -300,9 +299,9 @@ export function define_value_property(
       return throw_error(runtime, "TypeError", "Cannot redefine property")
     return OK
   }
-  const descriptor = alloc_root(memory),
-    name = alloc_root(memory),
-    field = alloc_root(memory)
+  const descriptor = memory.alloc_root(),
+    name = memory.alloc_root(),
+    field = memory.alloc_root()
   try {
     create_object(memory, descriptor)
     write_string(
@@ -325,6 +324,6 @@ export function define_value_property(
     }
     return invoke_define(runtime, method, object, key, descriptor)
   } finally {
-    for (const root of [descriptor, name, field]) free_root(memory, root)
+    for (const root of [descriptor, name, field]) memory.free_root(root)
   }
 }

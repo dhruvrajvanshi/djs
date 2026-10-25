@@ -1,13 +1,7 @@
 import type { Root } from "../vm/memory.ts"
 import type { Runtime } from "./modules.ts"
 import type { Context } from "../vm/context.ts"
-import {
-  context_status,
-  context_set_status,
-  context_error,
-} from "../vm/context.ts"
 import type { HostError } from "../host/node.ts"
-import { alloc_root, free_root, copy_value } from "../vm/memory.ts"
 import { write_string, write_number, write_boolean } from "../vm/values.ts"
 import { create_error } from "../vm/completion.ts"
 import {
@@ -55,10 +49,10 @@ export function enqueue_job(runtime: Runtime, callee: Root, argument?: Root) {
   const { memory, scheduler } = runtime
   if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
     panic("Job is not callable")
-  const fn = alloc_root(memory),
-    value = alloc_root(memory)
-  copy_value(memory, fn, callee)
-  if (argument !== undefined) copy_value(memory, value, argument)
+  const fn = memory.alloc_root(),
+    value = memory.alloc_root()
+  memory.copy_value(fn, callee)
+  if (argument !== undefined) memory.copy_value(value, argument)
   scheduler_enqueue_job(scheduler, {
     callee: fn,
     value,
@@ -75,16 +69,16 @@ function resume_function(
   rejected: boolean,
 ) {
   const { memory } = runtime
-  const target = alloc_root(memory),
-    flag = alloc_root(memory),
-    captured = alloc_root(memory)
+  const target = memory.alloc_root(),
+    flag = memory.alloc_root(),
+    captured = memory.alloc_root()
   try {
     write_number(memory, target, destination_root)
     write_boolean(memory, flag, rejected)
     create_value_array(memory, captured, [target, flag])
     create_function(memory, destination, RESUME_CODE, context.id, captured, 2)
   } finally {
-    for (const root of [target, flag, captured]) free_root(memory, root)
+    for (const root of [target, flag, captured]) memory.free_root(root)
   }
 }
 
@@ -97,9 +91,9 @@ export function await_value(
   const await_promise = runtime.intrinsics.get("Await")
   if (await_promise === undefined) panic("Promise is not initialized")
   const { memory } = runtime
-  const fulfilled = alloc_root(memory),
-    rejected = alloc_root(memory)
-  context_set_status(context, CONTEXT_STATE.WAITING)
+  const fulfilled = memory.alloc_root(),
+    rejected = memory.alloc_root()
+  context.status = CONTEXT_STATE.WAITING
   if (context.module_state)
     module_state_set_status(context.module_state, MODULE_STATE.AWAITING)
   let registration
@@ -112,18 +106,12 @@ export function await_value(
       rejected,
     ])
     run_task(runtime, registration)
-    if (context_status(registration) === CONTEXT_STATE.FAILED)
-      resume_context(
-        runtime,
-        context,
-        destination,
-        context_error(registration),
-        true,
-      )
+    if (registration.status === CONTEXT_STATE.FAILED)
+      resume_context(runtime, context, destination, registration.error, true)
   } finally {
     if (registration) dispose_context(runtime, registration)
-    free_root(memory, fulfilled)
-    free_root(memory, rejected)
+    memory.free_root(fulfilled)
+    memory.free_root(rejected)
   }
 }
 
@@ -150,13 +138,13 @@ export function start_operation(
     kind_of(memory, reject) !== KINDS.FUNCTION
   )
     panic("I/O operation requires resolve and reject callbacks")
-  const resolve_root = alloc_root(memory),
-    reject_root = alloc_root(memory),
-    buffer_root = buffer === undefined ? null : alloc_root(memory)
-  copy_value(memory, resolve_root, resolve)
-  copy_value(memory, reject_root, reject)
+  const resolve_root = memory.alloc_root(),
+    reject_root = memory.alloc_root(),
+    buffer_root = buffer === undefined ? null : memory.alloc_root()
+  memory.copy_value(resolve_root, resolve)
+  memory.copy_value(reject_root, reject)
   if (buffer !== undefined && buffer_root !== null)
-    copy_value(memory, buffer_root, buffer)
+    memory.copy_value(buffer_root, buffer)
   const id = scheduler_allocate_operation(scheduler, {
     resolve: resolve_root,
     reject: reject_root,
@@ -187,8 +175,8 @@ function operation_error(
 ) {
   const { memory } = runtime
   create_error(runtime, destination, "Error", String(error?.message ?? error))
-  const key = alloc_root(memory),
-    value = alloc_root(memory)
+  const key = memory.alloc_root(),
+    value = memory.alloc_root()
   try {
     for (const [name, item] of Object.entries({
       code: error?.code,
@@ -201,8 +189,8 @@ function operation_error(
       define_property(memory, destination, key, value)
     }
   } finally {
-    free_root(memory, key)
-    free_root(memory, value)
+    memory.free_root(key)
+    memory.free_root(value)
   }
 }
 
@@ -214,7 +202,7 @@ export function drain_completions(runtime: Runtime) {
       scheduler,
       completion.id,
     )
-    const value = alloc_root(memory)
+    const value = memory.alloc_root()
     try {
       let rejected = completion.rejected
       try {
@@ -239,10 +227,10 @@ export function drain_completions(runtime: Runtime) {
       }
       enqueue_job(runtime, rejected ? reject : resolve, value)
     } finally {
-      free_root(memory, value)
-      free_root(memory, resolve)
-      free_root(memory, reject)
-      if (buffer !== null) free_root(memory, buffer)
+      memory.free_root(value)
+      memory.free_root(resolve)
+      memory.free_root(reject)
+      if (buffer !== null) memory.free_root(buffer)
       scheduler_release_operation(scheduler, completion.id)
     }
   }
@@ -261,16 +249,15 @@ export function drain_jobs(runtime: Runtime) {
         has_argument ? [value] : [],
       )
       run_task(runtime, job)
-      if (context_status(job) === CONTEXT_STATE.FAILED)
-        throw new Error(to_string(memory, context_error(job)))
+      if (job.status === CONTEXT_STATE.FAILED)
+        throw new Error(to_string(memory, job.error))
       // Await reactions resume their context as part of the current microtask.
       for (const active of runtime.contexts)
-        if (context_status(active) === CONTEXT_STATE.READY)
-          run_task(runtime, active)
+        if (active.status === CONTEXT_STATE.READY) run_task(runtime, active)
     } finally {
       if (job) dispose_context(runtime, job)
-      free_root(memory, callee)
-      free_root(memory, value)
+      memory.free_root(callee)
+      memory.free_root(value)
     }
   }
 }

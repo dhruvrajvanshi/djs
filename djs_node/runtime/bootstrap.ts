@@ -1,5 +1,4 @@
 import type { Runtime } from "./modules.ts"
-import { alloc_root, free_root } from "../vm/memory.ts"
 import {
   write_string,
   create_symbol,
@@ -15,7 +14,7 @@ async function define_globals(runtime: Runtime, identity: string) {
   const module = await load_module(runtime, identity)
   await evaluate_module(runtime, module)
   for (const name of module.exports.keys()) {
-    const value = alloc_root(runtime.memory)
+    const value = runtime.memory.alloc_root()
     read_export(runtime, module, name, value)
     runtime.globals.set(name, value)
   }
@@ -23,20 +22,20 @@ async function define_globals(runtime: Runtime, identity: string) {
 
 export async function bootstrap(runtime: Runtime) {
   runtime.well_known_symbols = new Map()
-  const description = alloc_root(runtime.memory)
+  const description = runtime.memory.alloc_root()
   try {
     for (const name of WELL_KNOWN_SYMBOLS) {
-      const symbol = alloc_root(runtime.memory)
+      const symbol = runtime.memory.alloc_root()
       write_string(runtime.memory, description, `Symbol.${name}`)
       create_symbol(runtime.memory, symbol, description)
       runtime.well_known_symbols.set(name, symbol)
     }
   } finally {
-    free_root(runtime.memory, description)
+    runtime.memory.free_root(description)
   }
   runtime.property_names = new Map()
   for (const name of ["next", "done", "value", "return", "length"]) {
-    const root = alloc_root(runtime.memory)
+    const root = runtime.memory.alloc_root()
     write_string(runtime.memory, root, name)
     runtime.property_names.set(name, root)
   }

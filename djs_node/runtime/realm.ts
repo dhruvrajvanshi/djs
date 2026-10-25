@@ -1,7 +1,6 @@
 import type { Runtime, ModuleRecord } from "./modules.ts"
 import type { RealmDeclaration } from "../compiler/compile.ts"
 import type { Root } from "../vm/memory.ts"
-import { alloc_root, free_root } from "../vm/memory.ts"
 import { write_string } from "../vm/values.ts"
 import {
   create_object,
@@ -68,13 +67,13 @@ export function create_realm(runtime: Runtime) {
       ;(scope.intrinsic_bindings ??= new Map()).set(declaration.slot, name)
       continue
     }
-    const object = alloc_root(runtime.memory)
+    const object = runtime.memory.alloc_root()
     try {
       allocate(runtime, object, declaration.object)
       initialize_binding(runtime, module.environment, declaration.slot, object)
       set_realm_intrinsic(runtime, name, object)
     } finally {
-      free_root(runtime.memory, object)
+      runtime.memory.free_root(object)
     }
   }
 }
@@ -93,12 +92,12 @@ function allocate(
   if (kind === "function") create_function(memory, destination, BUILTIN_CODE, 0)
   else if (kind === "array") create_array(memory, destination, 0)
   else if (kind === "string") {
-    const empty = alloc_root(memory)
+    const empty = memory.alloc_root()
     try {
       write_string(memory, empty, "")
       create_string_object(memory, destination, empty)
     } finally {
-      free_root(memory, empty)
+      memory.free_root(empty)
     }
   } else create_object(memory, destination)
 }

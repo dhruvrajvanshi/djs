@@ -29,8 +29,8 @@ operations the VM provides.
 
 ## How a program runs
 
-1. [`djs_node.ts`](../djs_node.ts) creates a runtime with `create_runtime`
-   and calls `bootstrap` ([runtime/bootstrap.ts](../runtime/bootstrap.ts)).
+1. [`djs_node.ts`](../djs_node.ts) creates a `Runtime` and calls `bootstrap`
+   ([runtime/bootstrap.ts](../runtime/bootstrap.ts)).
 2. `bootstrap` loads the stdlib and creates the **realm**: the builtin objects
    every program shares, such as `%Array.prototype%` (the spec's name for
    `Array.prototype`; see [Vocabulary](#vocabulary)). [realm.md](realm.md)

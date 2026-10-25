@@ -5,10 +5,10 @@ import { readFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
 import { compile_module } from "./compiler/compile.ts"
 import { disassemble_module } from "./compiler/disassemble.ts"
-import { create_runtime, run_module } from "./runtime/modules.ts"
+import { Runtime, run_module } from "./runtime/modules.ts"
 import { bootstrap } from "./runtime/bootstrap.ts"
 
-export { create_runtime, run_module, bootstrap }
+export { Runtime, run_module, bootstrap }
 
 const USAGE =
   "Usage: djs_node <entry.js>\n       djs_node --dump-ir <module.js>..."
@@ -40,7 +40,7 @@ export async function main(arguments_: string[] = process.argv.slice(2)) {
     }
     return
   }
-  const runtime = create_runtime()
+  const runtime = new Runtime()
   await bootstrap(runtime)
   await run_module(runtime, modules[0])
 }
