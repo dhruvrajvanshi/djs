@@ -1,4 +1,4 @@
-import { enqueue_job, call } from "djs:intrinsics"
+import { abstract_operation, host_enqueue_promise_job, call } from "djs:native"
 
 let await_internal
 
@@ -58,7 +58,7 @@ class Promise {
           Promise.#settle(current, value, 1)
           return
         }
-        enqueue_job(function () {
+        host_enqueue_promise_job(function () {
           const functions = Promise.#resolving(current)
           try {
             call(then, value, functions.resolve, functions.reject)
@@ -90,7 +90,7 @@ class Promise {
   }
 
   static #enqueue(reaction, value, state) {
-    enqueue_job(function () {
+    host_enqueue_promise_job(function () {
       const handler = state === 1 ? reaction.fulfilled : reaction.rejected
       const resultCapability = reaction.capability
       let result
@@ -188,11 +188,17 @@ class Promise {
   }
 }
 
-export const await_promise = await_internal
+// 6.2.4.1 Await ( value ), resuming through the VM's callbacks
+function await_value(value, on_fulfilled, on_rejected) {
+  await_internal(value, on_fulfilled, on_rejected)
+}
+abstract_operation("Await", await_value)
 
-export function new_promise_capability() {
+// 27.2.1.5 NewPromiseCapability ( C ), for %Promise%
+function new_promise_capability() {
   return capability(Promise)
 }
+abstract_operation("NewPromiseCapability", new_promise_capability)
 
 function capability(Constructor) {
   let resolve

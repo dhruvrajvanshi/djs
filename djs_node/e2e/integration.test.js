@@ -250,9 +250,9 @@ test("guest modules share intrinsic function values through ordinary imports", a
       export const saved = write_stdout;
     `,
     "entry.js": `
-      import "djs:intrinsics";
+      import "djs:native";
       import { write_stdout as write, io_read } from "djs:host";
-      import { enqueue_job, call } from "djs:intrinsics";
+      import { host_enqueue_promise_job as enqueue_job, call } from "djs:native";
       import { saved } from "./dependency.js";
       console.log(typeof write, typeof io_read, typeof enqueue_job, typeof call, write === saved);
       const emit = write;
@@ -348,13 +348,13 @@ for (const [name, source, diagnostic] of [
   ],
   [
     "unknown intrinsic export",
-    'import { unknown } from "djs:intrinsics";',
-    /djs:intrinsics does not export unknown/,
+    'import { unknown } from "djs:native";',
+    /djs:native does not export unknown/,
   ],
   [
     "missing intrinsic default export",
-    'import intrinsics from "djs:intrinsics";',
-    /djs:intrinsics does not export default/,
+    'import intrinsics from "djs:native";',
+    /djs:native does not export default/,
   ],
   [
     "unknown djs module",
@@ -362,6 +362,31 @@ for (const [name, source, diagnostic] of [
     /Unsupported builtin module: djs:unknown/,
   ],
   ["parser errors", "const value = ;", /Expected an expression/],
+  [
+    "duplicate private names",
+    "class C { #value; #value; }",
+    /Duplicate or invalid private name: #value/,
+  ],
+  [
+    "undeclared private names",
+    "class C { read() { return this.#missing; } }",
+    /Undeclared private name: #missing/,
+  ],
+  [
+    "undeclared private brand checks",
+    "const x = #missing in {};",
+    /Undeclared private name: #missing/,
+  ],
+  [
+    "duplicate constructors",
+    "class C { constructor() {} constructor() {} }",
+    /Duplicate constructor/,
+  ],
+  [
+    "class inheritance",
+    "class C extends Object {}",
+    /Unsupported syntax: class inheritance/,
+  ],
   [
     "missing named export",
     'import { missing } from "./dependency.js";',

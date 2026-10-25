@@ -1,14 +1,20 @@
+// 22.1 String Objects
 import {
+  well_known,
+  slot,
+  internal_method,
+  attributes,
   string_code_unit_at as unit,
   string_from_code_unit as character,
   string_slice,
-  string_box,
-  string_value,
+  string_create,
+  has_slot,
+  get_slot,
   array_create,
-  set_prototype,
+  ordinary_set_prototype_of,
   call,
-  builtin_function,
-} from "djs:intrinsics"
+  create_builtin_function,
+} from "djs:native"
 import {
   to_string,
   to_number,
@@ -17,47 +23,48 @@ import {
   require_object_coercible,
   create_data_property_or_throw,
   get_prototype_from_constructor,
-  make_constructor,
 } from "djs:abstract"
-import { relative_index, define_methods } from "./support.js"
-import { object_prototype } from "./object.js"
+import { relative_index } from "./support.js"
+import { ObjectPrototype, FunctionPrototype } from "./fundamental.js"
 import Symbol, { descriptive_string } from "./symbol.js"
 import { iterator_prototype } from "./iteration.js"
 
-function String(value) {
-  let text = ""
-  if (arguments.length !== 0)
-    text =
-      new.target === undefined && typeof value === "symbol"
-        ? descriptive_string(value)
-        : to_string(value)
-  if (new.target === undefined) return text
-  return string_box(
-    text,
-    get_prototype_from_constructor(new.target, string_prototype),
-  )
-}
-builtin_function(String, 1)
-export const string_prototype = string_box("", object_prototype)
-make_constructor(String, string_prototype)
+// 22.1.1 The String Constructor
+const String = well_known("%String%", create_builtin_function, {
+  [slot("[[Prototype]]")]: FunctionPrototype,
 
-define_methods(String, {
-  fromCharCode(value) {
+  // 22.1.1.1 String ( value )
+  [internal_method("[[Call]]", "[[Construct]]")]: function String(value) {
+    let text = ""
+    if (arguments.length !== 0)
+      text =
+        new.target === undefined && typeof value === "symbol"
+          ? descriptive_string(value)
+          : to_string(value)
+    if (new.target === undefined) return text
+    return string_create(
+      text,
+      get_prototype_from_constructor(new.target, StringPrototype),
+    )
+  },
+
+  // 22.1.2 Properties of the String Constructor
+  fromCharCode(...code_units) {
     let text = ""
     let index = 0
-    while (index < arguments.length) {
-      text = text + character(to_number(arguments[index]) & 65535)
+    while (index < code_units.length) {
+      text = text + character(to_number(code_units[index]) & 65535)
       index = index + 1
     }
     return text
   },
 
-  fromCodePoint(value) {
+  fromCodePoint(...code_points) {
     let text = ""
     let index = 0
     let point
-    while (index < arguments.length) {
-      point = to_number(arguments[index])
+    while (index < code_points.length) {
+      point = to_number(code_points[index])
       if (point !== point || point < 0 || point > 1114111 || point % 1 !== 0)
         throw new RangeError("Invalid code point")
       text = text + point_string(point)
@@ -66,7 +73,7 @@ define_methods(String, {
     return text
   },
 
-  raw(template) {
+  raw(template, ...substitutions) {
     require_object_coercible(template)
     const raw = require_object_coercible(template.raw)
     const length = to_length(raw.length)
@@ -74,21 +81,32 @@ define_methods(String, {
     let text = ""
     while (index < length) {
       text = text + to_string(raw[index])
-      if (index + 1 < length && index + 1 < arguments.length)
-        text = text + to_string(arguments[index + 1])
+      if (index + 1 < length && index < substitutions.length)
+        text = text + to_string(substitutions[index])
       index = index + 1
     }
     return text
   },
+
+  prototype: attributes(
+    { writable: false, configurable: false },
+    StringPrototype,
+  ),
 })
 
-define_methods(string_prototype, {
+// 22.1.3 Properties of the String Prototype Object
+const StringPrototype = well_known("%String.prototype%", string_create, {
+  [slot("[[Prototype]]")]: ObjectPrototype,
+  [slot("[[StringData]]")]: "",
+
+  constructor: String,
+
   toString() {
-    return string_value(this)
+    return this_string_value(this)
   },
 
   valueOf() {
-    return string_value(this)
+    return this_string_value(this)
   },
 
   at(index) {
@@ -130,11 +148,11 @@ define_methods(string_prototype, {
     return string_iterator(text_receiver(this))
   },
 
-  concat(value) {
+  concat(...values) {
     let text = text_receiver(this)
     let index = 0
-    while (index < arguments.length) {
-      text = text + to_string(arguments[index])
+    while (index < values.length) {
+      text = text + to_string(values[index])
       index = index + 1
     }
     return text
@@ -346,6 +364,14 @@ define_methods(string_prototype, {
   },
 })
 
+// 22.1.3.35.1 ThisStringValue ( value )
+function this_string_value(value) {
+  if (typeof value === "string") return value
+  if (has_slot(value, "[[StringData]]"))
+    return get_slot(value, "[[StringData]]")
+  throw new TypeError("Receiver is not a string or String object")
+}
+
 function string_iterator(text) {
   let index = 0
   const result = {
@@ -366,7 +392,7 @@ function string_iterator(text) {
       return { value, done: false }
     },
   }
-  set_prototype(result, iterator_prototype)
+  ordinary_set_prototype_of(result, iterator_prototype)
   return result
 }
 

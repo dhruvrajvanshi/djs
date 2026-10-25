@@ -55,7 +55,7 @@ test("byte reads report short counts, preserve surrounding bytes, and distinguis
     closed = false
   const app = await prepare(
     `
-    import { byte_buffer } from "djs:intrinsics";
+    import { byte_buffer } from "djs:native";
     import { io_open, io_read, io_close } from "djs:host";
     const handle = await new Promise((resolve, reject) => io_open("data", "r", 438, resolve, reject));
     const bytes = byte_buffer(5);
@@ -91,7 +91,7 @@ test("byte reads report short counts, preserve surrounding bytes, and distinguis
 test("I/O validates callbacks and byte ranges before submitting host work", async () => {
   const app = await prepare(
     `
-    import { byte_buffer, string_from_code_unit } from "djs:intrinsics";
+    import { byte_buffer, string_from_code_unit } from "djs:native";
     import { io_open, io_read, io_close } from "djs:host";
     const bytes = byte_buffer(2);
     try { io_read(1, bytes, 1, 2, () => {}, () => {}); } catch (e) { console.log(e.name); }
@@ -134,7 +134,7 @@ test(
     })
     const app = await prepare(
       `
-    import { byte_buffer } from "djs:intrinsics";
+    import { byte_buffer } from "djs:native";
     import { io_read } from "djs:host";
     let bytes = byte_buffer(3);
     io_read(1, bytes, 0, 3, count => console.log(count), error => { throw error; });

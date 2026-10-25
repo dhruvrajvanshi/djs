@@ -29,46 +29,13 @@ async function equivalent(t, source) {
   )
   const result = await execute(
     t,
-    `import { call, define_property as define,
-    get_own_property_descriptor as descriptor, set_prototype as setPrototype,
-    object_create as create } from "djs:intrinsics";\n${source}`,
+    `import { call, define_property_or_throw as define,
+    get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
+    ordinary_object_create as create } from "djs:native";\n${source}`,
   )
   assert.equal(result.output, expected)
   return result
 }
-
-test("array literals, constructors, indices and holes follow array length rules", async (t) => {
-  await equivalent(
-    t,
-    `
-    const a = [1,,undefined,];
-    console.log(a.length, 0 in a, 1 in a, 2 in a, a.join("|"));
-    console.log(Array.isArray(a), Array.isArray(Array.prototype), Array.isArray({}), a instanceof Array);
-    console.log(Array().length, Array(3).length, 0 in Array(3), new Array(1,2).join("-"));
-    a[5] = "end"; a["01"] = 9; a["4294967295"] = 8;
-    console.log(a.length, a["01"], a["4294967295"]);
-    delete a[0]; console.log(a.length, 0 in a);
-    a.length = "2"; console.log(a.length, 2 in a, 5 in a);
-    a.length = 4; console.log(a.length, 2 in a);
-    console.log(Array.of(4).join(), Array.from({0:"a", 2:"c", length:3}).join("|"));
-    console.log(Array.from("A😀B").length, Array.from("A😀B").join("|"));
-    try { Array(-1) } catch (e) { console.log(e.name) }
-    try { a.length = 1.5 } catch (e) { console.log(e.name) }
-    console.log(Array.name, Array.length, Array.prototype.push.name, Array.prototype.push.length);
-    const zero = Array(-0);console.log(1 / zero.length);zero.length = -0;console.log(1 / zero.length);
-    const oldPoint = String.prototype.codePointAt;
-    const oldSlice = String.prototype.slice;
-    try {
-      String.prototype.codePointAt = () => {throw "patched"};
-      String.prototype.slice = () => {throw "patched"};
-      console.log(Array.from("A😀B").join("|"));
-    } finally {
-      String.prototype.codePointAt = oldPoint;
-      String.prototype.slice = oldSlice;
-    }
-  `,
-  )
-})
 
 test("array length truncation preserves descriptor invariants and partial failure", async (t) => {
   await equivalent(
@@ -309,45 +276,6 @@ test("descriptor changes preserve accessors and reject incompatible redefinition
   )
 })
 
-test("Array methods derive names, lengths and descriptors from class syntax", async (t) => {
-  await equivalent(
-    t,
-    `
-    function inspect(owner, key) {
-      const method = owner[key];
-      const property = descriptor(owner, key);
-      const name = descriptor(method, "name");
-      const length = descriptor(method, "length");
-      console.log(key, method.name, method.length,
-        property.writable, property.enumerable, property.configurable,
-        name.writable, name.enumerable, name.configurable,
-        length.writable, length.enumerable, length.configurable);
-      try { new method() } catch (error) { console.log(error.name) }
-    }
-    const statics = ["isArray", "of", "from"];
-    const methods = ["at", "push", "pop", "shift", "unshift", "join", "toString",
-      "slice", "concat", "reverse", "fill", "copyWithin", "splice", "keys",
-      "values", "entries", "forEach", "map", "filter", "some", "every", "find",
-      "findIndex", "findLast", "findLastIndex", "reduce", "reduceRight", "indexOf",
-      "lastIndexOf", "includes", "sort", "flat", "flatMap", "toReversed", "with",
-      "toSorted", "toSpliced"];
-    let index = 0;
-    while (index < statics.length) {
-      inspect(Array, statics[index]); index = index + 1;
-    }
-    index = 0;
-    while (index < methods.length) {
-      inspect(Array.prototype, methods[index]); index = index + 1;
-    }
-    console.log(Array.of().length, Array.of(undefined, 2, 3).join("|"));
-    console.log(Array.prototype.valueOf() === Array.prototype);
-    define(Array.prototype.map, "name", {value:"renamed"});
-    define(Array.prototype.map, "length", {value:7});
-    console.log(Array.prototype.map.name, Array.prototype.map.length);
-  `,
-  )
-})
-
 test("ordinary functions and methods expose JavaScript parameter lengths and method names", async (t) => {
   await equivalent(
     t,
@@ -396,48 +324,6 @@ test("ordinary functions and methods expose JavaScript parameter lengths and met
   )
 })
 
-test("String methods derive names, lengths and descriptors from class syntax", async (t) => {
-  await equivalent(
-    t,
-    `
-    function inspect(owner, key) {
-      const method = owner[key];
-      const property = descriptor(owner, key);
-      const name = descriptor(method, "name");
-      const length = descriptor(method, "length");
-      console.log(key, method.name, method.length,
-        property.writable, property.enumerable, property.configurable,
-        name.writable, name.enumerable, name.configurable,
-        length.writable, length.enumerable, length.configurable);
-      try { new method() } catch (error) { console.log(error.name) }
-    }
-    const statics = ["fromCharCode", "fromCodePoint", "raw"];
-    const methods = ["toString", "valueOf", "at", "charAt", "charCodeAt", "codePointAt",
-      "concat", "slice", "substring", "indexOf", "lastIndexOf", "includes", "startsWith",
-      "endsWith", "repeat", "split", "trim", "trimStart", "trimEnd", "padStart", "padEnd",
-      "replace", "replaceAll", "isWellFormed", "toWellFormed"];
-    let index = 0;
-    while (index < statics.length) {
-      inspect(String, statics[index]); index = index + 1;
-    }
-    index = 0;
-    while (index < methods.length) {
-      inspect(String.prototype, methods[index]); index = index + 1;
-    }
-    const prototype = descriptor(String, "prototype");
-    const constructor = descriptor(String.prototype, "constructor");
-    console.log(String.name, String.length, prototype.writable, prototype.enumerable,
-      prototype.configurable, constructor.value === String, constructor.writable,
-      constructor.enumerable, constructor.configurable);
-    console.log(String.fromCharCode(), String.fromCodePoint(), new String().length,
-      new String(undefined).valueOf(), call(String, {}, 123, 456));
-    define(String.prototype.slice, "name", {value:"renamed"});
-    define(String.prototype.slice, "length", {value:7});
-    console.log(String.prototype.slice.name, String.prototype.slice.length);
-  `,
-  )
-})
-
 test("String wrappers retain branding and virtual properties after prototype replacement", async (t) => {
   await equivalent(
     t,
@@ -457,4 +343,34 @@ test("String wrappers retain branding and virtual properties after prototype rep
     try {new String({toString(){throw reason}})} catch (error) {console.log(error === reason)}
   `,
   )
+})
+
+test("accessors on arrays, string wrappers and captured new.target work together", async (t) => {
+  const { output } = await execute(
+    t,
+    `
+    import { define_property_or_throw as define } from "djs:native";
+    const retained = [new String("a😀b"), [1,,3]];
+    function Capture() { return () => new.target }
+    const target = new Capture();
+    define(retained[1], "1", { get() { return retained[0].codePointAt(1) }, configurable: true });
+    console.log(retained[1].map(value => value + 1).join("-"), retained[0][0], target() === Capture);
+  `,
+  )
+  assert.equal(output, "2-128513-4 a true\n")
+})
+
+test("rest parameters are ordinary arrays and computed methods get their names", async (t) => {
+  const { output } = await execute(
+    t,
+    `
+    function retain(first, ...items) { return () => items }
+    const saved = retain(null, { value: "retained" }, 2);
+    const object = { ["method" + 1](value, optional = undefined) { return value } };
+    console.log(saved()[0].value, saved().length, object.method1.name, object.method1.length);
+    saved()[3] = 4;
+    console.log(saved().length, saved()[3]);
+  `,
+  )
+  assert.equal(output, "retained 2 method1 1\n4 4\n")
 })

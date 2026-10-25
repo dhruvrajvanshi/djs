@@ -46,6 +46,8 @@ const OPERANDS: Record<string, string[]> = {
   ITERATOR_CLOSE: ["iterator", "after_throw"],
   FOR_IN_START: ["keys", "object", "index", "src"],
   FOR_IN_NEXT: ["dst", "keys", "object", "index", "done"],
+  INIT_SLOT: ["object", "literal", "src"],
+  SET_BEHAVIOR: ["object", "steps", "constructor"],
 }
 
 const OPCODE_NAMES = record_invert(OP)

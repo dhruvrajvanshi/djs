@@ -1,7 +1,5 @@
-// Each module registers its intrinsics with the VM while it is evaluated, so
-// this import order is the realm's initialization order. Object comes first:
-// objects created before %Object.prototype% exists have a null prototype.
-export { default as Object } from "./object.js"
+// The globals of the realm.
+export { Object } from "./fundamental.js"
 export {
   Error,
   TypeError,

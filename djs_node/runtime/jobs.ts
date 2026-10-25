@@ -94,7 +94,7 @@ export function await_value(
   destination: Root,
   source: Root,
 ) {
-  const await_promise = runtime.intrinsics.get("AwaitPromise")
+  const await_promise = runtime.intrinsics.get("Await")
   if (await_promise === undefined) panic("Promise is not initialized")
   const { memory } = runtime
   const fulfilled = alloc_root(memory),

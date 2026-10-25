@@ -1,21 +1,25 @@
+// 23.1 Array Objects
 import {
+  well_known,
+  slot,
+  internal_method,
+  attributes,
   array_create,
   is_array,
   is_constructor,
   call,
   has_property,
-  delete_property,
-  get_own_property_descriptor,
+  delete_property_or_throw,
+  get_own_property,
   ordinary_define_own_property,
   ordinary_own_property_keys,
   ordinary_delete,
-  object_create,
-  set_prototype,
-  define_property,
+  ordinary_object_create,
+  ordinary_set_prototype_of,
   string_code_unit_at,
   string_slice,
-  builtin_function,
-} from "djs:intrinsics"
+  create_builtin_function,
+} from "djs:native"
 import {
   to_object,
   to_length,
@@ -24,26 +28,34 @@ import {
   to_number,
   create_data_property_or_throw,
   get_prototype_from_constructor,
-  make_constructor,
 } from "djs:abstract"
-import {
-  relative_index,
-  callable,
-  check_length,
-  define_methods,
-} from "./support.js"
+import { relative_index, callable, check_length } from "./support.js"
 import Symbol from "./symbol.js"
 import { iterator_prototype } from "./iteration.js"
-import { object_prototype } from "./object.js"
+import { ObjectPrototype, FunctionPrototype } from "./fundamental.js"
 
-function Array(...values) {
-  return create_from_arguments(values, new.target ?? Array)
-}
-builtin_function(Array, 1)
-export const array_prototype = array_create(0, object_prototype)
-make_constructor(Array, array_prototype)
+// 23.1.1 The Array Constructor
+const Array = well_known("%Array%", create_builtin_function, {
+  [slot("[[Prototype]]")]: FunctionPrototype,
 
-define_methods(Array, {
+  // 23.1.1.1 Array ( ...values )
+  [internal_method("[[Call]]", "[[Construct]]")]: function Array(...values) {
+    const prototype = get_prototype_from_constructor(
+      new.target ?? Array,
+      ArrayPrototype,
+    )
+    if (values.length === 1 && typeof values[0] === "number")
+      return array_create(values[0], prototype)
+    const array = array_create(values.length, prototype)
+    let index = 0
+    while (index < values.length) {
+      create_data_property_or_throw(array, index, values[index])
+      index = index + 1
+    }
+    return array
+  },
+
+  // 23.1.2 Properties of the Array Constructor
   isArray(value) {
     return is_array(value)
   },
@@ -103,9 +115,19 @@ define_methods(Array, {
     result.length = length
     return result
   },
+
+  prototype: attributes(
+    { writable: false, configurable: false },
+    ArrayPrototype,
+  ),
 })
 
-define_methods(array_prototype, {
+// 23.1.3 Properties of the Array Prototype Object
+const ArrayPrototype = well_known("%Array.prototype%", array_create, {
+  [slot("[[Prototype]]")]: ObjectPrototype,
+
+  constructor: Array,
+
   at(index) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -114,13 +136,13 @@ define_methods(array_prototype, {
     return actual < 0 || actual >= length ? undefined : object[actual]
   },
 
-  push(value) {
+  push(...values) {
     const object = to_object(this)
     let length = to_length(object.length)
-    check_length(length + arguments.length)
+    check_length(length + values.length)
     let index = 0
-    while (index < arguments.length) {
-      object[length] = arguments[index]
+    while (index < values.length) {
+      object[length] = values[index]
       length = length + 1
       index = index + 1
     }
@@ -136,7 +158,7 @@ define_methods(array_prototype, {
       return undefined
     }
     const value = object[length - 1]
-    delete_property(object, length - 1)
+    delete_property_or_throw(object, length - 1)
     object.length = length - 1
     return value
   },
@@ -152,29 +174,29 @@ define_methods(array_prototype, {
     let index = 1
     while (index < length) {
       if (has_property(object, index)) object[index - 1] = object[index]
-      else delete_property(object, index - 1)
+      else delete_property_or_throw(object, index - 1)
       index = index + 1
     }
-    delete_property(object, length - 1)
+    delete_property_or_throw(object, length - 1)
     object.length = length - 1
     return value
   },
 
-  unshift(value) {
+  unshift(...values) {
     const object = to_object(this)
     const length = to_length(object.length)
-    const count = arguments.length
+    const count = values.length
     check_length(length + count)
     let index = length
     while (count > 0 && index > 0) {
       if (has_property(object, index - 1))
         object[index + count - 1] = object[index - 1]
-      else delete_property(object, index + count - 1)
+      else delete_property_or_throw(object, index + count - 1)
       index = index - 1
     }
     index = 0
     while (index < count) {
-      object[index] = arguments[index]
+      object[index] = values[index]
       index = index + 1
     }
     object.length = length + count
@@ -214,7 +236,7 @@ define_methods(array_prototype, {
     const join = object.join
     return typeof join === "function"
       ? call(join, object)
-      : call(object_prototype.toString, object)
+      : call(ObjectPrototype.toString, object)
   },
 
   slice(start, end) {
@@ -234,15 +256,15 @@ define_methods(array_prototype, {
     return result
   },
 
-  concat(value) {
+  concat(...values) {
     const result = array_create(0)
     let offset = 0
     let argument = -1
     let item
     let index
     let length
-    while (argument < arguments.length) {
-      item = argument < 0 ? to_object(this) : arguments[argument]
+    while (argument < values.length) {
+      item = argument < 0 ? to_object(this) : values[argument]
       if (is_array(item)) {
         length = to_length(item.length)
         check_length(offset + length)
@@ -279,9 +301,9 @@ define_methods(array_prototype, {
       upper_exists = has_property(object, upper)
       if (upper_exists) upper_value = object[upper]
       if (upper_exists) object[lower] = upper_value
-      else if (lower_exists) delete_property(object, lower)
+      else if (lower_exists) delete_property_or_throw(object, lower)
       if (lower_exists) object[upper] = lower_value
-      else if (upper_exists) delete_property(object, upper)
+      else if (upper_exists) delete_property_or_throw(object, upper)
       lower = lower + 1
       upper = upper - 1
     }
@@ -315,7 +337,7 @@ define_methods(array_prototype, {
     }
     while (count > 0) {
       if (has_property(object, from)) object[to] = object[from]
-      else delete_property(object, to)
+      else delete_property_or_throw(object, to)
       from = from + direction
       to = to + direction
       count = count - 1
@@ -323,7 +345,7 @@ define_methods(array_prototype, {
     return object
   },
 
-  splice(start, deleteCount) {
+  splice(start, deleteCount, ...items) {
     const object = to_object(this)
     const length = to_length(object.length)
     const first = relative_index(start, length)
@@ -333,7 +355,7 @@ define_methods(array_prototype, {
       if (remove < 0) remove = 0
       if (remove > length - first) remove = length - first
     }
-    const insert = arguments.length > 2 ? arguments.length - 2 : 0
+    const insert = items.length
     check_length(length - remove + insert)
     const result = array_create(remove)
     let index = 0
@@ -347,12 +369,12 @@ define_methods(array_prototype, {
       while (index < length - remove) {
         if (has_property(object, index + remove))
           object[index + insert] = object[index + remove]
-        else delete_property(object, index + insert)
+        else delete_property_or_throw(object, index + insert)
         index = index + 1
       }
       index = length
       while (index > length - remove + insert) {
-        delete_property(object, index - 1)
+        delete_property_or_throw(object, index - 1)
         index = index - 1
       }
     } else if (insert > remove) {
@@ -360,13 +382,13 @@ define_methods(array_prototype, {
       while (index > first) {
         if (has_property(object, index + remove - 1))
           object[index + insert - 1] = object[index + remove - 1]
-        else delete_property(object, index + insert - 1)
+        else delete_property_or_throw(object, index + insert - 1)
         index = index - 1
       }
     }
     index = 0
     while (index < insert) {
-      object[first + index] = arguments[index + 2]
+      object[first + index] = items[index]
       index = index + 1
     }
     object.length = length - remove + insert
@@ -726,7 +748,7 @@ define_methods(array_prototype, {
     return sort_array(result, compare)
   },
 
-  toSpliced(start, deleteCount) {
+  toSpliced(start, deleteCount, ...items) {
     const object = to_object(this)
     const length = to_length(object.length)
     const first = relative_index(start, length)
@@ -736,7 +758,7 @@ define_methods(array_prototype, {
       if (remove < 0) remove = 0
       if (remove > length - first) remove = length - first
     }
-    const insert = arguments.length > 2 ? arguments.length - 2 : 0
+    const insert = items.length
     const count = length - remove + insert
     check_length(count)
     const result = array_create(count)
@@ -747,7 +769,7 @@ define_methods(array_prototype, {
     }
     let argument = 0
     while (argument < insert) {
-      create_data_property_or_throw(result, index, arguments[argument + 2])
+      create_data_property_or_throw(result, index, items[argument])
       index = index + 1
       argument = argument + 1
     }
@@ -759,34 +781,25 @@ define_methods(array_prototype, {
     }
     return result
   },
+
+  [Symbol.iterator]: ArrayPrototype.values,
 })
 
-// The VM passes keys already converted to property keys.
-export function array_define_own_property(array, key, descriptor) {
-  if (key === "length") return array_set_length(array, descriptor)
-  const index = array_index(key)
-  if (index < 0) return ordinary_define_own_property(array, key, descriptor)
-  const length = get_own_property_descriptor(array, "length")
+// 10.4.2.1 [[DefineOwnProperty]] ( P, Desc ). The VM passes P already
+// converted to a property key.
+function array_define_own_property(P, Desc) {
+  const array = this
+  if (P === "length") return array_set_length(array, Desc)
+  const index = array_index(P)
+  if (index < 0) return ordinary_define_own_property(array, P, Desc)
+  const length = get_own_property(array, "length")
   if (index >= length.value && !length.writable) return false
-  if (!ordinary_define_own_property(array, key, descriptor)) return false
+  if (!ordinary_define_own_property(array, P, Desc)) return false
   if (index >= length.value)
     return ordinary_define_own_property(array, "length", { value: index + 1 })
   return true
 }
-
-function create_from_arguments(args, newTarget) {
-  const prototype = get_prototype_from_constructor(newTarget, array_prototype)
-  const count = args.length
-  if (count === 1 && typeof args[0] === "number")
-    return array_create(args[0], prototype)
-  const result = array_create(count, prototype)
-  let index = 0
-  while (index < count) {
-    create_data_property_or_throw(result, index, args[index])
-    index = index + 1
-  }
-  return result
-}
+internal_method("array", "[[DefineOwnProperty]]", array_define_own_property)
 
 function array_index(key) {
   if (typeof key === "symbol") return -1
@@ -802,7 +815,7 @@ function array_index(key) {
 }
 
 function copy_descriptor(descriptor) {
-  const copy = object_create(null)
+  const copy = ordinary_object_create(null)
   if (has_property(descriptor, "value")) copy.value = descriptor.value
   if (has_property(descriptor, "writable")) copy.writable = descriptor.writable
   if (has_property(descriptor, "enumerable"))
@@ -822,7 +835,7 @@ function array_set_length(array, descriptor) {
   const length = to_number(value) >>> 0
   if (length !== to_number(value)) throw new RangeError("Invalid array length")
   next.value = length
-  const previous = get_own_property_descriptor(array, "length")
+  const previous = get_own_property(array, "length")
   if (length >= previous.value)
     return ordinary_define_own_property(array, "length", next)
   if (!previous.writable) return false
@@ -875,7 +888,7 @@ function iterator(object, kind) {
       }
     },
   }
-  set_prototype(result, iterator_prototype)
+  ordinary_set_prototype_of(result, iterator_prototype)
   return result
 }
 
@@ -949,7 +962,7 @@ function sort_array(receiver, compare) {
     index = index + 1
   }
   while (index < length) {
-    delete_property(object, index)
+    delete_property_or_throw(object, index)
     index = index + 1
   }
   return object
@@ -983,12 +996,5 @@ function flatten(target, source, length, depth, mapper, receiver, offset) {
   }
   return offset
 }
-
-define_property(array_prototype, Symbol.iterator, {
-  value: array_prototype.values,
-  writable: true,
-  enumerable: false,
-  configurable: true,
-})
 
 export default Array

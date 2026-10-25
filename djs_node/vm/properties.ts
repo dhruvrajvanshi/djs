@@ -246,11 +246,8 @@ function invoke_define(
     } else
       write_string(runtime.memory, normalized, to_string(runtime.memory, key))
     if (
-      invoke_sync(runtime, result, method, undefined, [
-        object,
-        normalized,
-        descriptor,
-      ]) === THROW
+      invoke_sync(runtime, result, method, object, [normalized, descriptor]) ===
+      THROW
     )
       return THROW
     if (tag_of(runtime.memory, result) !== TAGS.BOOLEAN)
@@ -269,10 +266,10 @@ function invoke_define(
 }
 
 // Array exotic objects define properties through the stdlib's
-// ArrayDefineOwnProperty; other objects are ordinary.
+// @internal_method("array", "[[DefineOwnProperty]]"); other objects are ordinary.
 function exotic_define_own_property(runtime: Runtime, object: Root) {
   if (kind_of(runtime.memory, object) !== KINDS.ARRAY) return undefined
-  return runtime.intrinsics.get("ArrayDefineOwnProperty")
+  return runtime.intrinsics.get("array [[DefineOwnProperty]]")
 }
 
 // Returns null when the object is ordinary.

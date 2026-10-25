@@ -1,5 +1,10 @@
 // Abstract operations from the ECMAScript specification, named after it.
-import { call, string_box, define_property } from "djs:intrinsics"
+import {
+  abstract_operation,
+  call,
+  string_create,
+  define_property_or_throw,
+} from "djs:native"
 
 function is_object(value) {
   return (
@@ -13,6 +18,7 @@ export function require_object_coercible(value) {
   return value
 }
 
+// 7.1.1 ToPrimitive ( input [ , preferredType ] )
 export function to_primitive(value, hint) {
   if (!is_object(value)) return value
   let first = hint === "string" ? value.toString : value.valueOf
@@ -27,16 +33,21 @@ export function to_primitive(value, hint) {
   }
   throw new TypeError("Cannot convert object to primitive")
 }
+abstract_operation("ToPrimitive", to_primitive)
 
+// 7.1.17 ToString ( argument )
 export function to_string(value) {
   return "" + to_primitive(value, "string")
 }
+abstract_operation("ToString", to_string)
+// 7.1.4 ToNumber ( argument )
 export function to_number(value) {
   return +to_primitive(value, "number")
 }
+abstract_operation("ToNumber", to_number)
 export function to_object(value) {
   require_object_coercible(value)
-  if (typeof value === "string") return string_box(value)
+  if (typeof value === "string") return string_create(value)
   if (is_object(value)) return value
   return {}
 }
@@ -52,7 +63,7 @@ export function to_length(value) {
   return length > 9007199254740991 ? 9007199254740991 : length
 }
 export function create_data_property_or_throw(object, key, value) {
-  define_property(object, key, {
+  define_property_or_throw(object, key, {
     value,
     writable: true,
     enumerable: true,
@@ -64,21 +75,14 @@ export function create_non_enumerable_data_property_or_throw(
   key,
   value,
 ) {
-  define_property(object, key, { value, writable: true, configurable: true })
+  define_property_or_throw(object, key, {
+    value,
+    writable: true,
+    configurable: true,
+  })
 }
 
 export function get_prototype_from_constructor(constructor, default_prototype) {
   const prototype = constructor.prototype
   return is_object(prototype) ? prototype : default_prototype
-}
-
-// Built-in constructors have a read-only prototype whose constructor
-// property is hidden.
-export function make_constructor(constructor, prototype) {
-  define_property(constructor, "prototype", { value: prototype })
-  create_non_enumerable_data_property_or_throw(
-    prototype,
-    "constructor",
-    constructor,
-  )
 }

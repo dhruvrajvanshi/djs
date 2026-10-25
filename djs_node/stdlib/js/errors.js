@@ -1,76 +1,45 @@
+// 20.5 Error Objects
 import {
-  error_create,
-  set_prototype,
-  object_create,
-  builtin_function,
-} from "djs:intrinsics"
+  well_known,
+  slot,
+  internal_method,
+  attributes,
+  ordinary_object_create,
+  create_builtin_function,
+} from "djs:native"
 import {
   to_string,
   get_prototype_from_constructor,
-  make_constructor,
   create_non_enumerable_data_property_or_throw,
 } from "djs:abstract"
-import { is_object, define_methods } from "./support.js"
-import { object_prototype } from "./object.js"
+import { is_object } from "./support.js"
+import { ObjectPrototype, FunctionPrototype } from "./fundamental.js"
 
-export function Error(message, options) {
-  return create_error(new.target ?? Error, Error, message, options)
-}
-export function TypeError(message, options) {
-  return create_error(new.target ?? TypeError, TypeError, message, options)
-}
-export function RangeError(message, options) {
-  return create_error(new.target ?? RangeError, RangeError, message, options)
-}
-export function ReferenceError(message, options) {
-  return create_error(
-    new.target ?? ReferenceError,
-    ReferenceError,
+// 20.5.1 The Error Constructor
+export const Error = well_known("%Error%", create_builtin_function, {
+  [slot("[[Prototype]]")]: FunctionPrototype,
+
+  [internal_method("[[Call]]", "[[Construct]]")]: function Error(
     message,
-    options,
-  )
-}
-export function SyntaxError(message, options) {
-  return create_error(new.target ?? SyntaxError, SyntaxError, message, options)
-}
+    options = undefined,
+  ) {
+    return create_error(new.target ?? Error, ErrorPrototype, message, options)
+  },
 
-function create_error(new_target, constructor, message, options) {
-  const error = error_create(
-    get_prototype_from_constructor(new_target, constructor.prototype),
-  )
-  if (message !== undefined)
-    create_non_enumerable_data_property_or_throw(
-      error,
-      "message",
-      to_string(message),
-    )
-  if (is_object(options) && "cause" in options)
-    create_non_enumerable_data_property_or_throw(error, "cause", options.cause)
-  return error
-}
+  prototype: attributes(
+    { writable: false, configurable: false },
+    ErrorPrototype,
+  ),
+})
 
-function define_error(constructor, parent) {
-  builtin_function(constructor, 1)
-  const prototype = object_create(
-    parent === undefined ? object_prototype : parent.prototype,
-  )
-  if (parent !== undefined) set_prototype(constructor, parent)
-  make_constructor(constructor, prototype)
-  create_non_enumerable_data_property_or_throw(
-    prototype,
-    "name",
-    constructor.name,
-  )
-  create_non_enumerable_data_property_or_throw(prototype, "message", "")
-}
+// 20.5.3 Properties of the Error Prototype Object
+const ErrorPrototype = well_known("%Error.prototype%", ordinary_object_create, {
+  [slot("[[Prototype]]")]: ObjectPrototype,
+  constructor: Error,
+  name: "Error",
+  message: "",
 
-define_error(Error)
-define_error(TypeError, Error)
-define_error(RangeError, Error)
-define_error(ReferenceError, Error)
-define_error(SyntaxError, Error)
-
-define_methods(Error.prototype, {
+  // 20.5.3.4 Error.prototype.toString ( )
   toString() {
     if (!is_object(this))
       throw new TypeError("Error.prototype.toString requires an object")
@@ -83,3 +52,164 @@ define_methods(Error.prototype, {
     return name + ": " + message
   },
 })
+
+// 20.5.5.5 TypeError, structured as in 20.5.6.1 The NativeError Constructors
+export const TypeError = well_known("%TypeError%", create_builtin_function, {
+  [slot("[[Prototype]]")]: Error,
+
+  [internal_method("[[Call]]", "[[Construct]]")]: function TypeError(
+    message,
+    options = undefined,
+  ) {
+    return create_error(
+      new.target ?? TypeError,
+      TypeErrorPrototype,
+      message,
+      options,
+    )
+  },
+
+  prototype: attributes(
+    { writable: false, configurable: false },
+    TypeErrorPrototype,
+  ),
+})
+
+// 20.5.6.3 Properties of the NativeError Prototype Objects
+const TypeErrorPrototype = well_known(
+  "%TypeError.prototype%",
+  ordinary_object_create,
+  {
+    [slot("[[Prototype]]")]: ErrorPrototype,
+    constructor: TypeError,
+    name: "TypeError",
+    message: "",
+  },
+)
+
+// 20.5.5.2 RangeError, structured as in 20.5.6.1 The NativeError Constructors
+export const RangeError = well_known("%RangeError%", create_builtin_function, {
+  [slot("[[Prototype]]")]: Error,
+
+  [internal_method("[[Call]]", "[[Construct]]")]: function RangeError(
+    message,
+    options = undefined,
+  ) {
+    return create_error(
+      new.target ?? RangeError,
+      RangeErrorPrototype,
+      message,
+      options,
+    )
+  },
+
+  prototype: attributes(
+    { writable: false, configurable: false },
+    RangeErrorPrototype,
+  ),
+})
+
+// 20.5.6.3 Properties of the NativeError Prototype Objects
+const RangeErrorPrototype = well_known(
+  "%RangeError.prototype%",
+  ordinary_object_create,
+  {
+    [slot("[[Prototype]]")]: ErrorPrototype,
+    constructor: RangeError,
+    name: "RangeError",
+    message: "",
+  },
+)
+
+// 20.5.5.3 ReferenceError, structured as in 20.5.6.1 The NativeError Constructors
+export const ReferenceError = well_known(
+  "%ReferenceError%",
+  create_builtin_function,
+  {
+    [slot("[[Prototype]]")]: Error,
+
+    [internal_method("[[Call]]", "[[Construct]]")]: function ReferenceError(
+      message,
+      options = undefined,
+    ) {
+      return create_error(
+        new.target ?? ReferenceError,
+        ReferenceErrorPrototype,
+        message,
+        options,
+      )
+    },
+
+    prototype: attributes(
+      { writable: false, configurable: false },
+      ReferenceErrorPrototype,
+    ),
+  },
+)
+
+// 20.5.6.3 Properties of the NativeError Prototype Objects
+const ReferenceErrorPrototype = well_known(
+  "%ReferenceError.prototype%",
+  ordinary_object_create,
+  {
+    [slot("[[Prototype]]")]: ErrorPrototype,
+    constructor: ReferenceError,
+    name: "ReferenceError",
+    message: "",
+  },
+)
+
+// 20.5.5.4 SyntaxError, structured as in 20.5.6.1 The NativeError Constructors
+export const SyntaxError = well_known(
+  "%SyntaxError%",
+  create_builtin_function,
+  {
+    [slot("[[Prototype]]")]: Error,
+
+    [internal_method("[[Call]]", "[[Construct]]")]: function SyntaxError(
+      message,
+      options = undefined,
+    ) {
+      return create_error(
+        new.target ?? SyntaxError,
+        SyntaxErrorPrototype,
+        message,
+        options,
+      )
+    },
+
+    prototype: attributes(
+      { writable: false, configurable: false },
+      SyntaxErrorPrototype,
+    ),
+  },
+)
+
+// 20.5.6.3 Properties of the NativeError Prototype Objects
+const SyntaxErrorPrototype = well_known(
+  "%SyntaxError.prototype%",
+  ordinary_object_create,
+  {
+    [slot("[[Prototype]]")]: ErrorPrototype,
+    constructor: SyntaxError,
+    name: "SyntaxError",
+    message: "",
+  },
+)
+
+function create_error(new_target, default_prototype, message, options) {
+  const error = ordinary_object_create(
+    get_prototype_from_constructor(new_target, default_prototype),
+    ["[[ErrorData]]"],
+  )
+  if (message !== undefined)
+    create_non_enumerable_data_property_or_throw(
+      error,
+      "message",
+      to_string(message),
+    )
+  // 20.5.9.1 InstallErrorCause
+  if (is_object(options) && "cause" in options)
+    create_non_enumerable_data_property_or_throw(error, "cause", options.cause)
+  return error
+}

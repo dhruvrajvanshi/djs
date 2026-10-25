@@ -55,6 +55,7 @@ export interface Memory {
   control: Uint8Array
   control_view: DataView
   object_prototype?: Root
+  function_prototype?: Root
   array_prototype?: Root
   string_prototype?: Root
   symbol_prototype?: Root

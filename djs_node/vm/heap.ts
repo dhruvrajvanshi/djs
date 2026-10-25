@@ -152,6 +152,7 @@ export function collect(memory: Memory) {
       trace_value(scan + 16)
       trace_raw(scan + 24)
       trace_raw(scan + 28)
+      trace_raw(scan + 36)
       trace_value(scan + 40)
       trace_value(scan + 48)
     } else if (kind === KINDS.SYMBOL) {

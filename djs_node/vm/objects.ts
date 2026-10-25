@@ -92,6 +92,12 @@ export function create_function(
   write_u32(memory, reference + 8, code_id)
   write_u32(memory, reference + 12, function_id)
   write_u32(memory, reference + 32, flags)
+  if (memory.function_prototype !== undefined)
+    write_u32(
+      memory,
+      reference + 28,
+      get_ref(memory, memory.function_prototype),
+    )
   if (receiver !== undefined)
     copy_root_to_heap_value(memory, reference + 40, receiver)
   if (environment !== undefined)
@@ -123,19 +129,38 @@ export function function_id(memory: Memory, callee: Root): FunctionId {
   return read_u32(memory, get_ref(memory, callee) + 12) as FunctionId
 }
 
-/** Built-in functions allocate their own result when constructed (spec 10.3). */
-export const BUILTIN_FUNCTION = 32
+/** A built-in function whose steps also implement [[Construct]]. */
+export const BUILTIN_CONSTRUCTOR = 32
+
+/** Stores a built-in function's specification steps (ECMA-262 10.3). */
+export function set_builtin_steps(
+  memory: Memory,
+  callee: Root,
+  steps: Root,
+  constructor: boolean,
+) {
+  const reference = get_ref(memory, callee)
+  write_u32(memory, reference + 36, get_ref(memory, steps))
+  if (constructor)
+    write_u32(
+      memory,
+      reference + 32,
+      read_u32(memory, reference + 32) | BUILTIN_CONSTRUCTOR,
+    )
+}
+
+export function load_builtin_steps(
+  memory: Memory,
+  destination: Root,
+  callee: Root,
+) {
+  const steps = read_u32(memory, get_ref(memory, callee) + 36)
+  if (steps !== 0) set_ref(memory, destination, steps)
+  return steps !== 0
+}
 
 export function function_flags(memory: Memory, callee: Root): number {
   return read_u32(memory, get_ref(memory, callee) + 32)
-}
-
-export function set_function_flags(
-  memory: Memory,
-  callee: Root,
-  flags: number,
-) {
-  write_u32(memory, get_ref(memory, callee) + 32, flags)
 }
 
 export function load_function_environment(
@@ -654,6 +679,22 @@ export function create_string_object(
   } finally {
     free_root(memory, source)
   }
+}
+
+export function string_object_set_value(
+  memory: Memory,
+  object: Root,
+  value: Root,
+) {
+  if (kind_of(memory, value) !== KINDS.STRING) panic("Expected a string")
+  copy_root_to_heap_value(memory, get_ref(memory, object) + 16, value)
+}
+
+export function object_prototype_reference(memory: Memory, object: Root) {
+  return read_u32(
+    memory,
+    get_ref(memory, object) + object_offsets(memory, object)[1],
+  )
 }
 
 export function string_value(memory: Memory, destination: Root, value: Root) {

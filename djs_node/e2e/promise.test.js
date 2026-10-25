@@ -4,7 +4,7 @@ import { execute, fixture } from "./helpers.js"
 
 test("imported call and enqueue_job intrinsics preserve receivers, errors and job order", async (t) => {
   const source = `
-    import { call, enqueue_job as enqueue } from "djs:intrinsics";
+    import { call, host_enqueue_promise_job as enqueue } from "djs:native";
     import { write_stdout as write } from "djs:host";
     function log(value) { write("" + value + "\\n"); }
     const fn = function(a, b) { return this.value + a + b; };
@@ -29,4 +29,51 @@ test("uncaught guest errors retain their name and message", async (t) => {
   })
   const result = app.run({ status: 1, stderr: /TypeError: handler/ })
   assert.equal(result.stdout, "")
+})
+
+test("finally blocks unwind deep recursion and keep completions across await", async (t) => {
+  const { output } = await execute(
+    t,
+    `
+    const token = { value: 42 };
+    let cleaned = 0;
+    function unwind(depth) {
+      try {
+        if (depth === 0) throw token;
+        return unwind(depth - 1);
+      } finally {
+        cleaned = cleaned + 1;
+      }
+    }
+    try { unwind(24); }
+    catch (error) { console.log(error === token, cleaned); }
+
+    async function preserve() {
+      try { return token; }
+      finally { await Promise.resolve(); }
+    }
+    console.log((await preserve()) === token);
+
+    async function replace() {
+      try { throw token; }
+      finally {
+        await Promise.resolve();
+        return 99;
+      }
+    }
+    console.log(await replace());
+    `,
+  )
+  assert.equal(output, "true 25\ntrue\n99\n")
+})
+
+test("an endless chain of microtasks stops at the instruction limit", async (t) => {
+  const app = await fixture(t, {
+    "entry.js": `
+      const p = Promise.resolve();
+      function again() { p.then(again); }
+      again();
+    `,
+  })
+  app.run({ status: 1, stderr: /VM instruction limit exceeded/ })
 })

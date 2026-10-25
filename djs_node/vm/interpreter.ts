@@ -88,7 +88,9 @@ import {
   function_code_id,
   function_id as callee_function_id,
   function_flags,
-  BUILTIN_FUNCTION,
+  BUILTIN_CONSTRUCTOR,
+  load_builtin_steps,
+  set_builtin_steps,
   load_function_environment,
   load_function_receiver,
   load_function_new_target,
@@ -121,6 +123,7 @@ import {
   call_intrinsic,
   NATIVE_CODE,
   RESUME_CODE,
+  BUILTIN_CODE,
   CALL_ID,
 } from "./intrinsics.ts"
 import {
@@ -132,6 +135,7 @@ import {
 } from "../runtime/jobs.ts"
 
 import { define_value_property } from "./properties.ts"
+import { init_slot } from "./slots.ts"
 import { panic } from "../utils.ts"
 import {
   OK,
@@ -315,6 +319,15 @@ function call_function(
     }
     return OK
   }
+  if (code_id === BUILTIN_CODE)
+    return enter_builtin(
+      runtime,
+      context,
+      destination,
+      callee,
+      receiver,
+      arguments_,
+    )
   if (code_id === NATIVE_CODE && function_id === CALL_ID)
     return call_function(
       runtime,
@@ -351,6 +364,7 @@ function enter_function(
   callee: Root,
   receiver: Root | undefined,
   arguments_: Root[],
+  target?: Root,
 ): Status {
   const { memory } = runtime
   const code_id = function_code_id(memory, callee),
@@ -370,6 +384,7 @@ function enter_function(
       receiver = this_value
       load_function_new_target(memory, new_target, callee)
     }
+    if (target !== undefined) copy_value(memory, new_target, target)
     create_environment(
       memory,
       environment,
@@ -880,6 +895,17 @@ const op = {
       has,
     )
   },
+  INIT_SLOT(runtime: Runtime, object: Root, name: string, value: Root): Status {
+    return init_slot(runtime, object, name, value)
+  },
+  SET_BEHAVIOR(
+    memory: Memory,
+    object: Root,
+    steps: Root,
+    constructor: boolean,
+  ) {
+    set_builtin_steps(memory, object, steps, constructor)
+  },
   CREATE_OBJECT(memory: Memory, destination: Root) {
     create_object(memory, destination)
   },
@@ -1196,6 +1222,17 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           break
         case OP.FOR_IN_START:
           status = op.FOR_IN_START(runtime, reg(a), reg(b), reg(c), reg(d))
+          break
+        case OP.INIT_SLOT:
+          status = op.INIT_SLOT(
+            runtime,
+            reg(a),
+            code.unit.literals[b] as string,
+            reg(c),
+          )
+          break
+        case OP.SET_BEHAVIOR:
+          op.SET_BEHAVIOR(memory, reg(a), reg(b), c === 1)
           break
         case OP.FOR_IN_NEXT:
           op.FOR_IN_NEXT(
@@ -1573,6 +1610,36 @@ export function resume_context(
   context_set_status(context, CONTEXT_STATE.READY)
 }
 
+// [[Call]] and [[Construct]] of built-in function objects (ECMA-262 10.3.1,
+// 10.3.2) both run the function's steps; construction passes new.target and
+// no receiver, and the steps return the new object.
+function enter_builtin(
+  runtime: Runtime,
+  context: Context,
+  destination: Root,
+  callee: Root,
+  receiver: Root | undefined,
+  arguments_: Root[],
+  new_target?: Root,
+): Status {
+  const steps = alloc_root(runtime.memory)
+  try {
+    if (!load_builtin_steps(runtime.memory, steps, callee))
+      panic("Built-in function has no steps")
+    return enter_function(
+      runtime,
+      context,
+      destination,
+      steps,
+      receiver,
+      arguments_,
+      new_target,
+    )
+  } finally {
+    free_root(runtime.memory, steps)
+  }
+}
+
 function construct_function(
   runtime: Runtime,
   context: Context,
@@ -1585,6 +1652,19 @@ function construct_function(
     return throw_error(runtime, "TypeError", "Value is not a constructor")
   const code = function_code_id(memory, callee),
     id = callee_function_id(memory, callee)
+  if (code === BUILTIN_CODE) {
+    if (!(function_flags(memory, callee) & BUILTIN_CONSTRUCTOR))
+      return throw_error(runtime, "TypeError", "Value is not a constructor")
+    return enter_builtin(
+      runtime,
+      context,
+      destination,
+      callee,
+      undefined,
+      arguments_,
+      callee,
+    )
+  }
   if (
     code === NATIVE_CODE ||
     code === RESUME_CODE ||
@@ -1600,15 +1680,12 @@ function construct_function(
     load_function_environment(memory, parent, callee)
     const { unit, scope_ids } = runtime.code[code],
       fn = unit.functions[id]
-    const builtin = function_flags(memory, callee) & BUILTIN_FUNCTION
-    if (!builtin) {
-      create_object(memory, receiver)
-      // Constructors in the supported subset have data-valued prototype properties.
-      write_string(memory, key, "prototype")
-      get_property(memory, prototype, callee, key)
-      if (has_property_list(memory, prototype))
-        set_prototype(memory, receiver, prototype)
-    }
+    create_object(memory, receiver)
+    // Constructors in the supported subset have data-valued prototype properties.
+    write_string(memory, key, "prototype")
+    get_property(memory, prototype, callee, key)
+    if (has_property_list(memory, prototype))
+      set_prototype(memory, receiver, prototype)
     create_environment(
       memory,
       environment,
@@ -1622,13 +1699,12 @@ function construct_function(
       code,
       id,
       environment,
-      builtin ? undefined : receiver,
+      receiver,
       arguments_,
       destination,
       callee,
     )
-    if (!builtin)
-      context_set_frame_construct_call(context, context_current_frame(context)!)
+    context_set_frame_construct_call(context, context_current_frame(context)!)
     return OK
   } finally {
     for (const root of [receiver, key, prototype, parent, environment])

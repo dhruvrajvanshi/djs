@@ -66,7 +66,18 @@ export const OP = Object.freeze({
   ITERATOR_CLOSE: 43,
   FOR_IN_START: 44,
   FOR_IN_NEXT: 45,
+  INIT_SLOT: 46,
+  SET_BEHAVIOR: 47,
 })
+
+/** Declaration markers, recognized at compile time through imports of djs:native. */
+export const NATIVE_MARKERS: readonly string[] = Object.freeze([
+  "well_known",
+  "slot",
+  "internal_method",
+  "attributes",
+  "abstract_operation",
+])
 
 export type Instruction = number[]
 

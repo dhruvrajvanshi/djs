@@ -150,12 +150,12 @@ test("method calls preserve receiver and reserve consecutive argument slots", ()
 
 test("intrinsic values compile as ordinary named imports", () => {
   const code = compile_module(
-    'import { write_stdout as write } from "djs:intrinsics"; export default { log: function(value) { write(value); } };',
+    'import { write_stdout as write } from "djs:native"; export default { log: function(value) { write(value); } };',
     "console.js",
   )
   assert.deepEqual(code.imports, [
     {
-      specifier: "djs:intrinsics",
+      specifier: "djs:native",
       bindings: [{ imported: "write_stdout", slot: 0 }],
     },
   ])

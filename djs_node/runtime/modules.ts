@@ -104,8 +104,10 @@ export interface Runtime {
   globals: Map<string, Root>
   contexts: Context[]
   scheduler: Scheduler
-  /** Values the stdlib registers for the VM, keyed by REALM_INTRINSICS names. */
+  /** The realm's well-known objects, abstract operations and internal methods by name. */
   intrinsics: Map<string, Root>
+  /** Private keys of internal slots the VM does not represent itself. */
+  slot_keys: Map<string, Root>
   /** Keyed by name without the "Symbol." prefix. */
   well_known_symbols?: Map<string, Root>
   /** Property keys the VM reads itself, such as iterator result fields. */
@@ -131,6 +133,7 @@ export function create_runtime({
     contexts: [],
     scheduler: create_scheduler(),
     intrinsics: new Map(),
+    slot_keys: new Map(),
     pending_exception: alloc_root(memory),
   }
   for (const [name, value] of [
@@ -332,30 +335,6 @@ export async function load_module(
     set_module_status(module, MODULE_STATE.ERRORED)
     write_string(runtime.memory, module.error, error.message)
     throw error
-  }
-}
-
-/**
- * Marks the binding behind each of the module's named exports, following
- * re-exports to the module that declares it.
- */
-export function link_realm_intrinsics(
-  runtime: Runtime,
-  module: ModuleRecord,
-  names: readonly string[],
-) {
-  for (const name of names) {
-    let slot = module.exports.get(name)
-    if (slot === undefined)
-      throw new SyntaxError(`${module.identity} does not export ${name}`)
-    let scope = runtime.scopes[module.scope_id]
-    let target = scope.import_bindings.get(slot)
-    while (target) {
-      slot = target.slot
-      scope = runtime.scopes[runtime.modules[target.module_id].scope_id]
-      target = scope.import_bindings.get(slot)
-    }
-    ;(scope.intrinsic_bindings ??= new Map()).set(slot, name)
   }
 }
 

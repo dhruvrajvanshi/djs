@@ -5,15 +5,9 @@ import {
   create_symbol,
   WELL_KNOWN_SYMBOLS,
 } from "../vm/values.ts"
-import { REALM_INTRINSICS } from "../vm/intrinsics.ts"
-import {
-  load_module,
-  evaluate_module,
-  read_export,
-  link_realm_intrinsics,
-} from "./modules.ts"
+import { load_module, evaluate_module, read_export } from "./modules.ts"
+import { create_realm } from "./realm.ts"
 
-const INTRINSICS = new URL("../stdlib/js/intrinsics.js", import.meta.url).href
 const REALM = new URL("../stdlib/js/realm.js", import.meta.url).href
 const NODE_GLOBALS = new URL("../stdlib/node/index.js", import.meta.url).href
 
@@ -46,11 +40,10 @@ export async function bootstrap(runtime: Runtime) {
     write_string(runtime.memory, root, name)
     runtime.property_names.set(name, root)
   }
-  // Marking happens before evaluation so each intrinsic reaches the VM as
-  // soon as the stdlib initializes it.
-  const intrinsics = await load_module(runtime, INTRINSICS)
-  link_realm_intrinsics(runtime, intrinsics, REALM_INTRINSICS)
+  // Linking the stdlib exposes its declarations; the realm is created from
+  // them before any stdlib code runs.
+  await load_module(runtime, REALM)
+  create_realm(runtime)
   await define_globals(runtime, REALM)
-  await evaluate_module(runtime, intrinsics)
   await define_globals(runtime, NODE_GLOBALS)
 }

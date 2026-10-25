@@ -13,12 +13,12 @@ function format_value(value) {
   return "" + value
 }
 
-export function log() {
+export function log(...values) {
   let text = ""
   let index = 0
-  while (index < arguments.length) {
+  while (index < values.length) {
     if (index !== 0) text = text + " "
-    text = text + format_value(arguments[index])
+    text = text + format_value(values[index])
     index = index + 1
   }
   write(text + "\n")

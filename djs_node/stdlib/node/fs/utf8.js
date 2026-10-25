@@ -1,4 +1,4 @@
-import { string_from_code_unit as character } from "djs:intrinsics"
+import { string_from_code_unit as character } from "djs:native"
 
 export default class Utf8Decoder {
   #text = ""
