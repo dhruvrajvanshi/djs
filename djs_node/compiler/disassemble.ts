@@ -40,6 +40,10 @@ const OPERANDS: Record<string, string[]> = {
   INSTALL_INTERNAL_METHOD: ["constructor", "method", "hook"],
   REGISTER_BUILTIN: ["constructor", "prototype", "name"],
   TO_PROPERTY_KEY: ["dst", "src"],
+  PUSH_ENV: ["environment"],
+  POP_ENV: ["count"],
+  COPY_ENV: ["environment"],
+  JUMP_OUT: ["target"],
 }
 
 const OPCODE_NAMES = record_invert(OP)

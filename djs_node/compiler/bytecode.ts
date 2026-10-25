@@ -69,6 +69,10 @@ export const OP = Object.freeze({
   INSTALL_INTERNAL_METHOD: 34,
   REGISTER_BUILTIN: 35,
   TO_PROPERTY_KEY: 36,
+  PUSH_ENV: 37,
+  POP_ENV: 38,
+  COPY_ENV: 39,
+  JUMP_OUT: 40,
 })
 
 export type Instruction = number[]

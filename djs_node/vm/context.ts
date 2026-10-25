@@ -187,10 +187,12 @@ export function context_push_handler(context: Context, header: HandlerHeader) {
   view.setUint32(offset + H.PHASE, HANDLER_PHASE.TRY, true)
   view.setUint32(offset + H.COMPLETION, COMPLETION_KIND.NORMAL, true)
   view.setUint32(offset + H.VALUE, header.completion_value_root, true)
+  view.setUint32(offset + H.ENV, header.environment_root, true)
+  view.setUint32(offset + H.START, header.start_pc, true)
   data_view(context.control).setUint32(C.HANDLERS, count + 1, true)
 }
 
-/** Caller must release the handler's completion value root first. */
+/** Caller must release the handler's completion value and environment roots first. */
 export function context_pop_handler(context: Context) {
   data_view(context.control).setUint32(
     C.HANDLERS,
@@ -376,26 +378,35 @@ function register_offset(
 }
 
 /** Byte offset into a context's handler stack; valid until that handler is popped. */
-type HandlerOffset = Brand<number, "HandlerOffset">
+export type HandlerOffset = Brand<number, "HandlerOffset">
 type HandlerStack = Brand<Uint8Array, "HandlerStack">
 
 export const HANDLER_PHASE = Object.freeze({ TRY: 0, CATCH: 1, FINALLY: 2 })
 type HandlerPhase = (typeof HANDLER_PHASE)[keyof typeof HANDLER_PHASE]
-export const COMPLETION_KIND = Object.freeze({ NORMAL: 0, RETURN: 1, THROW: 2 })
+// A JUMP completion's value is the target bytecode offset in the same frame.
+export const COMPLETION_KIND = Object.freeze({
+  NORMAL: 0,
+  RETURN: 1,
+  THROW: 2,
+  JUMP: 3,
+})
 export type CompletionKind =
   (typeof COMPLETION_KIND)[keyof typeof COMPLETION_KIND]
 
 interface HandlerHeader {
   frame: Frame
+  start_pc: BytecodeOffset
   catch_pc: BytecodeOffset | null
   finally_pc: BytecodeOffset | null
   end_pc: BytecodeOffset
   exception_register: RegisterIndex
   completion_value_root: Root
+  environment_root: Root
 }
 
-// Eight u32 fields. EXCEPTION is a register index; VALUE is an owned root.
-const HANDLER_BYTES = 32
+// Ten u32 fields. EXCEPTION is a register index; VALUE and ENV are owned roots.
+// ENV is the frame environment when the handler was pushed.
+const HANDLER_BYTES = 40
 const H = Object.freeze({
   FRAME: 0,
   CATCH: 4,
@@ -405,6 +416,8 @@ const H = Object.freeze({
   PHASE: 20,
   COMPLETION: 24,
   VALUE: 28,
+  ENV: 32,
+  START: 36,
 })
 
 export function handler_frame(
@@ -469,6 +482,23 @@ export function handler_completion_value_root(
   handler: HandlerOffset,
 ): Root {
   return read_root(data_view(handlers), handler + H.VALUE)
+}
+
+export function handler_environment_root(
+  handlers: HandlerStack,
+  handler: HandlerOffset,
+): Root {
+  return read_root(data_view(handlers), handler + H.ENV)
+}
+
+export function handler_start_pc(
+  handlers: HandlerStack,
+  handler: HandlerOffset,
+): BytecodeOffset {
+  return data_view(handlers).getUint32(
+    handler + H.START,
+    true,
+  ) as BytecodeOffset
 }
 
 export function handler_enter_catch(

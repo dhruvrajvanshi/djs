@@ -61,6 +61,7 @@ export interface LinkedCode {
   unit: CompiledModule
   constants: Root[]
   scope_ids: number[]
+  block_scope_ids: number[][]
   bytecodes: Uint8Array[]
 }
 
@@ -160,11 +161,19 @@ function link_code(runtime: Runtime, unit: CompiledModule) {
     })
     return id
   })
+  const block_scope_ids = unit.functions.map((fn) =>
+    fn.block_binding_flags.map((binding_flags) => {
+      const id = runtime.scopes.length
+      runtime.scopes.push({ binding_flags, import_bindings: new Map() })
+      return id
+    }),
+  )
   const id = runtime.code.length as CodeId
   runtime.code.push({
     unit,
     constants,
     scope_ids,
+    block_scope_ids,
     bytecodes: unit.functions.map((fn) => fn.bytecode),
   })
   return id

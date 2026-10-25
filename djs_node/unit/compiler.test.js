@@ -208,9 +208,14 @@ test("invalid and unsupported syntax fails clearly", () => {
   )
   assert.throws(() => compile_module("const x = [...items]"), /array spread/)
   assert.throws(() => compile_module("var x = 1"), /Unsupported syntax: var/)
+  assert.throws(() => compile_module("break;"), /not inside a loop/)
   assert.throws(
-    () => compile_module("while (true) { let x = 1; }"),
-    /loop-local declarations/,
+    () => compile_module("while (true) { function f() { continue; } }"),
+    /Illegal continue statement/,
+  )
+  assert.throws(
+    () => compile_module("outer: while (true) break outer;"),
+    /Unsupported syntax/,
   )
   assert.throws(
     () => compile_module("function* f() {}"),

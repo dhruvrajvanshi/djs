@@ -40,6 +40,8 @@ import {
   handler_completion_value_root,
   handler_enter_catch,
   handler_save_completion,
+  handler_environment_root,
+  handler_start_pc,
   CONTEXT_STATE,
   HANDLER_PHASE,
   COMPLETION_KIND,
@@ -56,7 +58,12 @@ import type {
   RegisterIndex,
   BuiltinPrototype,
 } from "../compiler/bytecode.ts"
-import type { Context, Frame, CompletionKind } from "./context.ts"
+import type {
+  Context,
+  Frame,
+  CompletionKind,
+  HandlerOffset,
+} from "./context.ts"
 import type { HostError } from "../host/node.ts"
 import {
   OP,
@@ -69,6 +76,7 @@ import {
 import { alloc_root, free_root, copy_value } from "./memory.ts"
 import {
   read_number,
+  write_number,
   read_boolean,
   write_undefined,
   tag_of,
@@ -90,6 +98,7 @@ import {
   load_value_array_element,
   load_property_setter,
   create_environment,
+  copy_environment_bindings,
   environment_at,
   load_binding,
   store_binding,
@@ -711,11 +720,37 @@ export function run_interpreter(runtime: Runtime, context: Context) {
             Array.from({ length: e }, (_, index) => reg(d + index)),
           )
           break
+        case OP.PUSH_ENV:
+        case OP.COPY_ENV:
+          // COPY_ENV replaces the current environment with a sibling holding
+          // the same values, giving each loop iteration fresh bindings.
+          if (opcode === OP.PUSH_ENV) copy_value(memory, operand, env)
+          else environment_at(memory, operand, env, 1)
+          create_environment(
+            memory,
+            temporary,
+            operand,
+            code.unit.functions[function_id].block_binding_flags[a].length,
+            code.block_scope_ids[function_id][a],
+          )
+          if (opcode === OP.COPY_ENV)
+            copy_environment_bindings(memory, temporary, env)
+          copy_value(memory, env, temporary)
+          break
+        case OP.POP_ENV:
+          environment_at(memory, temporary, env, a)
+          copy_value(memory, env, temporary)
+          break
+        case OP.JUMP_OUT:
+          write_number(memory, temporary, a)
+          complete(runtime, context, COMPLETION_KIND.JUMP, temporary)
+          break
         case OP.TRY:
           push_handler(
             runtime,
             context,
             frame,
+            bytecode_offset(pc),
             optional_bytecode_offset(a),
             optional_bytecode_offset(b),
             bytecode_offset(c),
@@ -1103,23 +1138,33 @@ function push_handler(
   runtime: Runtime,
   context: Context,
   frame: Frame,
+  start_pc: BytecodeOffset,
   catch_pc: BytecodeOffset | null,
   finally_pc: BytecodeOffset | null,
   end_pc: BytecodeOffset,
   exception_register: RegisterIndex,
 ) {
   const completion_value_root = alloc_root(runtime.memory)
+  const environment_root = alloc_root(runtime.memory)
   try {
+    copy_value(
+      runtime.memory,
+      environment_root,
+      context_frame_environment_root(context, frame),
+    )
     context_push_handler(context, {
       frame,
+      start_pc,
       catch_pc,
       finally_pc,
       end_pc,
       exception_register,
       completion_value_root,
+      environment_root,
     })
   } catch (error) {
     free_root(runtime.memory, completion_value_root)
+    free_root(runtime.memory, environment_root)
     throw error
   }
 }
@@ -1130,7 +1175,22 @@ function pop_handler(runtime: Runtime, context: Context) {
     runtime.memory,
     handler_completion_value_root(context.handlers, handler),
   )
+  free_root(runtime.memory, handler_environment_root(context.handlers, handler))
   context_pop_handler(context)
+}
+
+// Catch and finally blocks run in the environment of their try statement.
+function restore_handler_environment(
+  runtime: Runtime,
+  context: Context,
+  frame: Frame,
+  handler: HandlerOffset,
+) {
+  copy_value(
+    runtime.memory,
+    context_frame_environment_root(context, frame),
+    handler_environment_root(context.handlers, handler),
+  )
 }
 
 function leave_handler(runtime: Runtime, context: Context) {
@@ -1167,6 +1227,17 @@ function complete(
         handler !== null &&
         handler_frame(context.handlers, handler) === frame
       ) {
+        if (type === COMPLETION_KIND.JUMP) {
+          const target = read_number(memory, value)
+          if (
+            target >= handler_start_pc(context.handlers, handler) &&
+            target < handler_end_pc(context.handlers, handler)
+          ) {
+            context_set_frame_pc(context, frame, bytecode_offset(target))
+            return
+          }
+          restore_handler_environment(runtime, context, frame, handler)
+        }
         const phase = handler_phase(context.handlers, handler)
         const catch_pc = handler_catch_pc(context.handlers, handler)
         if (
@@ -1175,6 +1246,7 @@ function complete(
           catch_pc !== null
         ) {
           handler_enter_catch(context.handlers, handler)
+          restore_handler_environment(runtime, context, frame, handler)
           copy_value(
             memory,
             context_frame_register_root(
@@ -1190,6 +1262,7 @@ function complete(
         const finally_pc = handler_finally_pc(context.handlers, handler)
         if (phase !== HANDLER_PHASE.FINALLY && finally_pc !== null) {
           handler_save_completion(context.handlers, handler, type)
+          restore_handler_environment(runtime, context, frame, handler)
           copy_value(
             memory,
             handler_completion_value_root(context.handlers, handler),
@@ -1200,6 +1273,14 @@ function complete(
         }
         pop_handler(runtime, context)
         continue
+      }
+      if (type === COMPLETION_KIND.JUMP) {
+        context_set_frame_pc(
+          context,
+          frame!,
+          bytecode_offset(read_number(memory, value)),
+        )
+        return
       }
       if (frame === null) {
         copy_value(memory, context_error(context), value)

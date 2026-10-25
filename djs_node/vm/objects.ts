@@ -186,6 +186,31 @@ export function create_environment(
   }
 }
 
+export function copy_environment_bindings(
+  memory: Memory,
+  destination: Root,
+  source: Root,
+) {
+  const count = read_u32(memory, get_ref(memory, source) + 16)
+  const temporary = alloc_root(memory)
+  try {
+    for (let slot = 0; slot < count; slot++) {
+      copy_heap_value_to_root(
+        memory,
+        temporary,
+        get_ref(memory, source) + 24 + slot * 8,
+      )
+      copy_root_to_heap_value(
+        memory,
+        get_ref(memory, destination) + 24 + slot * 8,
+        temporary,
+      )
+    }
+  } finally {
+    free_root(memory, temporary)
+  }
+}
+
 export function environment_at(
   memory: Memory,
   destination: Root,

@@ -1,6 +1,6 @@
 import type { Brand } from "../utils.ts"
 import type { Instruction } from "./bytecode.ts"
-import type { Scope, ResolvedBinding } from "./scopes.ts"
+import type { Scope, ResolvedBinding, Environment } from "./scopes.ts"
 import type {
   Class,
   Span,
@@ -14,7 +14,12 @@ import type {
   IndexExpr,
   Ident,
 } from "djs_ast"
-import { QualifiedName, offset_to_line_and_col, preview_lines } from "djs_ast"
+import {
+  QualifiedName,
+  VarDeclStmt,
+  offset_to_line_and_col,
+  preview_lines,
+} from "djs_ast"
 import { parse_source_file } from "djs_parser"
 import {
   OP,
@@ -107,6 +112,8 @@ export interface FunctionDescriptor {
   arguments_slot: number | null
   binding_flags: boolean[]
   binding_count: number
+  /** Binding flags of each environment pushed by PUSH_ENV/COPY_ENV. */
+  block_binding_flags: boolean[][]
   slot_count: number
   bytecode: Uint8Array
 }
@@ -159,6 +166,8 @@ export function compile_module(
   }
   for (const fn of unit.functions) {
     Object.freeze(fn.binding_flags)
+    fn.block_binding_flags.forEach(Object.freeze)
+    Object.freeze(fn.block_binding_flags)
     Object.freeze(fn.parameter_slots)
     // A typed array cannot be frozen. Expose a fresh copy so compilation output
     // remains immutable even if a consumer modifies its instruction view.
@@ -402,6 +411,25 @@ export interface FunctionBuilder {
   parent: FunctionBuilder | null
   scope: Scope | null
   flags: number
+  block_environments: Environment[]
+  /** Number of block environments pushed at the current compile position. */
+  environment_depth: number
+  /** Environment depth at each enclosing try statement. */
+  try_environment_depths: number[]
+  loops: Loop[]
+}
+
+interface LoopJump {
+  instruction: number
+  /** Set for JUMP_OUT: block environments still to pop after unwinding. */
+  pad_pops: number | null
+}
+
+interface Loop {
+  environment_depth: number
+  try_count: number
+  breaks: LoopJump[]
+  continues: LoopJump[]
 }
 
 export interface FunctionOptions {
@@ -434,6 +462,10 @@ function compile_function(
     parent,
     scope: null,
     flags: options.flags ?? 0,
+    block_environments: [],
+    environment_depth: 0,
+    try_environment_depths: [],
+    loops: [],
   }
   state.unit.functions.push(null!)
   const scope = create_scope(parent_scope, fn)
@@ -493,6 +525,9 @@ function compile_function(
     flags: fn.flags,
     binding_count: fn.binding_flags.length,
     binding_flags: fn.binding_flags,
+    block_binding_flags: fn.block_environments.map(
+      (environment) => environment.binding_flags,
+    ),
     parameter_slots: fn.parameter_slots,
     rest_slot: fn.rest_slot,
     arguments_slot: fn.arguments_slot,
@@ -618,17 +653,20 @@ function compile_stmt(
     case "Try": {
       const exception = allocate(fn)
       const start = emit(fn, OP.TRY, 0xffffffff, 0xffffffff, 0, exception)
+      fn.try_environment_depths.push(fn.environment_depth)
       compile_stmt(state, fn, scope, { kind: "Block", block: stmt.try_block })
       emit(fn, OP.LEAVE_TRY)
       if (stmt.catch_block) {
         fn.instructions[start][1] = position(fn)
-        const child = create_scope(scope, fn)
-        if (stmt.catch_pattern) {
-          const binding = declare_pattern(child, stmt.catch_pattern, false)
-          emit(fn, OP.INIT_BINDING, 0, binding.slot, exception)
-        }
+        const child = block_scope(fn, scope)
+        const binding =
+          stmt.catch_pattern &&
+          declare_pattern(child, stmt.catch_pattern, false)
         prepare_statements(state, fn, child, stmt.catch_block.stmts)
+        const pushed = push_environment(fn, child)
+        if (binding) emit(fn, OP.INIT_BINDING, 0, binding.slot, exception)
         compile_statements(state, fn, child, stmt.catch_block.stmts)
+        if (pushed) pop_environment(fn)
         emit(fn, OP.LEAVE_TRY)
       }
       if (stmt.finally_block) {
@@ -639,6 +677,7 @@ function compile_stmt(
         })
         emit(fn, OP.END_FINALLY)
       }
+      fn.try_environment_depths.pop()
       fn.instructions[start][3] = position(fn)
       return
     }
@@ -663,9 +702,11 @@ function compile_stmt(
       )
       return
     case "Block": {
-      const child = create_scope(scope, fn)
+      const child = block_scope(fn, scope)
       prepare_statements(state, fn, child, stmt.block.stmts)
+      const pushed = push_environment(fn, child)
       compile_statements(state, fn, child, stmt.block.stmts)
+      if (pushed) pop_environment(fn)
       return
     }
     case "If": {
@@ -681,16 +722,84 @@ function compile_stmt(
       return
     }
     case "While": {
-      // A new per-iteration lexical environment needs dedicated bytecode. Reject
-      // loop-local declarations until that environment operation is available.
-      if (contains_declaration(stmt.body))
-        unsupported(stmt, "loop-local declarations")
+      const loop = enter_loop(fn)
       const start = position(fn)
       const condition = compile_expr(state, fn, scope, stmt.condition)
       const end = emit(fn, OP.JUMP_IF_FALSY, condition, 0)
       compile_stmt(state, fn, scope, stmt.body)
       emit(fn, OP.JUMP, start)
       fn.instructions[end][2] = position(fn)
+      leave_loop(fn, loop, position(fn), start)
+      return
+    }
+    case "For": {
+      // Lexical declarations get a loop environment. For let, each iteration
+      // copies it so closures capture that iteration's bindings.
+      const child = create_scope(
+        scope,
+        fn,
+        stmt.init.kind === "VarDecl" ? { binding_flags: [] } : undefined,
+      )
+      let pushed = false
+      if (stmt.init.kind === "VarDecl") {
+        const decl = new VarDeclStmt(stmt.span, stmt.init.decl)
+        prepare_statements(state, fn, child, [decl])
+        pushed = push_environment(fn, child)
+        compile_stmt(state, fn, child, decl)
+      } else compile_expr(state, fn, scope, stmt.init.expr)
+      const per_iteration =
+        pushed &&
+        stmt.init.kind === "VarDecl" &&
+        stmt.init.decl.decl_type === "Let"
+      const copy_environment = () => {
+        if (per_iteration)
+          emit(
+            fn,
+            OP.COPY_ENV,
+            fn.block_environments.indexOf(child.environment),
+          )
+      }
+      copy_environment()
+      const loop = enter_loop(fn)
+      const start = position(fn)
+      const exit = stmt.test
+        ? emit(
+            fn,
+            OP.JUMP_IF_FALSY,
+            compile_expr(state, fn, child, stmt.test),
+            0,
+          )
+        : null
+      compile_stmt(state, fn, child, stmt.body)
+      const next = position(fn)
+      copy_environment()
+      if (stmt.update) compile_expr(state, fn, child, stmt.update)
+      emit(fn, OP.JUMP, start)
+      if (exit !== null) fn.instructions[exit][2] = position(fn)
+      leave_loop(fn, loop, position(fn), next)
+      if (pushed) pop_environment(fn)
+      return
+    }
+    case "Break":
+    case "Continue": {
+      if (stmt.label) unsupported(stmt, `labeled ${stmt.kind.toLowerCase()}`)
+      const loop = fn.loops.at(-1)
+      if (!loop)
+        throw syntax_error(stmt, `Illegal ${stmt.kind.toLowerCase()} statement`)
+      const jumps = stmt.kind === "Break" ? loop.breaks : loop.continues
+      if (fn.try_environment_depths.length > loop.try_count) {
+        // Enclosing try statements must run finally blocks first. Unwinding
+        // restores the outermost one's environment; its pad pops the rest.
+        jumps.push({
+          instruction: emit(fn, OP.JUMP_OUT, 0),
+          pad_pops:
+            fn.try_environment_depths[loop.try_count] - loop.environment_depth,
+        })
+      } else {
+        const pops = fn.environment_depth - loop.environment_depth
+        if (pops) emit(fn, OP.POP_ENV, pops)
+        jumps.push({ instruction: emit(fn, OP.JUMP, 0), pad_pops: null })
+      }
       return
     }
     default:
@@ -698,23 +807,70 @@ function compile_stmt(
   }
 }
 
-function contains_declaration(stmt: Stmt): boolean | null {
-  if (["VarDecl", "Func", "ClassDecl"].includes(stmt.kind)) return true
-  if (stmt.kind === "Block") return stmt.block.stmts.some(contains_declaration)
-  if (stmt.kind === "If")
-    return (
-      contains_declaration(stmt.if_true) ||
-      (stmt.if_false && contains_declaration(stmt.if_false))
-    )
-  if (stmt.kind === "While") return contains_declaration(stmt.body)
-  if (stmt.kind === "Try")
-    return (
-      Boolean(stmt.catch_pattern) ||
-      [stmt.try_block, stmt.catch_block, stmt.finally_block].some((block) =>
-        block?.stmts.some(contains_declaration),
-      )
-    )
-  return false
+// Inside loops, a block's bindings get a fresh environment on each entry so
+// closures from different iterations do not share them.
+function block_scope(fn: FunctionBuilder, parent: Scope) {
+  return create_scope(
+    parent,
+    fn,
+    fn.loops.length ? { binding_flags: [] } : undefined,
+  )
+}
+
+function push_environment(fn: FunctionBuilder, scope: Scope) {
+  const parent = scope.parent!.environment
+  if (scope.environment === parent) return false
+  if (!scope.environment.binding_flags.length) {
+    scope.environment = parent
+    return false
+  }
+  emit(fn, OP.PUSH_ENV, fn.block_environments.push(scope.environment) - 1)
+  fn.environment_depth++
+  return true
+}
+
+function pop_environment(fn: FunctionBuilder) {
+  emit(fn, OP.POP_ENV, 1)
+  fn.environment_depth--
+}
+
+function enter_loop(fn: FunctionBuilder): Loop {
+  const loop = {
+    environment_depth: fn.environment_depth,
+    try_count: fn.try_environment_depths.length,
+    breaks: [],
+    continues: [],
+  }
+  fn.loops.push(loop)
+  return loop
+}
+
+// JUMP_OUT pads follow the loop so they lie outside every try statement
+// inside it, and inside every try statement enclosing it.
+function leave_loop(
+  fn: FunctionBuilder,
+  loop: Loop,
+  break_target: number,
+  continue_target: number,
+) {
+  fn.loops.pop()
+  let skip_pads = null
+  for (const [jumps, target] of [
+    [loop.breaks, break_target],
+    [loop.continues, continue_target],
+  ] as const) {
+    for (const { instruction, pad_pops } of jumps) {
+      if (pad_pops === null) {
+        fn.instructions[instruction][1] = target
+        continue
+      }
+      skip_pads ??= emit(fn, OP.JUMP, 0)
+      fn.instructions[instruction][1] = position(fn)
+      if (pad_pops) emit(fn, OP.POP_ENV, pad_pops)
+      emit(fn, OP.JUMP, target)
+    }
+  }
+  if (skip_pads !== null) fn.instructions[skip_pads][1] = position(fn)
 }
 
 const binary_operators: Record<string, string> = {
