@@ -1399,6 +1399,25 @@ function compile_expr(
         fn.instructions[end ?? branch][end === undefined ? 2 : 1] = position(fn)
         return dst
       }
+      if (expr.operator === "Coalesce") {
+        const dst = allocate(fn)
+        emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.lhs))
+        const present = allocate(fn)
+        emit(
+          fn,
+          OP.BINARY_OP,
+          present,
+          dst,
+          constant(state, fn, null),
+          literal(state, "!="),
+        )
+        const branch = emit(fn, OP.JUMP_IF_FALSY, present, 0)
+        const end = emit(fn, OP.JUMP, 0)
+        fn.instructions[branch][2] = position(fn)
+        emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.rhs))
+        fn.instructions[end][1] = position(fn)
+        return dst
+      }
       if (expr.lhs.kind === "PrivateName") {
         if (expr.operator !== "In")
           throw syntax_error(expr, "Private name must be used in a brand check")
