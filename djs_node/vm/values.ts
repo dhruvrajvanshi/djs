@@ -168,6 +168,22 @@ export function slice_string(
   set_ref(memory, destination, reference)
 }
 
+export const WELL_KNOWN_SYMBOLS = Object.freeze([
+  "asyncIterator",
+  "hasInstance",
+  "isConcatSpreadable",
+  "iterator",
+  "match",
+  "matchAll",
+  "replace",
+  "search",
+  "species",
+  "split",
+  "toPrimitive",
+  "toStringTag",
+  "unscopables",
+])
+
 export function create_symbol(
   memory: Memory,
   destination: Root,

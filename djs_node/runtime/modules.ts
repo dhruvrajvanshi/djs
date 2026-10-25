@@ -99,6 +99,10 @@ export interface Runtime {
   contexts: Context[]
   scheduler: Scheduler
   coercions?: Map<string, Root>
+  /** Keyed by name without the "Symbol." prefix. */
+  well_known_symbols?: Map<string, Root>
+  /** Property keys the VM reads itself, such as iterator result fields. */
+  property_names?: Map<string, Root>
   error_prototypes?: Map<string, Root>
   promise_await?: Root
   promise_capability?: Root

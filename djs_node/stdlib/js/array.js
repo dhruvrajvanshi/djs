@@ -10,6 +10,8 @@ import {
   ordinary_own_property_keys,
   ordinary_delete,
   object_create,
+  set_prototype,
+  define_property,
   string_code_unit_at,
   string_slice,
 } from "djs:intrinsics"
@@ -26,6 +28,8 @@ import {
   check_length,
   object_prototype,
 } from "./abstract.js"
+import Symbol from "./symbol.js"
+import { iterator_prototype } from "./iteration.js"
 
 @builtin({ name: "Array", prototype: "array", length: 1 })
 class Array {
@@ -847,7 +851,7 @@ function array_set_length(array, descriptor) {
 function iterator(object, kind) {
   let target = to_object(object)
   let index = 0
-  return {
+  const result = {
     next() {
       if (target === undefined) return { value: undefined, done: true }
       if (index >= to_length(target.length)) {
@@ -867,6 +871,8 @@ function iterator(object, kind) {
       }
     },
   }
+  set_prototype(result, iterator_prototype)
+  return result
 }
 
 let joining
@@ -973,5 +979,12 @@ function flatten(target, source, length, depth, mapper, receiver, offset) {
   }
   return offset
 }
+
+define_property(Array.prototype, Symbol.iterator, {
+  value: Array.prototype.values,
+  writable: true,
+  enumerable: false,
+  configurable: true,
+})
 
 export default Array

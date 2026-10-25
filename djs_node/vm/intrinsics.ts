@@ -34,7 +34,7 @@ import {
   define_own_property,
 } from "./properties.ts"
 import { create_builtin_object } from "./builtins.ts"
-import { KINDS, TAGS, read_u32 } from "./memory.ts"
+import { KINDS, TAGS, read_u32, copy_value } from "./memory.ts"
 import { enqueue_job, start_operation } from "../runtime/jobs.ts"
 
 export const NATIVE_CODE = 0xffffffff
@@ -68,6 +68,7 @@ export const INTRINSIC_NAMES = Object.freeze([
   "builtin_object_create",
   "symbol_create",
   "symbol_description",
+  "well_known_symbol",
 ])
 
 export function intrinsic_id(name: string) {
@@ -151,6 +152,13 @@ export function call_intrinsic(
     )
       throw new TypeError("Expected a symbol")
     load_symbol_description(memory, destination, arguments_[0])
+    return
+  } else if (name === "well_known_symbol") {
+    const symbol = runtime.well_known_symbols?.get(
+      string(memory, arguments_[0], "Symbol name"),
+    )
+    if (symbol === undefined) throw new TypeError("Unknown well-known symbol")
+    copy_value(memory, destination, symbol)
     return
   } else if (name === "string_code_unit_at") {
     write_number(

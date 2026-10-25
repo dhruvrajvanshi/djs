@@ -44,6 +44,11 @@ const OPERANDS: Record<string, string[]> = {
   POP_ENV: ["count"],
   COPY_ENV: ["environment"],
   JUMP_OUT: ["target"],
+  GET_ITERATOR: ["iterator", "next", "src"],
+  ITERATOR_NEXT: ["dst", "iterator", "next", "done"],
+  ITERATOR_CLOSE: ["iterator", "after_throw"],
+  FOR_IN_START: ["keys", "object", "index", "src"],
+  FOR_IN_NEXT: ["dst", "keys", "object", "index", "done"],
 }
 
 const OPCODE_NAMES = record_invert(OP)

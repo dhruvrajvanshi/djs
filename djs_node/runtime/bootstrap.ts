@@ -1,6 +1,10 @@
 import type { Runtime } from "./modules.ts"
 import { alloc_root, free_root } from "../vm/memory.ts"
-import { write_string } from "../vm/values.ts"
+import {
+  write_string,
+  create_symbol,
+  WELL_KNOWN_SYMBOLS,
+} from "../vm/values.ts"
 import {
   get_property,
   set_prototype,
@@ -24,6 +28,24 @@ async function define_globals(runtime: Runtime, identity: string) {
 }
 
 export async function bootstrap(runtime: Runtime) {
+  runtime.well_known_symbols = new Map()
+  const description = alloc_root(runtime.memory)
+  try {
+    for (const name of WELL_KNOWN_SYMBOLS) {
+      const symbol = alloc_root(runtime.memory)
+      write_string(runtime.memory, description, `Symbol.${name}`)
+      create_symbol(runtime.memory, symbol, description)
+      runtime.well_known_symbols.set(name, symbol)
+    }
+  } finally {
+    free_root(runtime.memory, description)
+  }
+  runtime.property_names = new Map()
+  for (const name of ["next", "done", "value", "return", "length"]) {
+    const root = alloc_root(runtime.memory)
+    write_string(runtime.memory, root, name)
+    runtime.property_names.set(name, root)
+  }
   const abstract = await load_module(runtime, ABSTRACT)
   await evaluate_module(runtime, abstract)
   runtime.coercions = new Map()

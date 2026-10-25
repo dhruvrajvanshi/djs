@@ -5,6 +5,7 @@ import {
   string_box,
   string_value,
   array_create,
+  set_prototype,
   call,
 } from "djs:intrinsics"
 import {
@@ -17,7 +18,8 @@ import {
   is_object,
   create_data_property,
 } from "./abstract.js"
-import { descriptive_string } from "./symbol.js"
+import Symbol, { descriptive_string } from "./symbol.js"
+import { iterator_prototype } from "./iteration.js"
 
 @builtin({ name: "String", prototype: "string", length: 1 })
 class String {
@@ -115,6 +117,10 @@ class String {
     const second = unit(text, actual + 1)
     if (second < 56320 || second > 57343) return first
     return (first - 55296) * 1024 + second - 56320 + 65536
+  }
+
+  [Symbol.iterator]() {
+    return string_iterator(text_receiver(this))
   }
 
   concat(value) {
@@ -323,6 +329,30 @@ class String {
     }
     return result
   }
+}
+
+function string_iterator(text) {
+  let index = 0
+  const result = {
+    next() {
+      if (text === undefined) return { value: undefined, done: true }
+      if (index >= text.length) {
+        text = undefined
+        return { value: undefined, done: true }
+      }
+      const first = unit(text, index)
+      let size = 1
+      if (first >= 55296 && first <= 56319 && index + 1 < text.length) {
+        const second = unit(text, index + 1)
+        if (second >= 56320 && second <= 57343) size = 2
+      }
+      const value = string_slice(text, index, index + size)
+      index = index + size
+      return { value, done: false }
+    },
+  }
+  set_prototype(result, iterator_prototype)
+  return result
 }
 
 function text_receiver(value) {

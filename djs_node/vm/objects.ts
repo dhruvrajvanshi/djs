@@ -1257,17 +1257,13 @@ export function unary_operation(
   else throw new SyntaxError(`Unsupported unary operator: ${operator}`)
 }
 
-export function ordinary_own_property_keys(
-  memory: Memory,
-  destination: Root,
-  object: Root,
-) {
+/** Own string keys in property order, followed by rooted symbol keys. */
+function own_property_keys(memory: Memory, object: Root) {
   const [head] = object_offsets(memory, object)
   const names = []
   // Symbol keys are rooted individually since creating the result moves them.
   const symbols: Root[] = []
-  const key = alloc_root(memory),
-    value = alloc_root(memory)
+  const key = alloc_root(memory)
   try {
     let property = read_u32(memory, get_ref(memory, object) + head)
     while (property) {
@@ -1281,20 +1277,38 @@ export function ordinary_own_property_keys(
       }
       property = read_u32(memory, property + 8)
     }
-    names.reverse()
-    symbols.reverse()
-    if (kind_of(memory, object) === KINDS.STRING_OBJECT) {
-      const reference = string_reference(memory, object)
-      const length = heap_string_length(memory, reference)
-      for (let index = 0; index < length; index++) names.push(String(index))
-      names.unshift("length")
-    }
-    const indices = names
-      .filter((name) => array_index(name) >= 0)
-      .sort((a, b) => Number(a) - Number(b))
-    const ordered = indices.concat(
-      names.filter((name) => array_index(name) < 0),
-    )
+  } catch (error) {
+    for (const symbol of symbols) free_root(memory, symbol)
+    throw error
+  } finally {
+    free_root(memory, key)
+  }
+  names.reverse()
+  symbols.reverse()
+  if (kind_of(memory, object) === KINDS.STRING_OBJECT) {
+    const reference = string_reference(memory, object)
+    const length = heap_string_length(memory, reference)
+    for (let index = 0; index < length; index++) names.push(String(index))
+    names.unshift("length")
+  }
+  const indices = names
+    .filter((name) => array_index(name) >= 0)
+    .sort((a, b) => Number(a) - Number(b))
+  return {
+    names: indices.concat(names.filter((name) => array_index(name) < 0)),
+    symbols,
+  }
+}
+
+export function ordinary_own_property_keys(
+  memory: Memory,
+  destination: Root,
+  object: Root,
+) {
+  const { names: ordered, symbols } = own_property_keys(memory, object)
+  const key = alloc_root(memory),
+    value = alloc_root(memory)
+  try {
     create_array(memory, destination, ordered.length + symbols.length)
     for (let index = 0; index < ordered.length; index++) {
       write_string(memory, key, String(index))
@@ -1309,5 +1323,41 @@ export function ordinary_own_property_keys(
     free_root(memory, key)
     free_root(memory, value)
     for (const symbol of symbols) free_root(memory, symbol)
+  }
+}
+
+/**
+ * Snapshots the enumerable string keys of an object and its prototype chain
+ * for for-in. Shadowed keys appear once, under the nearest object.
+ */
+export function for_in_keys(memory: Memory, destination: Root, object: Root) {
+  const visited = new Set<string>()
+  const keys = []
+  const current = alloc_root(memory),
+    value = alloc_root(memory)
+  try {
+    copy_value(memory, current, object)
+    while (true) {
+      const { names, symbols } = own_property_keys(memory, current)
+      for (const symbol of symbols) free_root(memory, symbol)
+      for (const name of names) {
+        if (visited.has(name)) continue
+        visited.add(name)
+        if ((own_property(memory, current, name)?.flags ?? 0) & 2)
+          keys.push(name)
+      }
+      const prototype = prototype_reference(memory, current)
+      if (!prototype) break
+      set_ref(memory, current, prototype)
+    }
+    create_array(memory, destination, keys.length)
+    for (let index = 0; index < keys.length; index++) {
+      write_string(memory, current, String(index))
+      write_string(memory, value, keys[index])
+      ordinary_define_property(memory, destination, current, value, 7)
+    }
+  } finally {
+    free_root(memory, current)
+    free_root(memory, value)
   }
 }

@@ -73,6 +73,11 @@ export const OP = Object.freeze({
   POP_ENV: 38,
   COPY_ENV: 39,
   JUMP_OUT: 40,
+  GET_ITERATOR: 41,
+  ITERATOR_NEXT: 42,
+  ITERATOR_CLOSE: 43,
+  FOR_IN_START: 44,
+  FOR_IN_NEXT: 45,
 })
 
 export type Instruction = number[]

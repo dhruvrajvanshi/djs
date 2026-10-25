@@ -50,7 +50,7 @@ import {
   MODULE_STATE,
   module_state_set_status,
 } from "../runtime/module-state.ts"
-import type { Root } from "./memory.ts"
+import type { Root, Memory } from "./memory.ts"
 import type { Runtime, CodeId } from "../runtime/modules.ts"
 import type { FunctionId } from "../compiler/compile.ts"
 import type {
@@ -115,6 +115,9 @@ import {
   define_property,
   delete_property,
   is_object,
+  has_property,
+  create_string_object,
+  for_in_keys,
 } from "./objects.ts"
 import {
   call_intrinsic,
@@ -424,6 +427,42 @@ function enter_function(
 
 // A synchronous language operation may execute user code (valueOf/toString).
 // Keep that execution in a rooted VM context and preserve thrown guest values.
+function nullish(memory: Memory, value: Root) {
+  return ([TAGS.NULL, TAGS.UNDEFINED] as number[]).includes(
+    tag_of(memory, value),
+  )
+}
+
+// Reads a property, calling a getter synchronously.
+function get_value(
+  runtime: Runtime,
+  destination: Root,
+  object: Root,
+  key: Root,
+) {
+  if (
+    get_property(runtime.memory, destination, object, key) &&
+    tag_of(runtime.memory, destination) !== TAGS.UNDEFINED
+  )
+    invoke_sync(runtime, destination, destination, object, [])
+}
+
+function close_iterator(runtime: Runtime, iterator: Root) {
+  const { memory } = runtime
+  const method = alloc_root(memory),
+    result = alloc_root(memory)
+  try {
+    get_value(runtime, method, iterator, runtime.property_names!.get("return")!)
+    if (nullish(memory, method)) return
+    invoke_sync(runtime, result, method, iterator, [])
+    if (!is_object(memory, result))
+      throw new TypeError("Iterator result is not an object")
+  } finally {
+    free_root(memory, method)
+    free_root(memory, result)
+  }
+}
+
 class GuestThrow extends Error {
   declare root: Root
   constructor(root: Root) {
@@ -550,6 +589,92 @@ export function run_interpreter(runtime: Runtime, context: Context) {
               write_undefined(memory, reg(a)) // typeof unresolvable name
             else throw new ReferenceError(`${name} is not defined`)
           } else copy_value(memory, reg(a), global)
+          break
+        }
+        // Iteration ops call guest methods synchronously, like coercions.
+        case OP.GET_ITERATOR:
+          if (nullish(memory, reg(c)))
+            throw new TypeError("Value is not iterable")
+          get_value(
+            runtime,
+            temporary,
+            reg(c),
+            runtime.well_known_symbols!.get("iterator")!,
+          )
+          if (nullish(memory, temporary))
+            throw new TypeError("Value is not iterable")
+          invoke_sync(runtime, reg(a), temporary, reg(c), [])
+          if (!is_object(memory, reg(a)))
+            throw new TypeError("Result of Symbol.iterator is not an object")
+          get_value(
+            runtime,
+            reg(b),
+            reg(a),
+            runtime.property_names!.get("next")!,
+          )
+          break
+        case OP.ITERATOR_NEXT:
+          invoke_sync(runtime, temporary, reg(c), reg(b), [])
+          if (!is_object(memory, temporary))
+            throw new TypeError("Iterator result is not an object")
+          get_value(
+            runtime,
+            operand,
+            temporary,
+            runtime.property_names!.get("done")!,
+          )
+          if (truthy(memory, operand))
+            context_set_frame_pc(context, frame, bytecode_offset(d))
+          else
+            get_value(
+              runtime,
+              reg(a),
+              temporary,
+              runtime.property_names!.get("value")!,
+            )
+          break
+        case OP.ITERATOR_CLOSE:
+          if (b === 0) close_iterator(runtime, reg(a))
+          else {
+            // The pending throw wins over errors from closing.
+            try {
+              close_iterator(runtime, reg(a))
+            } catch (error) {
+              if (error instanceof GuestThrow) free_root(memory, error.root)
+              else if (!(error instanceof TypeError)) throw error
+            }
+          }
+          break
+        case OP.FOR_IN_START:
+          write_number(memory, reg(c), 0)
+          if (kind_of(memory, reg(d)) === KINDS.STRING)
+            create_string_object(memory, reg(b), reg(d))
+          else copy_value(memory, reg(b), reg(d))
+          if (is_object(memory, reg(b))) for_in_keys(memory, reg(a), reg(b))
+          else create_array(memory, reg(a), 0)
+          break
+        case OP.FOR_IN_NEXT: {
+          // Keys deleted after the snapshot are skipped.
+          let index = read_number(memory, reg(d))
+          get_property(
+            memory,
+            temporary,
+            reg(b),
+            runtime.property_names!.get("length")!,
+          )
+          const length = read_number(memory, temporary)
+          let found = false
+          while (!found && index < length) {
+            write_number(memory, operand, index)
+            index++
+            get_property(memory, temporary, reg(b), operand)
+            if (has_property(memory, reg(c), temporary)) {
+              copy_value(memory, reg(a), temporary)
+              found = true
+            }
+          }
+          write_number(memory, reg(d), index)
+          if (!found) context_set_frame_pc(context, frame, bytecode_offset(e))
           break
         }
         case OP.LOAD_NEW_TARGET:

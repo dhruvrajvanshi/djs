@@ -780,6 +780,79 @@ function compile_stmt(
       if (pushed) pop_environment(fn)
       return
     }
+    case "ForInOrOf": {
+      if (stmt.decl_type === "Var") unsupported(stmt, "var declarations")
+      const is_of = stmt.in_or_of === "Of"
+      const readonly = stmt.decl_type === "Const"
+      let iterable
+      if (stmt.decl_type) {
+        // The right-hand side sees the loop bindings in their TDZ.
+        const tdz = create_scope(scope, fn, { binding_flags: [] })
+        declare_pattern(tdz, stmt.lhs, readonly)
+        const pushed = push_environment(fn, tdz)
+        iterable = compile_expr(state, fn, tdz, stmt.rhs)
+        if (pushed) pop_environment(fn)
+      } else iterable = compile_expr(state, fn, scope, stmt.rhs)
+      // For-of closes the iterator on abrupt exits from the body. `active` is
+      // only set while the body runs, so errors from the iterator itself do
+      // not close it.
+      const iterator = allocate(fn)
+      const next = allocate(fn)
+      const object = allocate(fn)
+      const index = allocate(fn)
+      const active = allocate(fn)
+      const set_active = (value: boolean) =>
+        emit(fn, OP.MOVE, active, constant(state, fn, value))
+      const exception = allocate(fn)
+      let handler = null
+      if (is_of) {
+        emit(fn, OP.GET_ITERATOR, iterator, next, iterable)
+        set_active(false)
+        handler = emit(fn, OP.TRY, 0xffffffff, 0xffffffff, 0, exception)
+        fn.try_environment_depths.push(fn.environment_depth)
+      } else emit(fn, OP.FOR_IN_START, iterator, object, index, iterable)
+      const loop = enter_loop(fn)
+      const start = position(fn)
+      if (is_of) set_active(false)
+      const value = allocate(fn)
+      const exit = is_of
+        ? emit(fn, OP.ITERATOR_NEXT, value, iterator, next, 0)
+        : emit(fn, OP.FOR_IN_NEXT, value, iterator, object, index, 0)
+      if (is_of) set_active(true)
+      const child = create_scope(
+        scope,
+        fn,
+        stmt.decl_type ? { binding_flags: [] } : undefined,
+      )
+      let pushed = false
+      if (stmt.decl_type) {
+        const binding = declare_pattern(child, stmt.lhs, readonly)
+        pushed = push_environment(fn, child)
+        emit(fn, OP.INIT_BINDING, 0, binding.slot, value)
+      } else store_pattern(state, fn, scope, stmt.lhs, value)
+      compile_stmt(state, fn, child, stmt.body)
+      if (pushed) pop_environment(fn)
+      emit(fn, OP.JUMP, start)
+      fn.instructions[exit][is_of ? 4 : 5] = position(fn)
+      leave_loop(fn, loop, position(fn), start)
+      if (handler === null) return
+      emit(fn, OP.LEAVE_TRY)
+      fn.instructions[handler][1] = position(fn)
+      const skip_close = emit(fn, OP.JUMP_IF_FALSY, active, 0)
+      set_active(false)
+      emit(fn, OP.ITERATOR_CLOSE, iterator, 1)
+      fn.instructions[skip_close][2] = position(fn)
+      emit(fn, OP.THROW, exception)
+      fn.instructions[handler][2] = position(fn)
+      const skip_return = emit(fn, OP.JUMP_IF_FALSY, active, 0)
+      set_active(false)
+      emit(fn, OP.ITERATOR_CLOSE, iterator, 0)
+      fn.instructions[skip_return][2] = position(fn)
+      emit(fn, OP.END_FINALLY)
+      fn.try_environment_depths.pop()
+      fn.instructions[handler][3] = position(fn)
+      return
+    }
     case "Break":
     case "Continue": {
       if (stmt.label) unsupported(stmt, `labeled ${stmt.kind.toLowerCase()}`)
@@ -805,6 +878,37 @@ function compile_stmt(
     default:
       unsupported(stmt)
   }
+}
+
+// Stores an already evaluated value, unlike Assign which evaluates the target
+// before the value.
+function store_pattern(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  pattern: Pattern,
+  value: number,
+) {
+  if (pattern.kind === "Var") {
+    const binding = resolve_name(scope, pattern.ident.text)
+    if (!binding)
+      throw syntax_error(
+        pattern,
+        `Assignment to undeclared binding: ${pattern.ident.text}`,
+      )
+    emit(fn, OP.STORE_BINDING, binding.depth, binding.slot, value)
+    return
+  }
+  if (pattern.kind === "Prop") {
+    const object = compile_expr(state, fn, scope, pattern.expr)
+    const is_private = pattern.key.kind === "Private"
+    const key = is_private
+      ? private_name(state, fn, scope, pattern.key.ident)
+      : property_key(state, fn, scope, pattern.key)
+    emit(fn, is_private ? OP.SET_PRIVATE : OP.SET_PROP, object, key, value)
+    return
+  }
+  unsupported(pattern, "assignment destructuring")
 }
 
 // Inside loops, a block's bindings get a fresh environment on each entry so

@@ -1,4 +1,5 @@
 import {
+  well_known_symbol,
   symbol_create,
   symbol_description,
   object_create,
@@ -70,7 +71,7 @@ const well_known = [
 let index = 0
 while (index < well_known.length) {
   define_property(Symbol, well_known[index], {
-    value: symbol_create("Symbol." + well_known[index]),
+    value: well_known_symbol(well_known[index]),
     writable: false,
     enumerable: false,
     configurable: false,

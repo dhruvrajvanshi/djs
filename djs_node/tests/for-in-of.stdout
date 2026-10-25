@@ -1,0 +1,16 @@
+2,4,6
+3 true
+x y
+0p,1q
+true
+5
+1|2|3|1|return 3|finally 1|finally 2|return 2|return 1|boom 1|return 2|return 1
+from body
+from return
+TypeError
+ReferenceError
+own=3,shadowed=4,inherited=1
+0,string,1,string
+a,c
+0
+only
