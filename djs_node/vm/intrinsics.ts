@@ -69,6 +69,7 @@ export const INTRINSIC_NAMES = Object.freeze([
   "symbol_create",
   "symbol_description",
   "well_known_symbol",
+  "process_cwd",
 ])
 
 export function intrinsic_id(name: string) {
@@ -270,6 +271,9 @@ export function call_intrinsic(
     if (!arguments_.length || kind_of(memory, arguments_[0]) !== KINDS.STRING)
       throw new TypeError("write_stdout requires a string")
     runtime.host.write_stdout(read_string(memory, arguments_[0]))
+  } else if (name === "process_cwd") {
+    write_string(memory, destination, runtime.host.cwd())
+    return
   } else if (name === "enqueue_job") {
     enqueue_job(runtime, arguments_[0])
   } else if (name === "byte_buffer") {

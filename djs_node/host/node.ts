@@ -12,6 +12,7 @@ export interface NodeHost {
   read(handle: number, length: number): Promise<Uint8Array>
   close(handle: number): Promise<void>
   write_stdout(text: string): void
+  cwd(): string
 }
 
 export function create_node_host({
@@ -48,6 +49,9 @@ export function create_node_host({
     },
     write_stdout(text: string) {
       stdout.write(text)
+    },
+    cwd() {
+      return process.cwd()
     },
   }
 }

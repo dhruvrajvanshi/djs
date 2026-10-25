@@ -49,6 +49,7 @@ export { MODULE_STATE } from "./module-state.ts"
 
 const BUILTINS = new Map([
   ["node:console", new URL("../stdlib/node/console.js", import.meta.url)],
+  ["node:path", new URL("../stdlib/node/path.js", import.meta.url)],
   [
     "node:fs/promises",
     new URL("../stdlib/node/fs/promises.js", import.meta.url),
