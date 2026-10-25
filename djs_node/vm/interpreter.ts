@@ -123,7 +123,7 @@ import {
   call_intrinsic,
   NATIVE_CODE,
   RESUME_CODE,
-  INTRINSIC_NAMES,
+  CALL_ID,
 } from "./intrinsics.ts"
 import {
   await_value,
@@ -352,7 +352,7 @@ function call_function(
     }
     return
   }
-  if (code_id === NATIVE_CODE && INTRINSIC_NAMES[function_id] === "call") {
+  if (code_id === NATIVE_CODE && function_id === CALL_ID) {
     call_function(
       runtime,
       context,

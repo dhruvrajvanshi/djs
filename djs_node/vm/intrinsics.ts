@@ -39,45 +39,6 @@ import { enqueue_job, start_operation } from "../runtime/jobs.ts"
 
 export const NATIVE_CODE = 0xffffffff
 export const RESUME_CODE = 0xfffffffe
-export const INTRINSIC_NAMES = Object.freeze([
-  "write_stdout",
-  "io_open",
-  "io_read",
-  "io_close",
-  "byte_buffer",
-  "string_from_code_unit",
-  "enqueue_job",
-  "call",
-  "string_code_unit_at",
-  "string_slice",
-  "string_box",
-  "string_value",
-  "array_create",
-  "is_array",
-  "is_constructor",
-  "has_property",
-  "delete_property",
-  "get_own_property_descriptor",
-  "define_property",
-  "object_create",
-  "get_prototype",
-  "set_prototype",
-  "ordinary_define_own_property",
-  "ordinary_own_property_keys",
-  "ordinary_delete",
-  "builtin_object_create",
-  "symbol_create",
-  "symbol_description",
-  "well_known_symbol",
-  "process_cwd",
-])
-
-export function intrinsic_id(name: string) {
-  const id = INTRINSIC_NAMES.indexOf(name)
-  if (id === -1) throw new SyntaxError(`Unknown intrinsic: ${name}`)
-  return id
-}
-
 function integer(
   memory: Memory,
   value: Root,
@@ -97,15 +58,15 @@ function string(memory: Memory, value: Root, name: string) {
   return read_string(memory, value)
 }
 
-export function call_intrinsic(
+type Intrinsic = (
   runtime: Runtime,
-  id: number,
   destination: Root,
   arguments_: Root[],
-) {
-  const { memory } = runtime
-  const name = INTRINSIC_NAMES[id]
-  if (name === "ordinary_define_own_property") {
+) => void
+
+const INTRINSICS: Record<string, Intrinsic> = {
+  ordinary_define_own_property(runtime, destination, arguments_) {
+    const { memory } = runtime
     try {
       define_own_property(
         memory,
@@ -120,8 +81,8 @@ export function call_intrinsic(
       if (!(error instanceof TypeError)) throw error
       write_boolean(memory, destination, false)
     }
-    return
-  } else if (name === "ordinary_delete") {
+  },
+  ordinary_delete({ memory }, destination, arguments_) {
     try {
       delete_property(memory, arguments_[0], arguments_[1])
       write_boolean(memory, destination, true)
@@ -129,14 +90,14 @@ export function call_intrinsic(
       if (!(error instanceof TypeError)) throw error
       write_boolean(memory, destination, false)
     }
-    return
-  } else if (name === "ordinary_own_property_keys") {
+  },
+  ordinary_own_property_keys({ memory }, destination, arguments_) {
     ordinary_own_property_keys(memory, destination, arguments_[0])
-    return
-  } else if (name === "builtin_object_create") {
+  },
+  builtin_object_create({ memory }, destination, arguments_) {
     create_builtin_object(memory, destination, arguments_[0], arguments_[1])
-    return
-  } else if (name === "symbol_create") {
+  },
+  symbol_create({ memory }, destination, arguments_) {
     const description = arguments_[0]
     if (
       description !== undefined &&
@@ -145,23 +106,24 @@ export function call_intrinsic(
     )
       throw new TypeError("Symbol description must be a string or undefined")
     create_symbol(memory, destination, description)
-    return
-  } else if (name === "symbol_description") {
+  },
+  symbol_description({ memory }, destination, arguments_) {
     if (
       arguments_[0] === undefined ||
       kind_of(memory, arguments_[0]) !== KINDS.SYMBOL
     )
       throw new TypeError("Expected a symbol")
     load_symbol_description(memory, destination, arguments_[0])
-    return
-  } else if (name === "well_known_symbol") {
+  },
+  well_known_symbol(runtime, destination, arguments_) {
+    const { memory } = runtime
     const symbol = runtime.well_known_symbols?.get(
       string(memory, arguments_[0], "Symbol name"),
     )
     if (symbol === undefined) throw new TypeError("Unknown well-known symbol")
     copy_value(memory, destination, symbol)
-    return
-  } else if (name === "string_code_unit_at") {
+  },
+  string_code_unit_at({ memory }, destination, arguments_) {
     write_number(
       memory,
       destination,
@@ -171,8 +133,8 @@ export function call_intrinsic(
         integer(memory, arguments_[1], "string index"),
       ),
     )
-    return
-  } else if (name === "string_slice") {
+  },
+  string_slice({ memory }, destination, arguments_) {
     slice_string(
       memory,
       destination,
@@ -180,22 +142,22 @@ export function call_intrinsic(
       integer(memory, arguments_[1], "start"),
       integer(memory, arguments_[2], "end"),
     )
-    return
-  } else if (name === "string_box") {
+  },
+  string_box({ memory }, destination, arguments_) {
     create_string_object(memory, destination, arguments_[0], arguments_[1])
-    return
-  } else if (name === "string_value") {
+  },
+  string_value({ memory }, destination, arguments_) {
     string_value(memory, destination, arguments_[0])
-    return
-  } else if (name === "array_create") {
+  },
+  array_create({ memory }, destination, arguments_) {
     create_array(
       memory,
       destination,
       integer(memory, arguments_[0], "array length", 0xffffffff),
       arguments_[1],
     )
-    return
-  } else if (name === "is_constructor") {
+  },
+  is_constructor({ memory }, destination, arguments_) {
     let result = false
     if (
       arguments_[0] !== undefined &&
@@ -209,27 +171,34 @@ export function call_intrinsic(
         !(read_u32(memory, reference + 32) & 14)
     }
     write_boolean(memory, destination, result)
-    return
-  } else if (name === "is_array") {
+  },
+  is_array({ memory }, destination, arguments_) {
     write_boolean(
       memory,
       destination,
       arguments_[0] !== undefined &&
         kind_of(memory, arguments_[0]) === KINDS.ARRAY,
     )
-    return
-  } else if (name === "has_property" || name === "delete_property") {
+  },
+  has_property({ memory }, destination, arguments_) {
     if (!is_object(memory, arguments_[0]))
       throw new TypeError("Expected an object")
     write_boolean(
       memory,
       destination,
-      name === "has_property"
-        ? has_property(memory, arguments_[0], arguments_[1])
-        : delete_property(memory, arguments_[0], arguments_[1]),
+      has_property(memory, arguments_[0], arguments_[1]),
     )
-    return
-  } else if (name === "get_own_property_descriptor") {
+  },
+  delete_property({ memory }, destination, arguments_) {
+    if (!is_object(memory, arguments_[0]))
+      throw new TypeError("Expected an object")
+    write_boolean(
+      memory,
+      destination,
+      delete_property(memory, arguments_[0], arguments_[1]),
+    )
+  },
+  get_own_property_descriptor({ memory }, destination, arguments_) {
     if (!is_object(memory, arguments_[0]))
       throw new TypeError("Expected an object")
     get_own_property_descriptor(
@@ -238,8 +207,9 @@ export function call_intrinsic(
       arguments_[0],
       arguments_[1],
     )
-    return
-  } else if (name === "define_property") {
+  },
+  define_property(runtime, destination, arguments_) {
+    const { memory } = runtime
     define_own_property(
       memory,
       arguments_[0],
@@ -247,13 +217,17 @@ export function call_intrinsic(
       arguments_[2],
       runtime,
     )
-  } else if (name === "object_create") {
+    write_undefined(memory, destination)
+  },
+  object_create({ memory }, destination, arguments_) {
     create_object(memory, destination)
     set_prototype(memory, destination, arguments_[0])
-    return
-  } else if (name === "set_prototype") {
+  },
+  set_prototype({ memory }, destination, arguments_) {
     set_prototype(memory, arguments_[0], arguments_[1])
-  } else if (name === "get_prototype") {
+    write_undefined(memory, destination)
+  },
+  get_prototype({ memory }, destination, arguments_) {
     if (
       !is_object(memory, arguments_[0]) ||
       kind_of(memory, arguments_[0]) === KINDS.BYTE_BUFFER
@@ -266,31 +240,37 @@ export function call_intrinsic(
     )
     if (prototype) set_ref(memory, destination, prototype)
     else write_null(memory, destination)
-    return
-  } else if (name === "write_stdout") {
+  },
+  write_stdout(runtime, destination, arguments_) {
+    const { memory } = runtime
     if (!arguments_.length || kind_of(memory, arguments_[0]) !== KINDS.STRING)
       throw new TypeError("write_stdout requires a string")
     runtime.host.write_stdout(read_string(memory, arguments_[0]))
-  } else if (name === "process_cwd") {
-    write_string(memory, destination, runtime.host.cwd())
-    return
-  } else if (name === "enqueue_job") {
+    write_undefined(memory, destination)
+  },
+  process_cwd(runtime, destination) {
+    write_string(runtime.memory, destination, runtime.host.cwd())
+  },
+  enqueue_job(runtime, destination, arguments_) {
     enqueue_job(runtime, arguments_[0])
-  } else if (name === "byte_buffer") {
+    write_undefined(runtime.memory, destination)
+  },
+  byte_buffer({ memory }, destination, arguments_) {
     create_byte_buffer(
       memory,
       destination,
       integer(memory, arguments_[0], "byte buffer length"),
     )
-    return
-  } else if (name === "string_from_code_unit") {
+  },
+  string_from_code_unit({ memory }, destination, arguments_) {
     write_string(
       memory,
       destination,
       String.fromCharCode(integer(memory, arguments_[0], "code unit", 0xffff)),
     )
-    return
-  } else if (name === "io_open") {
+  },
+  io_open(runtime, destination, arguments_) {
+    const { memory } = runtime
     const path = string(memory, arguments_[0], "path"),
       flags = string(memory, arguments_[1], "flags"),
       mode = integer(memory, arguments_[2], "mode", 0o7777)
@@ -301,7 +281,10 @@ export function call_intrinsic(
       () => runtime.host.open(path, flags, mode),
       { syscall: "open", path },
     )
-  } else if (name === "io_read") {
+    write_undefined(memory, destination)
+  },
+  io_read(runtime, destination, arguments_) {
+    const { memory } = runtime
     const handle = integer(memory, arguments_[0], "file handle"),
       buffer = arguments_[1],
       offset = integer(memory, arguments_[2], "buffer offset", 0xffffffff),
@@ -317,7 +300,10 @@ export function call_intrinsic(
       () => runtime.host.read(handle, length),
       { buffer, offset, length, syscall: "read" },
     )
-  } else if (name === "io_close") {
+    write_undefined(memory, destination)
+  },
+  io_close(runtime, destination, arguments_) {
+    const { memory } = runtime
     const handle = integer(memory, arguments_[0], "file handle")
     start_operation(
       runtime,
@@ -326,6 +312,31 @@ export function call_intrinsic(
       () => runtime.host.close(handle),
       { syscall: "close" },
     )
-  } else throw new Error(`Invalid intrinsic ID: ${id}`)
-  write_undefined(memory, destination)
+    write_undefined(memory, destination)
+  },
+  call() {
+    throw new Error("call is handled by the interpreter")
+  },
+}
+
+const INTRINSIC_HANDLERS = Object.freeze(Object.values(INTRINSICS))
+export const INTRINSIC_NAMES = Object.freeze(Object.keys(INTRINSICS))
+
+export function intrinsic_id(name: string) {
+  const id = INTRINSIC_NAMES.indexOf(name)
+  if (id === -1) throw new SyntaxError(`Unknown intrinsic: ${name}`)
+  return id
+}
+
+export const CALL_ID = intrinsic_id("call")
+
+export function call_intrinsic(
+  runtime: Runtime,
+  id: number,
+  destination: Root,
+  arguments_: Root[],
+) {
+  const intrinsic = INTRINSIC_HANDLERS[id]
+  if (intrinsic === undefined) throw new Error(`Invalid intrinsic ID: ${id}`)
+  intrinsic(runtime, destination, arguments_)
 }
