@@ -282,7 +282,7 @@ export async function load_module(
   const builtin = BUILTINS.get(identity)
   const path = fileURLToPath(builtin ?? new URL(identity))
   const source = await runtime.host.read_text(path, "utf8")
-  const unit = compile_module(source, path)
+  const unit = compile_module(source, path, builtin?.href ?? identity)
   const code_id = link_code(runtime, unit)
   const scope_id = runtime.code[code_id].scope_ids[unit.entry]
   const module = instantiate_module(runtime, identity, {

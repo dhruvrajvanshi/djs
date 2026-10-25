@@ -15,6 +15,7 @@ import type {
   Ident,
 } from "djs_ast"
 import {
+  ASTVisitorBase,
   QualifiedName,
   VarDeclStmt,
   offset_to_line_and_col,
@@ -145,6 +146,7 @@ export interface CompilerState {
 export function compile_module(
   source: string,
   path: string = "<module>",
+  url: string = path,
 ): CompiledModule {
   const ast = parse_source_file(QualifiedName(), path, source)
   if (ast.errors.length) throw located_error(path, source, ast.errors)
@@ -158,7 +160,11 @@ export function compile_module(
   }
   const state = { unit, prepared: new WeakSet() }
   try {
-    compile_function(state, null, null, ast.stmts, "<module>", [])
+    compile_function(state, null, null, ast.stmts, "<module>", [], null, {
+      build: uses_import_meta(ast.stmts)
+        ? (fn, scope) => init_import_meta(state, fn, scope, url)
+        : undefined,
+    })
   } catch (error) {
     if (!(error instanceof SyntaxError) || !(error as SourceDiagnostic).span)
       throw error
@@ -187,6 +193,48 @@ export function compile_module(
   for (const key of ["functions", "literals", "imports", "exports"])
     Object.freeze(unit[key as keyof CompiledModule])
   return Object.freeze(unit)
+}
+
+const IMPORT_META = "*import.meta*"
+
+class ImportMetaFinder extends ASTVisitorBase {
+  found = false
+  override visit_expr(expr: Expr) {
+    if (expr.kind === "ImportMeta") this.found = true
+    else super.visit_expr(expr)
+  }
+}
+
+function uses_import_meta(stmts: readonly Stmt[]) {
+  const finder = new ImportMetaFinder()
+  for (const stmt of stmts) finder.visit_stmt(stmt)
+  return finder.found
+}
+
+function init_import_meta(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  url: string,
+) {
+  const meta = allocate(fn)
+  emit(fn, OP.CREATE_OBJECT, meta)
+  emit(fn, OP.SET_PROTO, meta, constant(state, fn, null))
+  emit(
+    fn,
+    OP.DEFINE_PROP,
+    meta,
+    constant(state, fn, "url"),
+    constant(state, fn, url),
+    7,
+  )
+  emit(
+    fn,
+    OP.INIT_BINDING,
+    0,
+    declare_binding(scope, IMPORT_META, true).slot,
+    meta,
+  )
 }
 
 function located_error(
@@ -1231,6 +1279,8 @@ function compile_expr(
       }
       return dst
     }
+    case "ImportMeta":
+      return load_name(state, fn, scope, IMPORT_META)
     case "NewTarget": {
       let owner: FunctionBuilder | null = fn
       while (owner && owner.flags & 4) owner = owner.parent
