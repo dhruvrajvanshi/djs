@@ -28,10 +28,8 @@ const MIN_PAYLOAD_BYTES: Readonly<Record<number, number>> = Object.freeze({
   [KINDS.ENVIRONMENT]: 16,
   [KINDS.BYTE_BUFFER]: 4,
   [KINDS.ERROR]: 8,
-  [KINDS.ARRAY]: 16,
-  [KINDS.BUILTIN_OBJECT]: 16,
-  [KINDS.INTERNAL_METHODS]: 32,
-  [KINDS.STRING_OBJECT]: 24,
+  [KINDS.ARRAY]: 8,
+  [KINDS.STRING_OBJECT]: 16,
   [KINDS.VALUE_ARRAY]: 8,
   [KINDS.SYMBOL]: 8,
 })
@@ -70,9 +68,6 @@ export function allocate(memory: Memory, kind: number, payload_bytes: number) {
     write_heap_undefined(memory, cursor + 16)
     write_heap_undefined(memory, cursor + 40)
     write_heap_undefined(memory, cursor + 48)
-  } else if (kind === KINDS.INTERNAL_METHODS) {
-    for (const offset of [8, 16, 24])
-      write_heap_undefined(memory, cursor + offset)
   } else if (kind === KINDS.STRING_OBJECT) {
     write_heap_undefined(memory, cursor + 16)
   } else if (kind === KINDS.ENVIRONMENT || kind === KINDS.SYMBOL) {
@@ -142,20 +137,12 @@ export function collect(memory: Memory) {
           KINDS.ERROR,
           KINDS.ARRAY,
           KINDS.STRING_OBJECT,
-          KINDS.BUILTIN_OBJECT,
         ] as number[]
       ).includes(kind)
     ) {
       trace_raw(scan + 8)
       trace_raw(scan + 12)
-      if (kind === KINDS.STRING_OBJECT) {
-        trace_value(scan + 16)
-        trace_raw(scan + 24)
-      }
-      if (kind === KINDS.ARRAY || kind === KINDS.BUILTIN_OBJECT)
-        trace_raw(scan + 16)
-    } else if (kind === KINDS.INTERNAL_METHODS) {
-      for (const offset of [8, 16, 24]) trace_value(scan + offset)
+      if (kind === KINDS.STRING_OBJECT) trace_value(scan + 16)
     } else if (kind === KINDS.PROPERTY) {
       trace_raw(scan + 8)
       trace_value(scan + 16)
@@ -165,7 +152,6 @@ export function collect(memory: Memory) {
       trace_value(scan + 16)
       trace_raw(scan + 24)
       trace_raw(scan + 28)
-      trace_raw(scan + 36)
       trace_value(scan + 40)
       trace_value(scan + 48)
     } else if (kind === KINDS.SYMBOL) {

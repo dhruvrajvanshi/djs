@@ -27,7 +27,7 @@ import {
   load_binding,
   initialize_binding,
 } from "../vm/objects.ts"
-import { INTRINSIC_NAMES, NATIVE_CODE } from "../vm/intrinsics.ts"
+import { NATIVE_MODULES, NATIVE_CODE } from "../vm/intrinsics.ts"
 import { THROW, clear_exception } from "../vm/completion.ts"
 import {
   create_context,
@@ -49,6 +49,7 @@ import {
 export { MODULE_STATE } from "./module-state.ts"
 
 const BUILTINS = new Map([
+  ["djs:abstract", new URL("../stdlib/js/abstract.js", import.meta.url)],
   ["node:console", new URL("../stdlib/node/console.js", import.meta.url)],
   ["node:path", new URL("../stdlib/node/path.js", import.meta.url)],
   [
@@ -70,6 +71,8 @@ export interface LinkedCode {
 export interface RuntimeScope {
   binding_flags: boolean[]
   import_bindings: Map<number, { module_id: number; slot: number }>
+  /** Slots whose value the VM receives as a realm intrinsic once initialized. */
+  intrinsic_bindings?: Map<number, string>
 }
 
 export interface ModuleRecord {
@@ -77,6 +80,7 @@ export interface ModuleRecord {
   identity: string
   unit: CompiledModule | null
   code_id: CodeId | null
+  scope_id: number
   state: ModuleStateBytes
   dependencies: number[]
   exports: Map<string, number>
@@ -100,14 +104,12 @@ export interface Runtime {
   globals: Map<string, Root>
   contexts: Context[]
   scheduler: Scheduler
-  coercions?: Map<string, Root>
+  /** Values the stdlib registers for the VM, keyed by REALM_INTRINSICS names. */
+  intrinsics: Map<string, Root>
   /** Keyed by name without the "Symbol." prefix. */
   well_known_symbols?: Map<string, Root>
   /** Property keys the VM reads itself, such as iterator result fields. */
   property_names?: Map<string, Root>
-  error_prototypes?: Map<string, Root>
-  promise_await?: Root
-  promise_capability?: Root
   pending_exception: Root
 }
 
@@ -128,6 +130,7 @@ export function create_runtime({
     globals: new Map(),
     contexts: [],
     scheduler: create_scheduler(),
+    intrinsics: new Map(),
     pending_exception: alloc_root(memory),
   }
   for (const [name, value] of [
@@ -190,7 +193,7 @@ function link_code(runtime: Runtime, unit: CompiledModule) {
 
 export function resolve_specifier(specifier: string, importer: string) {
   if (specifier.startsWith("node:") || specifier.startsWith("djs:")) {
-    if (specifier !== "djs:intrinsics" && !BUILTINS.has(specifier))
+    if (!NATIVE_MODULES.has(specifier) && !BUILTINS.has(specifier))
       throw new SyntaxError(`Unsupported builtin module: ${specifier}`)
     return specifier
   }
@@ -228,6 +231,7 @@ function instantiate_module(
     identity,
     unit,
     code_id,
+    scope_id,
     state,
     dependencies: [],
     exports: new Map(exports.map((item) => [item.name, item.slot])),
@@ -250,20 +254,25 @@ function instantiate_module(
   return module
 }
 
-function load_intrinsics(runtime: Runtime): ModuleRecord {
+function load_native_module(
+  runtime: Runtime,
+  identity: string,
+  ids: Map<string, number>,
+): ModuleRecord {
+  const names = [...ids.keys()]
   const scope_id = runtime.scopes.length
   runtime.scopes.push({
-    binding_flags: INTRINSIC_NAMES.map(() => true),
+    binding_flags: names.map(() => true),
     import_bindings: new Map(),
   })
-  const module = instantiate_module(runtime, "djs:intrinsics", {
+  const module = instantiate_module(runtime, identity, {
     scope_id,
-    exports: INTRINSIC_NAMES.map((name, slot) => ({ name, slot })),
+    exports: names.map((name, slot) => ({ name, slot })),
   })
   const value = alloc_root(runtime.memory)
   try {
-    for (let slot = 0; slot < INTRINSIC_NAMES.length; slot++) {
-      create_function(runtime.memory, value, NATIVE_CODE, slot)
+    for (let slot = 0; slot < names.length; slot++) {
+      create_function(runtime.memory, value, NATIVE_CODE, ids.get(names[slot])!)
       initialize_binding(runtime, module.environment, slot, value)
     }
     set_module_status(module, MODULE_STATE.EVALUATED)
@@ -283,7 +292,8 @@ export async function load_module(
 ): Promise<ModuleRecord> {
   const cached = runtime.identities.get(identity)
   if (cached !== undefined) return runtime.modules[cached]
-  if (identity === "djs:intrinsics") return load_intrinsics(runtime)
+  const native = NATIVE_MODULES.get(identity)
+  if (native) return load_native_module(runtime, identity, native)
   const builtin = BUILTINS.get(identity)
   const path = fileURLToPath(builtin ?? new URL(identity))
   const source = await runtime.host.read_text(path, "utf8")
@@ -322,6 +332,30 @@ export async function load_module(
     set_module_status(module, MODULE_STATE.ERRORED)
     write_string(runtime.memory, module.error, error.message)
     throw error
+  }
+}
+
+/**
+ * Marks the binding behind each of the module's named exports, following
+ * re-exports to the module that declares it.
+ */
+export function link_realm_intrinsics(
+  runtime: Runtime,
+  module: ModuleRecord,
+  names: readonly string[],
+) {
+  for (const name of names) {
+    let slot = module.exports.get(name)
+    if (slot === undefined)
+      throw new SyntaxError(`${module.identity} does not export ${name}`)
+    let scope = runtime.scopes[module.scope_id]
+    let target = scope.import_bindings.get(slot)
+    while (target) {
+      slot = target.slot
+      scope = runtime.scopes[runtime.modules[target.module_id].scope_id]
+      target = scope.import_bindings.get(slot)
+    }
+    ;(scope.intrinsic_bindings ??= new Map()).set(slot, name)
   }
 }
 

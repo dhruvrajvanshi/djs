@@ -2085,10 +2085,7 @@ function parser_impl(
         type_only: false,
         span: Span.between(start, alias),
         as_name: alias,
-        imported_name: ModuleExportName.Ident({
-          span: tok.span,
-          text: tok.text,
-        }),
+        imported_name: ModuleExportName.String(tok.text),
       }
     }
     const name = parse_ident()

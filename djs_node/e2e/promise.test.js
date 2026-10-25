@@ -4,7 +4,8 @@ import { execute, fixture } from "./helpers.js"
 
 test("imported call and enqueue_job intrinsics preserve receivers, errors and job order", async (t) => {
   const source = `
-    import { call, enqueue_job as enqueue, write_stdout as write } from "djs:intrinsics";
+    import { call, enqueue_job as enqueue } from "djs:intrinsics";
+    import { write_stdout as write } from "djs:host";
     function log(value) { write("" + value + "\\n"); }
     const fn = function(a, b) { return this.value + a + b; };
     fn.call = () => { throw "patched"; };

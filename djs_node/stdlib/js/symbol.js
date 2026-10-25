@@ -5,53 +5,55 @@ import {
   object_create,
   has_property,
   define_property,
+  builtin_function,
 } from "djs:intrinsics"
-import { to_string } from "./abstract.js"
+import { to_string, make_constructor } from "djs:abstract"
+import { object_prototype } from "./object.js"
+import { define_methods } from "./support.js"
 
 const registry = object_create(null)
 const registry_keys = object_create(null)
 
-@builtin({ name: "Symbol", length: 0 })
-class Symbol {
-  @internalMethod("Call")
-  static #call(thisArgument, args) {
-    const description = args[0]
-    return symbol_create(
-      description === undefined ? undefined : to_string(description),
-    )
-  }
-
-  @internalMethod("Construct")
-  static #construct(args, newTarget) {
+function Symbol(description) {
+  if (new.target !== undefined)
     throw new TypeError("Symbol is not a constructor")
-  }
+  return symbol_create(
+    description === undefined ? undefined : to_string(description),
+  )
+}
+builtin_function(Symbol, 0)
+export const symbol_prototype = object_create(object_prototype)
+make_constructor(Symbol, symbol_prototype)
 
-  static for(key) {
+define_methods(Symbol, {
+  for(key) {
     const text = to_string(key)
     if (has_property(registry, text)) return registry[text]
     const symbol = symbol_create(text)
     registry[text] = symbol
     registry_keys[symbol] = text
     return symbol
-  }
+  },
 
-  static keyFor(symbol) {
+  keyFor(symbol) {
     if (typeof symbol !== "symbol") throw new TypeError("Expected a symbol")
     return registry_keys[symbol]
-  }
+  },
+})
 
+define_methods(symbol_prototype, {
   get description() {
     return symbol_description(this_symbol_value(this))
-  }
+  },
 
   toString() {
     return descriptive_string(this_symbol_value(this))
-  }
+  },
 
   valueOf() {
     return this_symbol_value(this)
-  }
-}
+  },
+})
 
 const well_known = [
   "asyncIterator",

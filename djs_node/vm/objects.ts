@@ -35,6 +35,7 @@ import { allocate } from "./heap.ts"
 import { byte_buffer_view } from "./bytes.ts"
 import { panic } from "../utils.ts"
 import { OK, THROW, throw_error } from "./completion.ts"
+import { set_realm_intrinsic } from "./intrinsics.ts"
 import type { Status } from "./completion.ts"
 
 export function kind_of(memory: Memory, value: Root) {
@@ -122,8 +123,19 @@ export function function_id(memory: Memory, callee: Root): FunctionId {
   return read_u32(memory, get_ref(memory, callee) + 12) as FunctionId
 }
 
+/** Built-in functions allocate their own result when constructed (spec 10.3). */
+export const BUILTIN_FUNCTION = 32
+
 export function function_flags(memory: Memory, callee: Root): number {
   return read_u32(memory, get_ref(memory, callee) + 32)
+}
+
+export function set_function_flags(
+  memory: Memory,
+  callee: Root,
+  flags: number,
+) {
+  write_u32(memory, get_ref(memory, callee) + 32, flags)
 }
 
 export function load_function_environment(
@@ -148,21 +160,6 @@ export function load_function_new_target(
   callee: Root,
 ) {
   copy_heap_value_to_root(memory, destination, get_ref(memory, callee) + 48)
-}
-
-export function function_internal_layout(
-  memory: Memory,
-  callee: Root,
-): HeapRef {
-  return read_u32(memory, get_ref(memory, callee) + 36)
-}
-
-export function set_function_internal_layout(
-  memory: Memory,
-  callee: Root,
-  layout: HeapRef,
-) {
-  write_u32(memory, get_ref(memory, callee) + 36, layout)
 }
 
 export function create_environment(
@@ -286,6 +283,8 @@ export function initialize_binding(
   if (!binding_uninitialized(memory, offset))
     panic("Binding is already initialized")
   copy_root_to_heap_value(memory, offset, source)
+  const intrinsic = scope.intrinsic_bindings?.get(slot)
+  if (intrinsic !== undefined) set_realm_intrinsic(runtime, intrinsic, source)
 }
 
 export function store_binding(
@@ -323,13 +322,7 @@ function object_offsets(memory: Memory, object: Root): [number, number] {
   if (kind === KINDS.FUNCTION) return [24, 28]
   if (
     (
-      [
-        KINDS.OBJECT,
-        KINDS.ERROR,
-        KINDS.ARRAY,
-        KINDS.STRING_OBJECT,
-        KINDS.BUILTIN_OBJECT,
-      ] as number[]
+      [KINDS.OBJECT, KINDS.ERROR, KINDS.ARRAY, KINDS.STRING_OBJECT] as number[]
     ).includes(kind)
   )
     return [8, 12]
@@ -409,7 +402,6 @@ export function is_object(memory: Memory, value: Root) {
       KINDS.ERROR,
       KINDS.ARRAY,
       KINDS.STRING_OBJECT,
-      KINDS.BUILTIN_OBJECT,
       KINDS.BYTE_BUFFER,
     ] as number[]
   ).includes(kind_of(memory, value))
@@ -629,15 +621,9 @@ export function create_array(
 ) {
   if (!Number.isInteger(length) || length < 0 || length > 0xffffffff)
     panic("Invalid array length")
-  set_ref(memory, destination, allocate(memory, KINDS.ARRAY, 16))
+  set_ref(memory, destination, allocate(memory, KINDS.ARRAY, 8))
   if (prototype === undefined) prototype = memory.array_prototype
   if (prototype !== undefined) set_prototype(memory, destination, prototype)
-  if (memory.array_class !== undefined)
-    set_object_internal_layout(
-      memory,
-      destination,
-      function_internal_layout(memory, memory.array_class),
-    )
   const key = alloc_root(memory),
     value = alloc_root(memory)
   try {
@@ -648,21 +634,6 @@ export function create_array(
     free_root(memory, key)
     free_root(memory, value)
   }
-}
-
-/** Exotic instances retain their layout independently of their prototype chain. */
-export function object_internal_layout(memory: Memory, object: Root): HeapRef {
-  const offset = kind_of(memory, object) === KINDS.STRING_OBJECT ? 24 : 16
-  return read_u32(memory, get_ref(memory, object) + offset)
-}
-
-export function set_object_internal_layout(
-  memory: Memory,
-  object: Root,
-  layout: HeapRef,
-) {
-  const offset = kind_of(memory, object) === KINDS.STRING_OBJECT ? 24 : 16
-  write_u32(memory, get_ref(memory, object) + offset, layout)
 }
 
 export function create_string_object(
@@ -676,16 +647,10 @@ export function create_string_object(
   const source = alloc_root(memory)
   try {
     copy_value(memory, source, value)
-    set_ref(memory, destination, allocate(memory, KINDS.STRING_OBJECT, 24))
+    set_ref(memory, destination, allocate(memory, KINDS.STRING_OBJECT, 16))
     copy_root_to_heap_value(memory, get_ref(memory, destination) + 16, source)
     if (prototype === undefined) prototype = memory.string_prototype
     if (prototype !== undefined) set_prototype(memory, destination, prototype)
-    if (memory.string_class !== undefined)
-      set_object_internal_layout(
-        memory,
-        destination,
-        function_internal_layout(memory, memory.string_class),
-      )
   } finally {
     free_root(memory, source)
   }
@@ -1041,32 +1006,6 @@ export function mark_error_object(memory: Memory, object: Root) {
   write_u32(memory, get_ref(memory, object), KINDS.ERROR)
 }
 
-export function create_error(
-  runtime: Runtime,
-  destination: Root,
-  name: string,
-  message: string,
-) {
-  const { memory } = runtime
-  create_object(memory, destination)
-  mark_error_object(memory, destination)
-  const prototype = runtime.error_prototypes?.get(name)
-  if (prototype !== undefined) set_prototype(memory, destination, prototype)
-  const key = alloc_root(memory),
-    value = alloc_root(memory)
-  try {
-    write_string(memory, key, "name")
-    write_string(memory, value, name)
-    define_property(memory, destination, key, value, 5)
-    write_string(memory, key, "message")
-    write_string(memory, value, message)
-    define_property(memory, destination, key, value, 5)
-  } finally {
-    free_root(memory, key)
-    free_root(memory, value)
-  }
-}
-
 function has_error_prototype(memory: Memory, value: Root) {
   let reference = get_ref(memory, value)
   while (reference !== 0) {
@@ -1215,7 +1154,6 @@ export function binary_operation(
             KINDS.ERROR,
             KINDS.ARRAY,
             KINDS.STRING_OBJECT,
-            KINDS.BUILTIN_OBJECT,
           ] as number[]
         ).includes(kind_of(memory, left))
       ) {

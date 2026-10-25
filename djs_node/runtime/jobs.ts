@@ -9,10 +9,10 @@ import {
 import type { HostError } from "../host/node.ts"
 import { alloc_root, free_root, copy_value } from "../vm/memory.ts"
 import { write_string, write_number, write_boolean } from "../vm/values.ts"
+import { create_error } from "../vm/completion.ts"
 import {
   create_function,
   create_value_array,
-  create_error,
   kind_of,
   to_string,
   define_property,
@@ -94,7 +94,8 @@ export function await_value(
   destination: Root,
   source: Root,
 ) {
-  if (runtime.promise_await === undefined) panic("Promise is not initialized")
+  const await_promise = runtime.intrinsics.get("AwaitPromise")
+  if (await_promise === undefined) panic("Promise is not initialized")
   const { memory } = runtime
   const fulfilled = alloc_root(memory),
     rejected = alloc_root(memory)
@@ -105,12 +106,11 @@ export function await_value(
   try {
     resume_function(runtime, fulfilled, context, destination, false)
     resume_function(runtime, rejected, context, destination, true)
-    registration = create_call_context(
-      runtime,
-      runtime.promise_await,
-      undefined,
-      [source, fulfilled, rejected],
-    )
+    registration = create_call_context(runtime, await_promise, undefined, [
+      source,
+      fulfilled,
+      rejected,
+    ])
     run_task(runtime, registration)
     if (context_status(registration) === CONTEXT_STATE.FAILED)
       resume_context(

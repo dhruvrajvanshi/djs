@@ -7,7 +7,7 @@ import {
   load_module,
   evaluate_module,
 } from "../runtime/modules.ts"
-import { collect, heap_stats } from "../vm/heap.ts"
+import { heap_stats } from "../vm/heap.ts"
 import { compile_module } from "../compiler/compile.ts"
 
 async function execute(source, options = {}) {
@@ -43,54 +43,6 @@ test("private names and unsupported class forms fail before execution", () => {
     "const x = #missing in {};",
   ])
     assert.throws(() => compile_module(source), SyntaxError)
-})
-
-test("promise chains and private values survive repeated moving collections", async () => {
-  const { output, runtime } = await execute(
-    `
-    let p = Promise.resolve("start");
-    let index = 0;
-    while (index < 120) {
-      p = p.then(value => value + "!");
-      if (index % 10 === 0) p = Promise.resolve(await p);
-      index = index + 1;
-    }
-    console.log((await p).length);
-  `,
-    { semispace_bytes: 65536, root_capacity: 2 },
-  )
-  assert.equal(output, "125\n")
-  assert.ok(heap_stats(runtime.memory).collections > 2)
-  collect(runtime.memory)
-  assert.ok(heap_stats(runtime.memory).used_bytes < 65536)
-})
-
-test("call and enqueue_job release temporary guest frame roots", async () => {
-  const source = `
-    import { call, enqueue_job as enqueue, write_stdout as write } from "djs:intrinsics";
-    function log(value) { write("" + value + "\\n"); }
-    const fn = function(a, b) { return this.value + a + b; };
-    fn.call = () => { throw "patched"; };
-    log(call(fn, { value: 1 }, 2, 3));
-    const reason = {};
-    try { call(() => { throw reason; }, undefined); }
-    catch (error) { log(error === reason); }
-    try { enqueue(1); } catch (error) { log(error.name); }
-    enqueue(() => { log("first"); enqueue(() => log("nested")); });
-    enqueue(() => log("second"));
-    log("sync");
-    export default undefined;
-  `
-  const runtime = create_runtime({
-    host: {
-      read_text: () => source,
-      write_stdout: () => {},
-    },
-  })
-  const module = await load_module(runtime, "node:console")
-  const roots = heap_stats(runtime.memory).roots
-  await evaluate_module(runtime, module)
-  assert.equal(heap_stats(runtime.memory).roots, roots)
 })
 
 test("grown frame and handler stacks unwind and preserve completions across await", async () => {

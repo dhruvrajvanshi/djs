@@ -1,75 +1,90 @@
-# Intrinsic class annotations
+# Runtime, intrinsics and builtins
 
-DJS recognizes `@builtin` and `@internalMethod` during compilation. These
-annotations do not evaluate decorator expressions or call runtime decorator
-functions. Options and hook names must be literals.
+The stdlib is ordinary DJS code layered on a small native core. Each layer
+only depends on the layers below it:
+
+| Layer        | Where                         | Contents                                                         |
+| ------------ | ----------------------------- | ---------------------------------------------------------------- |
+| Builtins     | `stdlib/js/*.js`              | `Object`, `Error`, `Array`… written from the spec text           |
+| Abstract ops | `djs:abstract`                | Spec abstract operations such as `to_string`, `make_constructor` |
+| Support      | `stdlib/js/support.js`        | Private helpers shared by builtins, such as `define_methods`     |
+| Intrinsics   | `djs:intrinsics`, `djs:host`  | Native operations JS cannot express                              |
+| VM           | `vm/*.ts`                     | Values, heap, objects and bytecode; knows no builtin names       |
+
+`djs:intrinsics` exposes object and value primitives (`object_create`,
+`set_prototype`, `define_property`, `array_create`, `string_box`…).
+`djs:host` exposes I/O provided by the embedder (`write_stdout`,
+`process_cwd`, `io_open`, `io_read`, `io_close`).
+
+## Realm intrinsics
+
+The VM needs some stdlib values: prototypes for literals and boxed values,
+error constructors for the errors it throws, coercions, and promise hooks.
+`stdlib/js/intrinsics.js` re-exports them under the names listed in
+`REALM_INTRINSICS` in `vm/intrinsics.ts`, for example:
 
 ```js
-import {
-  builtin_object_create,
-  ordinary_define_own_property,
-} from "djs:intrinsics"
-
-@builtin({ name: "Record", length: 1 })
-class Record {
-  @internalMethod("Call")
-  static #call(receiver, args) {
-    return args[0]
-  }
-
-  @internalMethod("Construct")
-  static #construct(args, newTarget) {
-    return builtin_object_create(newTarget, newTarget.prototype)
-  }
-
-  @internalMethod("DefineOwnProperty")
-  #define(key, descriptor) {
-    return ordinary_define_own_property(this, key, descriptor)
-  }
-}
+export { object_prototype as "%Object.prototype%" } from "./object.js"
 ```
 
-`@builtin` accepts `name` (defaults to the class name), `length` (defaults to the
-constructor's parameter count), and `prototype` (`"object"` by default or
-`"array"`). The Array builtin uses an array prototype and registers the canonical
-layout used by array literals and `array_create`.
+Before the stdlib is evaluated, bootstrap links this manifest and marks the
+binding behind each export; a missing export is a link error. When a marked
+binding is initialized, the VM receives its value. Exported intrinsics must
+therefore be `const` or function bindings whose initial value is final.
 
-Supported internal methods:
+`stdlib/js/realm.js` exports the globals. Its import order is the realm's
+initialization order: `object.js` comes first, because objects created before
+`%Object.prototype%` exists have a null prototype.
 
-| Annotation            | Placement               | Parameters                | Result          |
-| --------------------- | ----------------------- | ------------------------- | --------------- |
-| `"Call"`              | Static private method   | Receiver, argument list   | Any guest value |
-| `"Construct"`         | Static private method   | Argument list, new target | Object          |
-| `"DefineOwnProperty"` | Instance private method | Property key, descriptor  | Boolean         |
+The VM throws errors by calling `%TypeError%`, `%RangeError%` and so on, so
+guest and VM errors are the same kind of object. An error raised before the
+error constructors are initialized is a VM panic.
 
-Argument lists are internal array-like objects with indexed values and `length`.
-Hooks must be synchronous, non-generator methods with two parameters. Each hook
-can be declared once. A class without a Call hook retains the ordinary class
-restriction against calls without `new`. Without a Construct hook, construction
-allocates an instance carrying the class's layout and executes its constructor.
-An explicit Construct hook controls allocation and initialization itself.
+## Built-in functions
 
-Hook references live in GC-traced layout records. Instances retain their layout
-independently of their prototype chain. Annotated instance hooks are VM entry points, rather than ordinary private fields.
-Hook methods are not public properties; changing the prototype or installing a similarly named property does not replace
-them. Inheriting a builtin's prototype alone does not give an object its layout.
+```js
+import { builtin_function, object_create } from "djs:intrinsics"
+import { make_constructor, get_prototype_from_constructor } from "djs:abstract"
+import { object_prototype } from "./object.js"
 
-The VM dispatches guest assignments and property definitions through
-DefineOwnProperty. Returning false produces a TypeError at these throwing entry
-points; thrown guest values propagate unchanged. Public array methods remain
-generic and can operate on ordinary array-like objects.
+const record_prototype = object_create(object_prototype)
 
-`ordinary_define_own_property` bypasses the internal hook and returns false when
+function Record(value) {
+  if (new.target === undefined) return value
+  const record = object_create(
+    get_prototype_from_constructor(new.target, record_prototype),
+  )
+  record.value = value
+  return record
+}
+builtin_function(Record, 1)
+make_constructor(Record, record_prototype)
+```
+
+`builtin_function(fn, length)` marks an ordinary function as a built-in
+function (spec 10.3). Calling it behaves as usual. Constructing it does not
+allocate a receiver: `this` is undefined, `new.target` is set, and the function
+returns the object it creates. The optional `length` replaces the parameter
+count.
+
+`make_constructor` installs a read-only `prototype` and a non-enumerable
+`prototype.constructor`. `define_methods(object, { ... })` from `support.js`
+copies the methods and accessors of an object literal as non-enumerable
+properties, which is how builtins install their methods.
+
+## Exotic objects
+
+Array exotic behavior is implemented in JS. The VM dispatches guest
+assignments and property definitions on arrays to the registered
+`ArrayDefineOwnProperty(array, key, descriptor)`. Returning false produces a
+TypeError at these throwing entry points; thrown guest values propagate
+unchanged.
+
+`ordinary_define_own_property` bypasses this dispatch and returns false when
 ordinary descriptor validation refuses a definition. `ordinary_delete` similarly
 returns a boolean. `ordinary_own_property_keys` snapshots ordinary own keys in
 property order. These are low-level stdlib operations: using them directly can
-bypass the invariants enforced by an exotic object's hook.
+bypass the invariants enforced by an exotic object.
 
-The Array class implements indexed-property growth and length truncation in JS.
-Its allocator still provides array branding, raw storage, and the initial length
-property. Truncation scans existing own keys so sparse arrays do not require a
-loop over every hole.
-
-Instance field layouts and `@internalSlot` are not implemented yet. Ordinary
-static fields are supported. Additional internal methods, general-purpose JS
-decorators, and class inheritance are outside the current annotation surface.
+`error_create(prototype)` allocates an object carrying the `[[ErrorData]]`
+brand, which the host uses to print uncaught errors.

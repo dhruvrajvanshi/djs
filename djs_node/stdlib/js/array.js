@@ -14,64 +14,53 @@ import {
   define_property,
   string_code_unit_at,
   string_slice,
+  builtin_function,
 } from "djs:intrinsics"
 import {
   to_object,
   to_length,
-  to_integer,
-  relative_index,
-  callable,
+  to_integer_or_infinity,
   to_string,
   to_number,
-  is_object,
-  create_data_property,
+  create_data_property_or_throw,
+  get_prototype_from_constructor,
+  make_constructor,
+} from "djs:abstract"
+import {
+  relative_index,
+  callable,
   check_length,
-  object_prototype,
-} from "./abstract.js"
+  define_methods,
+} from "./support.js"
 import Symbol from "./symbol.js"
 import { iterator_prototype } from "./iteration.js"
+import { object_prototype } from "./object.js"
 
-@builtin({ name: "Array", prototype: "array", length: 1 })
-class Array {
-  @internalMethod("Call")
-  static #call(thisArgument, args) {
-    return create_from_arguments(args, Array)
-  }
-  @internalMethod("Construct")
-  static #construct(args, newTarget) {
-    return create_from_arguments(args, newTarget)
-  }
-  @internalMethod("DefineOwnProperty")
-  #defineOwnProperty(key, descriptor) {
-    // Internal method dispatch already supplies a property key.
-    const name = key
-    if (name === "length") return array_set_length(this, descriptor)
-    const index = array_index(name)
-    if (index < 0) return ordinary_define_own_property(this, name, descriptor)
-    const length = get_own_property_descriptor(this, "length")
-    if (index >= length.value && !length.writable) return false
-    if (!ordinary_define_own_property(this, name, descriptor)) return false
-    if (index >= length.value)
-      return ordinary_define_own_property(this, "length", { value: index + 1 })
-    return true
-  }
-  static isArray(value) {
+function Array(...values) {
+  return create_from_arguments(values, new.target ?? Array)
+}
+builtin_function(Array, 1)
+export const array_prototype = array_create(0, object_prototype)
+make_constructor(Array, array_prototype)
+
+define_methods(Array, {
+  isArray(value) {
     return is_array(value)
-  }
+  },
 
-  static of(...items) {
+  of(...items) {
     const count = items.length
     const result = is_constructor(this) ? new this(count) : array_create(count)
     let index = 0
     while (index < count) {
-      create_data_property(result, index, items[index])
+      create_data_property_or_throw(result, index, items[index])
       index = index + 1
     }
     result.length = count
     return result
-  }
+  },
 
-  static from(items, map = undefined, receiver = undefined) {
+  from(items, map = undefined, receiver = undefined) {
     if (map !== undefined) callable(map)
     // String iteration yields code points rather than individual code units.
     if (typeof items === "string") {
@@ -91,7 +80,7 @@ class Array {
         }
         value = string_slice(items, offset, offset + width)
         if (map !== undefined) value = call(map, receiver, value, index)
-        create_data_property(result, index, value)
+        create_data_property_or_throw(result, index, value)
         offset = offset + width
         index = index + 1
       }
@@ -108,20 +97,22 @@ class Array {
     while (index < length) {
       value = object[index]
       if (map !== undefined) value = call(map, receiver, value, index)
-      create_data_property(result, index, value)
+      create_data_property_or_throw(result, index, value)
       index = index + 1
     }
     result.length = length
     return result
-  }
+  },
+})
 
+define_methods(array_prototype, {
   at(index) {
     const object = to_object(this)
     const length = to_length(object.length)
-    const offset = to_integer(index)
+    const offset = to_integer_or_infinity(index)
     const actual = offset < 0 ? length + offset : offset
     return actual < 0 || actual >= length ? undefined : object[actual]
-  }
+  },
 
   push(value) {
     const object = to_object(this)
@@ -135,7 +126,7 @@ class Array {
     }
     object.length = length
     return length
-  }
+  },
 
   pop() {
     const object = to_object(this)
@@ -148,7 +139,7 @@ class Array {
     delete_property(object, length - 1)
     object.length = length - 1
     return value
-  }
+  },
 
   shift() {
     const object = to_object(this)
@@ -167,7 +158,7 @@ class Array {
     delete_property(object, length - 1)
     object.length = length - 1
     return value
-  }
+  },
 
   unshift(value) {
     const object = to_object(this)
@@ -188,7 +179,7 @@ class Array {
     }
     object.length = length + count
     return length + count
-  }
+  },
 
   join(separator) {
     const object = to_object(this)
@@ -216,7 +207,7 @@ class Array {
     } finally {
       joining = parent
     }
-  }
+  },
 
   toString() {
     const object = to_object(this)
@@ -224,7 +215,7 @@ class Array {
     return typeof join === "function"
       ? call(join, object)
       : call(object_prototype.toString, object)
-  }
+  },
 
   slice(start, end) {
     const object = to_object(this)
@@ -236,12 +227,12 @@ class Array {
     let offset = 0
     while (index < last) {
       if (has_property(object, index))
-        create_data_property(result, offset, object[index])
+        create_data_property_or_throw(result, offset, object[index])
       index = index + 1
       offset = offset + 1
     }
     return result
-  }
+  },
 
   concat(value) {
     const result = array_create(0)
@@ -258,20 +249,20 @@ class Array {
         index = 0
         while (index < length) {
           if (has_property(item, index))
-            create_data_property(result, offset, item[index])
+            create_data_property_or_throw(result, offset, item[index])
           offset = offset + 1
           index = index + 1
         }
       } else {
         check_length(offset + 1)
-        create_data_property(result, offset, item)
+        create_data_property_or_throw(result, offset, item)
         offset = offset + 1
       }
       argument = argument + 1
     }
     result.length = offset
     return result
-  }
+  },
 
   reverse() {
     const object = to_object(this)
@@ -295,7 +286,7 @@ class Array {
       upper = upper - 1
     }
     return object
-  }
+  },
 
   fill(value, start = undefined, end = undefined) {
     const object = to_object(this)
@@ -307,7 +298,7 @@ class Array {
       index = index + 1
     }
     return object
-  }
+  },
 
   copyWithin(target, start, end = undefined) {
     const object = to_object(this)
@@ -330,7 +321,7 @@ class Array {
       count = count - 1
     }
     return object
-  }
+  },
 
   splice(start, deleteCount) {
     const object = to_object(this)
@@ -338,7 +329,7 @@ class Array {
     const first = relative_index(start, length)
     let remove = arguments.length === 0 ? 0 : length - first
     if (arguments.length > 1) {
-      remove = to_integer(deleteCount)
+      remove = to_integer_or_infinity(deleteCount)
       if (remove < 0) remove = 0
       if (remove > length - first) remove = length - first
     }
@@ -348,7 +339,7 @@ class Array {
     let index = 0
     while (index < remove) {
       if (has_property(object, first + index))
-        create_data_property(result, index, object[first + index])
+        create_data_property_or_throw(result, index, object[first + index])
       index = index + 1
     }
     if (insert < remove) {
@@ -380,19 +371,19 @@ class Array {
     }
     object.length = length - remove + insert
     return result
-  }
+  },
 
   keys() {
     return iterator(this, 0)
-  }
+  },
 
   values() {
     return iterator(this, 1)
-  }
+  },
 
   entries() {
     return iterator(this, 2)
-  }
+  },
 
   forEach(callback, receiver = undefined) {
     const object = to_object(this)
@@ -409,7 +400,7 @@ class Array {
       index = index + 1
     }
     return undefined
-  }
+  },
 
   map(callback, receiver = undefined) {
     const object = to_object(this)
@@ -423,12 +414,12 @@ class Array {
       if (has_property(object, index)) {
         value = object[index]
         selected = call(callback, receiver, value, index, object)
-        create_data_property(result, index, selected)
+        create_data_property_or_throw(result, index, selected)
       }
       index = index + 1
     }
     return result
-  }
+  },
 
   filter(callback, receiver = undefined) {
     const object = to_object(this)
@@ -444,14 +435,14 @@ class Array {
         value = object[index]
         selected = call(callback, receiver, value, index, object)
         if (selected) {
-          create_data_property(result, offset, value)
+          create_data_property_or_throw(result, offset, value)
           offset = offset + 1
         }
       }
       index = index + 1
     }
     return result
-  }
+  },
 
   some(callback, receiver = undefined) {
     const object = to_object(this)
@@ -469,7 +460,7 @@ class Array {
       index = index + 1
     }
     return false
-  }
+  },
 
   every(callback, receiver = undefined) {
     const object = to_object(this)
@@ -487,7 +478,7 @@ class Array {
       index = index + 1
     }
     return true
-  }
+  },
 
   find(callback, receiver = undefined) {
     const object = to_object(this)
@@ -505,7 +496,7 @@ class Array {
       index = index + 1
     }
     return undefined
-  }
+  },
 
   findIndex(callback, receiver = undefined) {
     const object = to_object(this)
@@ -523,7 +514,7 @@ class Array {
       index = index + 1
     }
     return -1
-  }
+  },
 
   findLast(callback, receiver = undefined) {
     const object = to_object(this)
@@ -541,7 +532,7 @@ class Array {
       index = index - 1
     }
     return undefined
-  }
+  },
 
   findLastIndex(callback, receiver = undefined) {
     const object = to_object(this)
@@ -559,7 +550,7 @@ class Array {
       index = index - 1
     }
     return -1
-  }
+  },
 
   reduce(callback, initial = undefined) {
     const object = to_object(this)
@@ -589,7 +580,7 @@ class Array {
       index = index + 1
     }
     return accumulator
-  }
+  },
 
   reduceRight(callback, initial = undefined) {
     const object = to_object(this)
@@ -619,13 +610,13 @@ class Array {
       index = index - 1
     }
     return accumulator
-  }
+  },
 
   indexOf(search, fromIndex = undefined) {
     const object = to_object(this)
     const length = to_length(object.length)
     if (length === 0) return -1
-    const start = to_integer(fromIndex)
+    const start = to_integer_or_infinity(fromIndex)
     let index = start < 0 ? length + start : start
     if (index < 0) index = 0
     let value
@@ -634,13 +625,14 @@ class Array {
       index = index + 1
     }
     return -1
-  }
+  },
 
   lastIndexOf(search, fromIndex = undefined) {
     const object = to_object(this)
     const length = to_length(object.length)
     if (length === 0) return -1
-    const start = arguments.length < 2 ? length - 1 : to_integer(fromIndex)
+    const start =
+      arguments.length < 2 ? length - 1 : to_integer_or_infinity(fromIndex)
     let index = start < 0 ? length + start : start < length ? start : length - 1
     let value
     while (index >= 0) {
@@ -648,13 +640,13 @@ class Array {
       index = index - 1
     }
     return -1
-  }
+  },
 
   includes(search, fromIndex = undefined) {
     const object = to_object(this)
     const length = to_length(object.length)
     if (length === 0) return false
-    const start = to_integer(fromIndex)
+    const start = to_integer_or_infinity(fromIndex)
     let index = start < 0 ? length + start : start
     if (index < 0) index = 0
     let value
@@ -665,20 +657,20 @@ class Array {
       index = index + 1
     }
     return false
-  }
+  },
 
   sort(compare) {
     return sort_array(this, compare)
-  }
+  },
 
   flat(depth = undefined) {
     const object = to_object(this)
     const length = to_length(object.length)
-    const limit = depth === undefined ? 1 : to_integer(depth)
+    const limit = depth === undefined ? 1 : to_integer_or_infinity(depth)
     const result = array_create(0)
     flatten(result, object, length, limit, undefined, undefined, 0)
     return result
-  }
+  },
 
   flatMap(callback, receiver = undefined) {
     const object = to_object(this)
@@ -687,7 +679,7 @@ class Array {
     const result = array_create(0)
     flatten(result, object, length, 1, callback, receiver, 0)
     return result
-  }
+  },
 
   toReversed() {
     const object = to_object(this)
@@ -695,23 +687,23 @@ class Array {
     const result = array_create(length)
     let index = 0
     while (index < length) {
-      create_data_property(result, index, object[length - index - 1])
+      create_data_property_or_throw(result, index, object[length - index - 1])
       index = index + 1
     }
     return result
-  }
+  },
 
   ["with"](index, value) {
     const object = to_object(this)
     const length = to_length(object.length)
-    const relative = to_integer(index)
+    const relative = to_integer_or_infinity(index)
     const actual = relative < 0 ? length + relative : relative
     if (actual < 0 || actual >= length)
       throw new RangeError("Invalid array index")
     const result = array_create(length)
     let offset = 0
     while (offset < length) {
-      create_data_property(
+      create_data_property_or_throw(
         result,
         offset,
         offset === actual ? value : object[offset],
@@ -719,7 +711,7 @@ class Array {
       offset = offset + 1
     }
     return result
-  }
+  },
 
   toSorted(compare) {
     if (compare !== undefined) callable(compare)
@@ -728,11 +720,11 @@ class Array {
     const result = array_create(length)
     let index = 0
     while (index < length) {
-      create_data_property(result, index, object[index])
+      create_data_property_or_throw(result, index, object[index])
       index = index + 1
     }
     return sort_array(result, compare)
-  }
+  },
 
   toSpliced(start, deleteCount) {
     const object = to_object(this)
@@ -740,7 +732,7 @@ class Array {
     const first = relative_index(start, length)
     let remove = arguments.length === 0 ? 0 : length - first
     if (arguments.length > 1) {
-      remove = to_integer(deleteCount)
+      remove = to_integer_or_infinity(deleteCount)
       if (remove < 0) remove = 0
       if (remove > length - first) remove = length - first
     }
@@ -750,35 +742,47 @@ class Array {
     const result = array_create(count)
     let index = 0
     while (index < first) {
-      create_data_property(result, index, object[index])
+      create_data_property_or_throw(result, index, object[index])
       index = index + 1
     }
     let argument = 0
     while (argument < insert) {
-      create_data_property(result, index, arguments[argument + 2])
+      create_data_property_or_throw(result, index, arguments[argument + 2])
       index = index + 1
       argument = argument + 1
     }
     let source = first + remove
     while (source < length) {
-      create_data_property(result, index, object[source])
+      create_data_property_or_throw(result, index, object[source])
       source = source + 1
       index = index + 1
     }
     return result
-  }
+  },
+})
+
+// The VM passes keys already converted to property keys.
+export function array_define_own_property(array, key, descriptor) {
+  if (key === "length") return array_set_length(array, descriptor)
+  const index = array_index(key)
+  if (index < 0) return ordinary_define_own_property(array, key, descriptor)
+  const length = get_own_property_descriptor(array, "length")
+  if (index >= length.value && !length.writable) return false
+  if (!ordinary_define_own_property(array, key, descriptor)) return false
+  if (index >= length.value)
+    return ordinary_define_own_property(array, "length", { value: index + 1 })
+  return true
 }
 
 function create_from_arguments(args, newTarget) {
-  const candidate = newTarget.prototype
-  const prototype = is_object(candidate) ? candidate : Array.prototype
+  const prototype = get_prototype_from_constructor(newTarget, array_prototype)
   const count = args.length
   if (count === 1 && typeof args[0] === "number")
     return array_create(args[0], prototype)
   const result = array_create(count, prototype)
   let index = 0
   while (index < count) {
-    create_data_property(result, index, args[index])
+    create_data_property_or_throw(result, index, args[index])
     index = index + 1
   }
   return result
@@ -898,7 +902,7 @@ function sort_array(receiver, compare) {
   let count = 0
   while (index < length) {
     if (has_property(object, index)) {
-      create_data_property(values, count, object[index])
+      create_data_property_or_throw(values, count, object[index])
       count = count + 1
     }
     index = index + 1
@@ -926,10 +930,10 @@ function sort_array(receiver, compare) {
           (right >= end ||
             sort_compare(compare, values[left], values[right]) <= 0)
         ) {
-          create_data_property(next, out, values[left])
+          create_data_property_or_throw(next, out, values[left])
           left = left + 1
         } else {
-          create_data_property(next, out, values[right])
+          create_data_property_or_throw(next, out, values[right])
           right = right + 1
         }
         out = out + 1
@@ -971,7 +975,7 @@ function flatten(target, source, length, depth, mapper, receiver, offset) {
         )
       else {
         check_length(offset + 1)
-        create_data_property(target, offset, element)
+        create_data_property_or_throw(target, offset, element)
         offset = offset + 1
       }
     }
@@ -980,8 +984,8 @@ function flatten(target, source, length, depth, mapper, receiver, offset) {
   return offset
 }
 
-define_property(Array.prototype, Symbol.iterator, {
-  value: Array.prototype.values,
+define_property(array_prototype, Symbol.iterator, {
+  value: array_prototype.values,
   writable: true,
   enumerable: false,
   configurable: true,

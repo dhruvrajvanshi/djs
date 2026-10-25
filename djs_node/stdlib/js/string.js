@@ -7,37 +7,42 @@ import {
   array_create,
   set_prototype,
   call,
+  builtin_function,
 } from "djs:intrinsics"
 import {
   to_string,
   to_number,
-  to_integer,
+  to_integer_or_infinity,
   to_length,
-  relative_index,
   require_object_coercible,
-  is_object,
-  create_data_property,
-} from "./abstract.js"
+  create_data_property_or_throw,
+  get_prototype_from_constructor,
+  make_constructor,
+} from "djs:abstract"
+import { relative_index, define_methods } from "./support.js"
+import { object_prototype } from "./object.js"
 import Symbol, { descriptive_string } from "./symbol.js"
 import { iterator_prototype } from "./iteration.js"
 
-@builtin({ name: "String", prototype: "string", length: 1 })
-class String {
-  @internalMethod("Call")
-  static #call(thisArgument, args) {
-    if (args.length === 0) return ""
-    if (typeof args[0] === "symbol") return descriptive_string(args[0])
-    return to_string(args[0])
-  }
+function String(value) {
+  let text = ""
+  if (arguments.length !== 0)
+    text =
+      new.target === undefined && typeof value === "symbol"
+        ? descriptive_string(value)
+        : to_string(value)
+  if (new.target === undefined) return text
+  return string_box(
+    text,
+    get_prototype_from_constructor(new.target, string_prototype),
+  )
+}
+builtin_function(String, 1)
+export const string_prototype = string_box("", object_prototype)
+make_constructor(String, string_prototype)
 
-  @internalMethod("Construct")
-  static #construct(args, newTarget) {
-    const text = args.length === 0 ? "" : to_string(args[0])
-    const prototype = newTarget.prototype
-    return string_box(text, is_object(prototype) ? prototype : String.prototype)
-  }
-
-  static fromCharCode(value) {
+define_methods(String, {
+  fromCharCode(value) {
     let text = ""
     let index = 0
     while (index < arguments.length) {
@@ -45,9 +50,9 @@ class String {
       index = index + 1
     }
     return text
-  }
+  },
 
-  static fromCodePoint(value) {
+  fromCodePoint(value) {
     let text = ""
     let index = 0
     let point
@@ -59,9 +64,9 @@ class String {
       index = index + 1
     }
     return text
-  }
+  },
 
-  static raw(template) {
+  raw(template) {
     require_object_coercible(template)
     const raw = require_object_coercible(template.raw)
     const length = to_length(raw.length)
@@ -74,42 +79,44 @@ class String {
       index = index + 1
     }
     return text
-  }
+  },
+})
 
+define_methods(string_prototype, {
   toString() {
     return string_value(this)
-  }
+  },
 
   valueOf() {
     return string_value(this)
-  }
+  },
 
   at(index) {
     const text = text_receiver(this)
-    const relative = to_integer(index)
+    const relative = to_integer_or_infinity(index)
     const actual = relative < 0 ? text.length + relative : relative
     return actual < 0 || actual >= text.length
       ? undefined
       : character(unit(text, actual))
-  }
+  },
 
   charAt(index) {
     const text = text_receiver(this)
-    const actual = to_integer(index)
+    const actual = to_integer_or_infinity(index)
     return actual < 0 || actual >= text.length
       ? ""
       : character(unit(text, actual))
-  }
+  },
 
   charCodeAt(index) {
     const text = text_receiver(this)
-    const actual = to_integer(index)
+    const actual = to_integer_or_infinity(index)
     return actual < 0 || actual >= text.length ? NaN : unit(text, actual)
-  }
+  },
 
   codePointAt(index) {
     const text = text_receiver(this)
-    const actual = to_integer(index)
+    const actual = to_integer_or_infinity(index)
     if (actual < 0 || actual >= text.length) return undefined
     const first = unit(text, actual)
     if (first < 55296 || first > 56319 || actual + 1 === text.length)
@@ -117,11 +124,11 @@ class String {
     const second = unit(text, actual + 1)
     if (second < 56320 || second > 57343) return first
     return (first - 55296) * 1024 + second - 56320 + 65536
-  }
+  },
 
   [Symbol.iterator]() {
     return string_iterator(text_receiver(this))
-  }
+  },
 
   concat(value) {
     let text = text_receiver(this)
@@ -131,7 +138,7 @@ class String {
       index = index + 1
     }
     return text
-  }
+  },
 
   slice(start, end) {
     const text = text_receiver(this)
@@ -139,7 +146,7 @@ class String {
     const last =
       end === undefined ? text.length : relative_index(end, text.length)
     return string_slice(text, first, last < first ? first : last)
-  }
+  },
 
   substring(start, end) {
     const text = text_receiver(this)
@@ -148,13 +155,13 @@ class String {
     return first < last
       ? string_slice(text, first, last)
       : string_slice(text, last, first)
-  }
+  },
 
   indexOf(search, position = undefined) {
     const text = text_receiver(this)
     const needle = to_string(search)
     return find(text, needle, clamp(position, text.length))
-  }
+  },
 
   lastIndexOf(search, position = undefined) {
     const text = text_receiver(this)
@@ -174,13 +181,13 @@ class String {
       index = index - 1
     }
     return -1
-  }
+  },
 
   includes(search, position = undefined) {
     const text = text_receiver(this)
     const needle = to_string(search)
     return find(text, needle, clamp(position, text.length)) >= 0
-  }
+  },
 
   startsWith(search, position = undefined) {
     const text = text_receiver(this)
@@ -193,7 +200,7 @@ class String {
       index = index + 1
     }
     return true
-  }
+  },
 
   endsWith(search, position = undefined) {
     const text = text_receiver(this)
@@ -208,11 +215,11 @@ class String {
       index = index + 1
     }
     return true
-  }
+  },
 
   repeat(count) {
     let text = text_receiver(this)
-    let times = to_integer(count)
+    let times = to_integer_or_infinity(count)
     if (times < 0 || times === Infinity || text.length * times > 4294967295)
       throw new RangeError("Invalid repeat count")
     if (text.length === 0) return ""
@@ -223,7 +230,7 @@ class String {
       if (times > 0) text = text + text
     }
     return result
-  }
+  },
 
   split(separator, limit) {
     const text = text_receiver(this)
@@ -232,7 +239,7 @@ class String {
     const result = array_create(0)
     if (maximum === 0) return result
     if (needle === undefined) {
-      create_data_property(result, 0, text)
+      create_data_property_or_throw(result, 0, text)
       return result
     }
     let start = 0
@@ -240,7 +247,11 @@ class String {
     let index
     if (needle.length === 0) {
       while (start < text.length && count < maximum) {
-        create_data_property(result, count, character(unit(text, start)))
+        create_data_property_or_throw(
+          result,
+          count,
+          character(unit(text, start)),
+        )
         start = start + 1
         count = count + 1
       }
@@ -248,47 +259,51 @@ class String {
     }
     index = find(text, needle, start)
     while (index >= 0 && count < maximum) {
-      create_data_property(result, count, string_slice(text, start, index))
+      create_data_property_or_throw(
+        result,
+        count,
+        string_slice(text, start, index),
+      )
       count = count + 1
       start = index + needle.length
       index = find(text, needle, start)
     }
     if (count < maximum)
-      create_data_property(
+      create_data_property_or_throw(
         result,
         count,
         string_slice(text, start, text.length),
       )
     return result
-  }
+  },
 
   trim() {
     return trim(this, true, true)
-  }
+  },
 
   trimStart() {
     return trim(this, true, false)
-  }
+  },
 
   trimEnd() {
     return trim(this, false, true)
-  }
+  },
 
   padStart(maximum, fill = undefined) {
     return pad(this, maximum, fill, true)
-  }
+  },
 
   padEnd(maximum, fill = undefined) {
     return pad(this, maximum, fill, false)
-  }
+  },
 
   replace(search, replacement) {
     return replace(this, search, replacement, false)
-  }
+  },
 
   replaceAll(search, replacement) {
     return replace(this, search, replacement, true)
-  }
+  },
 
   isWellFormed() {
     const text = text_receiver(this)
@@ -307,7 +322,7 @@ class String {
       index = index + 1
     }
     return true
-  }
+  },
 
   toWellFormed() {
     const text = text_receiver(this)
@@ -328,8 +343,8 @@ class String {
       index = index + 1
     }
     return result
-  }
-}
+  },
+})
 
 function string_iterator(text) {
   let index = 0
@@ -359,7 +374,7 @@ function text_receiver(value) {
   return to_string(require_object_coercible(value))
 }
 function clamp(value, length) {
-  const index = to_integer(value)
+  const index = to_integer_or_infinity(value)
   return index < 0 ? 0 : index > length ? length : index
 }
 function find(text, search, start) {

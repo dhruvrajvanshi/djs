@@ -49,7 +49,7 @@ test("stdlib console formats error fields recursively and keeps ordinary objects
   const result = app.run()
   assert.equal(
     result.stdout,
-    "undefined: undefined undefined: undefined\n" +
+    "Error:  TypeError: \n" +
       "Error: TypeError: nested\n42: null [object Object]\n" +
       "-Infinity 1.25 1e+21 1e-7\n",
   )
@@ -246,12 +246,13 @@ test("imported bindings are readonly aliases", async (t) => {
 test("guest modules share intrinsic function values through ordinary imports", async (t) => {
   const app = await fixture(t, {
     "dependency.js": `
-      import { write_stdout } from "djs:intrinsics";
+      import { write_stdout } from "djs:host";
       export const saved = write_stdout;
     `,
     "entry.js": `
       import "djs:intrinsics";
-      import { write_stdout as write, io_read, enqueue_job, call } from "djs:intrinsics";
+      import { write_stdout as write, io_read } from "djs:host";
+      import { enqueue_job, call } from "djs:intrinsics";
       import { saved } from "./dependency.js";
       console.log(typeof write, typeof io_read, typeof enqueue_job, typeof call, write === saved);
       const emit = write;

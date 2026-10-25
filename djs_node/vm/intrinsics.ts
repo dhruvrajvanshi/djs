@@ -32,17 +32,69 @@ import {
   has_property_list,
   try_set_prototype,
   ordinary_own_property_keys,
+  define_property,
+  function_code_id,
+  function_flags,
+  set_function_flags,
+  BUILTIN_FUNCTION,
+  mark_error_object,
 } from "./objects.ts"
 import {
   get_own_property_descriptor,
   define_own_property,
 } from "./properties.ts"
-import { create_builtin_object, internal_layout } from "./builtins.ts"
-import { KINDS, TAGS, read_u32, copy_value } from "./memory.ts"
+import {
+  KINDS,
+  TAGS,
+  read_u32,
+  copy_value,
+  alloc_root,
+  free_root,
+} from "./memory.ts"
 import { enqueue_job, start_operation } from "../runtime/jobs.ts"
 import { panic } from "../utils.ts"
 import { OK, THROW, throw_error, clear_exception } from "./completion.ts"
 import type { Status } from "./completion.ts"
+
+// Values the stdlib provides to the VM as exports of stdlib/js/intrinsics.js.
+// Names in %percent% signs are the spec's well-known intrinsics; the others
+// are abstract operations.
+export const REALM_INTRINSICS: readonly string[] = Object.freeze([
+  "%Object.prototype%",
+  "%Array.prototype%",
+  "%String.prototype%",
+  "%Symbol.prototype%",
+  "%Error%",
+  "%TypeError%",
+  "%RangeError%",
+  "%ReferenceError%",
+  "%SyntaxError%",
+  "ToPrimitive",
+  "ToString",
+  "ToNumber",
+  "ArrayDefineOwnProperty",
+  "AwaitPromise",
+  "NewPromiseCapability",
+])
+
+const PROTOTYPE_FIELDS = Object.freeze({
+  "%Object.prototype%": "object_prototype",
+  "%Array.prototype%": "array_prototype",
+  "%String.prototype%": "string_prototype",
+  "%Symbol.prototype%": "symbol_prototype",
+} as const)
+
+export function set_realm_intrinsic(
+  runtime: Runtime,
+  name: string,
+  value: Root,
+) {
+  const root = alloc_root(runtime.memory)
+  copy_value(runtime.memory, root, value)
+  runtime.intrinsics.set(name, root)
+  const field = PROTOTYPE_FIELDS[name as keyof typeof PROTOTYPE_FIELDS]
+  if (field) runtime.memory[field] = root
+}
 
 export const NATIVE_CODE = 0xffffffff
 export const RESUME_CODE = 0xfffffffe
@@ -142,16 +194,46 @@ const INTRINSICS: Record<string, Intrinsic> = {
     ordinary_own_property_keys(runtime.memory, destination, arguments_[0])
     return OK
   },
-  builtin_object_create(runtime, destination, arguments_) {
+  builtin_function(runtime, destination, arguments_) {
     const { memory } = runtime
+    const fn = arguments_[0]
     if (
-      arguments_[0] === undefined ||
-      !internal_layout(memory, arguments_[0], true)
+      fn === undefined ||
+      kind_of(memory, fn) !== KINDS.FUNCTION ||
+      function_code_id(memory, fn) === NATIVE_CODE ||
+      function_code_id(memory, fn) === RESUME_CODE ||
+      function_flags(memory, fn) & 15
     )
-      return throw_error(runtime, "TypeError", "Expected an intrinsic class")
-    if (!is_prototype(memory, arguments_[1]))
+      return throw_error(runtime, "TypeError", "Expected an ordinary function")
+    set_function_flags(
+      memory,
+      fn,
+      function_flags(memory, fn) | BUILTIN_FUNCTION,
+    )
+    if (arguments_[1] !== undefined) {
+      const length = integer(runtime, arguments_[1], "length")
+      if (length < 0) return THROW
+      const key = alloc_root(memory),
+        value = alloc_root(memory)
+      try {
+        write_string(memory, key, "length")
+        write_number(memory, value, length)
+        define_property(memory, fn, key, value, 4)
+      } finally {
+        free_root(memory, key)
+        free_root(memory, value)
+      }
+    }
+    copy_value(memory, destination, fn)
+    return OK
+  },
+  error_create(runtime, destination, arguments_) {
+    const { memory } = runtime
+    if (arguments_[0] === undefined || !is_prototype(memory, arguments_[0]))
       return throw_error(runtime, "TypeError", "Expected an object")
-    create_builtin_object(memory, destination, arguments_[0], arguments_[1])
+    create_object(memory, destination)
+    mark_error_object(memory, destination)
+    set_prototype(memory, destination, arguments_[0])
     return OK
   },
   symbol_create(runtime, destination, arguments_) {
@@ -461,7 +543,31 @@ const INTRINSICS: Record<string, Intrinsic> = {
 }
 
 const INTRINSIC_HANDLERS = Object.freeze(Object.values(INTRINSICS))
-export const INTRINSIC_NAMES = Object.freeze(Object.keys(INTRINSICS))
+const INTRINSIC_NAMES = Object.freeze(Object.keys(INTRINSICS))
+const HOST_NAMES = Object.freeze([
+  "write_stdout",
+  "process_cwd",
+  "io_open",
+  "io_read",
+  "io_close",
+])
+
+function native_module(names: readonly string[]) {
+  return new Map(names.map((name) => [name, intrinsic_id(name)]))
+}
+
+/** Exported names and intrinsic IDs of each native module. */
+export const NATIVE_MODULES: ReadonlyMap<string, Map<string, number>> = new Map(
+  [
+    [
+      "djs:intrinsics",
+      native_module(
+        INTRINSIC_NAMES.filter((name) => !HOST_NAMES.includes(name)),
+      ),
+    ],
+    ["djs:host", native_module(HOST_NAMES)],
+  ],
+)
 
 export function intrinsic_id(name: string) {
   const id = INTRINSIC_NAMES.indexOf(name)

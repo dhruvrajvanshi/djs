@@ -1,4 +1,5 @@
-import { io_open, io_read, io_close, byte_buffer } from "djs:intrinsics"
+import { byte_buffer } from "djs:intrinsics"
+import { io_open, io_read, io_close } from "djs:host"
 import Utf8Decoder from "./utf8.js"
 
 export async function readFile(path, encoding) {

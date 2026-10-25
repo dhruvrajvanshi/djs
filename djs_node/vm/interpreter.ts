@@ -53,11 +53,7 @@ import {
 import type { Root, Memory } from "./memory.ts"
 import type { Runtime, CodeId, LinkedCode } from "../runtime/modules.ts"
 import type { FunctionId } from "../compiler/compile.ts"
-import type {
-  BytecodeOffset,
-  RegisterIndex,
-  BuiltinPrototype,
-} from "../compiler/bytecode.ts"
+import type { BytecodeOffset, RegisterIndex } from "../compiler/bytecode.ts"
 import type {
   Context,
   Frame,
@@ -92,6 +88,7 @@ import {
   function_code_id,
   function_id as callee_function_id,
   function_flags,
+  BUILTIN_FUNCTION,
   load_function_environment,
   load_function_receiver,
   load_function_new_target,
@@ -134,15 +131,6 @@ import {
   wait_for_completion,
 } from "../runtime/jobs.ts"
 
-import {
-  create_builtin_class,
-  install_internal_method,
-  register_builtin,
-  load_internal_method,
-  INTERNAL,
-  internal_layout,
-  create_builtin_object,
-} from "./builtins.ts"
 import { define_value_property } from "./properties.ts"
 import { panic } from "../utils.ts"
 import {
@@ -303,26 +291,6 @@ function call_function(
   const { memory } = runtime
   if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
     return throw_error(runtime, "TypeError", "Value is not callable")
-  const hook = alloc_root(memory)
-  try {
-    if (load_internal_method(memory, hook, callee, INTERNAL.Call)) {
-      const args = alloc_root(memory),
-        this_argument = alloc_root(memory)
-      try {
-        create_arguments_object(memory, args, arguments_)
-        if (receiver !== undefined) copy_value(memory, this_argument, receiver)
-        return invoke_sync(runtime, destination, hook, callee, [
-          this_argument,
-          args,
-        ])
-      } finally {
-        free_root(memory, args)
-        free_root(memory, this_argument)
-      }
-    }
-  } finally {
-    free_root(memory, hook)
-  }
   const code_id = function_code_id(memory, callee),
     function_id = callee_function_id(memory, callee)
   if (code_id === RESUME_CODE) {
@@ -489,7 +457,7 @@ export function coerce_value(
   operation: string,
   hint?: string,
 ): Status {
-  const helper = runtime.coercions?.get(operation)
+  const helper = runtime.intrinsics.get(operation)
   if (helper === undefined) {
     copy_value(runtime.memory, destination, source)
     return OK
@@ -534,7 +502,7 @@ function load_property_key(
 ): Status {
   copy_value(runtime.memory, destination, source)
   if (is_object(runtime.memory, destination))
-    return coerce_value(runtime, destination, destination, "to_string")
+    return coerce_value(runtime, destination, destination, "ToString")
   return OK
 }
 
@@ -772,30 +740,6 @@ const op = {
   },
   CREATE_ARRAY(memory: Memory, destination: Root, length: number) {
     create_array(memory, destination, length)
-  },
-  INIT_BUILTIN_CLASS(
-    memory: Memory,
-    destination: Root,
-    source: Root,
-    prototype: BuiltinPrototype,
-  ) {
-    create_builtin_class(memory, destination, source, prototype)
-  },
-  INSTALL_INTERNAL_METHOD(
-    memory: Memory,
-    target: Root,
-    method: Root,
-    slot: number,
-  ) {
-    install_internal_method(memory, target, method, slot)
-  },
-  REGISTER_BUILTIN(
-    runtime: Runtime,
-    target: Root,
-    value: Root,
-    name: string,
-  ): Status {
-    return register_builtin(runtime, target, value, name)
   },
   DELETE_PROP(
     runtime: Runtime,
@@ -1126,7 +1070,7 @@ const op = {
         )
       if (
         is_object(memory, temporary) &&
-        coerce_value(runtime, temporary, temporary, "to_string") === THROW
+        coerce_value(runtime, temporary, temporary, "ToString") === THROW
       )
         return THROW
     } else if (!["===", "!==", "instanceof"].includes(operator)) {
@@ -1139,14 +1083,13 @@ const op = {
         const hint = operator === "+" || loose ? undefined : "number"
         if (
           left_object &&
-          coerce_value(runtime, temporary, temporary, "to_primitive", hint) ===
+          coerce_value(runtime, temporary, temporary, "ToPrimitive", hint) ===
             THROW
         )
           return THROW
         if (
           right_object &&
-          coerce_value(runtime, operand, operand, "to_primitive", hint) ===
-            THROW
+          coerce_value(runtime, operand, operand, "ToPrimitive", hint) === THROW
         )
           return THROW
       }
@@ -1164,7 +1107,7 @@ const op = {
     if (
       ["+", "-", "~"].includes(operator) &&
       is_object(runtime.memory, operand) &&
-      coerce_value(runtime, operand, operand, "to_number") === THROW
+      coerce_value(runtime, operand, operand, "ToNumber") === THROW
     )
       return THROW
     return unary_operation(runtime, destination, operand, operator)
@@ -1276,20 +1219,6 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           break
         case OP.CREATE_ARRAY:
           op.CREATE_ARRAY(memory, reg(a), b)
-          break
-        case OP.INIT_BUILTIN_CLASS:
-          op.INIT_BUILTIN_CLASS(memory, reg(a), reg(b), c as BuiltinPrototype)
-          break
-        case OP.INSTALL_INTERNAL_METHOD:
-          op.INSTALL_INTERNAL_METHOD(memory, reg(a), reg(b), c)
-          break
-        case OP.REGISTER_BUILTIN:
-          status = op.REGISTER_BUILTIN(
-            runtime,
-            reg(a),
-            reg(b),
-            code.unit.literals[c] as string,
-          )
           break
         case OP.DELETE_PROP:
           status = op.DELETE_PROP(runtime, reg(a), reg(b), reg(c), property_key)
@@ -1494,18 +1423,13 @@ function call_async_function(
   receiver: Root | undefined,
   arguments_: Root[],
 ): Status {
-  if (runtime.promise_capability === undefined)
-    panic("Promise is not initialized")
+  const new_capability = runtime.intrinsics.get("NewPromiseCapability")
+  if (new_capability === undefined) panic("Promise is not initialized")
   const { memory } = runtime
   const key = alloc_root(memory),
     resolve = alloc_root(memory),
     reject = alloc_root(memory)
-  const capability = create_call_context(
-    runtime,
-    runtime.promise_capability,
-    undefined,
-    [],
-  )
+  const capability = create_call_context(runtime, new_capability, undefined, [])
   try {
     run_task(runtime, capability)
     if (context_status(capability) === CONTEXT_STATE.FAILED) {
@@ -1659,31 +1583,6 @@ function construct_function(
   const { memory } = runtime
   if (kind_of(memory, callee) !== KINDS.FUNCTION)
     return throw_error(runtime, "TypeError", "Value is not a constructor")
-  const hook = alloc_root(memory)
-  try {
-    if (load_internal_method(memory, hook, callee, INTERNAL.Construct)) {
-      const args = alloc_root(memory)
-      try {
-        create_arguments_object(memory, args, arguments_)
-        if (
-          invoke_sync(runtime, destination, hook, callee, [args, callee]) ===
-          THROW
-        )
-          return THROW
-        if (!is_object(memory, destination))
-          return throw_error(
-            runtime,
-            "TypeError",
-            "Construct must return an object",
-          )
-        return OK
-      } finally {
-        free_root(memory, args)
-      }
-    }
-  } finally {
-    free_root(memory, hook)
-  }
   const code = function_code_id(memory, callee),
     id = callee_function_id(memory, callee)
   if (
@@ -1699,18 +1598,16 @@ function construct_function(
     environment = alloc_root(memory)
   try {
     load_function_environment(memory, parent, callee)
-    create_object(memory, receiver)
-    // Constructors in the supported subset have data-valued prototype properties.
     const { unit, scope_ids } = runtime.code[code],
       fn = unit.functions[id]
-    write_string(memory, key, "prototype")
-    get_property(memory, prototype, callee, key)
-    if (has_property_list(memory, prototype))
-      set_prototype(memory, receiver, prototype)
-    if (internal_layout(memory, callee, true)) {
-      if (!has_property_list(memory, prototype))
-        copy_value(memory, prototype, runtime.memory.object_prototype!)
-      create_builtin_object(memory, receiver, callee, prototype)
+    const builtin = function_flags(memory, callee) & BUILTIN_FUNCTION
+    if (!builtin) {
+      create_object(memory, receiver)
+      // Constructors in the supported subset have data-valued prototype properties.
+      write_string(memory, key, "prototype")
+      get_property(memory, prototype, callee, key)
+      if (has_property_list(memory, prototype))
+        set_prototype(memory, receiver, prototype)
     }
     create_environment(
       memory,
@@ -1725,12 +1622,13 @@ function construct_function(
       code,
       id,
       environment,
-      receiver,
+      builtin ? undefined : receiver,
       arguments_,
       destination,
       callee,
     )
-    context_set_frame_construct_call(context, context_current_frame(context)!)
+    if (!builtin)
+      context_set_frame_construct_call(context, context_current_frame(context)!)
     return OK
   } finally {
     for (const root of [receiver, key, prototype, parent, environment])

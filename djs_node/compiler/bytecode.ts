@@ -23,15 +23,6 @@ export function register_index(operand: number): RegisterIndex {
 // Six little-endian u32 words per instruction. Branch targets are byte offsets.
 export const INSTRUCTION_BYTES = 24
 
-export const BUILTIN_PROTOTYPE = Object.freeze({
-  object: 0,
-  array: 1,
-  string: 2,
-})
-
-export type BuiltinPrototype =
-  (typeof BUILTIN_PROTOTYPE)[keyof typeof BUILTIN_PROTOTYPE]
-
 export const OP = Object.freeze({
   LOAD_CONST: 1,
   MOVE: 2,
@@ -65,9 +56,6 @@ export const OP = Object.freeze({
   CREATE_ARRAY: 30,
   DELETE_PROP: 31,
   LOAD_NEW_TARGET: 32,
-  INIT_BUILTIN_CLASS: 33,
-  INSTALL_INTERNAL_METHOD: 34,
-  REGISTER_BUILTIN: 35,
   TO_PROPERTY_KEY: 36,
   PUSH_ENV: 37,
   POP_ENV: 38,

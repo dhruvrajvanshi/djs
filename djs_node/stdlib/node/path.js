@@ -1,4 +1,4 @@
-import { process_cwd } from "djs:intrinsics"
+import { process_cwd } from "djs:host"
 
 const SLASH = 47
 

@@ -1,8 +1,9 @@
 import type { Root } from "./memory.ts"
 import type { Runtime } from "../runtime/modules.ts"
-import { copy_value } from "./memory.ts"
-import { write_undefined } from "./values.ts"
-import { create_error } from "./objects.ts"
+import { alloc_root, copy_value, free_root } from "./memory.ts"
+import { write_string, write_undefined } from "./values.ts"
+import { invoke_sync } from "./interpreter.ts"
+import { panic } from "../utils.ts"
 
 /**
  * Operations that guest code can observe failing return a Status. On THROW,
@@ -17,8 +18,36 @@ export function throw_error(
   name: string,
   message: string,
 ): typeof THROW {
-  create_error(runtime, runtime.pending_exception, name, message)
-  return THROW
+  const error = alloc_root(runtime.memory)
+  try {
+    create_error(runtime, error, name, message)
+    return throw_value(runtime, error)
+  } finally {
+    free_root(runtime.memory, error)
+  }
+}
+
+/** Calls the registered %name% constructor. A throwing constructor's exception is the result. */
+export function create_error(
+  runtime: Runtime,
+  destination: Root,
+  name: string,
+  message: string,
+) {
+  const constructor = runtime.intrinsics.get(`%${name}%`)
+  // Errors can only reach guest code once the stdlib has registered them.
+  if (constructor === undefined) panic(`${name}: ${message}`)
+  const text = alloc_root(runtime.memory)
+  try {
+    write_string(runtime.memory, text, message)
+    if (
+      invoke_sync(runtime, destination, constructor, undefined, [text]) ===
+      THROW
+    )
+      take_exception(runtime, destination)
+  } finally {
+    free_root(runtime.memory, text)
+  }
 }
 
 export function throw_value(runtime: Runtime, value: Root): typeof THROW {

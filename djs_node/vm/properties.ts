@@ -25,7 +25,6 @@ import {
   is_object,
 } from "./objects.ts"
 import { invoke_sync, coerce_value } from "./interpreter.ts"
-import { load_internal_method, INTERNAL } from "./builtins.ts"
 import { KINDS, TAGS } from "./memory.ts"
 import { tag_of, get_ref } from "./values.ts"
 import { OK, THROW, throw_error } from "./completion.ts"
@@ -242,13 +241,16 @@ function invoke_define(
     )
       copy_value(runtime.memory, normalized, key)
     else if (is_object(runtime.memory, key)) {
-      if (coerce_value(runtime, normalized, key, "to_string") === THROW)
+      if (coerce_value(runtime, normalized, key, "ToString") === THROW)
         return THROW
     } else
       write_string(runtime.memory, normalized, to_string(runtime.memory, key))
     if (
-      invoke_sync(runtime, result, method, object, [normalized, descriptor]) ===
-      THROW
+      invoke_sync(runtime, result, method, undefined, [
+        object,
+        normalized,
+        descriptor,
+      ]) === THROW
     )
       return THROW
     if (tag_of(runtime.memory, result) !== TAGS.BOOLEAN)
@@ -266,28 +268,23 @@ function invoke_define(
   }
 }
 
-// Returns null when the object has no DefineOwnProperty hook.
+// Array exotic objects define properties through the stdlib's
+// ArrayDefineOwnProperty; other objects are ordinary.
+function exotic_define_own_property(runtime: Runtime, object: Root) {
+  if (kind_of(runtime.memory, object) !== KINDS.ARRAY) return undefined
+  return runtime.intrinsics.get("ArrayDefineOwnProperty")
+}
+
+// Returns null when the object is ordinary.
 function dispatch_define(
   runtime: Runtime,
   object: Root,
   key: Root,
   descriptor: Root,
 ): Status | null {
-  const method = alloc_root(runtime.memory)
-  try {
-    if (
-      !load_internal_method(
-        runtime.memory,
-        method,
-        object,
-        INTERNAL.DefineOwnProperty,
-      )
-    )
-      return null
-    return invoke_define(runtime, method, object, key, descriptor)
-  } finally {
-    free_root(runtime.memory, method)
-  }
+  const method = exotic_define_own_property(runtime, object)
+  if (method === undefined) return null
+  return invoke_define(runtime, method, object, key, descriptor)
 }
 
 export function define_value_property(
@@ -300,43 +297,37 @@ export function define_value_property(
   value_only: boolean = false,
 ): Status {
   const { memory } = runtime
-  const method = alloc_root(memory)
+  const method = exotic_define_own_property(runtime, object)
+  if (method === undefined) {
+    if (!try_define_property(memory, object, key, value, flags, setter))
+      return throw_error(runtime, "TypeError", "Cannot redefine property")
+    return OK
+  }
+  const descriptor = alloc_root(memory),
+    name = alloc_root(memory),
+    field = alloc_root(memory)
   try {
-    if (
-      !load_internal_method(memory, method, object, INTERNAL.DefineOwnProperty)
-    ) {
-      if (!try_define_property(memory, object, key, value, flags, setter))
-        return throw_error(runtime, "TypeError", "Cannot redefine property")
-      return OK
-    }
-    const descriptor = alloc_root(memory),
-      name = alloc_root(memory),
-      field = alloc_root(memory)
-    try {
-      create_object(memory, descriptor)
-      write_string(
-        memory,
-        name,
-        flags & 16 ? (setter === undefined ? "get" : "set") : "value",
-      )
-      define_property(memory, descriptor, name, value)
-      if (!value_only) {
-        for (const [text, mask] of [
-          ["writable", 1],
-          ["enumerable", 2],
-          ["configurable", 4],
-        ] as [string, number][]) {
-          if (mask === 1 && flags & 16) continue
-          write_string(memory, name, text)
-          write_boolean(memory, field, Boolean(flags & mask))
-          define_property(memory, descriptor, name, field)
-        }
+    create_object(memory, descriptor)
+    write_string(
+      memory,
+      name,
+      flags & 16 ? (setter === undefined ? "get" : "set") : "value",
+    )
+    define_property(memory, descriptor, name, value)
+    if (!value_only) {
+      for (const [text, mask] of [
+        ["writable", 1],
+        ["enumerable", 2],
+        ["configurable", 4],
+      ] as [string, number][]) {
+        if (mask === 1 && flags & 16) continue
+        write_string(memory, name, text)
+        write_boolean(memory, field, Boolean(flags & mask))
+        define_property(memory, descriptor, name, field)
       }
-      return invoke_define(runtime, method, object, key, descriptor)
-    } finally {
-      for (const root of [descriptor, name, field]) free_root(memory, root)
     }
+    return invoke_define(runtime, method, object, key, descriptor)
   } finally {
-    free_root(memory, method)
+    for (const root of [descriptor, name, field]) free_root(memory, root)
   }
 }

@@ -29,8 +29,6 @@ export const KINDS = Object.freeze({
   ERROR: 8,
   ARRAY: 9,
   STRING_OBJECT: 10,
-  BUILTIN_OBJECT: 11,
-  INTERNAL_METHODS: 12,
   SYMBOL: 13,
 })
 const CONTROL = Object.freeze({
@@ -60,8 +58,6 @@ export interface Memory {
   array_prototype?: Root
   string_prototype?: Root
   symbol_prototype?: Root
-  array_class?: Root
-  string_class?: Root
 }
 
 function data_view(bytes: Uint8Array) {

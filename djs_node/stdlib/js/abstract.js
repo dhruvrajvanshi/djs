@@ -1,12 +1,7 @@
-import {
-  call,
-  string_box,
-  object_create,
-  define_property,
-} from "djs:intrinsics"
-import Object from "./object.js"
+// Abstract operations from the ECMAScript specification, named after it.
+import { call, string_box, define_property } from "djs:intrinsics"
 
-export function is_object(value) {
+function is_object(value) {
   return (
     value !== null && (typeof value === "object" || typeof value === "function")
   )
@@ -43,30 +38,20 @@ export function to_object(value) {
   require_object_coercible(value)
   if (typeof value === "string") return string_box(value)
   if (is_object(value)) return value
-  return object_create(object_prototype)
+  return {}
 }
-export function to_integer(value) {
+export function to_integer_or_infinity(value) {
   const number = to_number(value)
   if (number !== number || number === 0) return 0
   if (number === Infinity || number === -Infinity) return number
   return number - (number % 1)
 }
 export function to_length(value) {
-  const length = to_integer(value)
+  const length = to_integer_or_infinity(value)
   if (length <= 0) return 0
   return length > 9007199254740991 ? 9007199254740991 : length
 }
-export function relative_index(value, length) {
-  const index = to_integer(value)
-  if (index < 0) return index < -length ? 0 : length + index
-  return index > length ? length : index
-}
-export function callable(value) {
-  if (typeof value !== "function")
-    throw new TypeError("Callback is not callable")
-  return value
-}
-export function create_data_property(object, key, value) {
+export function create_data_property_or_throw(object, key, value) {
   define_property(object, key, {
     value,
     writable: true,
@@ -74,14 +59,26 @@ export function create_data_property(object, key, value) {
     configurable: true,
   })
 }
-export function method(object, key, value, length) {
-  define_property(value, "name", { value: key, configurable: true })
-  define_property(value, "length", { value: length, configurable: true })
+export function create_non_enumerable_data_property_or_throw(
+  object,
+  key,
+  value,
+) {
   define_property(object, key, { value, writable: true, configurable: true })
 }
-export function check_length(length) {
-  if (length > 9007199254740991)
-    throw new TypeError("Array-like length exceeds maximum")
+
+export function get_prototype_from_constructor(constructor, default_prototype) {
+  const prototype = constructor.prototype
+  return is_object(prototype) ? prototype : default_prototype
 }
 
-export const object_prototype = Object.prototype
+// Built-in constructors have a read-only prototype whose constructor
+// property is hidden.
+export function make_constructor(constructor, prototype) {
+  define_property(constructor, "prototype", { value: prototype })
+  create_non_enumerable_data_property_or_throw(
+    prototype,
+    "constructor",
+    constructor,
+  )
+}

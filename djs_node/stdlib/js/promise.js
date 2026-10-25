@@ -1,6 +1,6 @@
 import { enqueue_job, call } from "djs:intrinsics"
 
-export let await_promise
+let await_internal
 
 class Promise {
   #state = 0
@@ -141,7 +141,7 @@ class Promise {
   }
 
   // Await uses captured internal operations, independent of public methods.
-  static #await = (await_promise = function (value, fulfilled, rejected) {
+  static #await = (await_internal = function (value, fulfilled, rejected) {
     const promise = Promise.#resolve(Promise, value)
     Promise.#performThen(promise, fulfilled, rejected, undefined)
   })
@@ -188,7 +188,9 @@ class Promise {
   }
 }
 
-export function promise_capability() {
+export const await_promise = await_internal
+
+export function new_promise_capability() {
   return capability(Promise)
 }
 
