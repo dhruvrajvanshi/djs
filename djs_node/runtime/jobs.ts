@@ -20,6 +20,7 @@ import {
 } from "../vm/objects.ts"
 import { byte_buffer_view } from "../vm/bytes.ts"
 import { KINDS } from "../vm/memory.ts"
+import { panic } from "../utils.ts"
 import { RESUME_CODE } from "../vm/intrinsics.ts"
 import {
   create_call_context,
@@ -53,7 +54,7 @@ function notify(runtime: Runtime) {
 export function enqueue_job(runtime: Runtime, callee: Root, argument?: Root) {
   const { memory, scheduler } = runtime
   if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
-    throw new TypeError("Job is not callable")
+    panic("Job is not callable")
   const fn = alloc_root(memory),
     value = alloc_root(memory)
   copy_value(memory, fn, callee)
@@ -93,8 +94,7 @@ export function await_value(
   destination: Root,
   source: Root,
 ) {
-  if (runtime.promise_await === undefined)
-    throw new Error("Promise is not initialized")
+  if (runtime.promise_await === undefined) panic("Promise is not initialized")
   const { memory } = runtime
   const fulfilled = alloc_root(memory),
     rejected = alloc_root(memory)
@@ -149,7 +149,7 @@ export function start_operation(
     kind_of(memory, resolve) !== KINDS.FUNCTION ||
     kind_of(memory, reject) !== KINDS.FUNCTION
   )
-    throw new TypeError("I/O operation requires resolve and reject callbacks")
+    panic("I/O operation requires resolve and reject callbacks")
   const resolve_root = alloc_root(memory),
     reject_root = alloc_root(memory),
     buffer_root = buffer === undefined ? null : alloc_root(memory)

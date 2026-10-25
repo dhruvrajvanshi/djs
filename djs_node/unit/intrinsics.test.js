@@ -12,7 +12,8 @@ import { alloc_root, free_root, KINDS } from "../vm/memory.ts"
 import { get_ref } from "../vm/values.ts"
 import { INTRINSIC_NAMES } from "../vm/intrinsics.ts"
 import { collect, heap_stats } from "../vm/heap.ts"
-import { kind_of, store_binding } from "../vm/objects.ts"
+import { kind_of, store_binding, to_string } from "../vm/objects.ts"
+import { THROW, clear_exception } from "../vm/completion.ts"
 
 test("djs:intrinsics is a cached virtual module whose exports survive moving GC", async () => {
   const runtime = create_runtime({
@@ -44,16 +45,20 @@ test("djs:intrinsics is a cached virtual module whose exports survive moving GC"
         get_ref(runtime.memory, value),
         get_ref(runtime.memory, saved),
       )
-      assert.throws(
-        () =>
-          store_binding(
-            runtime,
-            module.environment,
-            module.exports.get(name),
-            value,
-          ),
+      assert.equal(
+        store_binding(
+          runtime,
+          module.environment,
+          module.exports.get(name),
+          value,
+        ),
+        THROW,
+      )
+      assert.match(
+        to_string(runtime.memory, runtime.pending_exception),
         /constant binding/,
       )
+      clear_exception(runtime)
     }
   } finally {
     free_root(runtime.memory, value)

@@ -1,4 +1,5 @@
 import type { Brand } from "../utils.ts"
+import { panic } from "../utils.ts"
 
 /** Byte offset into the heap; invalidated when garbage collection moves records. */
 export type HeapRef = number
@@ -159,7 +160,7 @@ export function assert_root(
   root: number,
 ): asserts root is Root {
   if (!Number.isInteger(root) || root < 0 || memory.root_used[root] !== 1) {
-    throw new RangeError(`Invalid root handle: ${root}`)
+    panic(`Invalid root handle: ${root}`)
   }
 }
 

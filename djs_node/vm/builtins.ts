@@ -14,6 +14,10 @@ import {
   copy_root_to_heap_value,
 } from "./memory.ts"
 import { allocate } from "./heap.ts"
+import { panic } from "../utils.ts"
+import { OK, throw_error } from "./completion.ts"
+import type { Status } from "./completion.ts"
+import type { Runtime } from "../runtime/modules.ts"
 import { set_ref, tag_of, write_null, write_string } from "./values.ts"
 import { TAGS } from "./memory.ts"
 import {
@@ -89,45 +93,63 @@ export function install_internal_method(
 ) {
   const layout = internal_layout(memory, constructor, true)
   if (!layout || id > 2 || kind_of(memory, method) !== KINDS.FUNCTION)
-    throw new TypeError("Invalid builtin internal method")
+    panic("Invalid builtin internal method")
   copy_root_to_heap_value(memory, layout + 8 + id * 8, method)
 }
 
 export function register_builtin(
-  memory: Memory,
+  runtime: Runtime,
   constructor: Root,
   prototype: Root,
   name: string,
-) {
+): Status {
+  const { memory } = runtime
   if (name === "Object") {
     if (memory.object_prototype !== undefined)
-      throw new TypeError("Object builtin is already registered")
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Object builtin is already registered",
+      )
     memory.object_prototype = alloc_root(memory)
     copy_value(memory, memory.object_prototype, prototype)
-    return
+    return OK
   }
   if (name === "Symbol") {
     if (memory.symbol_prototype !== undefined)
-      throw new TypeError("Symbol builtin is already registered")
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Symbol builtin is already registered",
+      )
     memory.symbol_prototype = alloc_root(memory)
     copy_value(memory, memory.symbol_prototype, prototype)
-    return
+    return OK
   }
-  if (name !== "Array" && name !== "String") return
+  if (name !== "Array" && name !== "String") return OK
   const layout = internal_layout(memory, constructor, true)
   const kind =
     name === "Array" ? BUILTIN_PROTOTYPE.array : BUILTIN_PROTOTYPE.string
   if (!layout || read_u32(memory, layout + 32) !== kind)
-    throw new TypeError(`${name} requires a ${name.toLowerCase()} prototype`)
+    return throw_error(
+      runtime,
+      "TypeError",
+      `${name} requires a ${name.toLowerCase()} prototype`,
+    )
   const class_field = name === "Array" ? "array_class" : "string_class"
   const prototype_field =
     name === "Array" ? "array_prototype" : "string_prototype"
   if (memory[class_field] !== undefined)
-    throw new TypeError(`${name} builtin is already registered`)
+    return throw_error(
+      runtime,
+      "TypeError",
+      `${name} builtin is already registered`,
+    )
   memory[class_field] = alloc_root(memory)
   copy_value(memory, memory[class_field], constructor)
   memory[prototype_field] = alloc_root(memory)
   copy_value(memory, memory[prototype_field], prototype)
+  return OK
 }
 
 export function create_builtin_object(
@@ -143,7 +165,7 @@ export function create_builtin_object(
     if (prototype === undefined) write_null(memory, parent)
     else copy_value(memory, parent, prototype)
     const layout = internal_layout(memory, owner, true)
-    if (!layout) throw new TypeError("Expected an intrinsic class")
+    if (!layout) panic("Expected an intrinsic class")
     const kind = read_u32(memory, layout + 32)
     if (kind === BUILTIN_PROTOTYPE.array)
       create_array(memory, destination, 0, parent)

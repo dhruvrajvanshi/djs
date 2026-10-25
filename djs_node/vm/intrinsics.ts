@@ -13,6 +13,7 @@ import {
   tag_of,
   string_code_unit_at,
   slice_string,
+  string_length,
   create_symbol,
   load_symbol_description,
 } from "./values.ts"
@@ -27,135 +28,224 @@ import {
   has_property,
   delete_property,
   is_object,
+  has_properties,
+  has_property_list,
+  try_set_prototype,
   ordinary_own_property_keys,
 } from "./objects.ts"
 import {
   get_own_property_descriptor,
   define_own_property,
 } from "./properties.ts"
-import { create_builtin_object } from "./builtins.ts"
+import { create_builtin_object, internal_layout } from "./builtins.ts"
 import { KINDS, TAGS, read_u32, copy_value } from "./memory.ts"
 import { enqueue_job, start_operation } from "../runtime/jobs.ts"
+import { panic } from "../utils.ts"
+import { OK, THROW, throw_error, clear_exception } from "./completion.ts"
+import type { Status } from "./completion.ts"
 
 export const NATIVE_CODE = 0xffffffff
 export const RESUME_CODE = 0xfffffffe
+// Returns -1 after raising, since valid arguments are never negative.
 function integer(
-  memory: Memory,
+  runtime: Runtime,
   value: Root,
   name: string,
   maximum: number = Number.MAX_SAFE_INTEGER,
 ) {
-  if (value === undefined) throw new TypeError(`${name} is required`)
+  const { memory } = runtime
+  if (value === undefined) {
+    throw_error(runtime, "TypeError", `${name} is required`)
+    return -1
+  }
+  if (tag_of(memory, value) !== TAGS.NUMBER) {
+    throw_error(runtime, "TypeError", "Expected a numeric value")
+    return -1
+  }
   const number = read_number(memory, value)
-  if (!Number.isSafeInteger(number) || number < 0 || number > maximum)
-    throw new RangeError(`Invalid ${name}`)
+  if (!Number.isSafeInteger(number) || number < 0 || number > maximum) {
+    throw_error(runtime, "RangeError", `Invalid ${name}`)
+    return -1
+  }
   return number
 }
 
-function string(memory: Memory, value: Root, name: string) {
-  if (value === undefined || kind_of(memory, value) !== KINDS.STRING)
-    throw new TypeError(`${name} must be a string`)
-  return read_string(memory, value)
+// Returns undefined after raising.
+function string(runtime: Runtime, value: Root, name: string) {
+  if (value === undefined || kind_of(runtime.memory, value) !== KINDS.STRING) {
+    throw_error(runtime, "TypeError", `${name} must be a string`)
+    return undefined
+  }
+  return read_string(runtime.memory, value)
+}
+
+function is_string(memory: Memory, value: Root) {
+  return value !== undefined && kind_of(memory, value) === KINDS.STRING
+}
+
+// An omitted prototype argument selects the default.
+function is_prototype(memory: Memory, value: Root | undefined) {
+  return (
+    value === undefined ||
+    tag_of(memory, value) === TAGS.NULL ||
+    has_property_list(memory, value)
+  )
+}
+
+function check_callbacks(runtime: Runtime, resolve: Root, reject: Root) {
+  const { memory } = runtime
+  if (
+    resolve === undefined ||
+    reject === undefined ||
+    kind_of(memory, resolve) !== KINDS.FUNCTION ||
+    kind_of(memory, reject) !== KINDS.FUNCTION
+  )
+    return throw_error(
+      runtime,
+      "TypeError",
+      "I/O operation requires resolve and reject callbacks",
+    )
+  return OK
 }
 
 type Intrinsic = (
   runtime: Runtime,
   destination: Root,
   arguments_: Root[],
-) => void
+) => Status
 
 const INTRINSICS: Record<string, Intrinsic> = {
   ordinary_define_own_property(runtime, destination, arguments_) {
-    const { memory } = runtime
-    try {
-      define_own_property(
-        memory,
-        arguments_[0],
-        arguments_[1],
-        arguments_[2],
-        runtime,
-        true,
-      )
-      write_boolean(memory, destination, true)
-    } catch (error) {
-      if (!(error instanceof TypeError)) throw error
-      write_boolean(memory, destination, false)
-    }
+    const status = define_own_property(
+      runtime,
+      arguments_[0],
+      arguments_[1],
+      arguments_[2],
+      true,
+    )
+    if (status === THROW) clear_exception(runtime)
+    write_boolean(runtime.memory, destination, status === OK)
+    return OK
   },
   ordinary_delete({ memory }, destination, arguments_) {
-    try {
-      delete_property(memory, arguments_[0], arguments_[1])
-      write_boolean(memory, destination, true)
-    } catch (error) {
-      if (!(error instanceof TypeError)) throw error
-      write_boolean(memory, destination, false)
-    }
+    write_boolean(
+      memory,
+      destination,
+      has_properties(memory, arguments_[0]) &&
+        delete_property(memory, arguments_[0], arguments_[1]),
+    )
+    return OK
   },
-  ordinary_own_property_keys({ memory }, destination, arguments_) {
-    ordinary_own_property_keys(memory, destination, arguments_[0])
+  ordinary_own_property_keys(runtime, destination, arguments_) {
+    if (!has_property_list(runtime.memory, arguments_[0]))
+      return throw_error(runtime, "TypeError", "Expected an object")
+    ordinary_own_property_keys(runtime.memory, destination, arguments_[0])
+    return OK
   },
-  builtin_object_create({ memory }, destination, arguments_) {
+  builtin_object_create(runtime, destination, arguments_) {
+    const { memory } = runtime
+    if (
+      arguments_[0] === undefined ||
+      !internal_layout(memory, arguments_[0], true)
+    )
+      return throw_error(runtime, "TypeError", "Expected an intrinsic class")
+    if (!is_prototype(memory, arguments_[1]))
+      return throw_error(runtime, "TypeError", "Expected an object")
     create_builtin_object(memory, destination, arguments_[0], arguments_[1])
+    return OK
   },
-  symbol_create({ memory }, destination, arguments_) {
+  symbol_create(runtime, destination, arguments_) {
+    const { memory } = runtime
     const description = arguments_[0]
     if (
       description !== undefined &&
       tag_of(memory, description) !== TAGS.UNDEFINED &&
       kind_of(memory, description) !== KINDS.STRING
     )
-      throw new TypeError("Symbol description must be a string or undefined")
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Symbol description must be a string or undefined",
+      )
     create_symbol(memory, destination, description)
+    return OK
   },
-  symbol_description({ memory }, destination, arguments_) {
+  symbol_description(runtime, destination, arguments_) {
+    const { memory } = runtime
     if (
       arguments_[0] === undefined ||
       kind_of(memory, arguments_[0]) !== KINDS.SYMBOL
     )
-      throw new TypeError("Expected a symbol")
+      return throw_error(runtime, "TypeError", "Expected a symbol")
     load_symbol_description(memory, destination, arguments_[0])
+    return OK
   },
   well_known_symbol(runtime, destination, arguments_) {
-    const { memory } = runtime
-    const symbol = runtime.well_known_symbols?.get(
-      string(memory, arguments_[0], "Symbol name"),
-    )
-    if (symbol === undefined) throw new TypeError("Unknown well-known symbol")
-    copy_value(memory, destination, symbol)
+    const name = string(runtime, arguments_[0], "Symbol name")
+    if (name === undefined) return THROW
+    const symbol = runtime.well_known_symbols?.get(name)
+    if (symbol === undefined)
+      return throw_error(runtime, "TypeError", "Unknown well-known symbol")
+    copy_value(runtime.memory, destination, symbol)
+    return OK
   },
-  string_code_unit_at({ memory }, destination, arguments_) {
+  string_code_unit_at(runtime, destination, arguments_) {
+    const { memory } = runtime
+    if (!is_string(memory, arguments_[0]))
+      return throw_error(runtime, "TypeError", "Expected a string")
+    const index = integer(runtime, arguments_[1], "string index")
+    if (index < 0) return THROW
+    if (index >= string_length(memory, arguments_[0]))
+      return throw_error(runtime, "RangeError", "Invalid string index")
     write_number(
       memory,
       destination,
-      string_code_unit_at(
-        memory,
-        arguments_[0],
-        integer(memory, arguments_[1], "string index"),
-      ),
+      string_code_unit_at(memory, arguments_[0], index),
     )
+    return OK
   },
-  string_slice({ memory }, destination, arguments_) {
-    slice_string(
-      memory,
-      destination,
-      arguments_[0],
-      integer(memory, arguments_[1], "start"),
-      integer(memory, arguments_[2], "end"),
-    )
+  string_slice(runtime, destination, arguments_) {
+    const { memory } = runtime
+    if (!is_string(memory, arguments_[0]))
+      return throw_error(runtime, "TypeError", "Expected a string")
+    const start = integer(runtime, arguments_[1], "start")
+    if (start < 0) return THROW
+    const end = integer(runtime, arguments_[2], "end")
+    if (end < 0) return THROW
+    if (end < start || end > string_length(memory, arguments_[0]))
+      return throw_error(runtime, "RangeError", "Invalid string range")
+    slice_string(memory, destination, arguments_[0], start, end)
+    return OK
   },
-  string_box({ memory }, destination, arguments_) {
+  string_box(runtime, destination, arguments_) {
+    const { memory } = runtime
+    if (!is_string(memory, arguments_[0]))
+      return throw_error(runtime, "TypeError", "Expected a string")
+    if (!is_prototype(memory, arguments_[1]))
+      return throw_error(runtime, "TypeError", "Expected an object")
     create_string_object(memory, destination, arguments_[0], arguments_[1])
+    return OK
   },
-  string_value({ memory }, destination, arguments_) {
+  string_value(runtime, destination, arguments_) {
+    const { memory } = runtime
+    const kind =
+      arguments_[0] === undefined ? 0 : kind_of(memory, arguments_[0])
+    if (kind !== KINDS.STRING && kind !== KINDS.STRING_OBJECT)
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Receiver is not a string or String object",
+      )
     string_value(memory, destination, arguments_[0])
+    return OK
   },
-  array_create({ memory }, destination, arguments_) {
-    create_array(
-      memory,
-      destination,
-      integer(memory, arguments_[0], "array length", 0xffffffff),
-      arguments_[1],
-    )
+  array_create(runtime, destination, arguments_) {
+    const length = integer(runtime, arguments_[0], "array length", 0xffffffff)
+    if (length < 0) return THROW
+    if (!is_prototype(runtime.memory, arguments_[1]))
+      return throw_error(runtime, "TypeError", "Expected an object")
+    create_array(runtime.memory, destination, length, arguments_[1])
+    return OK
   },
   is_constructor({ memory }, destination, arguments_) {
     let result = false
@@ -171,6 +261,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
         !(read_u32(memory, reference + 32) & 14)
     }
     write_boolean(memory, destination, result)
+    return OK
   },
   is_array({ memory }, destination, arguments_) {
     write_boolean(
@@ -179,60 +270,82 @@ const INTRINSICS: Record<string, Intrinsic> = {
       arguments_[0] !== undefined &&
         kind_of(memory, arguments_[0]) === KINDS.ARRAY,
     )
+    return OK
   },
-  has_property({ memory }, destination, arguments_) {
+  has_property(runtime, destination, arguments_) {
+    const { memory } = runtime
     if (!is_object(memory, arguments_[0]))
-      throw new TypeError("Expected an object")
+      return throw_error(runtime, "TypeError", "Expected an object")
     write_boolean(
       memory,
       destination,
       has_property(memory, arguments_[0], arguments_[1]),
     )
+    return OK
   },
-  delete_property({ memory }, destination, arguments_) {
+  delete_property(runtime, destination, arguments_) {
+    const { memory } = runtime
     if (!is_object(memory, arguments_[0]))
-      throw new TypeError("Expected an object")
-    write_boolean(
-      memory,
-      destination,
-      delete_property(memory, arguments_[0], arguments_[1]),
-    )
+      return throw_error(runtime, "TypeError", "Expected an object")
+    if (!delete_property(memory, arguments_[0], arguments_[1]))
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Cannot delete non-configurable property",
+      )
+    write_boolean(memory, destination, true)
+    return OK
   },
-  get_own_property_descriptor({ memory }, destination, arguments_) {
+  get_own_property_descriptor(runtime, destination, arguments_) {
+    const { memory } = runtime
     if (!is_object(memory, arguments_[0]))
-      throw new TypeError("Expected an object")
+      return throw_error(runtime, "TypeError", "Expected an object")
     get_own_property_descriptor(
       memory,
       destination,
       arguments_[0],
       arguments_[1],
     )
+    return OK
   },
   define_property(runtime, destination, arguments_) {
-    const { memory } = runtime
-    define_own_property(
-      memory,
-      arguments_[0],
-      arguments_[1],
-      arguments_[2],
-      runtime,
+    if (
+      define_own_property(
+        runtime,
+        arguments_[0],
+        arguments_[1],
+        arguments_[2],
+      ) === THROW
     )
-    write_undefined(memory, destination)
+      return THROW
+    write_undefined(runtime.memory, destination)
+    return OK
   },
-  object_create({ memory }, destination, arguments_) {
+  object_create(runtime, destination, arguments_) {
+    const { memory } = runtime
+    if (arguments_[0] === undefined || !is_prototype(memory, arguments_[0]))
+      return throw_error(runtime, "TypeError", "Expected an object")
     create_object(memory, destination)
     set_prototype(memory, destination, arguments_[0])
+    return OK
   },
-  set_prototype({ memory }, destination, arguments_) {
-    set_prototype(memory, arguments_[0], arguments_[1])
-    write_undefined(memory, destination)
-  },
-  get_prototype({ memory }, destination, arguments_) {
+  set_prototype(runtime, destination, arguments_) {
+    const { memory } = runtime
     if (
-      !is_object(memory, arguments_[0]) ||
-      kind_of(memory, arguments_[0]) === KINDS.BYTE_BUFFER
+      !has_property_list(memory, arguments_[0]) ||
+      arguments_[1] === undefined ||
+      !is_prototype(memory, arguments_[1])
     )
-      throw new TypeError("Expected an ordinary object")
+      return throw_error(runtime, "TypeError", "Expected an object")
+    if (!try_set_prototype(memory, arguments_[0], arguments_[1]))
+      return throw_error(runtime, "TypeError", "Cyclic prototype")
+    write_undefined(memory, destination)
+    return OK
+  },
+  get_prototype(runtime, destination, arguments_) {
+    const { memory } = runtime
+    if (!has_property_list(memory, arguments_[0]))
+      return throw_error(runtime, "TypeError", "Expected an ordinary object")
     const reference = get_ref(memory, arguments_[0])
     const prototype = read_u32(
       memory,
@@ -240,40 +353,53 @@ const INTRINSICS: Record<string, Intrinsic> = {
     )
     if (prototype) set_ref(memory, destination, prototype)
     else write_null(memory, destination)
+    return OK
   },
   write_stdout(runtime, destination, arguments_) {
     const { memory } = runtime
-    if (!arguments_.length || kind_of(memory, arguments_[0]) !== KINDS.STRING)
-      throw new TypeError("write_stdout requires a string")
+    if (!is_string(memory, arguments_[0]))
+      return throw_error(runtime, "TypeError", "write_stdout requires a string")
     runtime.host.write_stdout(read_string(memory, arguments_[0]))
     write_undefined(memory, destination)
+    return OK
   },
   process_cwd(runtime, destination) {
     write_string(runtime.memory, destination, runtime.host.cwd())
+    return OK
   },
   enqueue_job(runtime, destination, arguments_) {
+    if (
+      arguments_[0] === undefined ||
+      kind_of(runtime.memory, arguments_[0]) !== KINDS.FUNCTION
+    )
+      return throw_error(runtime, "TypeError", "Job is not callable")
     enqueue_job(runtime, arguments_[0])
     write_undefined(runtime.memory, destination)
+    return OK
   },
-  byte_buffer({ memory }, destination, arguments_) {
-    create_byte_buffer(
-      memory,
-      destination,
-      integer(memory, arguments_[0], "byte buffer length"),
-    )
+  byte_buffer(runtime, destination, arguments_) {
+    const length = integer(runtime, arguments_[0], "byte buffer length")
+    if (length < 0) return THROW
+    if (length > 0x7ffffff0)
+      return throw_error(runtime, "RangeError", "Invalid byte buffer length")
+    create_byte_buffer(runtime.memory, destination, length)
+    return OK
   },
-  string_from_code_unit({ memory }, destination, arguments_) {
-    write_string(
-      memory,
-      destination,
-      String.fromCharCode(integer(memory, arguments_[0], "code unit", 0xffff)),
-    )
+  string_from_code_unit(runtime, destination, arguments_) {
+    const code_unit = integer(runtime, arguments_[0], "code unit", 0xffff)
+    if (code_unit < 0) return THROW
+    write_string(runtime.memory, destination, String.fromCharCode(code_unit))
+    return OK
   },
   io_open(runtime, destination, arguments_) {
-    const { memory } = runtime
-    const path = string(memory, arguments_[0], "path"),
-      flags = string(memory, arguments_[1], "flags"),
-      mode = integer(memory, arguments_[2], "mode", 0o7777)
+    const path = string(runtime, arguments_[0], "path")
+    if (path === undefined) return THROW
+    const flags = string(runtime, arguments_[1], "flags")
+    if (flags === undefined) return THROW
+    const mode = integer(runtime, arguments_[2], "mode", 0o7777)
+    if (mode < 0) return THROW
+    if (check_callbacks(runtime, arguments_[3], arguments_[4]) === THROW)
+      return THROW
     start_operation(
       runtime,
       arguments_[3],
@@ -281,18 +407,29 @@ const INTRINSICS: Record<string, Intrinsic> = {
       () => runtime.host.open(path, flags, mode),
       { syscall: "open", path },
     )
-    write_undefined(memory, destination)
+    write_undefined(runtime.memory, destination)
+    return OK
   },
   io_read(runtime, destination, arguments_) {
     const { memory } = runtime
-    const handle = integer(memory, arguments_[0], "file handle"),
-      buffer = arguments_[1],
-      offset = integer(memory, arguments_[2], "buffer offset", 0xffffffff),
-      length = integer(memory, arguments_[3], "read length", 0xffffffff)
-    if (buffer === undefined) throw new TypeError("Expected a byte buffer")
+    const handle = integer(runtime, arguments_[0], "file handle")
+    if (handle < 0) return THROW
+    const buffer = arguments_[1]
+    const offset = integer(runtime, arguments_[2], "buffer offset", 0xffffffff)
+    if (offset < 0) return THROW
+    const length = integer(runtime, arguments_[3], "read length", 0xffffffff)
+    if (length < 0) return THROW
+    if (buffer === undefined || kind_of(memory, buffer) !== KINDS.BYTE_BUFFER)
+      return throw_error(runtime, "TypeError", "Expected a byte buffer")
     const capacity = byte_buffer_view(memory, buffer).length
     if (offset > capacity || length > capacity - offset)
-      throw new RangeError("Read exceeds byte buffer bounds")
+      return throw_error(
+        runtime,
+        "RangeError",
+        "Read exceeds byte buffer bounds",
+      )
+    if (check_callbacks(runtime, arguments_[4], arguments_[5]) === THROW)
+      return THROW
     start_operation(
       runtime,
       arguments_[4],
@@ -301,10 +438,13 @@ const INTRINSICS: Record<string, Intrinsic> = {
       { buffer, offset, length, syscall: "read" },
     )
     write_undefined(memory, destination)
+    return OK
   },
   io_close(runtime, destination, arguments_) {
-    const { memory } = runtime
-    const handle = integer(memory, arguments_[0], "file handle")
+    const handle = integer(runtime, arguments_[0], "file handle")
+    if (handle < 0) return THROW
+    if (check_callbacks(runtime, arguments_[1], arguments_[2]) === THROW)
+      return THROW
     start_operation(
       runtime,
       arguments_[1],
@@ -312,10 +452,11 @@ const INTRINSICS: Record<string, Intrinsic> = {
       () => runtime.host.close(handle),
       { syscall: "close" },
     )
-    write_undefined(memory, destination)
+    write_undefined(runtime.memory, destination)
+    return OK
   },
   call() {
-    throw new Error("call is handled by the interpreter")
+    panic("call is handled by the interpreter")
   },
 }
 
@@ -335,8 +476,8 @@ export function call_intrinsic(
   id: number,
   destination: Root,
   arguments_: Root[],
-) {
+): Status {
   const intrinsic = INTRINSIC_HANDLERS[id]
-  if (intrinsic === undefined) throw new Error(`Invalid intrinsic ID: ${id}`)
-  intrinsic(runtime, destination, arguments_)
+  if (intrinsic === undefined) panic(`Invalid intrinsic ID: ${id}`)
+  return intrinsic(runtime, destination, arguments_)
 }

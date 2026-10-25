@@ -12,3 +12,7 @@ export function record_invert<K extends PropertyKey, V extends PropertyKey>(
   }
   return inverted
 }
+
+export function panic(message: string): never {
+  throw new Error(message)
+}

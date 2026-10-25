@@ -33,6 +33,9 @@ import {
 } from "./values.ts"
 import { allocate } from "./heap.ts"
 import { byte_buffer_view } from "./bytes.ts"
+import { panic } from "../utils.ts"
+import { OK, THROW, throw_error } from "./completion.ts"
+import type { Status } from "./completion.ts"
 
 export function kind_of(memory: Memory, value: Root) {
   return tag_of(memory, value) === TAGS.REF
@@ -226,7 +229,7 @@ export function environment_at(
     )
   }
   if (kind_of(memory, destination) !== KINDS.ENVIRONMENT)
-    throw new Error("Invalid lexical environment")
+    panic("Invalid lexical environment")
 }
 
 export function load_binding(
@@ -234,25 +237,55 @@ export function load_binding(
   destination: Root,
   environment: Root,
   slot: number,
-) {
+): Status {
   const { memory } = runtime
   const reference = get_ref(memory, environment)
-  if (slot >= read_u32(memory, reference + 16))
-    throw new RangeError("Invalid binding slot")
+  if (slot >= read_u32(memory, reference + 16)) panic("Invalid binding slot")
   const scope = runtime.scopes[read_u32(memory, reference + 20)]
   const imported = scope.import_bindings?.get(slot)
-  if (imported) {
-    load_binding(
+  if (imported)
+    return load_binding(
       runtime,
       destination,
       runtime.modules[imported.module_id].environment,
       imported.slot,
     )
-    return
-  }
   copy_heap_value_to_root(memory, destination, reference + 24 + slot * 8)
   if (tag_of(memory, destination) === TAGS.UNINITIALIZED)
-    throw new ReferenceError("Cannot access binding before initialization")
+    return throw_error(
+      runtime,
+      "ReferenceError",
+      "Cannot access binding before initialization",
+    )
+  return OK
+}
+
+function binding_uninitialized(memory: Memory, offset: number) {
+  const previous = alloc_root(memory)
+  try {
+    copy_heap_value_to_root(memory, previous, offset)
+    return tag_of(memory, previous) === TAGS.UNINITIALIZED
+  } finally {
+    free_root(memory, previous)
+  }
+}
+
+export function initialize_binding(
+  runtime: Runtime,
+  environment: Root,
+  slot: number,
+  source: Root,
+) {
+  const { memory } = runtime
+  const reference = get_ref(memory, environment)
+  if (slot >= read_u32(memory, reference + 16)) panic("Invalid binding slot")
+  const scope = runtime.scopes[read_u32(memory, reference + 20)]
+  if (scope.import_bindings?.has(slot))
+    panic("Cannot initialize an imported binding")
+  const offset = reference + 24 + slot * 8
+  if (!binding_uninitialized(memory, offset))
+    panic("Binding is already initialized")
+  copy_root_to_heap_value(memory, offset, source)
 }
 
 export function store_binding(
@@ -260,29 +293,28 @@ export function store_binding(
   environment: Root,
   slot: number,
   source: Root,
-  initialize: boolean = false,
-) {
+): Status {
   const { memory } = runtime
   const reference = get_ref(memory, environment)
-  if (slot >= read_u32(memory, reference + 16))
-    throw new RangeError("Invalid binding slot")
+  if (slot >= read_u32(memory, reference + 16)) panic("Invalid binding slot")
   const scope = runtime.scopes[read_u32(memory, reference + 20)]
   if (scope.import_bindings?.has(slot))
-    throw new TypeError("Cannot assign to an imported binding")
-  const previous = alloc_root(memory)
-  try {
-    copy_heap_value_to_root(memory, previous, reference + 24 + slot * 8)
-    const uninitialized = tag_of(memory, previous) === TAGS.UNINITIALIZED
-    if (!initialize && uninitialized)
-      throw new ReferenceError("Cannot access binding before initialization")
-    if (initialize && !uninitialized)
-      throw new ReferenceError("Binding is already initialized")
-    if (!initialize && scope.binding_flags[slot])
-      throw new TypeError("Assignment to constant binding")
-    copy_root_to_heap_value(memory, reference + 24 + slot * 8, source)
-  } finally {
-    free_root(memory, previous)
-  }
+    return throw_error(
+      runtime,
+      "TypeError",
+      "Cannot assign to an imported binding",
+    )
+  const offset = reference + 24 + slot * 8
+  if (binding_uninitialized(memory, offset))
+    return throw_error(
+      runtime,
+      "ReferenceError",
+      "Cannot access binding before initialization",
+    )
+  if (scope.binding_flags[slot])
+    return throw_error(runtime, "TypeError", "Assignment to constant binding")
+  copy_root_to_heap_value(memory, offset, source)
+  return OK
 }
 
 // Object and function records have separate payloads but share property semantics.
@@ -301,7 +333,22 @@ function object_offsets(memory: Memory, object: Root): [number, number] {
     ).includes(kind)
   )
     return [8, 12]
-  throw new TypeError("Expected an object")
+  panic("Expected an object")
+}
+
+/** Objects with an ordinary property list and prototype slot. */
+export function has_property_list(memory: Memory, value: Root) {
+  return (
+    is_object(memory, value) && kind_of(memory, value) !== KINDS.BYTE_BUFFER
+  )
+}
+
+/** Values whose properties the VM can read without boxing. */
+export function has_properties(memory: Memory, value: Root) {
+  const kind = kind_of(memory, value)
+  return (
+    kind === KINDS.STRING || kind === KINDS.SYMBOL || is_object(memory, value)
+  )
 }
 
 /** String keys compare by contents; symbol and private keys by identity. */
@@ -532,15 +579,12 @@ export function has_property(
   }
 }
 
+/** Returns false when the property is non-configurable. */
 export function delete_property(memory: Memory, object: Root, key: Root) {
   const name = property_key(memory, key)
   const virtual = virtual_property(memory, object, name)
-  if (virtual) throw new TypeError("Cannot delete non-configurable property")
-  if (
-    kind_of(memory, object) === KINDS.STRING ||
-    kind_of(memory, object) === KINDS.SYMBOL
-  )
-    return true
+  if (virtual) return false
+  if (!has_property_list(memory, object)) return true
   const [head] = object_offsets(memory, object)
   let link = get_ref(memory, object) + head
   let property = read_u32(memory, link)
@@ -550,8 +594,7 @@ export function delete_property(memory: Memory, object: Root, key: Root) {
       if (!(read_u32(memory, property + 12) & 8)) {
         copy_heap_value_to_root(memory, temporary, property + 16)
         if (key_matches(memory, temporary, name)) {
-          if (!(read_u32(memory, property + 12) & 4))
-            throw new TypeError("Cannot delete non-configurable property")
+          if (!(read_u32(memory, property + 12) & 4)) return false
           write_u32(memory, link, read_u32(memory, property + 8))
           return true
         }
@@ -585,7 +628,7 @@ export function create_array(
   prototype?: Root,
 ) {
   if (!Number.isInteger(length) || length < 0 || length > 0xffffffff)
-    throw new RangeError("Invalid array length")
+    panic("Invalid array length")
   set_ref(memory, destination, allocate(memory, KINDS.ARRAY, 16))
   if (prototype === undefined) prototype = memory.array_prototype
   if (prototype !== undefined) set_prototype(memory, destination, prototype)
@@ -628,8 +671,7 @@ export function create_string_object(
   value: Root,
   prototype?: Root,
 ) {
-  if (kind_of(memory, value) !== KINDS.STRING)
-    throw new TypeError("Expected a string")
+  if (kind_of(memory, value) !== KINDS.STRING) panic("Expected a string")
   // Root the source separately when the destination aliases the argument.
   const source = alloc_root(memory)
   try {
@@ -654,10 +696,23 @@ export function string_value(memory: Memory, destination: Root, value: Root) {
     copy_value(memory, destination, value)
   else if (kind_of(memory, value) === KINDS.STRING_OBJECT)
     copy_heap_value_to_root(memory, destination, get_ref(memory, value) + 16)
-  else throw new TypeError("Receiver is not a string or String object")
+  else panic("Receiver is not a string or String object")
 }
 
 export function define_property(
+  memory: Memory,
+  object: Root,
+  key: Root,
+  value: Root,
+  flags: number = 7,
+  setter?: Root,
+) {
+  if (!try_define_property(memory, object, key, value, flags, setter))
+    panic("Cannot redefine property")
+}
+
+/** Returns false when an existing non-configurable property forbids the change. */
+export function try_define_property(
   memory: Memory,
   object: Root,
   key: Root,
@@ -672,14 +727,12 @@ export function define_property(
     const previous = alloc_root(memory)
     try {
       write_primitive(memory, previous, virtual.value)
-      if (flags !== virtual.flags || !same_value(memory, previous, value))
-        throw new TypeError("Cannot redefine property")
-      return
+      return flags === virtual.flags && same_value(memory, previous, value)
     } finally {
       free_root(memory, previous)
     }
   }
-  ordinary_define_property(memory, object, key, value, flags, setter)
+  return ordinary_define_property(memory, object, key, value, flags, setter)
 }
 
 function ordinary_define_property(
@@ -706,7 +759,7 @@ function ordinary_define_property(
         (flags & (2 | 4 | 16)) !== (previous_flags & (2 | 16)) ||
         (!(previous_flags & 1) && flags & 1)
       )
-        throw new TypeError("Cannot redefine property")
+        return false
       if (previous_flags & 16 || !(previous_flags & 1)) {
         const previous = alloc_root(memory)
         try {
@@ -715,8 +768,7 @@ function ordinary_define_property(
             previous,
             property + (flags & 16 && setter !== undefined ? 32 : 24),
           )
-          if (!same_value(memory, previous, value))
-            throw new TypeError("Cannot redefine property")
+          if (!same_value(memory, previous, value)) return false
         } finally {
           free_root(memory, previous)
         }
@@ -739,7 +791,7 @@ function ordinary_define_property(
         value,
       )
       write_u32(memory, property + 12, flags)
-      return
+      return true
     }
     write_u32(memory, property + 12, flags)
     copy_root_to_heap_value(memory, property + 24, value)
@@ -751,7 +803,7 @@ function ordinary_define_property(
         free_root(memory, empty)
       }
     }
-    return
+    return true
   }
   const normalized = alloc_root(memory)
   try {
@@ -773,65 +825,103 @@ function ordinary_define_property(
       value,
     )
     write_u32(memory, object_reference + head, reference)
+    return true
   } finally {
     free_root(memory, normalized)
   }
 }
 
-export function set_property(
-  memory: Memory,
+export type DefineValue = (
+  runtime: Runtime,
   object: Root,
   key: Root,
   value: Root,
-  define: (
-    memory: Memory,
-    object: Root,
-    key: Root,
-    value: Root,
-    flags?: number,
-    setter?: Root,
-    value_only?: boolean,
-  ) => void = define_property,
+  flags?: number,
+  setter?: Root,
+  value_only?: boolean,
+) => Status
+
+function define_ordinary_value(
+  runtime: Runtime,
+  object: Root,
+  key: Root,
+  value: Root,
+  flags?: number,
 ) {
+  if (!try_define_property(runtime.memory, object, key, value, flags))
+    return throw_error(runtime, "TypeError", "Cannot redefine property")
+  return OK
+}
+
+/** Loads the setter into `setter` when the assignment must call one. */
+export function set_property(
+  runtime: Runtime,
+  setter: Root,
+  object: Root,
+  key: Root,
+  value: Root,
+  define: DefineValue = define_ordinary_value,
+): Status {
+  const { memory } = runtime
+  write_undefined(memory, setter)
   if (kind_of(memory, object) === KINDS.BYTE_BUFFER) {
-    const name = to_string(memory, key),
+    const name =
+        kind_of(memory, key) === KINDS.SYMBOL ? "" : to_string(memory, key),
       index = Number(name),
       bytes = byte_buffer_view(memory, object)
-    if (name === "length") throw new TypeError("Byte buffer length is readonly")
+    if (name === "length")
+      return throw_error(runtime, "TypeError", "Byte buffer length is readonly")
     if (
       String(index) !== name ||
       !Number.isInteger(index) ||
       index < 0 ||
       index >= bytes.length
     )
-      throw new RangeError("Invalid byte buffer index")
+      return throw_error(runtime, "RangeError", "Invalid byte buffer index")
+    if (tag_of(memory, value) !== TAGS.NUMBER)
+      return throw_error(runtime, "TypeError", "Expected a numeric value")
     bytes[index] = read_number(memory, value)
-    return 0
+    return OK
   }
   const name = property_key(memory, key)
   if (
     kind_of(memory, object) === KINDS.STRING ||
     virtual_property(memory, object, name)
   )
-    throw new TypeError("Cannot assign to readonly string property")
+    return throw_error(
+      runtime,
+      "TypeError",
+      "Cannot assign to readonly string property",
+    )
   const current = alloc_root(memory)
   try {
     copy_value(memory, current, object)
     while (true) {
       const descriptor = own_property(memory, current, name)
       if (descriptor) {
-        if (descriptor.flags & 16) return descriptor.property
+        if (descriptor.flags & 16) {
+          load_property_setter(memory, setter, descriptor.property!)
+          if (tag_of(memory, setter) === TAGS.UNDEFINED)
+            return throw_error(runtime, "TypeError", "Property has no setter")
+          return OK
+        }
         if (!(descriptor.flags & 1))
-          throw new TypeError("Cannot assign to readonly property")
+          return throw_error(
+            runtime,
+            "TypeError",
+            "Cannot assign to readonly property",
+          )
         break
       }
       const prototype = prototype_reference(memory, current)
       if (!prototype) break
       set_ref(memory, current, prototype)
     }
+    if (!has_property_list(memory, object))
+      return throw_error(runtime, "TypeError", "Expected an object")
     const own = own_property(memory, object, name)
-    define(
-      memory,
+    return define(
+      runtime,
       object,
       key,
       value,
@@ -839,14 +929,13 @@ export function set_property(
       undefined,
       Boolean(own),
     )
-    return 0
   } finally {
     free_root(memory, current)
   }
 }
 
 export function private_property(
-  memory: Memory,
+  runtime: Runtime,
   destination: Root,
   object: Root,
   key: Root,
@@ -854,61 +943,69 @@ export function private_property(
   initialize: boolean = false,
   has: boolean = false,
   readonly: boolean = false,
-) {
+): Status {
+  const { memory } = runtime
   if (has && kind_of(memory, object) === KINDS.BYTE_BUFFER) {
     write_boolean(memory, destination, false)
-    return
+    return OK
   }
-  if (
-    has &&
-    !(
-      [
-        KINDS.OBJECT,
-        KINDS.FUNCTION,
-        KINDS.ERROR,
-        KINDS.ARRAY,
-        KINDS.STRING_OBJECT,
-        KINDS.BUILTIN_OBJECT,
-      ] as number[]
-    ).includes(kind_of(memory, object))
-  )
-    throw new TypeError("Private brand check requires an object")
+  if (!has_property_list(memory, object))
+    return throw_error(
+      runtime,
+      "TypeError",
+      has ? "Private brand check requires an object" : "Expected an object",
+    )
   const property = find_property(memory, object, key, true, true)
   if (has) {
     write_boolean(memory, destination, property !== 0)
-    return
+    return OK
   }
   if (initialize) {
     if (property !== 0)
-      throw new TypeError("Private field is already initialized")
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Private field is already initialized",
+      )
     define_property(memory, object, key, value!, readonly ? 8 : 9)
   } else {
-    if (property === 0) throw new TypeError("Invalid private field receiver")
+    if (property === 0)
+      return throw_error(runtime, "TypeError", "Invalid private field receiver")
     if (value === undefined)
       copy_heap_value_to_root(memory, destination, property + 24)
     else {
       if (!(read_u32(memory, property + 12) & 1))
-        throw new TypeError("Private method is readonly")
+        return throw_error(runtime, "TypeError", "Private method is readonly")
       copy_root_to_heap_value(memory, property + 24, value)
     }
   }
+  return OK
 }
 
 export function set_prototype(memory: Memory, object: Root, prototype: Root) {
+  if (!try_set_prototype(memory, object, prototype)) panic("Cyclic prototype")
+}
+
+/** Returns false when the change would create a prototype cycle. */
+export function try_set_prototype(
+  memory: Memory,
+  object: Root,
+  prototype: Root,
+) {
   const [, offset] = object_offsets(memory, object)
   const reference =
     tag_of(memory, prototype) === TAGS.NULL ? 0 : get_ref(memory, prototype)
   if (reference) object_offsets(memory, prototype)
   let current = reference
   while (current) {
-    if (current === get_ref(memory, object))
-      throw new TypeError("Cyclic prototype")
+    if (current === get_ref(memory, object)) return false
     current = read_u32(
       memory,
       current + (read_u32(memory, current) === KINDS.FUNCTION ? 28 : 12),
     )
   }
   write_u32(memory, get_ref(memory, object) + offset, reference)
+  return true
 }
 
 export function create_value_array(
@@ -935,7 +1032,7 @@ export function load_value_array_element(
     index < 0 ||
     index >= read_u32(memory, reference + 8)
   )
-    throw new RangeError("Invalid value array index")
+    panic("Invalid value array index")
   copy_heap_value_to_root(memory, destination, reference + 16 + index * 8)
 }
 
@@ -994,7 +1091,7 @@ export function to_string(memory: Memory, value: Root): string {
         case KINDS.STRING:
           return read_string(memory, value)
         case KINDS.SYMBOL:
-          throw new TypeError("Cannot convert a Symbol value to a string")
+          panic("Cannot convert a Symbol value to a string")
         case KINDS.FUNCTION:
           return "[Function]"
         case KINDS.OBJECT:
@@ -1018,7 +1115,7 @@ export function to_string(memory: Memory, value: Root): string {
           return "[object Object]"
       }
     default:
-      throw new ReferenceError("Invalid internal value exposed to guest code")
+      panic("Invalid internal value exposed to guest code")
   }
 }
 
@@ -1037,7 +1134,7 @@ export function truthy(memory: Memory, value: Root) {
         read_string(memory, value).length !== 0
       )
     default:
-      throw new ReferenceError("Invalid internal value")
+      panic("Invalid internal value")
   }
 }
 
@@ -1054,11 +1151,9 @@ function primitive(memory: Memory, value: Root): Literal {
     case TAGS.REF:
       if (kind_of(memory, value) === KINDS.STRING)
         return read_string(memory, value)
-      if (kind_of(memory, value) === KINDS.SYMBOL)
-        throw new TypeError("Cannot convert a Symbol value")
-      throw new TypeError("Object coercion is not implemented yet")
+      panic("Expected a primitive value")
     default:
-      throw new ReferenceError("Invalid internal value")
+      panic("Invalid internal value")
   }
 }
 
@@ -1071,31 +1166,46 @@ export function write_primitive(
   else if (typeof value === "number") write_number(memory, destination, value)
   else if (typeof value === "boolean") write_boolean(memory, destination, value)
   else if (value === undefined) write_undefined(memory, destination)
-  else throw new TypeError("Unsupported primitive result")
+  else panic("Unsupported primitive result")
+}
+
+// Host operators can only coerce primitives; objects must be converted first.
+function check_primitive(runtime: Runtime, value: Root): Status {
+  if (kind_of(runtime.memory, value) === KINDS.SYMBOL)
+    return throw_error(runtime, "TypeError", "Cannot convert a Symbol value")
+  if (kind_of(runtime.memory, value) > KINDS.STRING)
+    return throw_error(
+      runtime,
+      "TypeError",
+      "Object coercion is not implemented yet",
+    )
+  return OK
 }
 
 export function binary_operation(
-  memory: Memory,
+  runtime: Runtime,
   destination: Root,
   left: Root,
   right: Root,
   operator: string,
-) {
+): Status {
+  const { memory } = runtime
   if (operator === "in") {
     if (!is_object(memory, right))
-      throw new TypeError("Right operand of in must be an object")
+      panic("Right operand of in must be an object")
     write_boolean(memory, destination, has_property(memory, right, left))
-    return
+    return OK
   }
   if (operator === "instanceof") {
     if (kind_of(memory, right) !== KINDS.FUNCTION)
-      throw new TypeError("Expected a constructor")
+      return throw_error(runtime, "TypeError", "Expected a constructor")
     const key = alloc_root(memory),
       prototype = alloc_root(memory)
     try {
       write_string(memory, key, "prototype")
       get_property(memory, prototype, right, key)
-      object_offsets(memory, prototype)
+      if (!has_property_list(memory, prototype))
+        return throw_error(runtime, "TypeError", "Expected an object")
       let found = false
       if (
         (
@@ -1123,7 +1233,7 @@ export function binary_operation(
         }
       }
       write_boolean(memory, destination, found)
-      return
+      return OK
     } finally {
       free_root(memory, key)
       free_root(memory, prototype)
@@ -1143,8 +1253,10 @@ export function binary_operation(
       destination,
       operator === "===" || operator === "==" ? equal : !equal,
     )
-    return
+    return OK
   }
+  if (check_primitive(runtime, left) === THROW) return THROW
+  if (check_primitive(runtime, right) === THROW) return THROW
   // Host operators perform JavaScript coercion on the guest primitives.
   const a: any = primitive(memory, left),
     b: any = primitive(memory, right)
@@ -1211,24 +1323,26 @@ export function binary_operation(
       result = a >>> b
       break
     default:
-      throw new SyntaxError(`Unsupported binary operator: ${operator}`)
+      panic(`Unsupported binary operator: ${operator}`)
   }
   write_primitive(memory, destination, result)
+  return OK
 }
 
 export function unary_operation(
-  memory: Memory,
+  runtime: Runtime,
   destination: Root,
   source: Root,
   operator: string,
-) {
+): Status {
+  const { memory } = runtime
   if (operator === "!") {
     write_boolean(memory, destination, !truthy(memory, source))
-    return
+    return OK
   }
   if (operator === "void") {
     write_undefined(memory, destination)
-    return
+    return OK
   }
   if (operator === "typeof") {
     const tag = tag_of(memory, source)
@@ -1248,13 +1362,15 @@ export function unary_operation(
                   ? "function"
                   : "object"
     write_string(memory, destination, result)
-    return
+    return OK
   }
+  if (check_primitive(runtime, source) === THROW) return THROW
   const value: any = primitive(memory, source)
   if (operator === "+") write_number(memory, destination, +value)
   else if (operator === "-") write_number(memory, destination, -value)
   else if (operator === "~") write_number(memory, destination, ~value)
-  else throw new SyntaxError(`Unsupported unary operator: ${operator}`)
+  else panic(`Unsupported unary operator: ${operator}`)
+  return OK
 }
 
 /** Own string keys in property order, followed by rooted symbol keys. */

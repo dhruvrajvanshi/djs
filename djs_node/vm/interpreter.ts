@@ -96,17 +96,16 @@ import {
   load_function_receiver,
   load_function_new_target,
   load_value_array_element,
-  load_property_setter,
   create_environment,
   copy_environment_bindings,
   environment_at,
   load_binding,
+  initialize_binding,
   store_binding,
   get_property,
   set_property,
   private_property,
   set_prototype,
-  create_error,
   truthy,
   binary_operation,
   unary_operation,
@@ -115,6 +114,8 @@ import {
   define_property,
   delete_property,
   is_object,
+  has_properties,
+  has_property_list,
   has_property,
   create_string_object,
   for_in_keys,
@@ -143,6 +144,16 @@ import {
   create_builtin_object,
 } from "./builtins.ts"
 import { define_value_property } from "./properties.ts"
+import { panic } from "../utils.ts"
+import {
+  OK,
+  THROW,
+  throw_error,
+  throw_value,
+  take_exception,
+  clear_exception,
+} from "./completion.ts"
+import type { Status } from "./completion.ts"
 import {
   scheduler_has_jobs,
   scheduler_reset_task_steps,
@@ -161,22 +172,16 @@ export function create_context(
     alloc_root(runtime.memory),
     alloc_root(runtime.memory),
   )
-  try {
-    push_frame(
-      runtime,
-      context,
-      code_id,
-      runtime.code[code_id].unit.entry,
-      environment,
-      undefined,
-      [],
-      null,
-    )
-  } catch (error) {
-    free_root(runtime.memory, context_result(context))
-    free_root(runtime.memory, context_error(context))
-    throw error
-  }
+  push_frame(
+    runtime,
+    context,
+    code_id,
+    runtime.code[code_id].unit.entry,
+    environment,
+    undefined,
+    [],
+    null,
+  )
   runtime.contexts.push(context)
   return context
 }
@@ -194,80 +199,68 @@ function push_frame(
 ) {
   const { memory } = runtime
   const fn = runtime.code[code_id].unit.functions[function_id]
-  if (!fn) throw new Error("Invalid function descriptor")
+  if (!fn) panic("Invalid function descriptor")
   const offset = context_reserve_frame(context, fn.slot_count)
-  const allocated_roots = []
-  try {
-    const env = alloc_root(memory)
-    allocated_roots.push(env)
-    const this_value = alloc_root(memory)
-    allocated_roots.push(this_value)
-    copy_value(memory, env, environment)
-    if (receiver !== undefined) copy_value(memory, this_value, receiver)
-    const target = alloc_root(memory)
-    allocated_roots.push(target)
-    if (new_target !== undefined) copy_value(memory, target, new_target)
-    context_initialize_frame(context, offset, {
-      caller: context_current_frame(context),
-      code_id,
-      function_id,
-      return_root: destination,
-      environment_root: env,
-      this_root: this_value,
-      new_target_root: target,
-      register_count: fn.slot_count,
-    })
-    for (let index = 0; index < fn.slot_count; index++) {
-      const root = alloc_root(memory)
-      allocated_roots.push(root)
-      context_set_frame_register_root(
-        context,
-        offset,
-        register_index(index),
-        root,
-      )
+  const env = alloc_root(memory)
+  const this_value = alloc_root(memory)
+  copy_value(memory, env, environment)
+  if (receiver !== undefined) copy_value(memory, this_value, receiver)
+  const target = alloc_root(memory)
+  if (new_target !== undefined) copy_value(memory, target, new_target)
+  context_initialize_frame(context, offset, {
+    caller: context_current_frame(context),
+    code_id,
+    function_id,
+    return_root: destination,
+    environment_root: env,
+    this_root: this_value,
+    new_target_root: target,
+    register_count: fn.slot_count,
+  })
+  for (let index = 0; index < fn.slot_count; index++) {
+    context_set_frame_register_root(
+      context,
+      offset,
+      register_index(index),
+      alloc_root(memory),
+    )
+  }
+  if (fn.arguments_slot !== null) {
+    const args = alloc_root(memory)
+    try {
+      create_arguments_object(memory, args, arguments_)
+      initialize_binding(runtime, env, fn.arguments_slot, args)
+    } finally {
+      free_root(memory, args)
     }
-    if (fn.arguments_slot !== null) {
-      const args = alloc_root(memory)
+  }
+  for (let index = 0; index < fn.parameter_slots.length; index++) {
+    const argument = arguments_[index]
+    if (argument === undefined) {
+      const empty = alloc_root(memory)
       try {
-        create_arguments_object(memory, args, arguments_)
-        store_binding(runtime, env, fn.arguments_slot, args, true)
+        initialize_binding(runtime, env, fn.parameter_slots[index], empty)
       } finally {
-        free_root(memory, args)
+        free_root(memory, empty)
       }
-    }
-    for (let index = 0; index < fn.parameter_slots.length; index++) {
-      const argument = arguments_[index]
-      if (argument === undefined) {
-        const empty = alloc_root(memory)
-        try {
-          store_binding(runtime, env, fn.parameter_slots[index], empty, true)
-        } finally {
-          free_root(memory, empty)
-        }
-      } else
-        store_binding(runtime, env, fn.parameter_slots[index], argument, true)
-    }
-    if (fn.rest_slot !== null) {
-      const rest = alloc_root(memory),
-        key = alloc_root(memory)
-      try {
-        const start = fn.parameter_slots.length
-        const count = Math.max(0, arguments_.length - start)
-        create_array(memory, rest, count)
-        for (let index = 0; index < count; index++) {
-          write_string(memory, key, String(index))
-          define_property(memory, rest, key, arguments_[start + index])
-        }
-        store_binding(runtime, env, fn.rest_slot, rest, true)
-      } finally {
-        free_root(memory, rest)
-        free_root(memory, key)
+    } else initialize_binding(runtime, env, fn.parameter_slots[index], argument)
+  }
+  if (fn.rest_slot !== null) {
+    const rest = alloc_root(memory),
+      key = alloc_root(memory)
+    try {
+      const start = fn.parameter_slots.length
+      const count = Math.max(0, arguments_.length - start)
+      create_array(memory, rest, count)
+      for (let index = 0; index < count; index++) {
+        write_string(memory, key, String(index))
+        define_property(memory, rest, key, arguments_[start + index])
       }
+      initialize_binding(runtime, env, fn.rest_slot, rest)
+    } finally {
+      free_root(memory, rest)
+      free_root(memory, key)
     }
-  } catch (error) {
-    for (const root of allocated_roots) free_root(memory, root)
-    throw error
   }
   context_commit_frame(context, offset)
 }
@@ -306,10 +299,10 @@ function call_function(
   callee: Root,
   receiver: Root | undefined,
   arguments_: Root[],
-) {
+): Status {
   const { memory } = runtime
   if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
-    throw new TypeError("Value is not callable")
+    return throw_error(runtime, "TypeError", "Value is not callable")
   const hook = alloc_root(memory)
   try {
     if (load_internal_method(memory, hook, callee, INTERNAL.Call)) {
@@ -318,12 +311,14 @@ function call_function(
       try {
         create_arguments_object(memory, args, arguments_)
         if (receiver !== undefined) copy_value(memory, this_argument, receiver)
-        invoke_sync(runtime, destination, hook, callee, [this_argument, args])
+        return invoke_sync(runtime, destination, hook, callee, [
+          this_argument,
+          args,
+        ])
       } finally {
         free_root(memory, args)
         free_root(memory, this_argument)
       }
-      return
     }
   } finally {
     free_root(memory, hook)
@@ -350,10 +345,10 @@ function call_function(
       free_root(memory, captured)
       free_root(memory, value)
     }
-    return
+    return OK
   }
-  if (code_id === NATIVE_CODE && function_id === CALL_ID) {
-    call_function(
+  if (code_id === NATIVE_CODE && function_id === CALL_ID)
+    return call_function(
       runtime,
       context,
       destination,
@@ -361,17 +356,24 @@ function call_function(
       arguments_[1],
       arguments_.slice(2),
     )
-    return
-  }
-  if (code_id === NATIVE_CODE) {
-    call_intrinsic(runtime, function_id, destination, arguments_)
-    return
-  }
-  if (runtime.code[code_id].unit.functions[function_id].flags & 8) {
-    call_async_function(runtime, destination, callee, receiver, arguments_)
-    return
-  }
-  enter_function(runtime, context, destination, callee, receiver, arguments_)
+  if (code_id === NATIVE_CODE)
+    return call_intrinsic(runtime, function_id, destination, arguments_)
+  if (runtime.code[code_id].unit.functions[function_id].flags & 8)
+    return call_async_function(
+      runtime,
+      destination,
+      callee,
+      receiver,
+      arguments_,
+    )
+  return enter_function(
+    runtime,
+    context,
+    destination,
+    callee,
+    receiver,
+    arguments_,
+  )
 }
 
 function enter_function(
@@ -381,7 +383,7 @@ function enter_function(
   callee: Root,
   receiver: Root | undefined,
   arguments_: Root[],
-) {
+): Status {
   const { memory } = runtime
   const code_id = function_code_id(memory, callee),
     function_id = callee_function_id(memory, callee)
@@ -393,7 +395,8 @@ function enter_function(
     load_function_environment(memory, parent, callee)
     const fn = runtime.code[code_id].unit.functions[function_id]
     const flags = function_flags(memory, callee)
-    if (flags & 1) throw new TypeError("Class constructor requires new")
+    if (flags & 1)
+      return throw_error(runtime, "TypeError", "Class constructor requires new")
     if (flags & 4) {
       load_function_receiver(memory, this_value, callee)
       receiver = this_value
@@ -417,6 +420,7 @@ function enter_function(
       destination,
       new_target,
     )
+    return OK
   } finally {
     free_root(memory, new_target)
     free_root(memory, parent)
@@ -433,53 +437,49 @@ function nullish(memory: Memory, value: Root) {
   )
 }
 
+function check_properties(runtime: Runtime, value: Root): Status {
+  if (!has_properties(runtime.memory, value))
+    return throw_error(runtime, "TypeError", "Expected an object")
+  return OK
+}
+
 // Reads a property, calling a getter synchronously.
 function get_value(
   runtime: Runtime,
   destination: Root,
   object: Root,
   key: Root,
-) {
+): Status {
+  if (check_properties(runtime, object) === THROW) return THROW
   if (
     get_property(runtime.memory, destination, object, key) &&
     tag_of(runtime.memory, destination) !== TAGS.UNDEFINED
   )
-    invoke_sync(runtime, destination, destination, object, [])
+    return invoke_sync(runtime, destination, destination, object, [])
+  return OK
 }
 
-function close_iterator(runtime: Runtime, iterator: Root) {
+function close_iterator(runtime: Runtime, iterator: Root): Status {
   const { memory } = runtime
   const method = alloc_root(memory),
     result = alloc_root(memory)
   try {
-    get_value(runtime, method, iterator, runtime.property_names!.get("return")!)
-    if (nullish(memory, method)) return
-    invoke_sync(runtime, result, method, iterator, [])
+    const key = runtime.property_names!.get("return")!
+    if (get_value(runtime, method, iterator, key) === THROW) return THROW
+    if (nullish(memory, method)) return OK
+    if (invoke_sync(runtime, result, method, iterator, []) === THROW)
+      return THROW
     if (!is_object(memory, result))
-      throw new TypeError("Iterator result is not an object")
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Iterator result is not an object",
+      )
+    return OK
   } finally {
     free_root(memory, method)
     free_root(memory, result)
   }
-}
-
-class GuestThrow extends Error {
-  declare root: Root
-  constructor(root: Root) {
-    super("Guest exception")
-    this.root = root
-  }
-}
-
-function capture_error(
-  runtime: Runtime,
-  destination: Root,
-  error: HostError | GuestThrow,
-) {
-  if (error instanceof GuestThrow) {
-    copy_value(runtime.memory, destination, error.root)
-    free_root(runtime.memory, error.root)
-  } else create_error(runtime, destination, error.name, error.message)
 }
 
 export function coerce_value(
@@ -488,16 +488,19 @@ export function coerce_value(
   source: Root,
   operation: string,
   hint?: string,
-) {
+): Status {
   const helper = runtime.coercions?.get(operation)
   if (helper === undefined) {
     copy_value(runtime.memory, destination, source)
-    return
+    return OK
   }
   const hint_value = alloc_root(runtime.memory)
   try {
     if (hint !== undefined) write_string(runtime.memory, hint_value, hint)
-    invoke_sync(runtime, destination, helper, undefined, [source, hint_value])
+    return invoke_sync(runtime, destination, helper, undefined, [
+      source,
+      hint_value,
+    ])
   } finally {
     free_root(runtime.memory, hint_value)
   }
@@ -509,27 +512,30 @@ export function invoke_sync(
   callee: Root,
   receiver: Root | undefined,
   args: Root[],
-) {
+): Status {
   const context = create_call_context(runtime, callee, receiver, args)
   try {
     run_task(runtime, context)
-    if (context_status(context) === CONTEXT_STATE.FAILED) {
-      const thrown = alloc_root(runtime.memory)
-      copy_value(runtime.memory, thrown, context_error(context))
-      throw new GuestThrow(thrown)
-    }
+    if (context_status(context) === CONTEXT_STATE.FAILED)
+      return throw_value(runtime, context_error(context))
     if (context_status(context) !== CONTEXT_STATE.DONE)
-      throw new TypeError("Internal operations must complete synchronously")
+      panic("Internal operations must complete synchronously")
     copy_value(runtime.memory, destination, context_result(context))
+    return OK
   } finally {
     dispose_context(runtime, context)
   }
 }
 
-function load_property_key(runtime: Runtime, destination: Root, source: Root) {
+function load_property_key(
+  runtime: Runtime,
+  destination: Root,
+  source: Root,
+): Status {
   copy_value(runtime.memory, destination, source)
   if (is_object(runtime.memory, destination))
-    coerce_value(runtime, destination, destination, "to_string")
+    return coerce_value(runtime, destination, destination, "to_string")
+  return OK
 }
 
 function create_block_environment(
@@ -563,9 +569,20 @@ const op = {
     depth: number,
     slot: number,
     temporary: Root,
+  ): Status {
+    environment_at(runtime.memory, temporary, env, depth)
+    return load_binding(runtime, destination, temporary, slot)
+  },
+  INIT_BINDING(
+    runtime: Runtime,
+    env: Root,
+    depth: number,
+    slot: number,
+    value: Root,
+    temporary: Root,
   ) {
     environment_at(runtime.memory, temporary, env, depth)
-    load_binding(runtime, destination, temporary, slot)
+    initialize_binding(runtime, temporary, slot, value)
   },
   STORE_BINDING(
     runtime: Runtime,
@@ -573,24 +590,25 @@ const op = {
     depth: number,
     slot: number,
     value: Root,
-    initialize: boolean,
     temporary: Root,
-  ) {
+  ): Status {
     environment_at(runtime.memory, temporary, env, depth)
-    store_binding(runtime, temporary, slot, value, initialize)
+    return store_binding(runtime, temporary, slot, value)
   },
   LOAD_GLOBAL(
     runtime: Runtime,
     destination: Root,
     name: string,
     allow_unresolved: boolean,
-  ) {
+  ): Status {
     const global = runtime.globals.get(name)
     if (global === undefined) {
       if (allow_unresolved)
         write_undefined(runtime.memory, destination) // typeof unresolvable name
-      else throw new ReferenceError(`${name} is not defined`)
+      else
+        return throw_error(runtime, "ReferenceError", `${name} is not defined`)
     } else copy_value(runtime.memory, destination, global)
+    return OK
   },
   // Iteration ops call guest methods synchronously, like coercions.
   GET_ITERATOR(
@@ -599,20 +617,35 @@ const op = {
     next: Root,
     iterable: Root,
     temporary: Root,
-  ) {
+  ): Status {
     const { memory } = runtime
-    if (nullish(memory, iterable)) throw new TypeError("Value is not iterable")
-    get_value(
-      runtime,
-      temporary,
-      iterable,
-      runtime.well_known_symbols!.get("iterator")!,
+    if (nullish(memory, iterable))
+      return throw_error(runtime, "TypeError", "Value is not iterable")
+    if (
+      get_value(
+        runtime,
+        temporary,
+        iterable,
+        runtime.well_known_symbols!.get("iterator")!,
+      ) === THROW
     )
-    if (nullish(memory, temporary)) throw new TypeError("Value is not iterable")
-    invoke_sync(runtime, iterator, temporary, iterable, [])
+      return THROW
+    if (nullish(memory, temporary))
+      return throw_error(runtime, "TypeError", "Value is not iterable")
+    if (invoke_sync(runtime, iterator, temporary, iterable, []) === THROW)
+      return THROW
     if (!is_object(memory, iterator))
-      throw new TypeError("Result of Symbol.iterator is not an object")
-    get_value(runtime, next, iterator, runtime.property_names!.get("next")!)
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Result of Symbol.iterator is not an object",
+      )
+    return get_value(
+      runtime,
+      next,
+      iterator,
+      runtime.property_names!.get("next")!,
+    )
   },
   ITERATOR_NEXT(
     runtime: Runtime,
@@ -624,48 +657,53 @@ const op = {
     done_target: number,
     temporary: Root,
     operand: Root,
-  ) {
+  ): Status {
     const { memory } = runtime
-    invoke_sync(runtime, temporary, next, iterator, [])
+    if (invoke_sync(runtime, temporary, next, iterator, []) === THROW)
+      return THROW
     if (!is_object(memory, temporary))
-      throw new TypeError("Iterator result is not an object")
-    get_value(runtime, operand, temporary, runtime.property_names!.get("done")!)
-    if (truthy(memory, operand))
-      context_set_frame_pc(context, frame, bytecode_offset(done_target))
-    else
-      get_value(
+      return throw_error(
         runtime,
-        destination,
-        temporary,
-        runtime.property_names!.get("value")!,
+        "TypeError",
+        "Iterator result is not an object",
       )
+    const done = runtime.property_names!.get("done")!
+    if (get_value(runtime, operand, temporary, done) === THROW) return THROW
+    if (truthy(memory, operand)) {
+      context_set_frame_pc(context, frame, bytecode_offset(done_target))
+      return OK
+    }
+    return get_value(
+      runtime,
+      destination,
+      temporary,
+      runtime.property_names!.get("value")!,
+    )
   },
-  ITERATOR_CLOSE(runtime: Runtime, iterator: Root, throwing: boolean) {
-    if (!throwing) {
-      close_iterator(runtime, iterator)
-      return
-    }
+  ITERATOR_CLOSE(runtime: Runtime, iterator: Root, throwing: boolean): Status {
+    const status = close_iterator(runtime, iterator)
+    if (!throwing) return status
     // The pending throw wins over errors from closing.
-    try {
-      close_iterator(runtime, iterator)
-    } catch (error) {
-      if (error instanceof GuestThrow) free_root(runtime.memory, error.root)
-      else if (!(error instanceof TypeError)) throw error
-    }
+    if (status === THROW) clear_exception(runtime)
+    return OK
   },
   FOR_IN_START(
-    memory: Memory,
+    runtime: Runtime,
     keys: Root,
     object: Root,
     index: Root,
     source: Root,
-  ) {
+  ): Status {
+    const { memory } = runtime
     write_number(memory, index, 0)
     if (kind_of(memory, source) === KINDS.STRING)
       create_string_object(memory, object, source)
     else copy_value(memory, object, source)
-    if (is_object(memory, object)) for_in_keys(memory, keys, object)
-    else create_array(memory, keys, 0)
+    if (!is_object(memory, object)) create_array(memory, keys, 0)
+    else if (has_property_list(memory, object))
+      for_in_keys(memory, keys, object)
+    else return throw_error(runtime, "TypeError", "Expected an object")
+    return OK
   },
   // Keys deleted after the snapshot are skipped.
   FOR_IN_NEXT(
@@ -720,8 +758,8 @@ const op = {
     destination: Root,
     source: Root,
     property_key: Root,
-  ) {
-    load_property_key(runtime, property_key, source)
+  ): Status {
+    if (load_property_key(runtime, property_key, source) === THROW) return THROW
     if (kind_of(runtime.memory, property_key) === KINDS.SYMBOL)
       copy_value(runtime.memory, destination, property_key)
     else
@@ -730,6 +768,7 @@ const op = {
         destination,
         to_string(runtime.memory, property_key),
       )
+    return OK
   },
   CREATE_ARRAY(memory: Memory, destination: Root, length: number) {
     create_array(memory, destination, length)
@@ -750,8 +789,13 @@ const op = {
   ) {
     install_internal_method(memory, target, method, slot)
   },
-  REGISTER_BUILTIN(memory: Memory, target: Root, value: Root, name: string) {
-    register_builtin(memory, target, value, name)
+  REGISTER_BUILTIN(
+    runtime: Runtime,
+    target: Root,
+    value: Root,
+    name: string,
+  ): Status {
+    return register_builtin(runtime, target, value, name)
   },
   DELETE_PROP(
     runtime: Runtime,
@@ -759,13 +803,17 @@ const op = {
     object: Root,
     key: Root,
     property_key: Root,
-  ) {
-    load_property_key(runtime, property_key, key)
-    write_boolean(
-      runtime.memory,
-      destination,
-      delete_property(runtime.memory, object, property_key),
-    )
+  ): Status {
+    if (load_property_key(runtime, property_key, key) === THROW) return THROW
+    if (check_properties(runtime, object) === THROW) return THROW
+    if (!delete_property(runtime.memory, object, property_key))
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Cannot delete non-configurable property",
+      )
+    write_boolean(runtime.memory, destination, true)
+    return OK
   },
   GET_PROP(
     runtime: Runtime,
@@ -774,14 +822,23 @@ const op = {
     object: Root,
     key: Root,
     property_key: Root,
-  ) {
+  ): Status {
     const { memory } = runtime
-    load_property_key(runtime, property_key, key)
+    if (load_property_key(runtime, property_key, key) === THROW) return THROW
+    if (check_properties(runtime, object) === THROW) return THROW
     if (
       get_property(memory, destination, object, property_key) &&
       tag_of(memory, destination) !== TAGS.UNDEFINED
     )
-      call_function(runtime, context, destination, destination, object, [])
+      return call_function(
+        runtime,
+        context,
+        destination,
+        destination,
+        object,
+        [],
+      )
+    return OK
   },
   SET_PROP(
     runtime: Runtime,
@@ -792,31 +849,24 @@ const op = {
     property_key: Root,
     operand: Root,
     temporary: Root,
-  ) {
+  ): Status {
     const { memory } = runtime
-    load_property_key(runtime, property_key, key)
+    if (load_property_key(runtime, property_key, key) === THROW) return THROW
+    if (check_properties(runtime, object) === THROW) return THROW
     copy_value(memory, operand, value)
-    const property = set_property(
-      memory,
-      object,
-      property_key,
-      operand,
-      (_, object, key, value, flags, setter, value_only) =>
-        define_value_property(
-          runtime,
-          object,
-          key,
-          value,
-          flags,
-          setter,
-          value_only,
-        ),
+    if (
+      set_property(
+        runtime,
+        temporary,
+        object,
+        property_key,
+        operand,
+        define_value_property,
+      ) === THROW
     )
-    if (!property) return
-    load_property_setter(memory, temporary, property)
-    if (tag_of(memory, temporary) === TAGS.UNDEFINED)
-      throw new TypeError("Property has no setter")
-    call_function(
+      return THROW
+    if (tag_of(memory, temporary) === TAGS.UNDEFINED) return OK
+    return call_function(
       runtime,
       context,
       context_result(context),
@@ -834,25 +884,32 @@ const op = {
     setter: Root | undefined,
     property_key: Root,
     operand: Root,
-  ) {
-    load_property_key(runtime, property_key, key)
+  ): Status {
+    if (load_property_key(runtime, property_key, key) === THROW) return THROW
     copy_value(runtime.memory, operand, value)
-    define_value_property(runtime, object, property_key, operand, flags, setter)
+    return define_value_property(
+      runtime,
+      object,
+      property_key,
+      operand,
+      flags,
+      setter,
+    )
   },
   SET_PROTO(memory: Memory, object: Root, prototype: Root) {
     set_prototype(memory, object, prototype)
   },
   SET_PRIVATE(
-    memory: Memory,
+    runtime: Runtime,
     object: Root,
     key: Root,
     value: Root,
     initialize: boolean,
     readonly: boolean,
     temporary: Root,
-  ) {
-    private_property(
-      memory,
+  ): Status {
+    return private_property(
+      runtime,
       temporary,
       object,
       key,
@@ -863,13 +920,21 @@ const op = {
     )
   },
   GET_PRIVATE(
-    memory: Memory,
+    runtime: Runtime,
     destination: Root,
     object: Root,
     key: Root,
     has: boolean,
-  ) {
-    private_property(memory, destination, object, key, undefined, false, has)
+  ): Status {
+    return private_property(
+      runtime,
+      destination,
+      object,
+      key,
+      undefined,
+      false,
+      has,
+    )
   },
   CREATE_OBJECT(memory: Memory, destination: Root) {
     create_object(memory, destination)
@@ -905,8 +970,15 @@ const op = {
     callee: Root,
     receiver: Root,
     arguments_: Root[],
-  ) {
-    call_function(runtime, context, destination, callee, receiver, arguments_)
+  ): Status {
+    return call_function(
+      runtime,
+      context,
+      destination,
+      callee,
+      receiver,
+      arguments_,
+    )
   },
   CONSTRUCT(
     runtime: Runtime,
@@ -914,8 +986,8 @@ const op = {
     destination: Root,
     callee: Root,
     arguments_: Root[],
-  ) {
-    construct_function(runtime, context, destination, callee, arguments_)
+  ): Status {
+    return construct_function(runtime, context, destination, callee, arguments_)
   },
   PUSH_ENV(
     memory: Memory,
@@ -1041,15 +1113,22 @@ const op = {
     operator: string,
     temporary: Root,
     operand: Root,
-  ) {
+  ): Status {
     const { memory } = runtime
     copy_value(memory, temporary, left)
     copy_value(memory, operand, right)
     if (operator === "in") {
       if (!is_object(memory, operand))
-        throw new TypeError("Right operand of in must be an object")
-      if (is_object(memory, temporary))
-        coerce_value(runtime, temporary, temporary, "to_string")
+        return throw_error(
+          runtime,
+          "TypeError",
+          "Right operand of in must be an object",
+        )
+      if (
+        is_object(memory, temporary) &&
+        coerce_value(runtime, temporary, temporary, "to_string") === THROW
+      )
+        return THROW
     } else if (!["===", "!==", "instanceof"].includes(operator)) {
       const loose = operator === "==" || operator === "!="
       const left_object = is_object(memory, temporary),
@@ -1058,13 +1137,21 @@ const op = {
         nullish(memory, temporary) || nullish(memory, operand)
       if (!loose || (left_object !== right_object && !either_nullish)) {
         const hint = operator === "+" || loose ? undefined : "number"
-        if (left_object)
-          coerce_value(runtime, temporary, temporary, "to_primitive", hint)
-        if (right_object)
-          coerce_value(runtime, operand, operand, "to_primitive", hint)
+        if (
+          left_object &&
+          coerce_value(runtime, temporary, temporary, "to_primitive", hint) ===
+            THROW
+        )
+          return THROW
+        if (
+          right_object &&
+          coerce_value(runtime, operand, operand, "to_primitive", hint) ===
+            THROW
+        )
+          return THROW
       }
     }
-    binary_operation(memory, destination, temporary, operand, operator)
+    return binary_operation(runtime, destination, temporary, operand, operator)
   },
   UNARY_OP(
     runtime: Runtime,
@@ -1072,14 +1159,15 @@ const op = {
     source: Root,
     operator: string,
     operand: Root,
-  ) {
+  ): Status {
     copy_value(runtime.memory, operand, source)
     if (
       ["+", "-", "~"].includes(operator) &&
-      is_object(runtime.memory, operand)
+      is_object(runtime.memory, operand) &&
+      coerce_value(runtime, operand, operand, "to_number") === THROW
     )
-      coerce_value(runtime, operand, operand, "to_number")
-    unary_operation(runtime.memory, destination, operand, operator)
+      return THROW
+    return unary_operation(runtime, destination, operand, operator)
   },
   LOAD_THIS(memory: Memory, destination: Root, context: Context, frame: Frame) {
     copy_value(memory, destination, context_frame_this_root(context, frame))
@@ -1104,9 +1192,9 @@ export function run_interpreter(runtime: Runtime, context: Context) {
       const steps = context_increment_steps(context)
       const task_steps = scheduler_increment_task_steps(runtime.scheduler)
       if (steps > runtime.max_steps || task_steps > runtime.max_steps)
-        throw new RangeError("VM instruction limit exceeded")
+        panic("VM instruction limit exceeded")
       const frame = context_current_frame(context)
-      if (frame === null) throw new Error("No active frame")
+      if (frame === null) panic("No active frame")
       const code_id = context_frame_code_id(context, frame)
       const function_id = context_frame_function_id(context, frame)
       const code = runtime.code[code_id]
@@ -1119,6 +1207,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
       const reg = (index: number) =>
         context_frame_register_root(context, frame, register_index(index))
       const env = context_frame_environment_root(context, frame)
+      let status: Status = OK
       switch (opcode) {
         case OP.LOAD_CONST:
           op.LOAD_CONST(memory, reg(a), code.constants[b])
@@ -1127,22 +1216,16 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           op.MOVE(memory, reg(a), reg(b))
           break
         case OP.LOAD_BINDING:
-          op.LOAD_BINDING(runtime, reg(a), env, b, c, temporary)
+          status = op.LOAD_BINDING(runtime, reg(a), env, b, c, temporary)
           break
         case OP.INIT_BINDING:
+          op.INIT_BINDING(runtime, env, a, b, reg(c), temporary)
+          break
         case OP.STORE_BINDING:
-          op.STORE_BINDING(
-            runtime,
-            env,
-            a,
-            b,
-            reg(c),
-            opcode === OP.INIT_BINDING,
-            temporary,
-          )
+          status = op.STORE_BINDING(runtime, env, a, b, reg(c), temporary)
           break
         case OP.LOAD_GLOBAL:
-          op.LOAD_GLOBAL(
+          status = op.LOAD_GLOBAL(
             runtime,
             reg(a),
             code.unit.literals[b] as string,
@@ -1150,10 +1233,10 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           )
           break
         case OP.GET_ITERATOR:
-          op.GET_ITERATOR(runtime, reg(a), reg(b), reg(c), temporary)
+          status = op.GET_ITERATOR(runtime, reg(a), reg(b), reg(c), temporary)
           break
         case OP.ITERATOR_NEXT:
-          op.ITERATOR_NEXT(
+          status = op.ITERATOR_NEXT(
             runtime,
             context,
             frame,
@@ -1166,10 +1249,10 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           )
           break
         case OP.ITERATOR_CLOSE:
-          op.ITERATOR_CLOSE(runtime, reg(a), b !== 0)
+          status = op.ITERATOR_CLOSE(runtime, reg(a), b !== 0)
           break
         case OP.FOR_IN_START:
-          op.FOR_IN_START(memory, reg(a), reg(b), reg(c), reg(d))
+          status = op.FOR_IN_START(runtime, reg(a), reg(b), reg(c), reg(d))
           break
         case OP.FOR_IN_NEXT:
           op.FOR_IN_NEXT(
@@ -1189,7 +1272,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           op.LOAD_NEW_TARGET(memory, reg(a), context, frame)
           break
         case OP.TO_PROPERTY_KEY:
-          op.TO_PROPERTY_KEY(runtime, reg(a), reg(b), property_key)
+          status = op.TO_PROPERTY_KEY(runtime, reg(a), reg(b), property_key)
           break
         case OP.CREATE_ARRAY:
           op.CREATE_ARRAY(memory, reg(a), b)
@@ -1201,21 +1284,28 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           op.INSTALL_INTERNAL_METHOD(memory, reg(a), reg(b), c)
           break
         case OP.REGISTER_BUILTIN:
-          op.REGISTER_BUILTIN(
-            memory,
+          status = op.REGISTER_BUILTIN(
+            runtime,
             reg(a),
             reg(b),
             code.unit.literals[c] as string,
           )
           break
         case OP.DELETE_PROP:
-          op.DELETE_PROP(runtime, reg(a), reg(b), reg(c), property_key)
+          status = op.DELETE_PROP(runtime, reg(a), reg(b), reg(c), property_key)
           break
         case OP.GET_PROP:
-          op.GET_PROP(runtime, context, reg(a), reg(b), reg(c), property_key)
+          status = op.GET_PROP(
+            runtime,
+            context,
+            reg(a),
+            reg(b),
+            reg(c),
+            property_key,
+          )
           break
         case OP.SET_PROP:
-          op.SET_PROP(
+          status = op.SET_PROP(
             runtime,
             context,
             reg(a),
@@ -1227,7 +1317,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           )
           break
         case OP.DEFINE_PROP:
-          op.DEFINE_PROP(
+          status = op.DEFINE_PROP(
             runtime,
             reg(a),
             reg(b),
@@ -1243,8 +1333,8 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           break
         case OP.INIT_PRIVATE:
         case OP.SET_PRIVATE:
-          op.SET_PRIVATE(
-            memory,
+          status = op.SET_PRIVATE(
+            runtime,
             reg(a),
             reg(b),
             reg(c),
@@ -1255,8 +1345,8 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           break
         case OP.GET_PRIVATE:
         case OP.HAS_PRIVATE:
-          op.GET_PRIVATE(
-            memory,
+          status = op.GET_PRIVATE(
+            runtime,
             reg(a),
             reg(b),
             reg(c),
@@ -1279,7 +1369,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           )
           break
         case OP.CALL:
-          op.CALL(
+          status = op.CALL(
             runtime,
             context,
             reg(a),
@@ -1289,7 +1379,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           )
           break
         case OP.CONSTRUCT:
-          op.CONSTRUCT(
+          status = op.CONSTRUCT(
             runtime,
             context,
             reg(a),
@@ -1334,7 +1424,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           op.JUMP_IF_FALSY(memory, context, frame, reg(a), b)
           break
         case OP.BINARY_OP:
-          op.BINARY_OP(
+          status = op.BINARY_OP(
             runtime,
             reg(a),
             reg(b),
@@ -1345,7 +1435,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           )
           break
         case OP.UNARY_OP:
-          op.UNARY_OP(
+          status = op.UNARY_OP(
             runtime,
             reg(a),
             reg(b),
@@ -1357,7 +1447,17 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           op.LOAD_THIS(memory, reg(a), context, frame)
           break
         default:
-          throw new Error(`Unknown opcode: ${opcode}`)
+          panic(`Unknown opcode: ${opcode}`)
+      }
+      if (status === THROW) {
+        complete(
+          runtime,
+          context,
+          COMPLETION_KIND.THROW,
+          runtime.pending_exception,
+        )
+        clear_exception(runtime)
+        if (context_status(context) === CONTEXT_STATE.FAILED) return
       }
       // The helper root must not retain environments after the instruction.
       write_undefined(memory, temporary)
@@ -1365,11 +1465,6 @@ export function run_interpreter(runtime: Runtime, context: Context) {
       write_undefined(memory, property_key)
     }
     context_set_status(context, CONTEXT_STATE.READY)
-  } catch (error) {
-    capture_error(runtime, temporary, error)
-    complete(runtime, context, COMPLETION_KIND.THROW, temporary)
-    if (context_status(context) !== CONTEXT_STATE.FAILED)
-      context_set_status(context, CONTEXT_STATE.READY)
   } finally {
     free_root(memory, temporary)
     free_root(memory, operand)
@@ -1398,24 +1493,26 @@ function call_async_function(
   callee: Root,
   receiver: Root | undefined,
   arguments_: Root[],
-) {
+): Status {
   if (runtime.promise_capability === undefined)
-    throw new Error("Promise is not initialized")
+    panic("Promise is not initialized")
   const { memory } = runtime
   const key = alloc_root(memory),
     resolve = alloc_root(memory),
     reject = alloc_root(memory)
-  let capability
+  const capability = create_call_context(
+    runtime,
+    runtime.promise_capability,
+    undefined,
+    [],
+  )
   try {
-    capability = create_call_context(
-      runtime,
-      runtime.promise_capability,
-      undefined,
-      [],
-    )
     run_task(runtime, capability)
-    if (context_status(capability) === CONTEXT_STATE.FAILED)
-      throw new Error(to_string(memory, context_error(capability)))
+    if (context_status(capability) === CONTEXT_STATE.FAILED) {
+      free_root(memory, resolve)
+      free_root(memory, reject)
+      return throw_value(runtime, context_error(capability))
+    }
     for (const [name, target] of [
       ["promise", destination],
       ["resolve", resolve],
@@ -1424,17 +1521,13 @@ function call_async_function(
       write_string(memory, key, name)
       get_property(memory, target, context_result(capability), key)
     }
-  } catch (error) {
-    free_root(memory, resolve)
-    free_root(memory, reject)
-    throw error
   } finally {
-    if (capability) dispose_context(runtime, capability)
+    dispose_context(runtime, capability)
     free_root(memory, key)
   }
   const context = create_empty_context(runtime)
   context.settle = { resolve, reject }
-  try {
+  if (
     enter_function(
       runtime,
       context,
@@ -1442,12 +1535,13 @@ function call_async_function(
       callee,
       receiver,
       arguments_,
-    )
-  } catch (error) {
-    capture_error(runtime, context_error(context), error)
+    ) === THROW
+  ) {
+    take_exception(runtime, context_error(context))
     context_set_status(context, CONTEXT_STATE.FAILED)
   }
   run_task(runtime, context)
+  return OK
 }
 
 function settle_async_function(runtime: Runtime, context: Context) {
@@ -1515,7 +1609,7 @@ export function create_call_context(
   arguments_: Root[],
 ): Context {
   const context = create_empty_context(runtime)
-  try {
+  if (
     call_function(
       runtime,
       context,
@@ -1523,13 +1617,12 @@ export function create_call_context(
       callee,
       receiver,
       arguments_,
-    )
-    if (context_current_frame(context) === null)
-      context_set_status(context, CONTEXT_STATE.DONE)
-  } catch (error) {
-    capture_error(runtime, context_error(context), error)
+    ) === THROW
+  ) {
+    take_exception(runtime, context_error(context))
     context_set_status(context, CONTEXT_STATE.FAILED)
-  }
+  } else if (context_current_frame(context) === null)
+    context_set_status(context, CONTEXT_STATE.DONE)
   return context
 }
 
@@ -1562,23 +1655,31 @@ function construct_function(
   destination: Root,
   callee: Root,
   arguments_: Root[],
-) {
+): Status {
   const { memory } = runtime
   if (kind_of(memory, callee) !== KINDS.FUNCTION)
-    throw new TypeError("Value is not a constructor")
+    return throw_error(runtime, "TypeError", "Value is not a constructor")
   const hook = alloc_root(memory)
   try {
     if (load_internal_method(memory, hook, callee, INTERNAL.Construct)) {
       const args = alloc_root(memory)
       try {
         create_arguments_object(memory, args, arguments_)
-        invoke_sync(runtime, destination, hook, callee, [args, callee])
+        if (
+          invoke_sync(runtime, destination, hook, callee, [args, callee]) ===
+          THROW
+        )
+          return THROW
         if (!is_object(memory, destination))
-          throw new TypeError("Construct must return an object")
+          return throw_error(
+            runtime,
+            "TypeError",
+            "Construct must return an object",
+          )
+        return OK
       } finally {
         free_root(memory, args)
       }
-      return
     }
   } finally {
     free_root(memory, hook)
@@ -1590,7 +1691,7 @@ function construct_function(
     code === RESUME_CODE ||
     runtime.code[code].unit.functions[id].flags & 14
   )
-    throw new TypeError("Value is not a constructor")
+    return throw_error(runtime, "TypeError", "Value is not a constructor")
   const receiver = alloc_root(memory),
     key = alloc_root(memory),
     prototype = alloc_root(memory),
@@ -1604,9 +1705,10 @@ function construct_function(
       fn = unit.functions[id]
     write_string(memory, key, "prototype")
     get_property(memory, prototype, callee, key)
-    if (is_object(memory, prototype)) set_prototype(memory, receiver, prototype)
+    if (has_property_list(memory, prototype))
+      set_prototype(memory, receiver, prototype)
     if (internal_layout(memory, callee, true)) {
-      if (!is_object(memory, prototype))
+      if (!has_property_list(memory, prototype))
         copy_value(memory, prototype, runtime.memory.object_prototype!)
       create_builtin_object(memory, receiver, callee, prototype)
     }
@@ -1629,6 +1731,7 @@ function construct_function(
       callee,
     )
     context_set_frame_construct_call(context, context_current_frame(context)!)
+    return OK
   } finally {
     for (const root of [receiver, key, prototype, parent, environment])
       free_root(memory, root)
@@ -1647,27 +1750,21 @@ function push_handler(
 ) {
   const completion_value_root = alloc_root(runtime.memory)
   const environment_root = alloc_root(runtime.memory)
-  try {
-    copy_value(
-      runtime.memory,
-      environment_root,
-      context_frame_environment_root(context, frame),
-    )
-    context_push_handler(context, {
-      frame,
-      start_pc,
-      catch_pc,
-      finally_pc,
-      end_pc,
-      exception_register,
-      completion_value_root,
-      environment_root,
-    })
-  } catch (error) {
-    free_root(runtime.memory, completion_value_root)
-    free_root(runtime.memory, environment_root)
-    throw error
-  }
+  copy_value(
+    runtime.memory,
+    environment_root,
+    context_frame_environment_root(context, frame),
+  )
+  context_push_handler(context, {
+    frame,
+    start_pc,
+    catch_pc,
+    finally_pc,
+    end_pc,
+    exception_register,
+    completion_value_root,
+    environment_root,
+  })
 }
 
 function pop_handler(runtime: Runtime, context: Context) {

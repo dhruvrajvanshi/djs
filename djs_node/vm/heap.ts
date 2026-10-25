@@ -1,3 +1,4 @@
+import { panic } from "../utils.ts"
 import type { Memory } from "./memory.ts"
 import {
   KINDS,
@@ -37,23 +38,23 @@ const MIN_PAYLOAD_BYTES: Readonly<Record<number, number>> = Object.freeze({
 
 export function allocate(memory: Memory, kind: number, payload_bytes: number) {
   if (!(Object.values(KINDS) as number[]).includes(kind)) {
-    throw new RangeError(`Unknown heap kind: ${kind}`)
+    panic(`Unknown heap kind: ${kind}`)
   }
   if (
     !Number.isSafeInteger(payload_bytes) ||
     payload_bytes < MIN_PAYLOAD_BYTES[kind]
   ) {
-    throw new RangeError("Invalid heap payload size")
+    panic("Invalid heap payload size")
   }
   const size = Math.ceil((8 + payload_bytes) / 8) * 8
   const semispace_bytes = memory_semispace_bytes(memory)
-  if (size > semispace_bytes) throw new RangeError("VM heap out of memory")
+  if (size > semispace_bytes) panic("VM heap out of memory")
   let cursor = memory_allocation_cursor(memory)
   if (cursor + size > memory_active_start(memory) + semispace_bytes) {
     collect(memory)
     cursor = memory_allocation_cursor(memory)
     if (cursor + size > memory_active_start(memory) + semispace_bytes) {
-      throw new RangeError("VM heap out of memory")
+      panic("VM heap out of memory")
     }
   }
   memory.heap.fill(0, cursor, cursor + size)
@@ -104,18 +105,17 @@ export function collect(memory: Memory) {
       reference >= from_end ||
       reference % 8 !== 0
     ) {
-      throw new Error(`Invalid heap reference: ${reference}`)
+      panic(`Invalid heap reference: ${reference}`)
     }
     const kind = read_u32(memory, reference)
     if (kind === FORWARDED) return read_u32(memory, reference + 4)
     const size = read_u32(memory, reference + 4)
     if (size < 8 || size % 8 !== 0 || reference + size > from_end) {
-      throw new Error("Invalid heap record size")
+      panic("Invalid heap record size")
     }
     const destination = to_cursor
     to_cursor += size
-    if (to_cursor > to_start + semispace_bytes)
-      throw new RangeError("VM heap out of memory")
+    if (to_cursor > to_start + semispace_bytes) panic("VM heap out of memory")
     memory.heap.copyWithin(destination, reference, reference + size)
     write_u32(memory, reference, FORWARDED)
     write_u32(memory, reference + 4, destination)
@@ -176,12 +176,12 @@ export function collect(memory: Memory) {
       const count = read_u32(memory, scan + (environment ? 16 : 8))
       const values_start = scan + (environment ? 24 : 16)
       if (values_start + count * 8 > scan + size)
-        throw new Error("Invalid heap value array length")
+        panic("Invalid heap value array length")
       for (let index = 0; index < count; index++) {
         trace_value(values_start + index * 8)
       }
     } else if (kind !== KINDS.STRING && kind !== KINDS.BYTE_BUFFER) {
-      throw new Error(`Unknown heap kind: ${kind}`)
+      panic(`Unknown heap kind: ${kind}`)
     }
     scan += size
   }

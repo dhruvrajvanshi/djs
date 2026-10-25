@@ -25,9 +25,10 @@ import {
   create_environment,
   create_function,
   load_binding,
-  store_binding,
+  initialize_binding,
 } from "../vm/objects.ts"
 import { INTRINSIC_NAMES, NATIVE_CODE } from "../vm/intrinsics.ts"
+import { THROW, clear_exception } from "../vm/completion.ts"
 import {
   create_context,
   evaluate_context,
@@ -107,6 +108,7 @@ export interface Runtime {
   error_prototypes?: Map<string, Root>
   promise_await?: Root
   promise_capability?: Root
+  pending_exception: Root
 }
 
 export function create_runtime({
@@ -114,8 +116,9 @@ export function create_runtime({
   max_steps = 1000000,
   ...memory_options
 }: RuntimeOptions = {}): Runtime {
+  const memory = create_memory(memory_options)
   const runtime: Runtime = {
-    memory: create_memory(memory_options),
+    memory,
     host,
     max_steps,
     code: [],
@@ -125,6 +128,7 @@ export function create_runtime({
     globals: new Map(),
     contexts: [],
     scheduler: create_scheduler(),
+    pending_exception: alloc_root(memory),
   }
   for (const [name, value] of [
     ["undefined", undefined],
@@ -260,7 +264,7 @@ function load_intrinsics(runtime: Runtime): ModuleRecord {
   try {
     for (let slot = 0; slot < INTRINSIC_NAMES.length; slot++) {
       create_function(runtime.memory, value, NATIVE_CODE, slot)
-      store_binding(runtime, module.environment, slot, value, true)
+      initialize_binding(runtime, module.environment, slot, value)
     }
     set_module_status(module, MODULE_STATE.EVALUATED)
     return module
@@ -363,7 +367,10 @@ export function read_export(
 ) {
   const slot = module.exports.get(name)
   if (slot === undefined) throw new SyntaxError(`Missing export: ${name}`)
-  load_binding(runtime, destination, module.environment, slot)
+  if (load_binding(runtime, destination, module.environment, slot) === THROW) {
+    clear_exception(runtime)
+    throw new ReferenceError("Cannot access binding before initialization")
+  }
 }
 
 export async function run_module(

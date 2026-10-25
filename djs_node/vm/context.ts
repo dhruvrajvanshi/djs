@@ -1,5 +1,6 @@
 import type { Root } from "./memory.ts"
 import type { Brand } from "../utils.ts"
+import { panic } from "../utils.ts"
 import type { BytecodeOffset, RegisterIndex } from "../compiler/bytecode.ts"
 import type { FunctionId } from "../compiler/compile.ts"
 import type { CodeId } from "../runtime/modules.ts"
@@ -218,7 +219,7 @@ export function context_commit_frame(context: Context, frame: Frame) {
 /** Caller must release the frame's roots before reclaiming its storage. */
 export function context_pop_frame(context: Context) {
   const frame = context_current_frame(context)
-  if (frame === null) throw new Error("No active frame")
+  if (frame === null) panic("No active frame")
   context_set_current_frame(context, context_frame_caller(context, frame))
   context_set_used_frame_bytes(context, frame)
 }
@@ -373,7 +374,7 @@ function register_offset(
     index < 0 ||
     index >= context_frame_register_count(context, frame)
   )
-    throw new RangeError("Invalid register index")
+    panic("Invalid register index")
   return frame + FRAME_BYTES + index * 4
 }
 
