@@ -4,6 +4,7 @@ const error_prototype = ErrorConstructor.prototype
 
 function format_value(value) {
   if (typeof value === "function") return "[Function]"
+  if (typeof value === "symbol") return value.toString()
   if (value !== null && typeof value === "object") {
     if (value === error_prototype || value instanceof ErrorConstructor)
       return format_value(value.name) + ": " + format_value(value.message)

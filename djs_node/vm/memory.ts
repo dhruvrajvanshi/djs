@@ -30,6 +30,7 @@ export const KINDS = Object.freeze({
   STRING_OBJECT: 10,
   BUILTIN_OBJECT: 11,
   INTERNAL_METHODS: 12,
+  SYMBOL: 13,
 })
 const CONTROL = Object.freeze({
   SEMISPACE_BYTES: 0,
@@ -57,6 +58,7 @@ export interface Memory {
   object_prototype?: Root
   array_prototype?: Root
   string_prototype?: Root
+  symbol_prototype?: Root
   array_class?: Root
   string_class?: Root
 }

@@ -10,8 +10,11 @@ import {
   write_null,
   set_ref,
   get_ref,
+  tag_of,
   string_code_unit_at,
   slice_string,
+  create_symbol,
+  load_symbol_description,
 } from "./values.ts"
 import { byte_buffer_view, create_byte_buffer } from "./bytes.ts"
 import {
@@ -31,7 +34,7 @@ import {
   define_own_property,
 } from "./properties.ts"
 import { create_builtin_object } from "./builtins.ts"
-import { KINDS, read_u32 } from "./memory.ts"
+import { KINDS, TAGS, read_u32 } from "./memory.ts"
 import { enqueue_job, start_operation } from "../runtime/jobs.ts"
 
 export const NATIVE_CODE = 0xffffffff
@@ -63,6 +66,8 @@ export const INTRINSIC_NAMES = Object.freeze([
   "ordinary_own_property_keys",
   "ordinary_delete",
   "builtin_object_create",
+  "symbol_create",
+  "symbol_description",
 ])
 
 export function intrinsic_id(name: string) {
@@ -128,6 +133,24 @@ export function call_intrinsic(
     return
   } else if (name === "builtin_object_create") {
     create_builtin_object(memory, destination, arguments_[0], arguments_[1])
+    return
+  } else if (name === "symbol_create") {
+    const description = arguments_[0]
+    if (
+      description !== undefined &&
+      tag_of(memory, description) !== TAGS.UNDEFINED &&
+      kind_of(memory, description) !== KINDS.STRING
+    )
+      throw new TypeError("Symbol description must be a string or undefined")
+    create_symbol(memory, destination, description)
+    return
+  } else if (name === "symbol_description") {
+    if (
+      arguments_[0] === undefined ||
+      kind_of(memory, arguments_[0]) !== KINDS.SYMBOL
+    )
+      throw new TypeError("Expected a symbol")
+    load_symbol_description(memory, destination, arguments_[0])
     return
   } else if (name === "string_code_unit_at") {
     write_number(

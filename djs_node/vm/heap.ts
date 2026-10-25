@@ -32,6 +32,7 @@ const MIN_PAYLOAD_BYTES: Readonly<Record<number, number>> = Object.freeze({
   [KINDS.INTERNAL_METHODS]: 32,
   [KINDS.STRING_OBJECT]: 24,
   [KINDS.VALUE_ARRAY]: 8,
+  [KINDS.SYMBOL]: 8,
 })
 
 export function allocate(memory: Memory, kind: number, payload_bytes: number) {
@@ -73,7 +74,7 @@ export function allocate(memory: Memory, kind: number, payload_bytes: number) {
       write_heap_undefined(memory, cursor + offset)
   } else if (kind === KINDS.STRING_OBJECT) {
     write_heap_undefined(memory, cursor + 16)
-  } else if (kind === KINDS.ENVIRONMENT) {
+  } else if (kind === KINDS.ENVIRONMENT || kind === KINDS.SYMBOL) {
     write_heap_undefined(memory, cursor + 8)
   }
   if (kind === KINDS.ENVIRONMENT || kind === KINDS.VALUE_ARRAY) {
@@ -167,6 +168,8 @@ export function collect(memory: Memory) {
       trace_raw(scan + 36)
       trace_value(scan + 40)
       trace_value(scan + 48)
+    } else if (kind === KINDS.SYMBOL) {
+      trace_value(scan + 8)
     } else if (kind === KINDS.ENVIRONMENT || kind === KINDS.VALUE_ARRAY) {
       const environment = kind === KINDS.ENVIRONMENT
       if (environment) trace_value(scan + 8)

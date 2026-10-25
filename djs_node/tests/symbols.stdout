@@ -1,0 +1,19 @@
+symbol true false false
+a undefined undefined
+Symbol(a) Symbol() Symbol(a)
+Symbol(a) Symbol 0
+true false
+TypeError
+TypeError
+TypeError
+TypeError
+1 3 2 undefined
+true false
+false undefined
+method
+2 true true
+2 tagged
+true false
+app undefined
+symbol Symbol(Symbol.iterator) true
+TypeError

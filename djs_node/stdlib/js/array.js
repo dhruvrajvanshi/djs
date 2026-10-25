@@ -781,6 +781,7 @@ function create_from_arguments(args, newTarget) {
 }
 
 function array_index(key) {
+  if (typeof key === "symbol") return -1
   const index = +key
   if (
     index < 0 ||

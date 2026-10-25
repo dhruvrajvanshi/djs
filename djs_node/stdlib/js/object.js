@@ -1,4 +1,10 @@
-import { is_array, object_create, string_box } from "djs:intrinsics"
+import {
+  is_array,
+  object_create,
+  string_box,
+  array_create,
+  ordinary_own_property_keys,
+} from "djs:intrinsics"
 
 // Must not import other stdlib modules: it is evaluated first so that objects
 // created afterwards inherit from Object.prototype.
@@ -14,6 +20,19 @@ class Object {
     if (newTarget === Object) return from_value(args[0])
     const prototype = newTarget.prototype
     return object_create(is_object(prototype) ? prototype : Object.prototype)
+  }
+
+  static getOwnPropertySymbols(value) {
+    if (value === null || value === undefined)
+      throw new TypeError("Cannot convert null or undefined")
+    const keys = ordinary_own_property_keys(from_value(value))
+    const symbols = array_create(0)
+    let index = 0
+    while (index < keys.length) {
+      if (typeof keys[index] === "symbol") symbols[symbols.length] = keys[index]
+      index = index + 1
+    }
+    return symbols
   }
 
   valueOf() {

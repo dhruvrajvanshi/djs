@@ -18,6 +18,7 @@ import {
   has_property,
   truthy,
   to_string,
+  property_key,
   kind_of,
   is_object,
 } from "./objects.ts"
@@ -32,7 +33,7 @@ export function get_own_property_descriptor(
   object: Root,
   key: Root,
 ) {
-  const descriptor = own_property(memory, object, to_string(memory, key))
+  const descriptor = own_property(memory, object, property_key(memory, key))
   if (!descriptor) {
     write_undefined(memory, destination)
     return
@@ -94,7 +95,7 @@ export function define_own_property(
     getter = alloc_root(memory),
     setter = alloc_root(memory)
   try {
-    const previous = own_property(memory, object, to_string(memory, key))
+    const previous = own_property(memory, object, property_key(memory, key))
     let flags = previous?.flags ?? 0
     if (flags & 16) flags &= ~1
     if (previous?.property) {
@@ -136,7 +137,11 @@ export function define_own_property(
         )
           throw new TypeError("Accessor must be callable or undefined")
         if (!accessor && flags & 16) {
-          const current = own_property(memory, object, to_string(memory, key))
+          const current = own_property(
+            memory,
+            object,
+            property_key(memory, key),
+          )
           load_property_value(memory, getter, current!.property!)
         }
         if (!(flags & 16) && !has_setter) write_undefined(memory, setter)
@@ -158,7 +163,7 @@ export function define_own_property(
       }
       if (flags & 16) {
         // Validate a non-configurable accessor's two fields before changing either.
-        const current = own_property(memory, object, to_string(memory, key))
+        const current = own_property(memory, object, property_key(memory, key))
         if (current && !(current.flags & 4)) {
           if (flags !== (current.flags & ~1))
             throw new TypeError("Cannot redefine property")
@@ -174,7 +179,7 @@ export function define_own_property(
         const property = own_property(
           memory,
           object,
-          to_string(memory, key),
+          property_key(memory, key),
         )!.property!
         store_property_setter(memory, property, setter)
       } else {
@@ -206,7 +211,10 @@ function invoke_define(
   const result = alloc_root(runtime.memory),
     normalized = alloc_root(runtime.memory)
   try {
-    if (kind_of(runtime.memory, key) === KINDS.STRING)
+    if (
+      kind_of(runtime.memory, key) === KINDS.STRING ||
+      kind_of(runtime.memory, key) === KINDS.SYMBOL
+    )
       copy_value(runtime.memory, normalized, key)
     else if (is_object(runtime.memory, key))
       coerce_value(runtime, normalized, key, "to_string")

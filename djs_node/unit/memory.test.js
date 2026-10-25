@@ -29,7 +29,10 @@ import {
   write_string,
   write_undefined,
   write_uninitialized,
+  create_symbol,
+  load_symbol_description,
 } from "../vm/values.ts"
+import { create_object, define_property, get_property } from "../vm/objects.ts"
 
 test("number slots canonicalize NaN and preserve binary64 values", () => {
   const memory = create_memory()
@@ -107,6 +110,28 @@ test("strings retain UTF-16 code units through repeated moving collections", () 
   collect(memory)
   assert.equal(read_string(memory, root), text)
   assert.equal(get_ref(memory, root), before)
+})
+
+test("symbols keep identity and descriptions as property keys through moving collections", () => {
+  const memory = create_memory({ semispace_bytes: 1024 })
+  const symbol = alloc_root(memory)
+  const object = alloc_root(memory)
+  const value = alloc_root(memory)
+  write_string(memory, value, "description")
+  create_symbol(memory, symbol, value)
+  create_object(memory, object)
+  write_number(memory, value, 7)
+  define_property(memory, object, symbol, value)
+  const before = get_ref(memory, symbol)
+  collect(memory)
+  assert.notEqual(get_ref(memory, symbol), before)
+  load_symbol_description(memory, value, symbol)
+  assert.equal(read_string(memory, value), "description")
+  get_property(memory, value, object, symbol)
+  assert.equal(read_number(memory, value), 7)
+  write_string(memory, value, "description")
+  get_property(memory, value, object, value)
+  assert.equal(tag_of(memory, value), TAGS.UNDEFINED)
 })
 
 function record(memory, kind, payload_bytes) {

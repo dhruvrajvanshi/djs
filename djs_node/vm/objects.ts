@@ -279,10 +279,23 @@ function object_offsets(memory: Memory, object: Root): [number, number] {
   throw new TypeError("Expected an object")
 }
 
+/** String keys compare by contents; symbol and private keys by identity. */
+export type PropertyKey = string | Root
+
+export function property_key(memory: Memory, key: Root): PropertyKey {
+  return kind_of(memory, key) === KINDS.SYMBOL ? key : to_string(memory, key)
+}
+
+function key_matches(memory: Memory, key: Root, name: PropertyKey) {
+  return typeof name === "string"
+    ? kind_of(memory, key) === KINDS.STRING && read_string(memory, key) === name
+    : get_ref(memory, key) === get_ref(memory, name)
+}
+
 export function find_property(
   memory: Memory,
   object: Root,
-  name: string | Root,
+  name: PropertyKey,
   own: boolean = false,
   private_key: boolean = false,
 ) {
@@ -298,12 +311,7 @@ export function find_property(
         const flags = read_u32(memory, property + 12)
         if (Boolean(flags & 8) === private_key) {
           copy_heap_value_to_root(memory, key, property + 16)
-          if (
-            private_key
-              ? get_ref(memory, key) === get_ref(memory, name as Root)
-              : read_string(memory, key) === name
-          )
-            return property
+          if (key_matches(memory, key, name)) return property
         }
         property = read_u32(memory, property + 8)
       }
@@ -389,8 +397,9 @@ export function store_property_setter(
 function virtual_property(
   memory: Memory,
   object: Root,
-  name: string,
+  name: PropertyKey,
 ): OwnProperty | undefined {
+  if (typeof name !== "string") return undefined
   const reference = string_reference(memory, object)
   if (reference) {
     const length = heap_string_length(memory, reference)
@@ -416,12 +425,13 @@ function virtual_property(
 export function own_property(
   memory: Memory,
   object: Root,
-  name: string,
+  name: PropertyKey,
 ): OwnProperty | undefined {
   const virtual = virtual_property(memory, object, name)
   if (virtual) return virtual
   if (
     kind_of(memory, object) === KINDS.STRING ||
+    kind_of(memory, object) === KINDS.SYMBOL ||
     kind_of(memory, object) === KINDS.BYTE_BUFFER
   )
     return undefined
@@ -436,6 +446,10 @@ function prototype_reference(memory: Memory, object: Root) {
     return memory.string_prototype === undefined
       ? 0
       : get_ref(memory, memory.string_prototype)
+  if (kind_of(memory, object) === KINDS.SYMBOL)
+    return memory.symbol_prototype === undefined
+      ? 0
+      : get_ref(memory, memory.symbol_prototype)
   if (kind_of(memory, object) === KINDS.BYTE_BUFFER) return 0
   const [, offset] = object_offsets(memory, object)
   return read_u32(memory, get_ref(memory, object) + offset)
@@ -448,7 +462,7 @@ export function get_property(
   object: Root,
   key: Root,
 ) {
-  const name = to_string(memory, key)
+  const name = property_key(memory, key)
   const current = alloc_root(memory)
   try {
     copy_value(memory, current, object)
@@ -477,7 +491,7 @@ export function has_property(
   key: Root,
   own: boolean = false,
 ) {
-  const name = to_string(memory, key),
+  const name = property_key(memory, key),
     current = alloc_root(memory)
   try {
     copy_value(memory, current, object)
@@ -494,10 +508,14 @@ export function has_property(
 }
 
 export function delete_property(memory: Memory, object: Root, key: Root) {
-  const name = to_string(memory, key)
+  const name = property_key(memory, key)
   const virtual = virtual_property(memory, object, name)
   if (virtual) throw new TypeError("Cannot delete non-configurable property")
-  if (kind_of(memory, object) === KINDS.STRING) return true
+  if (
+    kind_of(memory, object) === KINDS.STRING ||
+    kind_of(memory, object) === KINDS.SYMBOL
+  )
+    return true
   const [head] = object_offsets(memory, object)
   let link = get_ref(memory, object) + head
   let property = read_u32(memory, link)
@@ -506,7 +524,7 @@ export function delete_property(memory: Memory, object: Root, key: Root) {
     while (property) {
       if (!(read_u32(memory, property + 12) & 8)) {
         copy_heap_value_to_root(memory, temporary, property + 16)
-        if (read_string(memory, temporary) === name) {
+        if (key_matches(memory, temporary, name)) {
           if (!(read_u32(memory, property + 12) & 4))
             throw new TypeError("Cannot delete non-configurable property")
           write_u32(memory, link, read_u32(memory, property + 8))
@@ -622,7 +640,7 @@ export function define_property(
   flags: number = 7,
   setter?: Root,
 ) {
-  const name = flags & 8 ? undefined : to_string(memory, key)
+  const name = flags & 8 ? undefined : property_key(memory, key)
   const virtual =
     name === undefined ? undefined : virtual_property(memory, object, name)
   if (virtual) {
@@ -652,7 +670,7 @@ function ordinary_define_property(
   const property = find_property(
     memory,
     object,
-    private_key ? key : to_string(memory, key),
+    private_key ? key : property_key(memory, key),
     true,
     private_key,
   )
@@ -712,7 +730,11 @@ function ordinary_define_property(
   }
   const normalized = alloc_root(memory)
   try {
-    if (private_key || kind_of(memory, key) === KINDS.STRING)
+    if (
+      private_key ||
+      kind_of(memory, key) === KINDS.STRING ||
+      kind_of(memory, key) === KINDS.SYMBOL
+    )
       copy_value(memory, normalized, key)
     else write_string(memory, normalized, to_string(memory, key))
     const reference = allocate(memory, KINDS.PROPERTY, private_key ? 24 : 32)
@@ -761,7 +783,7 @@ export function set_property(
     bytes[index] = read_number(memory, value)
     return 0
   }
-  const name = to_string(memory, key)
+  const name = property_key(memory, key)
   if (
     kind_of(memory, object) === KINDS.STRING ||
     virtual_property(memory, object, name)
@@ -946,6 +968,8 @@ export function to_string(memory: Memory, value: Root): string {
       switch (kind_of(memory, value)) {
         case KINDS.STRING:
           return read_string(memory, value)
+        case KINDS.SYMBOL:
+          throw new TypeError("Cannot convert a Symbol value to a string")
         case KINDS.FUNCTION:
           return "[Function]"
         case KINDS.OBJECT:
@@ -1005,6 +1029,8 @@ function primitive(memory: Memory, value: Root): Literal {
     case TAGS.REF:
       if (kind_of(memory, value) === KINDS.STRING)
         return read_string(memory, value)
+      if (kind_of(memory, value) === KINDS.SYMBOL)
+        throw new TypeError("Cannot convert a Symbol value")
       throw new TypeError("Object coercion is not implemented yet")
     default:
       throw new ReferenceError("Invalid internal value")
@@ -1191,9 +1217,11 @@ export function unary_operation(
             ? "boolean"
             : kind === KINDS.STRING
               ? "string"
-              : kind === KINDS.FUNCTION
-                ? "function"
-                : "object"
+              : kind === KINDS.SYMBOL
+                ? "symbol"
+                : kind === KINDS.FUNCTION
+                  ? "function"
+                  : "object"
     write_string(memory, destination, result)
     return
   }
@@ -1211,6 +1239,8 @@ export function ordinary_own_property_keys(
 ) {
   const [head] = object_offsets(memory, object)
   const names = []
+  // Symbol keys are rooted individually since creating the result moves them.
+  const symbols: Root[] = []
   const key = alloc_root(memory),
     value = alloc_root(memory)
   try {
@@ -1218,11 +1248,16 @@ export function ordinary_own_property_keys(
     while (property) {
       if (!(read_u32(memory, property + 12) & 8)) {
         copy_heap_value_to_root(memory, key, property + 16)
-        names.push(read_string(memory, key))
+        if (kind_of(memory, key) === KINDS.SYMBOL) {
+          const symbol = alloc_root(memory)
+          copy_value(memory, symbol, key)
+          symbols.push(symbol)
+        } else names.push(read_string(memory, key))
       }
       property = read_u32(memory, property + 8)
     }
     names.reverse()
+    symbols.reverse()
     if (kind_of(memory, object) === KINDS.STRING_OBJECT) {
       const reference = string_reference(memory, object)
       const length = heap_string_length(memory, reference)
@@ -1235,14 +1270,19 @@ export function ordinary_own_property_keys(
     const ordered = indices.concat(
       names.filter((name) => array_index(name) < 0),
     )
-    create_array(memory, destination, ordered.length)
+    create_array(memory, destination, ordered.length + symbols.length)
     for (let index = 0; index < ordered.length; index++) {
       write_string(memory, key, String(index))
       write_string(memory, value, ordered[index])
       ordinary_define_property(memory, destination, key, value, 7)
     }
+    for (let index = 0; index < symbols.length; index++) {
+      write_string(memory, key, String(ordered.length + index))
+      ordinary_define_property(memory, destination, key, symbols[index], 7)
+    }
   } finally {
     free_root(memory, key)
     free_root(memory, value)
+    for (const symbol of symbols) free_root(memory, symbol)
   }
 }

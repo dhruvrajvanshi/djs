@@ -554,7 +554,9 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           copy_value(memory, property_key, reg(b))
           if (is_object(memory, property_key))
             coerce_value(runtime, property_key, property_key, "to_string")
-          write_string(memory, reg(a), to_string(memory, property_key))
+          if (kind_of(memory, property_key) === KINDS.SYMBOL)
+            copy_value(memory, reg(a), property_key)
+          else write_string(memory, reg(a), to_string(memory, property_key))
           break
         case OP.CREATE_ARRAY:
           create_array(memory, reg(a), b)

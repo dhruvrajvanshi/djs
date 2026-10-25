@@ -6,6 +6,8 @@ import {
   assert_root,
   read_u32,
   write_u32,
+  copy_heap_value_to_root,
+  copy_root_to_heap_value,
 } from "./memory.ts"
 import { allocate } from "./heap.ts"
 
@@ -164,4 +166,27 @@ export function slice_string(
   memory.heap.copyWithin(reference + 12, source, source + (end - start) * 2)
   write_u32(memory, reference + 8, end - start)
   set_ref(memory, destination, reference)
+}
+
+export function create_symbol(
+  memory: Memory,
+  destination: Root,
+  description?: Root,
+) {
+  const reference = allocate(memory, KINDS.SYMBOL, 8)
+  // Copy before writing the destination, which may alias the description.
+  if (description !== undefined)
+    copy_root_to_heap_value(memory, reference + 8, description)
+  set_ref(memory, destination, reference)
+}
+
+export function load_symbol_description(
+  memory: Memory,
+  destination: Root,
+  symbol: Root,
+) {
+  const reference = get_ref(memory, symbol)
+  if (read_u32(memory, reference) !== KINDS.SYMBOL)
+    throw new TypeError("Expected a symbol")
+  copy_heap_value_to_root(memory, destination, reference + 8)
 }

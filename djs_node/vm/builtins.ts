@@ -106,6 +106,13 @@ export function register_builtin(
     copy_value(memory, memory.object_prototype, prototype)
     return
   }
+  if (name === "Symbol") {
+    if (memory.symbol_prototype !== undefined)
+      throw new TypeError("Symbol builtin is already registered")
+    memory.symbol_prototype = alloc_root(memory)
+    copy_value(memory, memory.symbol_prototype, prototype)
+    return
+  }
   if (name !== "Array" && name !== "String") return
   const layout = internal_layout(memory, constructor, true)
   const kind =

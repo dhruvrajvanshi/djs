@@ -17,12 +17,15 @@ import {
   is_object,
   create_data_property,
 } from "./abstract.js"
+import { descriptive_string } from "./symbol.js"
 
 @builtin({ name: "String", prototype: "string", length: 1 })
 class String {
   @internalMethod("Call")
   static #call(thisArgument, args) {
-    return args.length === 0 ? "" : to_string(args[0])
+    if (args.length === 0) return ""
+    if (typeof args[0] === "symbol") return descriptive_string(args[0])
+    return to_string(args[0])
   }
 
   @internalMethod("Construct")
