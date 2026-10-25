@@ -1,6 +1,7 @@
 import {
   alloc_root,
   free_root,
+  copy_value,
   copy_heap_value_to_root,
   copy_root_to_heap_value,
 } from "./memory.js"
@@ -19,8 +20,10 @@ import {
   truthy,
   to_string,
   kind_of,
+  is_object,
 } from "./objects.js"
-import { coerce_array_length } from "./interpreter.js"
+import { invoke_sync, coerce_value } from "./interpreter.js"
+import { load_internal_method, INTERNAL } from "./builtins.js"
 import { KINDS, TAGS } from "./memory.js"
 import { tag_of, get_ref } from "./values.js"
 
@@ -69,16 +72,18 @@ export function get_own_property_descriptor(memory, destination, object, key) {
 
 // Intrinsic descriptors are trusted records of data fields. Public Object APIs
 // can perform observable descriptor conversion in the stdlib before calling us.
-export function define_own_property(memory, object, key, descriptor, runtime) {
-  if (
-    ![
-      KINDS.OBJECT,
-      KINDS.FUNCTION,
-      KINDS.ERROR,
-      KINDS.ARRAY,
-      KINDS.STRING_OBJECT,
-    ].includes(kind_of(memory, descriptor))
-  )
+export function define_own_property(
+  memory,
+  object,
+  key,
+  descriptor,
+  runtime,
+  ordinary = false,
+) {
+  if (!ordinary && runtime && dispatch_define(runtime, object, key, descriptor))
+    return
+
+  if (!is_object(memory, descriptor))
     throw new TypeError("Expected a property descriptor")
   const name = alloc_root(memory),
     value = alloc_root(memory),
@@ -169,20 +174,6 @@ export function define_own_property(memory, object, key, descriptor, runtime) {
         ).property
         copy_root_to_heap_value(memory, property + 32, setter)
       } else {
-        if (
-          has_value &&
-          kind_of(memory, object) === KINDS.ARRAY &&
-          to_string(memory, key) === "length" &&
-          runtime &&
-          [
-            KINDS.OBJECT,
-            KINDS.FUNCTION,
-            KINDS.ERROR,
-            KINDS.ARRAY,
-            KINDS.STRING_OBJECT,
-          ].includes(kind_of(memory, value))
-        )
-          coerce_array_length(runtime, value, value)
         define_property(memory, object, key, value, flags)
       }
     } finally {
@@ -199,4 +190,94 @@ function same_reference(memory, left, right) {
     (tag_of(memory, left) === TAGS.UNDEFINED ||
       get_ref(memory, left) === get_ref(memory, right))
   )
+}
+
+function invoke_define(runtime, method, object, key, descriptor) {
+  const result = alloc_root(runtime.memory),
+    normalized = alloc_root(runtime.memory)
+  try {
+    if (kind_of(runtime.memory, key) === KINDS.STRING)
+      copy_value(runtime.memory, normalized, key)
+    else if (is_object(runtime.memory, key))
+      coerce_value(runtime, normalized, key, "to_string")
+    else
+      write_string(runtime.memory, normalized, to_string(runtime.memory, key))
+    invoke_sync(runtime, result, method, object, [normalized, descriptor])
+    if (tag_of(runtime.memory, result) !== TAGS.BOOLEAN)
+      throw new TypeError("DefineOwnProperty must return a boolean")
+    if (!truthy(runtime.memory, result))
+      throw new TypeError("Cannot define property")
+  } finally {
+    free_root(runtime.memory, result)
+    free_root(runtime.memory, normalized)
+  }
+}
+
+function dispatch_define(runtime, object, key, descriptor) {
+  const method = alloc_root(runtime.memory)
+  try {
+    if (
+      !load_internal_method(
+        runtime.memory,
+        method,
+        object,
+        INTERNAL.DefineOwnProperty,
+      )
+    )
+      return false
+    invoke_define(runtime, method, object, key, descriptor)
+    return true
+  } finally {
+    free_root(runtime.memory, method)
+  }
+}
+
+export function define_value_property(
+  runtime,
+  object,
+  key,
+  value,
+  flags = 7,
+  setter,
+  value_only = false,
+) {
+  const { memory } = runtime
+  const method = alloc_root(memory)
+  try {
+    if (
+      !load_internal_method(memory, method, object, INTERNAL.DefineOwnProperty)
+    ) {
+      define_property(memory, object, key, value, flags, setter)
+      return
+    }
+    const descriptor = alloc_root(memory),
+      name = alloc_root(memory),
+      field = alloc_root(memory)
+    try {
+      create_object(memory, descriptor)
+      write_string(
+        memory,
+        name,
+        flags & 16 ? (setter === undefined ? "get" : "set") : "value",
+      )
+      define_property(memory, descriptor, name, value)
+      if (!value_only) {
+        for (const [text, mask] of [
+          ["writable", 1],
+          ["enumerable", 2],
+          ["configurable", 4],
+        ]) {
+          if (mask === 1 && flags & 16) continue
+          write_string(memory, name, text)
+          write_boolean(memory, field, Boolean(flags & mask))
+          define_property(memory, descriptor, name, field)
+        }
+      }
+      invoke_define(runtime, method, object, key, descriptor)
+    } finally {
+      for (const root of [descriptor, name, field]) free_root(memory, root)
+    }
+  } finally {
+    free_root(memory, method)
+  }
 }

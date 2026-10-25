@@ -34,6 +34,9 @@ const OPERANDS = {
   ARRAY: ["dst", "length"],
   DELETE_PROP: ["dst", "object", "key"],
   LOAD_NEW_TARGET: ["dst"],
+  BUILTIN_CLASS: ["constructor", "prototype", "array"],
+  INTERNAL_METHOD: ["constructor", "method", "hook"],
+  REGISTER_BUILTIN: ["constructor", "prototype", "name"],
 }
 const OPCODE_NAMES = new Map(
   Object.entries(OP).map(([name, opcode]) => [opcode, name]),

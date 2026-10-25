@@ -145,6 +145,7 @@ export function lexer_impl(self: LexerState): Lexer {
     else if (at(")")) return lex_single_char_token(TokenKind.RParen)
     // ';' => self.lex_single_char_token(TokenKind::Semi),
     else if (at(";")) return lex_single_char_token(TokenKind.Semi)
+    else if (at("@")) return lex_single_char_token(TokenKind.At)
     // '[' => self.lex_single_char_token(TokenKind::LSquare),
     else if (at("[")) return lex_single_char_token(TokenKind.LSquare)
     // ']' => self.lex_single_char_token(TokenKind::RSquare),

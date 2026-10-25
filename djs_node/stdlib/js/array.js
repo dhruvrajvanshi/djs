@@ -5,7 +5,12 @@ import {
   call,
   has_property,
   delete_property,
-  define_property,
+  get_own_property_descriptor,
+  ordinary_define_own_property,
+  ordinary_own_property_keys,
+  ordinary_delete,
+  set_prototype,
+  object_create,
   string_code_unit_at,
   string_slice,
 } from "djs:intrinsics"
@@ -16,6 +21,7 @@ import {
   relative_index,
   callable,
   to_string,
+  to_number,
   is_object,
   create_data_property,
   method,
@@ -23,39 +29,247 @@ import {
   object_prototype,
 } from "./abstract.js"
 
-function Array() {
-  let prototype = array_prototype
-  if (new.target !== undefined) {
-    const candidate = new.target.prototype
-    if (is_object(candidate)) prototype = candidate
-  }
-  const count = arguments.length
-  if (count === 1 && typeof arguments[0] === "number")
-    return array_create(arguments[0], prototype)
+function create_from_arguments(args, newTarget) {
+  const candidate = newTarget.prototype
+  const prototype = is_object(candidate) ? candidate : Array.prototype
+  const count = args.length
+  if (count === 1 && typeof args[0] === "number")
+    return array_create(args[0], prototype)
   const result = array_create(count, prototype)
   let index = 0
   while (index < count) {
-    create_data_property(result, index, arguments[index])
+    create_data_property(result, index, args[index])
     index = index + 1
   }
   return result
 }
 
-const array_prototype = array_create(0, object_prototype)
-define_property(Array, "prototype", { value: array_prototype })
-define_property(array_prototype, "constructor", {
-  value: Array,
-  writable: true,
-  configurable: true,
-})
-define_property(Array, "name", { value: "Array", configurable: true })
-define_property(Array, "length", { value: 1, configurable: true })
+function array_index(key) {
+  const index = +key
+  if (
+    index < 0 ||
+    index >= 4294967295 ||
+    index % 1 !== 0 ||
+    to_string(index) !== key
+  )
+    return -1
+  return index
+}
 
-const statics = {
-  isArray(value) {
+function copy_descriptor(descriptor) {
+  const copy = object_create(null)
+  if (has_property(descriptor, "value")) copy.value = descriptor.value
+  if (has_property(descriptor, "writable")) copy.writable = descriptor.writable
+  if (has_property(descriptor, "enumerable"))
+    copy.enumerable = descriptor.enumerable
+  if (has_property(descriptor, "configurable"))
+    copy.configurable = descriptor.configurable
+  if (has_property(descriptor, "get")) copy.get = descriptor.get
+  if (has_property(descriptor, "set")) copy.set = descriptor.set
+  return copy
+}
+
+function array_set_length(array, descriptor) {
+  if (!has_property(descriptor, "value"))
+    return ordinary_define_own_property(array, "length", descriptor)
+  const next = copy_descriptor(descriptor)
+  const value = next.value
+  const length = to_number(value) >>> 0
+  if (length !== to_number(value)) throw new RangeError("Invalid array length")
+  next.value = length
+  const previous = get_own_property_descriptor(array, "length")
+  if (length >= previous.value)
+    return ordinary_define_own_property(array, "length", next)
+  if (!previous.writable) return false
+  const writable = !has_property(next, "writable") || !!next.writable
+  if (!writable) next.writable = true
+  if (!ordinary_define_own_property(array, "length", next)) return false
+  // Enumerating existing keys avoids walking billions of holes in sparse arrays.
+  const keys = ordinary_own_property_keys(array)
+  let offset = keys.length - 1
+  let key
+  let index
+  while (offset >= 0) {
+    key = keys[offset]
+    index = array_index(key)
+    if (index >= length) {
+      if (!ordinary_delete(array, key)) {
+        next.value = index + 1
+        if (!writable) next.writable = false
+        ordinary_define_own_property(array, "length", next)
+        return false
+      }
+    }
+    offset = offset - 1
+  }
+  if (!writable)
+    return ordinary_define_own_property(array, "length", { writable: false })
+  return true
+}
+
+function array_define_own_property(array, key, descriptor) {
+  // Internal method dispatch already supplies a property key.
+  const name = key
+  if (name === "length") return array_set_length(array, descriptor)
+  const index = array_index(name)
+  if (index < 0) return ordinary_define_own_property(array, name, descriptor)
+  const length = get_own_property_descriptor(array, "length")
+  if (index >= length.value && !length.writable) return false
+  if (!ordinary_define_own_property(array, name, descriptor)) return false
+  if (index >= length.value)
+    return ordinary_define_own_property(array, "length", { value: index + 1 })
+  return true
+}
+
+function iterator(object, kind) {
+  let target = to_object(object)
+  let index = 0
+  return {
+    next() {
+      if (target === undefined) return { value: undefined, done: true }
+      if (index >= to_length(target.length)) {
+        target = undefined
+        return { value: undefined, done: true }
+      }
+      const current = index
+      index = index + 1
+      return {
+        value:
+          kind === 0
+            ? current
+            : kind === 1
+              ? target[current]
+              : [current, target[current]],
+        done: false,
+      }
+    },
+  }
+}
+
+let joining
+
+function sort_compare(compare, left, right) {
+  if (left === undefined) return right === undefined ? 0 : 1
+  if (right === undefined) return -1
+  if (compare !== undefined) {
+    const result = +call(compare, undefined, left, right)
+    return result !== result ? 0 : result
+  }
+  const a = to_string(left)
+  const b = to_string(right)
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
+function sort_array(receiver, compare) {
+  if (compare !== undefined) callable(compare)
+  const object = to_object(receiver)
+  const length = to_length(object.length)
+  let values = array_create(0)
+  let index = 0
+  let count = 0
+  while (index < length) {
+    if (has_property(object, index)) {
+      create_data_property(values, count, object[index])
+      count = count + 1
+    }
+    index = index + 1
+  }
+  let width = 1
+  let next
+  let start
+  let middle
+  let end
+  let left
+  let right
+  let out
+  while (width < count) {
+    next = array_create(count)
+    start = 0
+    while (start < count) {
+      middle = start + width < count ? start + width : count
+      end = start + width * 2 < count ? start + width * 2 : count
+      left = start
+      right = middle
+      out = start
+      while (out < end) {
+        if (
+          left < middle &&
+          (right >= end ||
+            sort_compare(compare, values[left], values[right]) <= 0)
+        ) {
+          create_data_property(next, out, values[left])
+          left = left + 1
+        } else {
+          create_data_property(next, out, values[right])
+          right = right + 1
+        }
+        out = out + 1
+      }
+      start = end
+    }
+    values = next
+    width = width * 2
+  }
+  index = 0
+  while (index < count) {
+    object[index] = values[index]
+    index = index + 1
+  }
+  while (index < length) {
+    delete_property(object, index)
+    index = index + 1
+  }
+  return object
+}
+
+function flatten(target, source, length, depth, mapper, receiver, offset) {
+  let index = 0
+  let element
+  while (index < length) {
+    if (has_property(source, index)) {
+      element = source[index]
+      if (mapper !== undefined)
+        element = call(mapper, receiver, element, index, source)
+      if (depth > 0 && is_array(element))
+        offset = flatten(
+          target,
+          element,
+          to_length(element.length),
+          depth - 1,
+          undefined,
+          undefined,
+          offset,
+        )
+      else {
+        check_length(offset + 1)
+        create_data_property(target, offset, element)
+        offset = offset + 1
+      }
+    }
+    index = index + 1
+  }
+  return offset
+}
+
+@builtin({ name: "Array", prototype: "array", length: 1 })
+class Array {
+  @internalMethod("Call")
+  static #call(thisArgument, args) {
+    return create_from_arguments(args, Array)
+  }
+  @internalMethod("Construct")
+  static #construct(args, newTarget) {
+    return create_from_arguments(args, newTarget)
+  }
+  @internalMethod("DefineOwnProperty")
+  #defineOwnProperty(key, descriptor) {
+    return array_define_own_property(this, key, descriptor)
+  }
+  static isArray(value) {
     return is_array(value)
-  },
-  of() {
+  }
+
+  static of() {
     const count = arguments.length
     const result = is_constructor(this) ? new this(count) : array_create(count)
     let index = 0
@@ -65,8 +279,9 @@ const statics = {
     }
     result.length = count
     return result
-  },
-  from(items, map, receiver) {
+  }
+
+  static from(items, map, receiver) {
     if (map !== undefined) callable(map)
     // String iteration yields code points rather than individual code units.
     if (typeof items === "string") {
@@ -108,47 +323,16 @@ const statics = {
     }
     result.length = length
     return result
-  },
-}
-method(Array, "isArray", statics.isArray, 1)
-method(Array, "of", statics.of, 0)
-method(Array, "from", statics.from, 1)
-
-function iterator(object, kind) {
-  let target = to_object(object)
-  let index = 0
-  return {
-    next() {
-      if (target === undefined) return { value: undefined, done: true }
-      if (index >= to_length(target.length)) {
-        target = undefined
-        return { value: undefined, done: true }
-      }
-      const current = index
-      index = index + 1
-      return {
-        value:
-          kind === 0
-            ? current
-            : kind === 1
-              ? target[current]
-              : [current, target[current]],
-        done: false,
-      }
-    },
   }
-}
 
-// A linked stack avoids recursively joining arrays that contain themselves.
-let joining
-const methods = {
   at(index) {
     const object = to_object(this)
     const length = to_length(object.length)
     const offset = to_integer(index)
     const actual = offset < 0 ? length + offset : offset
     return actual < 0 || actual >= length ? undefined : object[actual]
-  },
+  }
+
   push() {
     const object = to_object(this)
     let length = to_length(object.length)
@@ -161,7 +345,8 @@ const methods = {
     }
     object.length = length
     return length
-  },
+  }
+
   pop() {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -173,7 +358,8 @@ const methods = {
     delete_property(object, length - 1)
     object.length = length - 1
     return value
-  },
+  }
+
   shift() {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -191,7 +377,8 @@ const methods = {
     delete_property(object, length - 1)
     object.length = length - 1
     return value
-  },
+  }
+
   unshift() {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -211,7 +398,8 @@ const methods = {
     }
     object.length = length + count
     return length + count
-  },
+  }
+
   join(separator) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -238,14 +426,16 @@ const methods = {
     } finally {
       joining = parent
     }
-  },
+  }
+
   toString() {
     const object = to_object(this)
     const join = object.join
     return typeof join === "function"
       ? call(join, object)
       : call(object_prototype.toString, object)
-  },
+  }
+
   slice(start, end) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -261,7 +451,8 @@ const methods = {
       offset = offset + 1
     }
     return result
-  },
+  }
+
   concat() {
     const result = array_create(0)
     let offset = 0
@@ -290,7 +481,8 @@ const methods = {
     }
     result.length = offset
     return result
-  },
+  }
+
   reverse() {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -313,7 +505,8 @@ const methods = {
       upper = upper - 1
     }
     return object
-  },
+  }
+
   fill(value, start, end) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -324,7 +517,8 @@ const methods = {
       index = index + 1
     }
     return object
-  },
+  }
+
   copyWithin(target, start, end) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -346,7 +540,8 @@ const methods = {
       count = count - 1
     }
     return object
-  },
+  }
+
   splice(start, deleteCount) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -395,19 +590,20 @@ const methods = {
     }
     object.length = length - remove + insert
     return result
-  },
+  }
+
   keys() {
     return iterator(this, 0)
-  },
+  }
+
   values() {
     return iterator(this, 1)
-  },
+  }
+
   entries() {
     return iterator(this, 2)
-  },
-}
+  }
 
-methods.forEach = {
   forEach(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -423,10 +619,8 @@ methods.forEach = {
       index = index + 1
     }
     return undefined
-  },
-}.forEach
+  }
 
-methods.map = {
   map(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -444,10 +638,8 @@ methods.map = {
       index = index + 1
     }
     return result
-  },
-}.map
+  }
 
-methods.filter = {
   filter(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -469,10 +661,8 @@ methods.filter = {
       index = index + 1
     }
     return result
-  },
-}.filter
+  }
 
-methods.some = {
   some(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -489,10 +679,8 @@ methods.some = {
       index = index + 1
     }
     return false
-  },
-}.some
+  }
 
-methods.every = {
   every(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -509,10 +697,8 @@ methods.every = {
       index = index + 1
     }
     return true
-  },
-}.every
+  }
 
-methods.find = {
   find(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -529,10 +715,8 @@ methods.find = {
       index = index + 1
     }
     return undefined
-  },
-}.find
+  }
 
-methods.findIndex = {
   findIndex(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -549,10 +733,8 @@ methods.findIndex = {
       index = index + 1
     }
     return -1
-  },
-}.findIndex
+  }
 
-methods.findLast = {
   findLast(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -569,10 +751,8 @@ methods.findLast = {
       index = index - 1
     }
     return undefined
-  },
-}.findLast
+  }
 
-methods.findLastIndex = {
   findLastIndex(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -589,10 +769,8 @@ methods.findLastIndex = {
       index = index - 1
     }
     return -1
-  },
-}.findLastIndex
+  }
 
-methods.reduce = {
   reduce(callback, initial) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -621,10 +799,8 @@ methods.reduce = {
       index = index + 1
     }
     return accumulator
-  },
-}.reduce
+  }
 
-methods.reduceRight = {
   reduceRight(callback, initial) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -653,10 +829,8 @@ methods.reduceRight = {
       index = index - 1
     }
     return accumulator
-  },
-}.reduceRight
+  }
 
-methods.indexOf = {
   indexOf(search, fromIndex) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -670,10 +844,8 @@ methods.indexOf = {
       index = index + 1
     }
     return -1
-  },
-}.indexOf
+  }
 
-methods.lastIndexOf = {
   lastIndexOf(search, fromIndex) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -686,10 +858,8 @@ methods.lastIndexOf = {
       index = index - 1
     }
     return -1
-  },
-}.lastIndexOf
+  }
 
-methods.includes = {
   includes(search, fromIndex) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -705,115 +875,12 @@ methods.includes = {
       index = index + 1
     }
     return false
-  },
-}.includes
-
-function sort_compare(compare, left, right) {
-  if (left === undefined) return right === undefined ? 0 : 1
-  if (right === undefined) return -1
-  if (compare !== undefined) {
-    const result = +call(compare, undefined, left, right)
-    return result !== result ? 0 : result
   }
-  const a = to_string(left)
-  const b = to_string(right)
-  return a < b ? -1 : a > b ? 1 : 0
-}
 
-// Bottom-up merge sort is stable and keeps comparisons in the stdlib.
-methods.sort = {
   sort(compare) {
-    if (compare !== undefined) callable(compare)
-    const object = to_object(this)
-    const length = to_length(object.length)
-    let values = array_create(0)
-    let index = 0
-    let count = 0
-    while (index < length) {
-      if (has_property(object, index)) {
-        create_data_property(values, count, object[index])
-        count = count + 1
-      }
-      index = index + 1
-    }
-    let width = 1
-    let next
-    let start
-    let middle
-    let end
-    let left
-    let right
-    let out
-    while (width < count) {
-      next = array_create(count)
-      start = 0
-      while (start < count) {
-        middle = start + width < count ? start + width : count
-        end = start + width * 2 < count ? start + width * 2 : count
-        left = start
-        right = middle
-        out = start
-        while (out < end) {
-          if (
-            left < middle &&
-            (right >= end ||
-              sort_compare(compare, values[left], values[right]) <= 0)
-          ) {
-            create_data_property(next, out, values[left])
-            left = left + 1
-          } else {
-            create_data_property(next, out, values[right])
-            right = right + 1
-          }
-          out = out + 1
-        }
-        start = end
-      }
-      values = next
-      width = width * 2
-    }
-    index = 0
-    while (index < count) {
-      object[index] = values[index]
-      index = index + 1
-    }
-    while (index < length) {
-      delete_property(object, index)
-      index = index + 1
-    }
-    return object
-  },
-}.sort
-
-function flatten(target, source, length, depth, mapper, receiver, offset) {
-  let index = 0
-  let element
-  while (index < length) {
-    if (has_property(source, index)) {
-      element = source[index]
-      if (mapper !== undefined)
-        element = call(mapper, receiver, element, index, source)
-      if (depth > 0 && is_array(element))
-        offset = flatten(
-          target,
-          element,
-          to_length(element.length),
-          depth - 1,
-          undefined,
-          undefined,
-          offset,
-        )
-      else {
-        check_length(offset + 1)
-        create_data_property(target, offset, element)
-        offset = offset + 1
-      }
-    }
-    index = index + 1
+    return sort_array(this, compare)
   }
-  return offset
-}
-methods.flat = {
+
   flat(depth) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -821,9 +888,8 @@ methods.flat = {
     const result = array_create(0)
     flatten(result, object, length, limit, undefined, undefined, 0)
     return result
-  },
-}.flat
-methods.flatMap = {
+  }
+
   flatMap(callback, receiver) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -831,9 +897,8 @@ methods.flatMap = {
     const result = array_create(0)
     flatten(result, object, length, 1, callback, receiver, 0)
     return result
-  },
-}.flatMap
-methods.toReversed = {
+  }
+
   toReversed() {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -844,10 +909,9 @@ methods.toReversed = {
       index = index + 1
     }
     return result
-  },
-}.toReversed
-methods.with = {
-  withValue(index, value) {
+  }
+
+  ["with"](index, value) {
     const object = to_object(this)
     const length = to_length(object.length)
     const relative = to_integer(index)
@@ -865,9 +929,8 @@ methods.with = {
       offset = offset + 1
     }
     return result
-  },
-}.withValue
-methods.toSorted = {
+  }
+
   toSorted(compare) {
     if (compare !== undefined) callable(compare)
     const object = to_object(this)
@@ -878,10 +941,9 @@ methods.toSorted = {
       create_data_property(result, index, object[index])
       index = index + 1
     }
-    return call(methods.sort, result, compare)
-  },
-}.toSorted
-methods.toSpliced = {
+    return sort_array(result, compare)
+  }
+
   toSpliced(start, deleteCount) {
     const object = to_object(this)
     const length = to_length(object.length)
@@ -914,45 +976,49 @@ methods.toSpliced = {
       index = index + 1
     }
     return result
-  },
-}.toSpliced
+  }
+}
 
-method(array_prototype, "at", methods.at, 1)
-method(array_prototype, "push", methods.push, 1)
-method(array_prototype, "pop", methods.pop, 0)
-method(array_prototype, "shift", methods.shift, 0)
-method(array_prototype, "unshift", methods.unshift, 1)
-method(array_prototype, "join", methods.join, 1)
-method(array_prototype, "toString", methods.toString, 0)
-method(array_prototype, "slice", methods.slice, 2)
-method(array_prototype, "concat", methods.concat, 1)
-method(array_prototype, "reverse", methods.reverse, 0)
-method(array_prototype, "fill", methods.fill, 1)
-method(array_prototype, "copyWithin", methods.copyWithin, 2)
-method(array_prototype, "splice", methods.splice, 2)
-method(array_prototype, "keys", methods.keys, 0)
-method(array_prototype, "values", methods.values, 0)
-method(array_prototype, "entries", methods.entries, 0)
-method(array_prototype, "forEach", methods.forEach, 1)
-method(array_prototype, "map", methods.map, 1)
-method(array_prototype, "filter", methods.filter, 1)
-method(array_prototype, "some", methods.some, 1)
-method(array_prototype, "every", methods.every, 1)
-method(array_prototype, "find", methods.find, 1)
-method(array_prototype, "findIndex", methods.findIndex, 1)
-method(array_prototype, "findLast", methods.findLast, 1)
-method(array_prototype, "findLastIndex", methods.findLastIndex, 1)
-method(array_prototype, "reduce", methods.reduce, 1)
-method(array_prototype, "reduceRight", methods.reduceRight, 1)
-method(array_prototype, "indexOf", methods.indexOf, 1)
-method(array_prototype, "lastIndexOf", methods.lastIndexOf, 1)
-method(array_prototype, "includes", methods.includes, 1)
-method(array_prototype, "sort", methods.sort, 1)
-method(array_prototype, "flat", methods.flat, 0)
-method(array_prototype, "flatMap", methods.flatMap, 1)
-method(array_prototype, "toReversed", methods.toReversed, 0)
-method(array_prototype, "with", methods.with, 2)
-method(array_prototype, "toSorted", methods.toSorted, 1)
-method(array_prototype, "toSpliced", methods.toSpliced, 2)
+set_prototype(Array.prototype, object_prototype)
+method(Array, "isArray", Array.isArray, 1)
+method(Array, "of", Array.of, 0)
+method(Array, "from", Array.from, 1)
+method(Array.prototype, "at", Array.prototype.at, 1)
+method(Array.prototype, "push", Array.prototype.push, 1)
+method(Array.prototype, "pop", Array.prototype.pop, 0)
+method(Array.prototype, "shift", Array.prototype.shift, 0)
+method(Array.prototype, "unshift", Array.prototype.unshift, 1)
+method(Array.prototype, "join", Array.prototype.join, 1)
+method(Array.prototype, "toString", Array.prototype.toString, 0)
+method(Array.prototype, "slice", Array.prototype.slice, 2)
+method(Array.prototype, "concat", Array.prototype.concat, 1)
+method(Array.prototype, "reverse", Array.prototype.reverse, 0)
+method(Array.prototype, "fill", Array.prototype.fill, 1)
+method(Array.prototype, "copyWithin", Array.prototype.copyWithin, 2)
+method(Array.prototype, "splice", Array.prototype.splice, 2)
+method(Array.prototype, "keys", Array.prototype.keys, 0)
+method(Array.prototype, "values", Array.prototype.values, 0)
+method(Array.prototype, "entries", Array.prototype.entries, 0)
+method(Array.prototype, "forEach", Array.prototype.forEach, 1)
+method(Array.prototype, "map", Array.prototype.map, 1)
+method(Array.prototype, "filter", Array.prototype.filter, 1)
+method(Array.prototype, "some", Array.prototype.some, 1)
+method(Array.prototype, "every", Array.prototype.every, 1)
+method(Array.prototype, "find", Array.prototype.find, 1)
+method(Array.prototype, "findIndex", Array.prototype.findIndex, 1)
+method(Array.prototype, "findLast", Array.prototype.findLast, 1)
+method(Array.prototype, "findLastIndex", Array.prototype.findLastIndex, 1)
+method(Array.prototype, "reduce", Array.prototype.reduce, 1)
+method(Array.prototype, "reduceRight", Array.prototype.reduceRight, 1)
+method(Array.prototype, "indexOf", Array.prototype.indexOf, 1)
+method(Array.prototype, "lastIndexOf", Array.prototype.lastIndexOf, 1)
+method(Array.prototype, "includes", Array.prototype.includes, 1)
+method(Array.prototype, "sort", Array.prototype.sort, 1)
+method(Array.prototype, "flat", Array.prototype.flat, 0)
+method(Array.prototype, "flatMap", Array.prototype.flatMap, 1)
+method(Array.prototype, "toReversed", Array.prototype.toReversed, 0)
+method(Array.prototype, "with", Array.prototype.with, 2)
+method(Array.prototype, "toSorted", Array.prototype.toSorted, 1)
+method(Array.prototype, "toSpliced", Array.prototype.toSpliced, 2)
 
 export default Array

@@ -20,7 +20,9 @@ const MIN_PAYLOAD_BYTES = Object.freeze({
   [KINDS.ENVIRONMENT]: 16,
   [KINDS.BYTE_BUFFER]: 4,
   [KINDS.ERROR]: 8,
-  [KINDS.ARRAY]: 8,
+  [KINDS.ARRAY]: 16,
+  [KINDS.BUILTIN_OBJECT]: 16,
+  [KINDS.INTERNAL_METHODS]: 32,
   [KINDS.STRING_OBJECT]: 16,
   [KINDS.VALUE_ARRAY]: 8,
 })
@@ -65,6 +67,9 @@ export function allocate(memory, kind, payload_bytes) {
     write_heap_undefined(memory, cursor + 16)
     write_heap_undefined(memory, cursor + 40)
     write_heap_undefined(memory, cursor + 48)
+  } else if (kind === KINDS.INTERNAL_METHODS) {
+    for (const offset of [8, 16, 24])
+      write_heap_undefined(memory, cursor + offset)
   } else if (kind === KINDS.STRING_OBJECT) {
     write_heap_undefined(memory, cursor + 16)
   } else if (kind === KINDS.ENVIRONMENT) {
@@ -137,13 +142,22 @@ export function collect(memory) {
     const kind = read_u32(memory, scan)
     const size = read_u32(memory, scan + 4)
     if (
-      [KINDS.OBJECT, KINDS.ERROR, KINDS.ARRAY, KINDS.STRING_OBJECT].includes(
-        kind,
-      )
+      [
+        KINDS.OBJECT,
+        KINDS.ERROR,
+        KINDS.ARRAY,
+        KINDS.STRING_OBJECT,
+        KINDS.BUILTIN_OBJECT,
+      ].includes(kind)
     ) {
       trace_raw(scan + 8)
       trace_raw(scan + 12)
       if (kind === KINDS.STRING_OBJECT) trace_value(memory.heap_view, scan + 16)
+      if (kind === KINDS.ARRAY || kind === KINDS.BUILTIN_OBJECT)
+        trace_raw(scan + 16)
+    } else if (kind === KINDS.INTERNAL_METHODS) {
+      for (const offset of [8, 16, 24])
+        trace_value(memory.heap_view, scan + offset)
     } else if (kind === KINDS.PROPERTY) {
       trace_raw(scan + 8)
       trace_value(memory.heap_view, scan + 16)
@@ -153,6 +167,7 @@ export function collect(memory) {
       trace_value(memory.heap_view, scan + 16)
       trace_raw(scan + 24)
       trace_raw(scan + 28)
+      trace_raw(scan + 36)
       trace_value(memory.heap_view, scan + 40)
       trace_value(memory.heap_view, scan + 48)
     } else if (kind === KINDS.ENVIRONMENT || kind === KINDS.VALUE_ARRAY) {

@@ -406,7 +406,7 @@ for (const [name, source, diagnostic] of [
   [
     "removed intrinsic syntax",
     'const fn = @djs_intrinsic("write_stdout");',
-    /Unexpected character: '@'/,
+    /Expected Class/,
   ],
   [
     "unknown intrinsic export",

@@ -546,6 +546,7 @@ export const Stmt = {
 
 export interface Class {
   readonly span: Span
+  readonly decorators: readonly Expr[]
   readonly name: Ident | null
   readonly superclass: Expr | null
   readonly body: ClassBody
@@ -563,6 +564,7 @@ export interface ClassBody {
 
 export interface MethodDef {
   readonly span: Span
+  readonly decorators: readonly Expr[]
   readonly name: ObjectKey
   readonly is_static: boolean
   readonly body: Func
@@ -596,6 +598,7 @@ export const ClassMember = {
 
 export interface FieldDef {
   readonly span: Span
+  readonly decorators: readonly Expr[]
   readonly name: ObjectKey
   readonly is_static: boolean
   readonly initializer: Expr | null

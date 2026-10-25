@@ -2,6 +2,7 @@ export const tokens: (string | [string, string])[] = [
   "Ident",
 
   "PrivateIdent",
+  "At",
 
   ["True", "true"],
   ["False", "false"],

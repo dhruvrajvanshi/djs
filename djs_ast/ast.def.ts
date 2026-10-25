@@ -201,6 +201,7 @@ const FuncTypeParam = Struct("FuncTypeParam", [], {
   type_annotation: () => TypeAnnotation,
 })
 const Class = Struct("Class", ["span"], {
+  decorators: List(() => Expr),
   name: Option(Ident),
   superclass: Option(() => Expr),
   body: () => ClassBody,
@@ -215,11 +216,13 @@ const ClassMember = Enum("ClassMember", [], {
 })
 
 const FieldDef = Struct("FieldDef", ["span"], {
+  decorators: List(() => Expr),
   name: () => ObjectKey,
   is_static: "boolean",
   initializer: Option(() => Expr),
 })
 const MethodDef = Struct("MethodDef", ["span"], {
+  decorators: List(() => Expr),
   name: () => ObjectKey,
   is_static: "boolean",
   body: () => Func,

@@ -553,6 +553,9 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_method_def(node: ast.MethodDef): void {
+    for (const decorator of node.decorators) {
+      this.visit_expr(decorator)
+    }
     this.visit_object_key(node.name)
 
     this.visit_func(node.body)
@@ -580,6 +583,9 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_class(node: ast.Class): void {
+    for (const decorator of node.decorators) {
+      this.visit_expr(decorator)
+    }
     if (node.name !== null) {
       this.visit_ident(node.name)
     }
@@ -606,6 +612,9 @@ export class ASTVisitorBase implements ASTVisitor {
     }
   }
   visit_field_def(node: ast.FieldDef): void {
+    for (const decorator of node.decorators) {
+      this.visit_expr(decorator)
+    }
     this.visit_object_key(node.name)
 
     if (node.initializer !== null) {

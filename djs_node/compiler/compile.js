@@ -955,7 +955,107 @@ function private_name(state, fn, scope, ident) {
   throw syntax_error(ident, `Undeclared private name: ${ident.text}`)
 }
 
+// Intrinsic decorators are compile-time declarations, never evaluated as JS.
+function intrinsic_decorator(node, name) {
+  if (
+    node.kind !== "Call" ||
+    node.callee.kind !== "Var" ||
+    node.callee.ident.text !== name ||
+    node.spread ||
+    node.is_optional
+  )
+    throw syntax_error(node, `Expected @${name}(...) intrinsic annotation`)
+  return node.args
+}
+
+function builtin_class(cls) {
+  if (!cls.decorators.length) return null
+  if (cls.decorators.length !== 1)
+    throw syntax_error(cls, "Expected one @builtin annotation")
+  const args = intrinsic_decorator(cls.decorators[0], "builtin")
+  if (args.length !== 1 || args[0].kind !== "Object")
+    throw syntax_error(cls, "@builtin requires a literal options object")
+  const options = { name: cls.name?.text, prototype: "object", length: null }
+  const seen = new Set()
+  for (const entry of args[0].entries) {
+    if (
+      entry.kind !== "Prop" ||
+      entry.key.kind !== "Ident" ||
+      !["name", "prototype", "length"].includes(entry.key.ident.text) ||
+      seen.has(entry.key.ident.text)
+    )
+      throw syntax_error(entry, "Invalid or duplicate @builtin option")
+    const key = entry.key.ident.text
+    seen.add(key)
+    if (key === "length") {
+      if (
+        entry.value.kind !== "Number" ||
+        !Number.isSafeInteger(Number(entry.value.text)) ||
+        Number(entry.value.text) < 0
+      )
+        throw syntax_error(
+          entry,
+          "Builtin length must be a non-negative integer",
+        )
+      options.length = Number(entry.value.text)
+    } else {
+      if (entry.value.kind !== "String")
+        throw syntax_error(entry, "Builtin options must be literals")
+      options[key] = decode_string(entry.value.text, entry.value)
+    }
+  }
+  if (!options.name || !["object", "array"].includes(options.prototype))
+    throw syntax_error(cls, "Invalid builtin name or prototype kind")
+  const hooks = new Map()
+  const used = new Set()
+  for (const item of cls.body.members) {
+    const member = item.method ?? item.field
+    if (!member.body) {
+      if (member.is_static && !member.decorators.length) continue
+      throw syntax_error(
+        member,
+        "Builtin instance layouts and @internalSlot fields are not supported yet",
+      )
+    }
+    if (!member.decorators.length) continue
+    if (member.decorators.length !== 1)
+      throw syntax_error(member, "Expected one @internalMethod annotation")
+    const args = intrinsic_decorator(member.decorators[0], "internalMethod")
+    if (args.length !== 1 || args[0].kind !== "String")
+      throw syntax_error(
+        member,
+        "Internal method name must be a string literal",
+      )
+    const name = decode_string(args[0].text, args[0])
+    const id = ["Call", "Construct", "DefineOwnProperty"].indexOf(name)
+    if (id < 0 || used.has(name))
+      throw syntax_error(member, "Unknown or duplicate internal method")
+    if (
+      member.name.kind !== "Private" ||
+      member.accessor_type ||
+      member.body.is_async ||
+      member.body.is_generator ||
+      member.is_static !== id < 2 ||
+      member.body.params.length !== 2
+    )
+      throw syntax_error(
+        member,
+        "Internal methods must be private synchronous methods with two parameters; Call/Construct must be static",
+      )
+    hooks.set(member, id)
+    used.add(name)
+  }
+  return { ...options, hooks }
+}
+
 function class_value(state, parent, parent_scope, cls) {
+  const builtin = builtin_class(cls)
+  if (!builtin)
+    for (const item of cls.body.members) {
+      const member = item.method ?? item.field
+      if (member.decorators.length)
+        throw syntax_error(member, "Internal annotations require @builtin")
+    }
   if (cls.superclass) unsupported(cls, "class inheritance")
   const id = compile_function(
     state,
@@ -1062,7 +1162,7 @@ function class_value(state, parent, parent_scope, cls) {
               const field_scope = create_scope(scope, owner)
               const receiver = load_name(state, owner, field_scope, "this")
               for (const [member, hidden] of private_methods)
-                if (!member.is_static)
+                if (!member.is_static && !builtin?.hooks.has(member))
                   emit(
                     owner,
                     OP.PRIVATE_INIT,
@@ -1100,7 +1200,20 @@ function class_value(state, parent, parent_scope, cls) {
           prototype = allocate(fn)
         emit(fn, OP.CLOSURE, ctor, constructor_id)
         emit(fn, OP.INIT_ENV, 0, scope.bindings.get(name).slot, ctor)
-        emit(fn, OP.OBJECT, prototype)
+        emit(
+          fn,
+          builtin?.prototype === "array" ? OP.ARRAY : OP.OBJECT,
+          prototype,
+          0,
+        )
+        if (builtin)
+          emit(
+            fn,
+            OP.BUILTIN_CLASS,
+            ctor,
+            prototype,
+            builtin.prototype === "array" ? 1 : 0,
+          )
         emit(
           fn,
           OP.DEFINE_PROP,
@@ -1114,7 +1227,7 @@ function class_value(state, parent, parent_scope, cls) {
           OP.DEFINE_PROP,
           ctor,
           constant(state, fn, "name"),
-          constant(state, fn, cls.name?.text ?? ""),
+          constant(state, fn, builtin?.name ?? cls.name?.text ?? ""),
           4,
         )
         emit(
@@ -1122,7 +1235,11 @@ function class_value(state, parent, parent_scope, cls) {
           OP.DEFINE_PROP,
           ctor,
           constant(state, fn, "length"),
-          constant(state, fn, constructor?.body.params.length ?? 0),
+          constant(
+            state,
+            fn,
+            builtin?.length ?? constructor?.body.params.length ?? 0,
+          ),
           4,
         )
         emit(
@@ -1143,6 +1260,8 @@ function class_value(state, parent, parent_scope, cls) {
             member.name.ident?.text ?? "<method>",
             2,
           )
+          if (builtin?.hooks.has(member))
+            emit(fn, OP.INTERNAL_METHOD, ctor, value, builtin.hooks.get(member))
           if (member.name.kind === "Private") {
             emit(
               fn,
@@ -1200,6 +1319,14 @@ function class_value(state, parent, parent_scope, cls) {
               member.name.kind === "Private" ? 0 : 7,
             )
           }
+        if (builtin)
+          emit(
+            fn,
+            OP.REGISTER_BUILTIN,
+            ctor,
+            prototype,
+            literal(state, builtin.name),
+          )
         emit(fn, OP.RETURN, ctor)
       },
     },

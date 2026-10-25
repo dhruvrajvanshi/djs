@@ -340,3 +340,34 @@ test("export async function", () => {
     func: { is_async: true },
   })
 })
+
+test("intrinsic decorators are retained on classes and methods", () => {
+  const source = parse_source_file(
+    `
+    @builtin({name:"Array",prototype:"array"})
+    class Array {
+      @internalMethod("Call") static #call(receiver,args) {return args}
+      @internalMethod("DefineOwnProperty") #define(key,descriptor) {return false}
+    }
+  `,
+    "entry.js",
+  )
+  expect(source.errors).toEqual([])
+  const declaration = source.stmts[0]
+  assert(declaration.kind === "ClassDecl")
+  expect(declaration.class_def.decorators).toHaveLength(1)
+  const [call, define] = declaration.class_def.body.members
+  assert(call.kind === "MethodDef" && define.kind === "MethodDef")
+  expect(call.method.decorators).toHaveLength(1)
+  expect(call.method.is_static).toBe(true)
+  expect(define.method.is_static).toBe(false)
+  const exported = parse_source_file(
+    "export @builtin({}) class Box {}",
+    "entry.js",
+  )
+  expect(exported.errors).toEqual([])
+  expect(parse_expr("(@builtin({name:'Box'}) class {})")).toMatchObject({
+    kind: "Paren",
+    expr: { kind: "Class" },
+  })
+})

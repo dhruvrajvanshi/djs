@@ -658,6 +658,7 @@ function parser_impl(
         if (meta === ERR) return ERR
         return Expr.ImportMeta(Span.between(start.span, meta.span))
       }
+      case t.At:
       case t.Class: {
         const cls = parse_class()
         if (cls === ERR) return ERR
@@ -710,7 +711,20 @@ function parser_impl(
     }
     return fragments
   }
+  function parse_decorators(): Expr[] | Err {
+    const decorators: Expr[] = []
+    while (at(t.At)) {
+      advance()
+      const decorator = parse_member_or_call_expr(true)
+      if (decorator === ERR) return ERR
+      decorators.push(decorator)
+    }
+    return decorators
+  }
+
   function parse_class(): Class | Err {
+    const decorators = parse_decorators()
+    if (decorators === ERR) return ERR
     const first = expect(t.Class)
     if (first === ERR) return ERR
 
@@ -747,6 +761,7 @@ function parser_impl(
     return {
       span,
       name,
+      decorators,
       superclass,
       body: {
         span: Span.between(body_start.span, body_end.span),
@@ -768,6 +783,8 @@ function parser_impl(
   }
 
   function parse_method_def(): ClassMember | Err {
+    const decorators = parse_decorators()
+    if (decorators === ERR) return ERR
     let static_token: Token | null = null
     if (
       at(t.Static) &&
@@ -826,6 +843,7 @@ function parser_impl(
       }
       if (expect_semi() === ERR) return ERR
       return ClassMember.FieldDef({
+        decorators,
         span: Span.between(start, initializer?.span ?? name.span),
         name,
         is_static: static_token !== null,
@@ -847,6 +865,7 @@ function parser_impl(
     const span = Span.between(start, body.span)
 
     return ClassMember.MethodDef({
+      decorators,
       span,
       name,
       is_static: static_token !== null,
@@ -913,6 +932,7 @@ function parser_impl(
           if (body === ERR) return ERR
           const span = Span.between(start, body.span)
           const method: MethodDef = {
+            decorators: [],
             span,
             name,
             is_static: false,
@@ -993,6 +1013,7 @@ function parser_impl(
     }
 
     const method: MethodDef = {
+      decorators: [],
       span,
       name,
       is_static: false,
@@ -1745,6 +1766,7 @@ function parser_impl(
       (next_is(t.Function) ||
         next_is(t.Async) ||
         next_is(t.Class) ||
+        next_is(t.At) ||
         next_is(t.Var) ||
         next_is(t.Let) ||
         next_is(t.Const) ||
@@ -1855,6 +1877,7 @@ function parser_impl(
         if (f === ERR) return ERR
         return Stmt.Func(f.span, f, export_token !== null)
       }
+      case t.At:
       case t.Class: {
         const c = parse_class()
         if (c === ERR) return ERR

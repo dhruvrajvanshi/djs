@@ -22,11 +22,13 @@ import {
   has_property,
   delete_property,
   is_object,
+  ordinary_own_property_keys,
 } from "./objects.js"
 import {
   get_own_property_descriptor,
   define_own_property,
 } from "./properties.js"
+import { create_builtin_object } from "./builtins.js"
 import { KINDS, read_u32 } from "./memory.js"
 import { enqueue_job, start_operation } from "../runtime/jobs.js"
 
@@ -55,6 +57,10 @@ export const INTRINSIC_NAMES = Object.freeze([
   "object_create",
   "get_prototype",
   "set_prototype",
+  "ordinary_define_own_property",
+  "ordinary_own_property_keys",
+  "ordinary_delete",
+  "builtin_object_create",
 ])
 
 export function intrinsic_id(name) {
@@ -80,7 +86,38 @@ function string(memory, value, name) {
 export function call_intrinsic(runtime, id, destination, arguments_) {
   const { memory } = runtime
   const name = INTRINSIC_NAMES[id]
-  if (name === "string_code_unit_at") {
+  if (name === "ordinary_define_own_property") {
+    try {
+      define_own_property(
+        memory,
+        arguments_[0],
+        arguments_[1],
+        arguments_[2],
+        runtime,
+        true,
+      )
+      write_boolean(memory, destination, true)
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error
+      write_boolean(memory, destination, false)
+    }
+    return
+  } else if (name === "ordinary_delete") {
+    try {
+      delete_property(memory, arguments_[0], arguments_[1])
+      write_boolean(memory, destination, true)
+    } catch (error) {
+      if (!(error instanceof TypeError)) throw error
+      write_boolean(memory, destination, false)
+    }
+    return
+  } else if (name === "ordinary_own_property_keys") {
+    ordinary_own_property_keys(memory, destination, arguments_[0])
+    return
+  } else if (name === "builtin_object_create") {
+    create_builtin_object(memory, destination, arguments_[0], arguments_[1])
+    return
+  } else if (name === "string_code_unit_at") {
     write_number(
       memory,
       destination,

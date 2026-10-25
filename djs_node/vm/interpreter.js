@@ -31,7 +31,6 @@ import {
   store_binding,
   get_property,
   set_property,
-  define_property,
   private_property,
   set_prototype,
   create_error,
@@ -42,7 +41,6 @@ import {
   create_array,
   delete_property,
   is_object,
-  own_property,
 } from "./objects.js"
 import {
   call_intrinsic,
@@ -58,6 +56,17 @@ import {
   pending_operations,
   wait_for_completion,
 } from "../runtime/jobs.js"
+
+import {
+  create_builtin_class,
+  install_internal_method,
+  register_builtin,
+  load_internal_method,
+  INTERNAL,
+  internal_layout,
+  create_builtin_object,
+} from "./builtins.js"
+import { define_value_property } from "./properties.js"
 
 const NONE = 0xffffffff
 const FRAME_BYTES = 40
@@ -250,6 +259,24 @@ function call_function(
   const { memory } = runtime
   if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
     throw new TypeError("Value is not callable")
+  const hook = alloc_root(memory)
+  try {
+    if (load_internal_method(memory, hook, callee, INTERNAL.Call)) {
+      const args = alloc_root(memory),
+        this_argument = alloc_root(memory)
+      try {
+        create_arguments_object(memory, args, arguments_)
+        if (receiver !== undefined) copy_value(memory, this_argument, receiver)
+        invoke_sync(runtime, destination, hook, callee, [this_argument, args])
+      } finally {
+        free_root(memory, args)
+        free_root(memory, this_argument)
+      }
+      return
+    }
+  } finally {
+    free_root(memory, hook)
+  }
   const reference = get_ref(memory, callee)
   const code_id = read_u32(memory, reference + 8),
     function_id = read_u32(memory, reference + 12)
@@ -365,24 +392,6 @@ function capture_error(runtime, destination, error) {
   } else create_error(runtime, destination, error.name, error.message)
 }
 
-export function coerce_array_length(runtime, destination, source) {
-  const first = alloc_root(runtime.memory),
-    second = alloc_root(runtime.memory)
-  try {
-    coerce_value(runtime, first, source, "to_number")
-    coerce_value(runtime, second, source, "to_number")
-    if (
-      read_number(runtime.memory, first) >>> 0 !==
-      read_number(runtime.memory, second)
-    )
-      throw new RangeError("Invalid array length")
-    copy_value(runtime.memory, destination, second)
-  } finally {
-    free_root(runtime.memory, first)
-    free_root(runtime.memory, second)
-  }
-}
-
 export function coerce_value(runtime, destination, source, operation, hint) {
   const helper = runtime.coercions?.get(operation)
   if (helper === undefined) {
@@ -390,23 +399,28 @@ export function coerce_value(runtime, destination, source, operation, hint) {
     return
   }
   const hint_value = alloc_root(runtime.memory)
-  let conversion
   try {
     if (hint !== undefined) write_string(runtime.memory, hint_value, hint)
-    conversion = create_call_context(runtime, helper, undefined, [
-      source,
-      hint_value,
-    ])
-    run_task(runtime, conversion)
-    if (context_status(conversion) === CONTEXT_STATE.FAILED) {
+    invoke_sync(runtime, destination, helper, undefined, [source, hint_value])
+  } finally {
+    free_root(runtime.memory, hint_value)
+  }
+}
+
+export function invoke_sync(runtime, destination, callee, receiver, args) {
+  const context = create_call_context(runtime, callee, receiver, args)
+  try {
+    run_task(runtime, context)
+    if (context_status(context) === CONTEXT_STATE.FAILED) {
       const thrown = alloc_root(runtime.memory)
-      copy_value(runtime.memory, thrown, context_error(conversion))
+      copy_value(runtime.memory, thrown, context_error(context))
       throw new GuestThrow(thrown)
     }
-    copy_value(runtime.memory, destination, context_result(conversion))
+    if (context_status(context) !== CONTEXT_STATE.DONE)
+      throw new TypeError("Internal operations must complete synchronously")
+    copy_value(runtime.memory, destination, context_result(context))
   } finally {
-    if (conversion) dispose_context(runtime, conversion)
-    free_root(runtime.memory, hint_value)
+    dispose_context(runtime, context)
   }
 }
 
@@ -479,6 +493,15 @@ export function run_interpreter(runtime, context) {
         case OP.ARRAY:
           create_array(memory, reg(a), b)
           break
+        case OP.BUILTIN_CLASS:
+          create_builtin_class(memory, reg(a), reg(b), c === 1)
+          break
+        case OP.INTERNAL_METHOD:
+          install_internal_method(memory, reg(a), reg(b), c)
+          break
+        case OP.REGISTER_BUILTIN:
+          register_builtin(memory, reg(a), reg(b), code.unit.literals[c])
+          break
         case OP.DELETE_PROP:
           copy_value(memory, property_key, reg(c))
           if (is_object(memory, property_key))
@@ -503,14 +526,22 @@ export function run_interpreter(runtime, context) {
           if (is_object(memory, property_key))
             coerce_value(runtime, property_key, property_key, "to_string")
           copy_value(memory, operand, reg(c))
-          if (
-            kind_of(memory, reg(a)) === KINDS.ARRAY &&
-            to_string(memory, property_key) === "length" &&
-            is_object(memory, operand) &&
-            own_property(memory, reg(a), "length").flags & 1
+          const property = set_property(
+            memory,
+            reg(a),
+            property_key,
+            operand,
+            (_, object, key, value, flags, setter, value_only) =>
+              define_value_property(
+                runtime,
+                object,
+                key,
+                value,
+                flags,
+                setter,
+                value_only,
+              ),
           )
-            coerce_array_length(runtime, operand, operand)
-          const property = set_property(memory, reg(a), property_key, operand)
           if (property) {
             copy_heap_value_to_root(memory, temporary, property + 32)
             if (tag_of(memory, temporary) === TAGS.UNDEFINED)
@@ -531,14 +562,8 @@ export function run_interpreter(runtime, context) {
           if (is_object(memory, property_key))
             coerce_value(runtime, property_key, property_key, "to_string")
           copy_value(memory, operand, reg(c))
-          if (
-            kind_of(memory, reg(a)) === KINDS.ARRAY &&
-            to_string(memory, property_key) === "length" &&
-            is_object(memory, operand)
-          )
-            coerce_array_length(runtime, operand, operand)
-          define_property(
-            memory,
+          define_value_property(
+            runtime,
             reg(a),
             property_key,
             operand,
@@ -908,6 +933,23 @@ function construct_function(runtime, context, destination, callee, arguments_) {
   const { memory } = runtime
   if (kind_of(memory, callee) !== KINDS.FUNCTION)
     throw new TypeError("Value is not a constructor")
+  const hook = alloc_root(memory)
+  try {
+    if (load_internal_method(memory, hook, callee, INTERNAL.Construct)) {
+      const args = alloc_root(memory)
+      try {
+        create_arguments_object(memory, args, arguments_)
+        invoke_sync(runtime, destination, hook, callee, [args, callee])
+        if (!is_object(memory, destination))
+          throw new TypeError("Construct must return an object")
+      } finally {
+        free_root(memory, args)
+      }
+      return
+    }
+  } finally {
+    free_root(memory, hook)
+  }
   const reference = get_ref(memory, callee),
     code = read_u32(memory, reference + 8),
     id = read_u32(memory, reference + 12)
@@ -931,6 +973,11 @@ function construct_function(runtime, context, destination, callee, arguments_) {
     write_string(memory, key, "prototype")
     get_property(memory, prototype, callee, key)
     if (is_object(memory, prototype)) set_prototype(memory, receiver, prototype)
+    if (internal_layout(memory, callee, true)) {
+      if (!is_object(memory, prototype))
+        copy_value(memory, prototype, runtime.memory.object_prototype)
+      create_builtin_object(memory, receiver, callee, prototype)
+    }
     create_environment(
       memory,
       environment,

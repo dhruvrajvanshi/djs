@@ -36,6 +36,9 @@ export const OP = Object.freeze(
       "ARRAY",
       "DELETE_PROP",
       "LOAD_NEW_TARGET",
+      "BUILTIN_CLASS",
+      "INTERNAL_METHOD",
+      "REGISTER_BUILTIN",
     ].map((name, index) => [name, index + 1]),
   ),
 )

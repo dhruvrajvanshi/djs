@@ -23,6 +23,8 @@ export const KINDS = Object.freeze({
   ERROR: 8,
   ARRAY: 9,
   STRING_OBJECT: 10,
+  BUILTIN_OBJECT: 11,
+  INTERNAL_METHODS: 12,
 })
 export const CONTROL = Object.freeze({
   SEMISPACE_BYTES: 0,

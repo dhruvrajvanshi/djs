@@ -39,11 +39,10 @@ export async function bootstrap(runtime) {
   try {
     write_string(runtime.memory, key, "prototype")
     for (const name of ["String", "Array"]) {
-      const prototype = alloc_root(runtime.memory)
+      const field = name === "String" ? "string_prototype" : "array_prototype"
+      const prototype = runtime.memory[field] ?? alloc_root(runtime.memory)
       get_property(runtime.memory, prototype, runtime.globals.get(name), key)
-      runtime.memory[
-        name === "String" ? "string_prototype" : "array_prototype"
-      ] = prototype
+      runtime.memory[field] = prototype
     }
     for (const name of [
       "Error",
