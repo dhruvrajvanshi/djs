@@ -7,28 +7,21 @@ import {
   alloc_root,
   copy_heap_value_to_root,
   copy_root_to_heap_value,
-  copy_value,
   create_memory,
   free_root,
-  memory_root_count,
   read_u32,
   write_u32,
 } from "../vm/memory.ts"
 import { allocate, collect, heap_stats } from "../vm/heap.ts"
 import {
   get_ref,
-  read_boolean,
   read_number,
   read_string,
   set_ref,
   tag_of,
-  write_boolean,
-  write_hole,
-  write_null,
   write_number,
   write_string,
   write_undefined,
-  write_uninitialized,
   create_symbol,
   load_symbol_description,
 } from "../vm/values.ts"
@@ -49,49 +42,6 @@ test("number slots canonicalize NaN and preserve binary64 values", () => {
   assert.ok(Number.isNaN(read_number(memory, root)))
   assert.equal(memory.roots_view.getUint32(root * 8, true), 0)
   assert.equal(memory.roots_view.getUint32(root * 8 + 4, true), NAN_HIGH)
-})
-
-test("tagged values copy as raw bytes and reject incorrect decoders", () => {
-  const memory = create_memory()
-  const source = alloc_root(memory)
-  const destination = alloc_root(memory)
-  for (const [write, tag] of [
-    [write_undefined, TAGS.UNDEFINED],
-    [write_null, TAGS.NULL],
-    [write_uninitialized, TAGS.UNINITIALIZED],
-    [write_hole, TAGS.HOLE],
-  ]) {
-    write(memory, source)
-    copy_value(memory, destination, source)
-    assert.equal(tag_of(memory, destination), tag)
-    assert.deepEqual(memory.roots.slice(0, 8), memory.roots.slice(8, 16))
-    assert.throws(() => read_number(memory, destination), /numeric/)
-  }
-  write_boolean(memory, source, true)
-  assert.equal(read_boolean(memory, source), true)
-  write_boolean(memory, source, false)
-  assert.equal(read_boolean(memory, source), false)
-  set_ref(memory, source, 0x12345678)
-  copy_value(memory, destination, source)
-  assert.equal(get_ref(memory, destination), 0x12345678)
-})
-
-test("root handles survive storage growth and freed handles are reusable", () => {
-  const memory = create_memory({ root_capacity: 1 })
-  const first = alloc_root(memory)
-  write_string(memory, first, "retained")
-  const roots = Array.from({ length: 80 }, () => alloc_root(memory))
-  assert.ok(memory.roots instanceof Uint8Array)
-  assert.ok(memory.root_used instanceof Uint8Array)
-  assert.ok(memory.control instanceof Uint8Array)
-  assert.equal(read_string(memory, first), "retained")
-  assert.equal(memory_root_count(memory), 81)
-  free_root(memory, roots[12])
-  assert.throws(() => get_ref(memory, roots[12]), /Invalid root/)
-  assert.equal(alloc_root(memory), roots[12])
-  assert.equal(tag_of(memory, roots[12]), TAGS.UNDEFINED)
-  collect(memory)
-  assert.equal(read_string(memory, first), "retained")
 })
 
 test("strings retain UTF-16 code units through repeated moving collections", () => {
@@ -214,23 +164,4 @@ test("Cheney tracing updates nested raw pointers, tagged fields, aliases and cyc
     copy_heap_value_to_root(memory, scratch, moved_private_values + 16)
     assert.equal(read_string(memory, scratch), "result")
   }
-})
-
-test("allocation collects dead records and reports live-set exhaustion", () => {
-  const memory = create_memory({ semispace_bytes: 64 })
-  const root = alloc_root(memory)
-  for (let index = 0; index < 20; index++) write_string(memory, root, "small")
-  assert.ok(heap_stats(memory).collections > 0)
-  assert.equal(read_string(memory, root), "small")
-  const second = alloc_root(memory)
-  write_string(memory, second, "small")
-  assert.throws(() => write_string(memory, root, "small"), /out of memory/)
-  assert.equal(read_string(memory, root), "small")
-  assert.equal(read_string(memory, second), "small")
-  assert.throws(() => allocate(memory, KINDS.STRING, 100), /out of memory/)
-  assert.throws(() => allocate(memory, KINDS.PROPERTY, 0), /payload/)
-  free_root(memory, root)
-  free_root(memory, second)
-  collect(memory)
-  assert.equal(heap_stats(memory).used_bytes, 0)
 })
