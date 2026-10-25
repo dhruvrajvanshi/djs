@@ -33,6 +33,9 @@ export const OP = Object.freeze(
       "TRY",
       "LEAVE_TRY",
       "END_FINALLY",
+      "ARRAY",
+      "DELETE_PROP",
+      "LOAD_NEW_TARGET",
     ].map((name, index) => [name, index + 1]),
   ),
 )

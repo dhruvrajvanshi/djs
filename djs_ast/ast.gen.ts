@@ -821,6 +821,7 @@ export type Expr =
   | PreDecrementExpr
   | ArrayExpr
   | NewExpr
+  | NewTargetExpr
   | YieldExpr
   | YieldFromExpr
   | TernaryExpr
@@ -1170,6 +1171,17 @@ export class NewExpr {
 
   get kind(): "New" {
     return "New"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
+export class NewTargetExpr {
+  constructor(readonly span: Span) {}
+
+  get kind(): "NewTarget" {
+    return "NewTarget"
   }
 
   toString(): string {
@@ -1566,6 +1578,8 @@ export const Expr = {
     new ArrayExpr(span, items),
 
   New: (span: Span, expr: Expr): NewExpr => new NewExpr(span, expr),
+
+  NewTarget: (span: Span): NewTargetExpr => new NewTargetExpr(span),
 
   Yield: (span: Span, value: Expr | null): YieldExpr =>
     new YieldExpr(span, value),

@@ -3,10 +3,31 @@ import {
   read_string,
   write_string,
   write_undefined,
+  write_number,
+  write_boolean,
+  write_null,
+  set_ref,
+  get_ref,
+  string_code_unit_at,
+  slice_string,
 } from "./values.js"
 import { byte_buffer_view, create_byte_buffer } from "./bytes.js"
-import { kind_of } from "./objects.js"
-import { KINDS } from "./memory.js"
+import {
+  kind_of,
+  create_array,
+  create_string_object,
+  string_value,
+  create_object,
+  set_prototype,
+  has_property,
+  delete_property,
+  is_object,
+} from "./objects.js"
+import {
+  get_own_property_descriptor,
+  define_own_property,
+} from "./properties.js"
+import { KINDS, read_u32 } from "./memory.js"
 import { enqueue_job, start_operation } from "../runtime/jobs.js"
 
 export const NATIVE_CODE = 0xffffffff
@@ -20,6 +41,20 @@ export const INTRINSIC_NAMES = Object.freeze([
   "string_from_code_unit",
   "enqueue_job",
   "call",
+  "string_code_unit_at",
+  "string_slice",
+  "string_box",
+  "string_value",
+  "array_create",
+  "is_array",
+  "is_constructor",
+  "has_property",
+  "delete_property",
+  "get_own_property_descriptor",
+  "define_property",
+  "object_create",
+  "get_prototype",
+  "set_prototype",
 ])
 
 export function intrinsic_id(name) {
@@ -45,7 +80,113 @@ function string(memory, value, name) {
 export function call_intrinsic(runtime, id, destination, arguments_) {
   const { memory } = runtime
   const name = INTRINSIC_NAMES[id]
-  if (name === "write_stdout") {
+  if (name === "string_code_unit_at") {
+    write_number(
+      memory,
+      destination,
+      string_code_unit_at(
+        memory,
+        arguments_[0],
+        integer(memory, arguments_[1], "string index"),
+      ),
+    )
+    return
+  } else if (name === "string_slice") {
+    slice_string(
+      memory,
+      destination,
+      arguments_[0],
+      integer(memory, arguments_[1], "start"),
+      integer(memory, arguments_[2], "end"),
+    )
+    return
+  } else if (name === "string_box") {
+    create_string_object(memory, destination, arguments_[0], arguments_[1])
+    return
+  } else if (name === "string_value") {
+    string_value(memory, destination, arguments_[0])
+    return
+  } else if (name === "array_create") {
+    create_array(
+      memory,
+      destination,
+      integer(memory, arguments_[0], "array length", 0xffffffff),
+      arguments_[1],
+    )
+    return
+  } else if (name === "is_constructor") {
+    let result = false
+    if (
+      arguments_[0] !== undefined &&
+      kind_of(memory, arguments_[0]) === KINDS.FUNCTION
+    ) {
+      const reference = get_ref(memory, arguments_[0])
+      const code = read_u32(memory, reference + 8)
+      result =
+        code !== NATIVE_CODE &&
+        code !== RESUME_CODE &&
+        !(read_u32(memory, reference + 32) & 14)
+    }
+    write_boolean(memory, destination, result)
+    return
+  } else if (name === "is_array") {
+    write_boolean(
+      memory,
+      destination,
+      arguments_[0] !== undefined &&
+        kind_of(memory, arguments_[0]) === KINDS.ARRAY,
+    )
+    return
+  } else if (name === "has_property" || name === "delete_property") {
+    if (!is_object(memory, arguments_[0]))
+      throw new TypeError("Expected an object")
+    write_boolean(
+      memory,
+      destination,
+      name === "has_property"
+        ? has_property(memory, arguments_[0], arguments_[1])
+        : delete_property(memory, arguments_[0], arguments_[1]),
+    )
+    return
+  } else if (name === "get_own_property_descriptor") {
+    if (!is_object(memory, arguments_[0]))
+      throw new TypeError("Expected an object")
+    get_own_property_descriptor(
+      memory,
+      destination,
+      arguments_[0],
+      arguments_[1],
+    )
+    return
+  } else if (name === "define_property") {
+    define_own_property(
+      memory,
+      arguments_[0],
+      arguments_[1],
+      arguments_[2],
+      runtime,
+    )
+  } else if (name === "object_create") {
+    create_object(memory, destination)
+    set_prototype(memory, destination, arguments_[0])
+    return
+  } else if (name === "set_prototype") {
+    set_prototype(memory, arguments_[0], arguments_[1])
+  } else if (name === "get_prototype") {
+    if (
+      !is_object(memory, arguments_[0]) ||
+      kind_of(memory, arguments_[0]) === KINDS.BYTE_BUFFER
+    )
+      throw new TypeError("Expected an ordinary object")
+    const reference = get_ref(memory, arguments_[0])
+    const prototype = read_u32(
+      memory,
+      reference + (kind_of(memory, arguments_[0]) === KINDS.FUNCTION ? 28 : 12),
+    )
+    if (prototype) set_ref(memory, destination, prototype)
+    else write_null(memory, destination)
+    return
+  } else if (name === "write_stdout") {
     if (!arguments_.length || kind_of(memory, arguments_[0]) !== KINDS.STRING)
       throw new TypeError("write_stdout requires a string")
     runtime.host.write_stdout(read_string(memory, arguments_[0]))

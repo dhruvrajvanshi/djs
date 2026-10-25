@@ -173,16 +173,28 @@ test("compilation metadata and instruction storage cannot be changed by consumer
   )
 })
 
+test("new.target requires an enclosing ordinary function", () => {
+  assert.throws(
+    () => compile_module("new.target"),
+    /new.target requires a function/,
+  )
+  assert.throws(
+    () => compile_module("() => new.target"),
+    /new.target requires a function/,
+  )
+  assert.throws(
+    () => compile_module("delete variable"),
+    /Cannot delete a binding/,
+  )
+})
+
 test("invalid and unsupported syntax fails clearly", () => {
   assert.throws(() => compile_module("const x = ;"), SyntaxError)
   assert.throws(
     () => compile_module("let x = 1; let x = 2;"),
     /Duplicate binding/,
   )
-  assert.throws(
-    () => compile_module("const x = []"),
-    /Unsupported syntax: Array/,
-  )
+  assert.throws(() => compile_module("const x = [...items]"), /array spread/)
   assert.throws(() => compile_module("var x = 1"), /Unsupported syntax: var/)
   assert.throws(
     () => compile_module("while (true) { let x = 1; }"),

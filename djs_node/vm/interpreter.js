@@ -17,6 +17,7 @@ import {
   write_undefined,
   tag_of,
   write_string,
+  write_boolean,
 } from "./values.js"
 import { KINDS, TAGS } from "./memory.js"
 import {
@@ -38,6 +39,10 @@ import {
   binary_operation,
   unary_operation,
   to_string,
+  create_array,
+  delete_property,
+  is_object,
+  own_property,
 } from "./objects.js"
 import {
   call_intrinsic,
@@ -66,6 +71,7 @@ const F = Object.freeze({
   THIS: 24,
   COUNT: 28,
   CONSTRUCT: 32,
+  NEW_TARGET: 36,
 })
 export const C = Object.freeze({
   STATUS: 0,
@@ -140,6 +146,7 @@ function push_frame(
   receiver,
   arguments_,
   destination,
+  new_target,
 ) {
   const { memory } = runtime
   const fn = runtime.code[code_id].unit.functions[function_id]
@@ -167,6 +174,10 @@ function push_frame(
     allocated_roots.push(this_value)
     copy_value(memory, env, environment)
     if (receiver !== undefined) copy_value(memory, this_value, receiver)
+    const target = alloc_root(memory)
+    allocated_roots.push(target)
+    if (new_target !== undefined) copy_value(memory, target, new_target)
+    view.setUint32(offset + F.NEW_TARGET, target, true)
     view.setUint32(offset + F.ENV, env, true)
     view.setUint32(offset + F.THIS, this_value, true)
     view.setUint32(offset + F.COUNT, fn.slot_count, true)
@@ -213,6 +224,7 @@ function pop_frame(runtime, context) {
   }
   free_root(runtime.memory, view.getUint32(frame + F.ENV, true))
   free_root(runtime.memory, view.getUint32(frame + F.THIS, true))
+  free_root(runtime.memory, view.getUint32(frame + F.NEW_TARGET, true))
   control.setUint32(C.FRAME, view.getUint32(frame + F.CALLER, true), true)
   control.setUint32(C.USED, frame, true)
 }
@@ -299,7 +311,8 @@ function enter_function(
     function_id = read_u32(memory, reference + 12)
   const parent = alloc_root(memory),
     environment = alloc_root(memory),
-    this_value = alloc_root(memory)
+    this_value = alloc_root(memory),
+    new_target = alloc_root(memory)
   try {
     copy_heap_value_to_root(memory, parent, reference + 16)
     const fn = runtime.code[code_id].unit.functions[function_id]
@@ -308,6 +321,7 @@ function enter_function(
     if (flags & 4) {
       copy_heap_value_to_root(memory, this_value, reference + 40)
       receiver = this_value
+      copy_heap_value_to_root(memory, new_target, reference + 48)
     }
     create_environment(
       memory,
@@ -325,11 +339,74 @@ function enter_function(
       receiver,
       arguments_,
       destination,
+      new_target,
     )
   } finally {
+    free_root(memory, new_target)
     free_root(memory, parent)
     free_root(memory, environment)
     free_root(memory, this_value)
+  }
+}
+
+// A synchronous language operation may execute user code (valueOf/toString).
+// Keep that execution in a rooted VM context and preserve thrown guest values.
+class GuestThrow extends Error {
+  constructor(root) {
+    super("Guest exception")
+    this.root = root
+  }
+}
+
+function capture_error(runtime, destination, error) {
+  if (error instanceof GuestThrow) {
+    copy_value(runtime.memory, destination, error.root)
+    free_root(runtime.memory, error.root)
+  } else create_error(runtime, destination, error.name, error.message)
+}
+
+export function coerce_array_length(runtime, destination, source) {
+  const first = alloc_root(runtime.memory),
+    second = alloc_root(runtime.memory)
+  try {
+    coerce_value(runtime, first, source, "to_number")
+    coerce_value(runtime, second, source, "to_number")
+    if (
+      read_number(runtime.memory, first) >>> 0 !==
+      read_number(runtime.memory, second)
+    )
+      throw new RangeError("Invalid array length")
+    copy_value(runtime.memory, destination, second)
+  } finally {
+    free_root(runtime.memory, first)
+    free_root(runtime.memory, second)
+  }
+}
+
+export function coerce_value(runtime, destination, source, operation, hint) {
+  const helper = runtime.coercions?.get(operation)
+  if (helper === undefined) {
+    copy_value(runtime.memory, destination, source)
+    return
+  }
+  const hint_value = alloc_root(runtime.memory)
+  let conversion
+  try {
+    if (hint !== undefined) write_string(runtime.memory, hint_value, hint)
+    conversion = create_call_context(runtime, helper, undefined, [
+      source,
+      hint_value,
+    ])
+    run_task(runtime, conversion)
+    if (context_status(conversion) === CONTEXT_STATE.FAILED) {
+      const thrown = alloc_root(runtime.memory)
+      copy_value(runtime.memory, thrown, context_error(conversion))
+      throw new GuestThrow(thrown)
+    }
+    copy_value(runtime.memory, destination, context_result(conversion))
+  } finally {
+    if (conversion) dispose_context(runtime, conversion)
+    free_root(runtime.memory, hint_value)
   }
 }
 
@@ -339,7 +416,9 @@ export function run_interpreter(runtime, context) {
   control.setUint32(C.STATUS, CONTEXT_STATE.RUNNING, true)
   if (context.module_state)
     new DataView(context.module_state.buffer).setUint32(0, 2, true) // evaluating
-  const temporary = alloc_root(memory)
+  const temporary = alloc_root(memory),
+    operand = alloc_root(memory),
+    property_key = alloc_root(memory)
   try {
     if (control.getUint32(C.REJECTED, true)) {
       control.setUint32(C.REJECTED, 0, true)
@@ -394,14 +473,44 @@ export function run_interpreter(runtime, context) {
           } else copy_value(memory, reg(a), global)
           break
         }
+        case OP.LOAD_NEW_TARGET:
+          copy_value(memory, reg(a), view.getUint32(frame + F.NEW_TARGET, true))
+          break
+        case OP.ARRAY:
+          create_array(memory, reg(a), b)
+          break
+        case OP.DELETE_PROP:
+          copy_value(memory, property_key, reg(c))
+          if (is_object(memory, property_key))
+            coerce_value(runtime, property_key, property_key, "to_string")
+          write_boolean(
+            memory,
+            reg(a),
+            delete_property(memory, reg(b), property_key),
+          )
+          break
         case OP.GET_PROP:
-          if (get_property(memory, reg(a), reg(b), reg(c))) {
+          copy_value(memory, property_key, reg(c))
+          if (is_object(memory, property_key))
+            coerce_value(runtime, property_key, property_key, "to_string")
+          if (get_property(memory, reg(a), reg(b), property_key)) {
             if (tag_of(memory, reg(a)) !== TAGS.UNDEFINED)
               call_function(runtime, context, reg(a), reg(a), reg(b), [])
           }
           break
         case OP.SET_PROP: {
-          const property = set_property(memory, reg(a), reg(b), reg(c))
+          copy_value(memory, property_key, reg(b))
+          if (is_object(memory, property_key))
+            coerce_value(runtime, property_key, property_key, "to_string")
+          copy_value(memory, operand, reg(c))
+          if (
+            kind_of(memory, reg(a)) === KINDS.ARRAY &&
+            to_string(memory, property_key) === "length" &&
+            is_object(memory, operand) &&
+            own_property(memory, reg(a), "length").flags & 1
+          )
+            coerce_array_length(runtime, operand, operand)
+          const property = set_property(memory, reg(a), property_key, operand)
           if (property) {
             copy_heap_value_to_root(memory, temporary, property + 32)
             if (tag_of(memory, temporary) === TAGS.UNDEFINED)
@@ -418,11 +527,21 @@ export function run_interpreter(runtime, context) {
           break
         }
         case OP.DEFINE_PROP:
+          copy_value(memory, property_key, reg(b))
+          if (is_object(memory, property_key))
+            coerce_value(runtime, property_key, property_key, "to_string")
+          copy_value(memory, operand, reg(c))
+          if (
+            kind_of(memory, reg(a)) === KINDS.ARRAY &&
+            to_string(memory, property_key) === "length" &&
+            is_object(memory, operand)
+          )
+            coerce_array_length(runtime, operand, operand)
           define_property(
             memory,
             reg(a),
-            reg(b),
-            reg(c),
+            property_key,
+            operand,
             d,
             e === 1 ? reg(c) : undefined,
           )
@@ -468,6 +587,9 @@ export function run_interpreter(runtime, context) {
             code.unit.functions[b].flags,
             code.unit.functions[b].flags & 4
               ? view.getUint32(frame + F.THIS, true)
+              : undefined,
+            code.unit.functions[b].flags & 4
+              ? view.getUint32(frame + F.NEW_TARGET, true)
               : undefined,
           )
           break
@@ -530,17 +652,52 @@ export function run_interpreter(runtime, context) {
         case OP.JUMP_IF_FALSE:
           if (!truthy(memory, reg(a))) view.setUint32(frame + F.PC, b, true)
           break
-        case OP.BINARY:
-          binary_operation(
-            memory,
-            reg(a),
-            reg(b),
-            reg(c),
-            code.unit.literals[d],
-          )
+        case OP.BINARY: {
+          const operator = code.unit.literals[d]
+          copy_value(memory, temporary, reg(b))
+          copy_value(memory, operand, reg(c))
+          if (operator === "in") {
+            if (!is_object(memory, operand))
+              throw new TypeError("Right operand of in must be an object")
+            if (is_object(memory, temporary))
+              coerce_value(runtime, temporary, temporary, "to_string")
+          } else if (!["===", "!==", "instanceof"].includes(operator)) {
+            const loose = operator === "==" || operator === "!="
+            const left_object = is_object(memory, temporary),
+              right_object = is_object(memory, operand)
+            const nullish =
+              [TAGS.NULL, TAGS.UNDEFINED].includes(tag_of(memory, temporary)) ||
+              [TAGS.NULL, TAGS.UNDEFINED].includes(tag_of(memory, operand))
+            if (!loose || (left_object !== right_object && !nullish)) {
+              if (left_object)
+                coerce_value(
+                  runtime,
+                  temporary,
+                  temporary,
+                  "to_primitive",
+                  operator === "+" || loose ? undefined : "number",
+                )
+              if (right_object)
+                coerce_value(
+                  runtime,
+                  operand,
+                  operand,
+                  "to_primitive",
+                  operator === "+" || loose ? undefined : "number",
+                )
+            }
+          }
+          binary_operation(memory, reg(a), temporary, operand, operator)
           break
+        }
         case OP.UNARY:
-          unary_operation(memory, reg(a), reg(b), code.unit.literals[c])
+          copy_value(memory, operand, reg(b))
+          if (
+            ["+", "-", "~"].includes(code.unit.literals[c]) &&
+            is_object(memory, operand)
+          )
+            coerce_value(runtime, operand, operand, "to_number")
+          unary_operation(memory, reg(a), operand, code.unit.literals[c])
           break
         case OP.LOAD_THIS:
           copy_value(memory, reg(a), view.getUint32(frame + F.THIS, true))
@@ -550,15 +707,19 @@ export function run_interpreter(runtime, context) {
       }
       // The helper root must not retain environments after the instruction.
       write_undefined(memory, temporary)
+      write_undefined(memory, operand)
+      write_undefined(memory, property_key)
     }
     control.setUint32(C.STATUS, CONTEXT_STATE.READY, true)
   } catch (error) {
-    create_error(runtime, temporary, error.name, error.message)
+    capture_error(runtime, temporary, error)
     complete(runtime, context, 2, temporary)
     if (context_status(context) !== CONTEXT_STATE.FAILED)
       control.setUint32(C.STATUS, CONTEXT_STATE.READY, true)
   } finally {
     free_root(memory, temporary)
+    free_root(memory, operand)
+    free_root(memory, property_key)
   }
 }
 
@@ -629,7 +790,7 @@ function call_async_function(
       arguments_,
     )
   } catch (error) {
-    create_error(runtime, context_error(context), error.name, error.message)
+    capture_error(runtime, context_error(context), error)
     context_view(context).setUint32(C.STATUS, CONTEXT_STATE.FAILED, true)
   }
   run_task(runtime, context)
@@ -714,7 +875,7 @@ export function create_call_context(runtime, callee, receiver, arguments_) {
     if (control.getUint32(C.FRAME, true) === NONE)
       control.setUint32(C.STATUS, CONTEXT_STATE.DONE, true)
   } catch (error) {
-    create_error(runtime, context_error(context), error.name, error.message)
+    capture_error(runtime, context_error(context), error)
     control.setUint32(C.STATUS, CONTEXT_STATE.FAILED, true)
   }
   return context
@@ -769,12 +930,7 @@ function construct_function(runtime, context, destination, callee, arguments_) {
       fn = unit.functions[id]
     write_string(memory, key, "prototype")
     get_property(memory, prototype, callee, key)
-    if (
-      [KINDS.OBJECT, KINDS.FUNCTION, KINDS.ERROR].includes(
-        kind_of(memory, prototype),
-      )
-    )
-      set_prototype(memory, receiver, prototype)
+    if (is_object(memory, prototype)) set_prototype(memory, receiver, prototype)
     create_environment(
       memory,
       environment,
@@ -791,6 +947,7 @@ function construct_function(runtime, context, destination, callee, arguments_) {
       receiver,
       arguments_,
       destination,
+      callee,
     )
     frame_view(context).setUint32(
       context_view(context).getUint32(C.FRAME, true) + F.CONSTRUCT,
@@ -910,9 +1067,7 @@ function complete(runtime, context, type, source) {
       if (type === 1) {
         if (
           view.getUint32(frame + F.CONSTRUCT, true) &&
-          ![KINDS.OBJECT, KINDS.FUNCTION, KINDS.ERROR].includes(
-            kind_of(memory, value),
-          )
+          !is_object(memory, value)
         )
           copy_value(memory, value, view.getUint32(frame + F.THIS, true))
         const destination =

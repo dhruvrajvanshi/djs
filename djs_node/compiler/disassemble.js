@@ -31,6 +31,9 @@ const OPERANDS = {
   TRY: ["catch", "finally", "end", "exception"],
   LEAVE_TRY: [],
   END_FINALLY: [],
+  ARRAY: ["dst", "length"],
+  DELETE_PROP: ["dst", "object", "key"],
+  LOAD_NEW_TARGET: ["dst"],
 }
 const OPCODE_NAMES = new Map(
   Object.entries(OP).map(([name, opcode]) => [opcode, name]),

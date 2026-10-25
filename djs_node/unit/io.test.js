@@ -145,7 +145,7 @@ test(
           })
         },
       },
-      { semispace_bytes: 16384, root_capacity: 1 },
+      { semispace_bytes: 65536, root_capacity: 1 },
     )
     const evaluation = app.run()
     await began

@@ -20,6 +20,8 @@ const MIN_PAYLOAD_BYTES = Object.freeze({
   [KINDS.ENVIRONMENT]: 16,
   [KINDS.BYTE_BUFFER]: 4,
   [KINDS.ERROR]: 8,
+  [KINDS.ARRAY]: 8,
+  [KINDS.STRING_OBJECT]: 16,
   [KINDS.VALUE_ARRAY]: 8,
 })
 
@@ -62,6 +64,9 @@ export function allocate(memory, kind, payload_bytes) {
   } else if (kind === KINDS.FUNCTION) {
     write_heap_undefined(memory, cursor + 16)
     write_heap_undefined(memory, cursor + 40)
+    write_heap_undefined(memory, cursor + 48)
+  } else if (kind === KINDS.STRING_OBJECT) {
+    write_heap_undefined(memory, cursor + 16)
   } else if (kind === KINDS.ENVIRONMENT) {
     write_heap_undefined(memory, cursor + 8)
   }
@@ -131,9 +136,14 @@ export function collect(memory) {
   while (scan < to_cursor) {
     const kind = read_u32(memory, scan)
     const size = read_u32(memory, scan + 4)
-    if (kind === KINDS.OBJECT || kind === KINDS.ERROR) {
+    if (
+      [KINDS.OBJECT, KINDS.ERROR, KINDS.ARRAY, KINDS.STRING_OBJECT].includes(
+        kind,
+      )
+    ) {
       trace_raw(scan + 8)
       trace_raw(scan + 12)
+      if (kind === KINDS.STRING_OBJECT) trace_value(memory.heap_view, scan + 16)
     } else if (kind === KINDS.PROPERTY) {
       trace_raw(scan + 8)
       trace_value(memory.heap_view, scan + 16)
@@ -144,6 +154,7 @@ export function collect(memory) {
       trace_raw(scan + 24)
       trace_raw(scan + 28)
       trace_value(memory.heap_view, scan + 40)
+      trace_value(memory.heap_view, scan + 48)
     } else if (kind === KINDS.ENVIRONMENT || kind === KINDS.VALUE_ARRAY) {
       const environment = kind === KINDS.ENVIRONMENT
       if (environment) trace_value(memory.heap_view, scan + 8)

@@ -104,3 +104,39 @@ export function read_string(memory, root) {
   }
   return text
 }
+
+export function string_length(memory, value) {
+  const reference = get_ref(memory, value)
+  if (read_u32(memory, reference) !== KINDS.STRING)
+    throw new TypeError("Expected a string")
+  return read_u32(memory, reference + 8)
+}
+
+export function string_code_unit_at(memory, value, index) {
+  const length = string_length(memory, value)
+  if (!Number.isInteger(index) || index < 0 || index >= length)
+    throw new RangeError("Invalid string index")
+  return memory.heap_view.getUint16(
+    get_ref(memory, value) + 12 + index * 2,
+    true,
+  )
+}
+
+export function slice_string(memory, destination, value, start, end) {
+  const length = string_length(memory, value)
+  if (
+    !Number.isInteger(start) ||
+    !Number.isInteger(end) ||
+    start < 0 ||
+    end < start ||
+    end > length
+  )
+    throw new RangeError("Invalid string range")
+  const reference = allocate(memory, KINDS.STRING, 4 + (end - start) * 2)
+  // Allocation may move the source; read its root afterwards, before replacing
+  // an aliased destination. copyWithin also handles overlapping storage safely.
+  const source = get_ref(memory, value) + 12 + start * 2
+  memory.heap.copyWithin(reference + 12, source, source + (end - start) * 2)
+  write_u32(memory, reference + 8, end - start)
+  set_ref(memory, destination, reference)
+}

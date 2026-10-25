@@ -5,6 +5,7 @@ import { load_module, evaluate_module, read_export } from "./modules.js"
 
 const JS_GLOBALS = new URL("../stdlib/js/index.js", import.meta.url).href
 const NODE_GLOBALS = new URL("../stdlib/node/index.js", import.meta.url).href
+const ABSTRACT = new URL("../stdlib/js/abstract.js", import.meta.url).href
 const PROMISE = new URL("../stdlib/js/promise.js", import.meta.url).href
 
 async function define_globals(runtime, identity) {
@@ -19,10 +20,31 @@ async function define_globals(runtime, identity) {
 
 export async function bootstrap(runtime) {
   await define_globals(runtime, JS_GLOBALS)
+  const abstract = await load_module(runtime, ABSTRACT)
+  runtime.coercions = new Map()
+  for (const name of ["to_primitive", "to_string", "to_number"]) {
+    const value = alloc_root(runtime.memory)
+    read_export(runtime, abstract, name, value)
+    runtime.coercions.set(name, value)
+  }
+  runtime.memory.object_prototype = alloc_root(runtime.memory)
+  read_export(
+    runtime,
+    abstract,
+    "object_prototype",
+    runtime.memory.object_prototype,
+  )
   runtime.error_prototypes = new Map()
   const key = alloc_root(runtime.memory)
   try {
     write_string(runtime.memory, key, "prototype")
+    for (const name of ["String", "Array"]) {
+      const prototype = alloc_root(runtime.memory)
+      get_property(runtime.memory, prototype, runtime.globals.get(name), key)
+      runtime.memory[
+        name === "String" ? "string_prototype" : "array_prototype"
+      ] = prototype
+    }
     for (const name of [
       "Error",
       "TypeError",
@@ -34,7 +56,13 @@ export async function bootstrap(runtime) {
       get_property(runtime.memory, prototype, runtime.globals.get(name), key)
       runtime.error_prototypes.set(name, prototype)
       write_u32(runtime.memory, get_ref(runtime.memory, prototype), KINDS.ERROR)
-      if (name !== "Error")
+      if (name === "Error")
+        set_prototype(
+          runtime.memory,
+          prototype,
+          runtime.memory.object_prototype,
+        )
+      else
         set_prototype(
           runtime.memory,
           prototype,

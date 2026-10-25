@@ -564,6 +564,7 @@ function contains_declaration(stmt) {
 }
 
 const binary_operators = {
+  In: "in",
   Add: "+",
   Sub: "-",
   Mul: "*",
@@ -617,8 +618,15 @@ function load_name(state, fn, scope, name, allow_missing = false) {
 
 function property_key(state, fn, scope, key) {
   if (key.kind === "Ident") return constant(state, fn, key.ident.text)
-  if (key.kind === "String")
-    return constant(state, fn, decode_string(key.text, key))
+  if (key.kind === "String") {
+    // The parser uses String keys for both quoted and numeric property names.
+    const text = key.text
+    const name =
+      text[0] === '"' || text[0] === "'"
+        ? decode_string(text, key)
+        : String(Number(text.replaceAll("_", "")))
+    return constant(state, fn, name)
+  }
   if (key.kind === "Computed") return compile_expr(state, fn, scope, key.expr)
   unsupported(key)
 }
@@ -717,6 +725,45 @@ function compile_expr(state, fn, scope, expr) {
         args,
         expr.args.length,
       )
+      return dst
+    }
+    case "Array": {
+      const dst = allocate(fn)
+      emit(fn, OP.ARRAY, dst, expr.items.length)
+      for (let index = 0; index < expr.items.length; index++) {
+        const item = expr.items[index]
+        if (item.kind === "Elision") continue
+        if (item.kind === "Spread") unsupported(item, "array spread")
+        const key = constant(state, fn, String(index))
+        const value = compile_expr(state, fn, scope, item.expr)
+        emit(fn, OP.DEFINE_PROP, dst, key, value, 7)
+      }
+      return dst
+    }
+    case "NewTarget": {
+      let owner = fn
+      while (owner && owner.flags & 4) owner = owner.parent
+      if (!owner?.parent)
+        throw syntax_error(expr, "new.target requires a function")
+      const dst = allocate(fn)
+      emit(fn, OP.LOAD_NEW_TARGET, dst)
+      return dst
+    }
+    case "Delete": {
+      let target = expr.expr
+      while (target.kind === "Paren") target = target.expr
+      const dst = allocate(fn)
+      if (target.kind === "Prop" || target.kind === "Index") {
+        const reference = property_reference(state, fn, scope, target)
+        if (reference.private)
+          throw syntax_error(expr, "Cannot delete a private field")
+        emit(fn, OP.DELETE_PROP, dst, reference.object, reference.key)
+      } else {
+        if (target.kind === "Var")
+          throw syntax_error(expr, "Cannot delete a binding in strict mode")
+        compile_expr(state, fn, scope, target)
+        emit(fn, OP.CONST, dst, literal(state, true))
+      }
       return dst
     }
     case "Object": {

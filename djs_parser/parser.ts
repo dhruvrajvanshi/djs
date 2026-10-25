@@ -321,11 +321,21 @@ function parser_impl(
 
     if (at(t.New)) {
       const start = advance()
-      // When parsing something like "new Foo()", we don't want to allow calls when parsing Foo
-      // since new Foo() means `new (Foo)()` and not (new (Foo()))
-      const expr = parse_member_or_call_expr(/* allow_calls */ false)
-      if (expr === ERR) return expr
-      lhs = Expr.New(Span.between(start.span, expr.span), expr)
+      if (at(t.Dot)) {
+        advance()
+        const target = parse_member_ident_name()
+        if (target === ERR) return ERR
+        if (target.text !== "target") {
+          emit_error("Expected new.target")
+          return ERR
+        }
+        lhs = Expr.NewTarget(Span.between(start.span, target.span))
+      } else {
+        // Parse the constructor without consuming its argument list.
+        const expr = parse_member_or_call_expr(/* allow_calls */ false)
+        if (expr === ERR) return expr
+        lhs = Expr.New(Span.between(start.span, expr.span), expr)
+      }
     } else {
       const expr = parse_primary_expr()
       if (expr === ERR) return expr

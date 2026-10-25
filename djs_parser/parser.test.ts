@@ -142,6 +142,20 @@ test("side-effect-only imports preserve the dependency specifier", () => {
   expect(stmt.default_import).toBeNull()
   expect(stmt.named_imports).toEqual([])
 })
+test("new.target supports member access and arrow bodies", () => {
+  expect(parse_expr("new.target.prototype")).toMatchObject({
+    kind: "Prop",
+    lhs: { kind: "NewTarget" },
+    property: { text: "prototype" },
+  })
+  expect(parse_expr("() => new.target")).toMatchObject({
+    kind: "ArrowFn",
+    body: { kind: "Expr", expr: { kind: "NewTarget" } },
+  })
+  expect(
+    parse_source_file("new.other", "entry.js").errors.length,
+  ).toBeGreaterThan(0)
+})
 test("import.meta", () => {
   expect(parse_expr("import.meta.url")).toMatchObject({
     kind: "Prop",

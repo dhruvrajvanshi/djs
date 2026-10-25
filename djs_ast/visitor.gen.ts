@@ -267,6 +267,9 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_expr(expr.expr)
         break
       }
+      case "NewTarget": {
+        break
+      }
       case "Yield": {
         if (expr.value !== null) {
           this.visit_expr(expr.value)

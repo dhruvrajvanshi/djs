@@ -119,6 +119,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
   PreDecrement: { value: () => Expr },
   Array: { items: List(() => ArrayLiteralMember) },
   New: { expr: () => Expr },
+  NewTarget: {},
   Yield: { value: Option(() => Expr) },
   YieldFrom: { expr: () => Expr },
   Ternary: {

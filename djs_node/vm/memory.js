@@ -21,6 +21,8 @@ export const KINDS = Object.freeze({
   BYTE_BUFFER: 6,
   VALUE_ARRAY: 7,
   ERROR: 8,
+  ARRAY: 9,
+  STRING_OBJECT: 10,
 })
 export const CONTROL = Object.freeze({
   SEMISPACE_BYTES: 0,

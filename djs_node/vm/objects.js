@@ -33,6 +33,12 @@ export function kind_of(memory, value) {
 
 export function create_object(memory, destination) {
   set_ref(memory, destination, allocate(memory, KINDS.OBJECT, 8))
+  if (memory.object_prototype !== undefined)
+    write_u32(
+      memory,
+      get_ref(memory, destination) + 12,
+      get_ref(memory, memory.object_prototype),
+    )
 }
 
 export function create_arguments_object(memory, destination, arguments_) {
@@ -61,6 +67,7 @@ export function create_function(
   environment,
   flags = 0,
   receiver,
+  new_target,
 ) {
   const reference = allocate(memory, KINDS.FUNCTION, 48)
   set_ref(memory, destination, reference)
@@ -71,6 +78,8 @@ export function create_function(
     copy_root_to_heap_value(memory, reference + 40, receiver)
   if (environment !== undefined)
     copy_root_to_heap_value(memory, reference + 16, environment)
+  if (new_target !== undefined)
+    copy_root_to_heap_value(memory, reference + 48, new_target)
 }
 
 export function create_environment(
@@ -165,7 +174,10 @@ export function store_binding(
 function object_offsets(memory, object) {
   const kind = kind_of(memory, object)
   if (kind === KINDS.FUNCTION) return [24, 28]
-  if (kind === KINDS.OBJECT || kind === KINDS.ERROR) return [8, 12]
+  if (
+    [KINDS.OBJECT, KINDS.ERROR, KINDS.ARRAY, KINDS.STRING_OBJECT].includes(kind)
+  )
+    return [8, 12]
   throw new TypeError("Expected an object")
 }
 
@@ -211,42 +223,310 @@ export function find_property(
   }
 }
 
-export function get_property(memory, destination, object, key) {
-  const name = to_string(memory, key)
+export function is_object(memory, value) {
+  return [
+    KINDS.OBJECT,
+    KINDS.FUNCTION,
+    KINDS.ERROR,
+    KINDS.ARRAY,
+    KINDS.STRING_OBJECT,
+    KINDS.BYTE_BUFFER,
+  ].includes(kind_of(memory, value))
+}
+
+function string_reference(memory, value) {
+  const kind = kind_of(memory, value)
+  if (kind === KINDS.STRING) return get_ref(memory, value)
+  if (kind === KINDS.STRING_OBJECT)
+    return read_u32(memory, get_ref(memory, value) + 16)
+  return 0
+}
+
+function array_index(name) {
+  const index = Number(name)
+  return Number.isInteger(index) &&
+    index >= 0 &&
+    index < 0xffffffff &&
+    String(index) === name
+    ? index
+    : -1
+}
+
+// Virtual descriptors contain only host numbers/strings, never unrooted VM refs.
+function virtual_property(memory, object, name) {
+  const reference = string_reference(memory, object)
+  if (reference) {
+    const length = read_u32(memory, reference + 8)
+    if (name === "length") return { flags: 0, value: length }
+    const index = array_index(name)
+    if (index >= 0 && index < length)
+      return {
+        flags: 2,
+        value: String.fromCharCode(
+          memory.heap_view.getUint16(reference + 12 + index * 2, true),
+        ),
+      }
+  }
   if (kind_of(memory, object) === KINDS.BYTE_BUFFER) {
     const bytes = byte_buffer_view(memory, object)
-    if (name === "length") write_number(memory, destination, bytes.length)
-    else {
-      const index = Number(name)
-      if (
-        String(index) === name &&
-        Number.isInteger(index) &&
-        index >= 0 &&
-        index < bytes.length
-      )
-        write_number(memory, destination, bytes[index])
-      else write_undefined(memory, destination)
+    if (name === "length") return { flags: 0, value: bytes.length }
+    const index = array_index(name)
+    if (index >= 0 && index < bytes.length)
+      return { flags: 3, value: bytes[index] }
+  }
+}
+
+export function own_property(memory, object, name) {
+  const virtual = virtual_property(memory, object, name)
+  if (virtual) return virtual
+  if (
+    kind_of(memory, object) === KINDS.STRING ||
+    kind_of(memory, object) === KINDS.BYTE_BUFFER
+  )
+    return undefined
+  const property = find_property(memory, object, name, true)
+  return property
+    ? { property, flags: read_u32(memory, property + 12) }
+    : undefined
+}
+
+function prototype_reference(memory, object) {
+  if (kind_of(memory, object) === KINDS.STRING)
+    return memory.string_prototype === undefined
+      ? 0
+      : get_ref(memory, memory.string_prototype)
+  if (kind_of(memory, object) === KINDS.BYTE_BUFFER) return 0
+  const [, offset] = object_offsets(memory, object)
+  return read_u32(memory, get_ref(memory, object) + offset)
+}
+
+// Return an accessor flag; only the interpreter invokes guest getters.
+export function get_property(memory, destination, object, key) {
+  const name = to_string(memory, key)
+  const current = alloc_root(memory)
+  try {
+    copy_value(memory, current, object)
+    while (true) {
+      const descriptor = own_property(memory, current, name)
+      if (descriptor) {
+        if (descriptor.property)
+          copy_heap_value_to_root(memory, destination, descriptor.property + 24)
+        else write_primitive(memory, destination, descriptor.value)
+        return descriptor.flags & 16 ? 1 : 0
+      }
+      const prototype = prototype_reference(memory, current)
+      if (!prototype) break
+      set_ref(memory, current, prototype)
     }
+    write_undefined(memory, destination)
     return 0
+  } finally {
+    free_root(memory, current)
   }
-  if (kind_of(memory, object) === KINDS.STRING) {
-    if (name === "length")
-      write_number(
-        memory,
-        destination,
-        read_u32(memory, get_ref(memory, object) + 8),
-      )
-    else write_undefined(memory, destination)
-    return 0
+}
+
+export function has_property(memory, object, key, own = false) {
+  const name = to_string(memory, key),
+    current = alloc_root(memory)
+  try {
+    copy_value(memory, current, object)
+    while (true) {
+      if (own_property(memory, current, name)) return true
+      if (own) return false
+      const prototype = prototype_reference(memory, current)
+      if (!prototype) return false
+      set_ref(memory, current, prototype)
+    }
+  } finally {
+    free_root(memory, current)
   }
-  const property = find_property(memory, object, name)
-  if (property === 0) write_undefined(memory, destination)
-  else copy_heap_value_to_root(memory, destination, property + 24)
-  // The interpreter invokes getters; the memory layer never executes guest code.
-  return property !== 0 && read_u32(memory, property + 12) & 16 ? 1 : 0
+}
+
+export function delete_property(memory, object, key) {
+  const name = to_string(memory, key)
+  const virtual = virtual_property(memory, object, name)
+  if (virtual) throw new TypeError("Cannot delete non-configurable property")
+  if (kind_of(memory, object) === KINDS.STRING) return true
+  const [head] = object_offsets(memory, object)
+  let link = get_ref(memory, object) + head
+  let property = read_u32(memory, link)
+  const temporary = alloc_root(memory)
+  try {
+    while (property) {
+      if (!(read_u32(memory, property + 12) & 8)) {
+        copy_heap_value_to_root(memory, temporary, property + 16)
+        if (read_string(memory, temporary) === name) {
+          if (!(read_u32(memory, property + 12) & 4))
+            throw new TypeError("Cannot delete non-configurable property")
+          write_u32(memory, link, read_u32(memory, property + 8))
+          return true
+        }
+      }
+      link = property + 8
+      property = read_u32(memory, link)
+    }
+    return true
+  } finally {
+    free_root(memory, temporary)
+  }
+}
+
+function same_value(memory, left, right) {
+  if (tag_of(memory, left) !== tag_of(memory, right)) return false
+  if (tag_of(memory, left) === TAGS.REF) {
+    if (
+      kind_of(memory, left) === KINDS.STRING &&
+      kind_of(memory, right) === KINDS.STRING
+    )
+      return read_string(memory, left) === read_string(memory, right)
+    return get_ref(memory, left) === get_ref(memory, right)
+  }
+  return Object.is(primitive(memory, left), primitive(memory, right))
+}
+
+export function create_array(memory, destination, length, prototype) {
+  if (!Number.isInteger(length) || length < 0 || length > 0xffffffff)
+    throw new RangeError("Invalid array length")
+  set_ref(memory, destination, allocate(memory, KINDS.ARRAY, 8))
+  if (prototype === undefined) prototype = memory.array_prototype
+  if (prototype !== undefined) set_prototype(memory, destination, prototype)
+  const key = alloc_root(memory),
+    value = alloc_root(memory)
+  try {
+    write_string(memory, key, "length")
+    write_number(memory, value, length >>> 0)
+    ordinary_define_property(memory, destination, key, value, 1)
+  } finally {
+    free_root(memory, key)
+    free_root(memory, value)
+  }
+}
+
+export function create_string_object(memory, destination, value, prototype) {
+  if (kind_of(memory, value) !== KINDS.STRING)
+    throw new TypeError("Expected a string")
+  // Root the source separately when the destination aliases the argument.
+  const source = alloc_root(memory)
+  try {
+    copy_value(memory, source, value)
+    set_ref(memory, destination, allocate(memory, KINDS.STRING_OBJECT, 16))
+    copy_root_to_heap_value(memory, get_ref(memory, destination) + 16, source)
+    if (prototype === undefined) prototype = memory.string_prototype
+    if (prototype !== undefined) set_prototype(memory, destination, prototype)
+  } finally {
+    free_root(memory, source)
+  }
+}
+
+export function string_value(memory, destination, value) {
+  if (kind_of(memory, value) === KINDS.STRING)
+    copy_value(memory, destination, value)
+  else if (kind_of(memory, value) === KINDS.STRING_OBJECT)
+    copy_heap_value_to_root(memory, destination, get_ref(memory, value) + 16)
+  else throw new TypeError("Receiver is not a string or String object")
 }
 
 export function define_property(memory, object, key, value, flags = 7, setter) {
+  const name = flags & 8 ? undefined : to_string(memory, key)
+  const virtual =
+    name === undefined ? undefined : virtual_property(memory, object, name)
+  if (virtual) {
+    const previous = alloc_root(memory)
+    try {
+      write_primitive(memory, previous, virtual.value)
+      if (flags !== virtual.flags || !same_value(memory, previous, value))
+        throw new TypeError("Cannot redefine property")
+      return
+    } finally {
+      free_root(memory, previous)
+    }
+  }
+  if (kind_of(memory, object) === KINDS.ARRAY && name === "length") {
+    const length = +primitive(memory, value)
+    if (!Number.isInteger(length) || length < 0 || length > 0xffffffff)
+      throw new RangeError("Invalid array length")
+    if (flags & (2 | 4 | 16))
+      throw new TypeError("Cannot redefine array length")
+    const property = find_property(memory, object, "length", true)
+    const previous = alloc_root(memory),
+      normalized = alloc_root(memory)
+    try {
+      copy_heap_value_to_root(memory, previous, property + 24)
+      const old_length = read_number(memory, previous)
+      const old_flags = read_u32(memory, property + 12)
+      write_number(memory, normalized, length >>> 0)
+      if (!(old_flags & 1)) {
+        if (length !== old_length || flags & 1)
+          throw new TypeError("Array length is readonly")
+        return
+      }
+      // Keep length writable until truncation succeeds, or restore it at the
+      // first undeletable index before applying the requested readonly flag.
+      ordinary_define_property(memory, object, key, normalized, 1)
+      if (length < old_length) {
+        const indices = []
+        let item = read_u32(memory, get_ref(memory, object) + 8)
+        while (item) {
+          if (!(read_u32(memory, item + 12) & 8)) {
+            copy_heap_value_to_root(memory, previous, item + 16)
+            const index = array_index(read_string(memory, previous))
+            if (index >= length) indices.push(index)
+          }
+          item = read_u32(memory, item + 8)
+        }
+        indices.sort((a, b) => b - a)
+        for (const index of indices) {
+          write_string(memory, previous, String(index))
+          try {
+            delete_property(memory, object, previous)
+          } catch (error) {
+            write_number(memory, normalized, index + 1)
+            ordinary_define_property(memory, object, key, normalized, flags)
+            throw error
+          }
+        }
+      }
+      ordinary_define_property(memory, object, key, normalized, flags)
+      return
+    } finally {
+      free_root(memory, previous)
+      free_root(memory, normalized)
+    }
+  }
+  const index =
+    kind_of(memory, object) === KINDS.ARRAY && name !== undefined
+      ? array_index(name)
+      : -1
+  if (index >= 0) {
+    const property = find_property(memory, object, "length", true)
+    const temporary = alloc_root(memory)
+    try {
+      copy_heap_value_to_root(memory, temporary, property + 24)
+      const length = read_number(memory, temporary)
+      if (index >= length && !(read_u32(memory, property + 12) & 1))
+        throw new TypeError("Array length is readonly")
+      ordinary_define_property(memory, object, key, value, flags, setter)
+      if (index >= length) {
+        write_number(memory, temporary, index + 1)
+        const moved = find_property(memory, object, "length", true)
+        copy_root_to_heap_value(memory, moved + 24, temporary)
+      }
+      return
+    } finally {
+      free_root(memory, temporary)
+    }
+  }
+  ordinary_define_property(memory, object, key, value, flags, setter)
+}
+
+function ordinary_define_property(
+  memory,
+  object,
+  key,
+  value,
+  flags = 7,
+  setter,
+) {
   const [head] = object_offsets(memory, object)
   const private_key = Boolean(flags & 8)
   const property = find_property(
@@ -258,7 +538,27 @@ export function define_property(memory, object, key, value, flags = 7, setter) {
   )
   if (property !== 0) {
     const previous_flags = read_u32(memory, property + 12)
-    if (!(previous_flags & 4)) throw new TypeError("Cannot redefine property")
+    if (!(previous_flags & 4)) {
+      if (
+        (flags & (2 | 4 | 16)) !== (previous_flags & (2 | 16)) ||
+        (!(previous_flags & 1) && flags & 1)
+      )
+        throw new TypeError("Cannot redefine property")
+      if (previous_flags & 16 || !(previous_flags & 1)) {
+        const previous = alloc_root(memory)
+        try {
+          copy_heap_value_to_root(
+            memory,
+            previous,
+            property + (flags & 16 && setter !== undefined ? 32 : 24),
+          )
+          if (!same_value(memory, previous, value))
+            throw new TypeError("Cannot redefine property")
+        } finally {
+          free_root(memory, previous)
+        }
+      }
+    }
     if (flags & 16) {
       if (!(previous_flags & 16)) {
         write_u32(memory, property + 12, flags)
@@ -275,6 +575,7 @@ export function define_property(memory, object, key, value, flags = 7, setter) {
         property + (setter === undefined ? 24 : 32),
         value,
       )
+      write_u32(memory, property + 12, flags)
       return
     }
     write_u32(memory, property + 12, flags)
@@ -326,18 +627,33 @@ export function set_property(memory, object, key, value) {
     bytes[index] = read_number(memory, value)
     return 0
   }
-  const property = find_property(memory, object, to_string(memory, key))
-  if (property !== 0) {
-    const flags = read_u32(memory, property + 12)
-    if (flags & 16) return property
-    if (!(flags & 1)) throw new TypeError("Cannot assign to readonly property")
-    if (find_property(memory, object, to_string(memory, key), true) !== 0) {
-      copy_root_to_heap_value(memory, property + 24, value)
-      return 0
+  const name = to_string(memory, key)
+  if (
+    kind_of(memory, object) === KINDS.STRING ||
+    virtual_property(memory, object, name)
+  )
+    throw new TypeError("Cannot assign to readonly string property")
+  const current = alloc_root(memory)
+  try {
+    copy_value(memory, current, object)
+    while (true) {
+      const descriptor = own_property(memory, current, name)
+      if (descriptor) {
+        if (descriptor.flags & 16) return descriptor.property
+        if (!(descriptor.flags & 1))
+          throw new TypeError("Cannot assign to readonly property")
+        break
+      }
+      const prototype = prototype_reference(memory, current)
+      if (!prototype) break
+      set_ref(memory, current, prototype)
     }
+    const own = own_property(memory, object, name)
+    define_property(memory, object, key, value, own ? own.flags : 7)
+    return 0
+  } finally {
+    free_root(memory, current)
   }
-  define_property(memory, object, key, value)
-  return 0
 }
 
 export function private_property(
@@ -356,9 +672,13 @@ export function private_property(
   }
   if (
     has &&
-    ![KINDS.OBJECT, KINDS.FUNCTION, KINDS.ERROR].includes(
-      kind_of(memory, object),
-    )
+    ![
+      KINDS.OBJECT,
+      KINDS.FUNCTION,
+      KINDS.ERROR,
+      KINDS.ARRAY,
+      KINDS.STRING_OBJECT,
+    ].includes(kind_of(memory, object))
   )
     throw new TypeError("Private brand check requires an object")
   const property = find_property(memory, object, key, true, true)
@@ -384,11 +704,19 @@ export function private_property(
 
 export function set_prototype(memory, object, prototype) {
   const [, offset] = object_offsets(memory, object)
-  write_u32(
-    memory,
-    get_ref(memory, object) + offset,
-    get_ref(memory, prototype),
-  )
+  const reference =
+    tag_of(memory, prototype) === TAGS.NULL ? 0 : get_ref(memory, prototype)
+  if (reference) object_offsets(memory, prototype)
+  let current = reference
+  while (current) {
+    if (current === get_ref(memory, object))
+      throw new TypeError("Cyclic prototype")
+    current = read_u32(
+      memory,
+      current + (read_u32(memory, current) === KINDS.FUNCTION ? 28 : 12),
+    )
+  }
+  write_u32(memory, get_ref(memory, object) + offset, reference)
 }
 
 export function create_value_array(memory, destination, values) {
@@ -517,6 +845,12 @@ export function write_primitive(memory, destination, value) {
 }
 
 export function binary_operation(memory, destination, left, right, operator) {
+  if (operator === "in") {
+    if (!is_object(memory, right))
+      throw new TypeError("Right operand of in must be an object")
+    write_boolean(memory, destination, has_property(memory, right, left))
+    return
+  }
   if (operator === "instanceof") {
     if (kind_of(memory, right) !== KINDS.FUNCTION)
       throw new TypeError("Expected a constructor")
@@ -528,9 +862,13 @@ export function binary_operation(memory, destination, left, right, operator) {
       object_offsets(memory, prototype)
       let found = false
       if (
-        [KINDS.OBJECT, KINDS.FUNCTION, KINDS.ERROR].includes(
-          kind_of(memory, left),
-        )
+        [
+          KINDS.OBJECT,
+          KINDS.FUNCTION,
+          KINDS.ERROR,
+          KINDS.ARRAY,
+          KINDS.STRING_OBJECT,
+        ].includes(kind_of(memory, left))
       ) {
         let reference = get_ref(memory, left)
         while (reference !== 0) {
@@ -557,13 +895,15 @@ export function binary_operation(memory, destination, left, right, operator) {
     (kind_of(memory, left) > KINDS.STRING ||
       kind_of(memory, right) > KINDS.STRING)
   ) {
-    if (operator === "==" || operator === "!=")
-      throw new TypeError("Loose object equality is not implemented yet")
     const equal =
       tag_of(memory, left) === TAGS.REF &&
       tag_of(memory, right) === TAGS.REF &&
       get_ref(memory, left) === get_ref(memory, right)
-    write_boolean(memory, destination, operator === "===" ? equal : !equal)
+    write_boolean(
+      memory,
+      destination,
+      operator === "===" || operator === "==" ? equal : !equal,
+    )
     return
   }
   const a = primitive(memory, left),

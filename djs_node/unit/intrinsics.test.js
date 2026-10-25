@@ -9,18 +9,26 @@ import {
   read_export,
 } from "../runtime/modules.js"
 import { alloc_root, free_root, KINDS, TAGS } from "../vm/memory.js"
-import { get_ref, tag_of, write_number, write_string } from "../vm/values.js"
+import {
+  get_ref,
+  tag_of,
+  write_number,
+  write_string,
+  read_string,
+  read_number,
+  read_boolean,
+} from "../vm/values.js"
 import {
   call_intrinsic,
   intrinsic_id,
   INTRINSIC_NAMES,
 } from "../vm/intrinsics.js"
 import { collect, heap_stats } from "../vm/heap.js"
-import { kind_of, store_binding } from "../vm/objects.js"
+import { kind_of, store_binding, get_property } from "../vm/objects.js"
 
 test("djs:intrinsics is a cached virtual module whose exports survive moving GC", async () => {
   const runtime = create_runtime({
-    semispace_bytes: 1024,
+    semispace_bytes: 8192,
     root_capacity: 1,
     host: {
       read_text() {
@@ -96,5 +104,95 @@ test("write_stdout writes a guest string verbatim and requires a string", () => 
   } finally {
     free_root(memory, value)
     free_root(memory, result)
+  }
+})
+
+test("UTF-16 primitives copy ranges across moving GC and support aliased destinations", () => {
+  const runtime = create_runtime({ semispace_bytes: 256, root_capacity: 1 })
+  const { memory } = runtime
+  const roots = heap_stats(memory).roots
+  const source = alloc_root(memory),
+    destination = alloc_root(memory),
+    start = alloc_root(memory),
+    end = alloc_root(memory),
+    garbage = alloc_root(memory)
+  try {
+    write_string(memory, source, "A\ud800\udc00B")
+    write_number(memory, start, 1)
+    write_number(memory, end, 3)
+    for (let index = 0; index < 40; index++) {
+      write_string(memory, garbage, "discarded allocation")
+      call_intrinsic(runtime, intrinsic_id("string_slice"), destination, [
+        source,
+        start,
+        end,
+      ])
+      assert.equal(read_string(memory, destination), "\ud800\udc00")
+    }
+    assert.ok(heap_stats(memory).collections > 2)
+    call_intrinsic(runtime, intrinsic_id("string_code_unit_at"), destination, [
+      source,
+      start,
+    ])
+    assert.equal(read_number(memory, destination), 0xd800)
+    call_intrinsic(runtime, intrinsic_id("string_slice"), source, [
+      source,
+      start,
+      end,
+    ])
+    collect(memory)
+    assert.equal(read_string(memory, source), "\ud800\udc00")
+    assert.throws(
+      () =>
+        call_intrinsic(runtime, intrinsic_id("string_slice"), destination, [
+          source,
+          start,
+          end,
+        ]),
+      /Invalid string range/,
+    )
+    write_number(memory, start, 2)
+    assert.throws(
+      () =>
+        call_intrinsic(
+          runtime,
+          intrinsic_id("string_code_unit_at"),
+          destination,
+          [source, start],
+        ),
+      /Invalid string index/,
+    )
+  } finally {
+    for (const root of [source, destination, start, end, garbage])
+      free_root(memory, root)
+  }
+  assert.equal(heap_stats(memory).roots, roots)
+})
+
+test("array allocation is sparse and brands survive moving collection", () => {
+  const runtime = create_runtime({ semispace_bytes: 256, root_capacity: 1 })
+  const { memory } = runtime
+  const length = alloc_root(memory),
+    array = alloc_root(memory),
+    result = alloc_root(memory),
+    key = alloc_root(memory)
+  try {
+    write_number(memory, length, 0xffffffff)
+    call_intrinsic(runtime, intrinsic_id("array_create"), array, [length])
+    collect(memory)
+    call_intrinsic(runtime, intrinsic_id("is_array"), result, [array])
+    assert.equal(read_boolean(memory, result), true)
+    write_string(memory, key, "length")
+    get_property(memory, result, array, key)
+    assert.equal(read_number(memory, result), 0xffffffff)
+    assert.ok(heap_stats(memory).used_bytes < 200)
+    write_number(memory, length, 1.5)
+    assert.throws(
+      () =>
+        call_intrinsic(runtime, intrinsic_id("array_create"), result, [length]),
+      /Invalid array length/,
+    )
+  } finally {
+    for (const root of [length, array, result, key]) free_root(memory, root)
   }
 })

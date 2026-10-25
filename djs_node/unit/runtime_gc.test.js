@@ -141,7 +141,7 @@ test("guest closures survive repeated calls and allocation-triggered collection"
     )
     let output = ""
     const runtime = create_runtime({
-      semispace_bytes: 16384,
+      semispace_bytes: 40960,
       root_capacity: 2,
       host: {
         read_text: readFile,
@@ -194,7 +194,7 @@ test(
       let reads = 0
       let closed = false
       const runtime = create_runtime({
-        semispace_bytes: 32768,
+        semispace_bytes: 65536,
         root_capacity: 2,
         host: {
           read_text: readFile,
@@ -270,7 +270,7 @@ for (const rejected of [false, true]) {
       finally { console.log("finished"); }
     `
     const runtime = create_runtime({
-      semispace_bytes: 32768,
+      semispace_bytes: 65536,
       root_capacity: 2,
       host: {
         read_text: (path, encoding) => {
