@@ -4,7 +4,6 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { CONTEXT_STATE } from "../vm/execution/context.ts"
 import { read_number } from "../vm/storage/value.ts"
 import { read_string, write_string } from "../vm/records/string.ts"
 import {
