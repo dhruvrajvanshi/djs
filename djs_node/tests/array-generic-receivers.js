@@ -1,0 +1,22 @@
+import { call, define_property_or_throw as define,
+  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
+  ordinary_object_create as create } from "djs:native";
+const prototype = {1:7};
+const object = create(prototype);
+object[0] = 2; object.length = 4;
+const mapped = call(Array.prototype.map, object, (x,i) => x + i);
+console.log(mapped.join("|"), 1 in mapped, 2 in mapped);
+console.log(call(Array.prototype.filter, object, x => x > 3).join());
+console.log(call(Array.prototype.reduce, object, (a,b) => a+b, 0));
+console.log(call(Array.prototype.slice, object).join("|"));
+let trace = "";
+call(Array.prototype.find, object, (x,i) => {trace = trace + i; return false});
+console.log(trace);
+trace = "";
+call(Array.prototype.forEach, object, (x,i) => {trace = trace + i; object[2] = 9});
+console.log(trace);
+console.log(call(Array.prototype.join,"abc","-"));
+const receiver = {base:10};
+console.log([1,2].map(function(x) {return this.base+x}, receiver).join());
+console.log([,].includes(undefined), [,].indexOf(undefined), [NaN].includes(NaN));
+console.log([1,2,1].lastIndexOf(1), [1,2,1].lastIndexOf(1,undefined));

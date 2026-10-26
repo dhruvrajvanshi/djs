@@ -1,0 +1,5 @@
+SyntaxError: syntax-new-target-arrow.js:1:7: new.target requires a function
+1|  () => new.target
+          ^~~
+2|  console.log("unreachable");
+3|  

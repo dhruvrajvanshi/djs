@@ -1,0 +1,11 @@
+cab bcab ab
+4 4 6
+true true true
+a|ca|c a||b|
+2 0 1
+0 a|b
+bcbcba abcbcb xxx 
+x x     x
+a1b2c a1null
+RangeError
+TypeError

@@ -1,0 +1,5 @@
+SyntaxError: syntax-function-in-if.js:1:11: Unsupported syntax: function declarations outside blocks
+1|  if (true) function f() {}
+              ^~~
+2|  console.log("unreachable");
+3|  

@@ -1,0 +1,5 @@
+SyntaxError: syntax-continue.js:1:31: Illegal continue statement
+1|  while (true) { function f() { continue; } }
+                                  ^~~
+2|  console.log("unreachable");
+3|  

@@ -1,0 +1,5 @@
+SyntaxError: syntax-rest-parameter.js:1:21: A rest parameter must be last and cannot have a default
+1|  function invalid(...items, last) {}
+                        ^~~
+2|  console.log("unreachable");
+3|  

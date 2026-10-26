@@ -1,0 +1,5 @@
+SyntaxError: syntax-break.js:1:1: Break statement not inside a loop
+1|  break;
+    ^~~
+2|  console.log("unreachable");
+3|  

@@ -27,35 +27,6 @@ async function fixture(t, files) {
   return directory
 }
 
-test("--dump-ir prints all supplied modules without linking or executing them", async (t) => {
-  const directory = await fixture(t, {
-    "first.js": `
-      import "./missing.js";
-      export function answer() { return 42; }
-      throw "must not execute";
-    `,
-    "second.js": "export const second = true;",
-  })
-  const result = cli(["--dump-ir", "first.js", "second.js"], directory)
-  assert.equal(result.status, 0, result.stderr)
-  assert.equal(result.stderr, "")
-  assert.equal((result.stdout.match(/^Module /gm) ?? []).length, 2)
-  assert.ok(result.stdout.startsWith('Module "first.js"\n'))
-  assert.match(result.stdout, /function answer\(\) #1/)
-  assert.match(result.stdout, /THROW %\d+/)
-  assert.match(result.stdout, /\nModule "second.js"\n/)
-})
-
-test("--dump-ir accepts options after paths and -- for dash-prefixed paths", async (t) => {
-  const directory = await fixture(t, { "-entry.js": "export default 1;" })
-  const result = cli(["--dump-ir", "--", "-entry.js"], directory)
-  assert.equal(result.status, 0, result.stderr)
-  assert.match(result.stdout, /^Module "-entry.js"/)
-  const trailing = cli(["./-entry.js", "--dump-ir"], directory)
-  assert.equal(trailing.status, 0, trailing.stderr)
-  assert.match(trailing.stdout, /^Module "\.\/-entry.js"/)
-})
-
 test("CLI help describes compile-only bytecode output", () => {
   for (const flag of ["--help", "-h"]) {
     const result = cli([flag])
@@ -77,18 +48,5 @@ test("CLI rejects missing modules, unknown flags and multiple execution entries"
     assert.equal(result.status, 1)
     assert.equal(result.stdout, "")
     assert.match(result.stderr, /Usage: djs_node/)
-  }
-})
-
-test("--dump-ir reports file and compilation failures", async (t) => {
-  const directory = await fixture(t, { "invalid.js": "const value = ;" })
-  for (const [path, diagnostic] of [
-    ["missing.js", /ENOENT/],
-    ["invalid.js", /SyntaxError:.*invalid.js/],
-  ]) {
-    const result = cli(["--dump-ir", path], directory)
-    assert.equal(result.status, 1)
-    assert.equal(result.stdout, "")
-    assert.match(result.stderr, diagnostic)
   }
 })

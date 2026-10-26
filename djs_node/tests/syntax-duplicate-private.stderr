@@ -1,0 +1,5 @@
+SyntaxError: syntax-duplicate-private.js:1:19: Duplicate or invalid private name: #value
+1|  class C { #value; #value; }
+                      ^~~
+2|  console.log("unreachable");
+3|  

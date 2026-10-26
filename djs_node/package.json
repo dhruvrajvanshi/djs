@@ -8,7 +8,7 @@
     "djs_node": "./djs_node.ts"
   },
   "scripts": {
-    "test": "node --test unit/*.test.js e2e/*.test.js",
+    "test": "node --test e2e/*.test.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

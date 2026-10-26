@@ -1,0 +1,5 @@
+SyntaxError: syntax-duplicate-constructor.js:1:28: Duplicate constructor
+1|  class C { constructor() {} constructor() {} }
+                               ^~~
+2|  console.log("unreachable");
+3|  

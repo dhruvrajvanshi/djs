@@ -5,10 +5,8 @@ import { HEADER, LAYOUTS } from "./layout.ts"
 
 const FORWARDED = 0xffffffff
 
-export interface MemoryOptions {
-  semispace_bytes?: number
-  root_capacity?: number
-}
+const SEMISPACE_BYTES = 1024 * 1024
+const INITIAL_ROOT_CAPACITY = 64
 
 function data_view(bytes: Uint8Array) {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
@@ -35,36 +33,16 @@ export class Memory {
   roots: Uint8Array
   roots_view: DataView
   root_used: Uint8Array
-  readonly semispace_bytes: number
+  readonly semispace_bytes = SEMISPACE_BYTES
   active_start = 8
   allocation_cursor = 8
-  root_count = 0
-  collections = 0
-  allocations = 0
 
-  constructor({
-    semispace_bytes = 1024 * 1024,
-    root_capacity = 64,
-  }: MemoryOptions = {}) {
-    if (
-      !Number.isSafeInteger(semispace_bytes) ||
-      semispace_bytes < 32 ||
-      semispace_bytes % 8 !== 0 ||
-      semispace_bytes > 0x7ffffff8
-    ) {
-      throw new RangeError(
-        "semispace_bytes must be an aligned size below 2 GiB",
-      )
-    }
-    if (!Number.isSafeInteger(root_capacity) || root_capacity < 1) {
-      throw new RangeError("root_capacity must be a positive integer")
-    }
-    this.semispace_bytes = semispace_bytes
-    this.heap = new Uint8Array(8 + semispace_bytes * 2)
+  constructor() {
+    this.heap = new Uint8Array(8 + this.semispace_bytes * 2)
     this.heap_view = data_view(this.heap)
-    this.roots = new Uint8Array(root_capacity * VALUE_BYTES)
+    this.roots = new Uint8Array(INITIAL_ROOT_CAPACITY * VALUE_BYTES)
     this.roots_view = data_view(this.roots)
-    this.root_used = new Uint8Array(root_capacity)
+    this.root_used = new Uint8Array(INITIAL_ROOT_CAPACITY)
   }
 
   assert_root(root: number): asserts root is Root {
@@ -92,7 +70,6 @@ export class Memory {
       NAN_HIGH | TAGS.UNDEFINED,
       true,
     )
-    this.root_count++
     return root as Root
   }
 
@@ -100,7 +77,6 @@ export class Memory {
     this.assert_root(root)
     this.roots.fill(0, root * VALUE_BYTES, (root + 1) * VALUE_BYTES)
     this.root_used[root] = 0
-    this.root_count--
   }
 
   copy_value(destination: Root, source: Root) {
@@ -182,7 +158,6 @@ export class Memory {
       )
         this.write_heap_undefined(cursor + offset)
     this.allocation_cursor = cursor + size
-    this.allocations++
     return cursor
   }
 
@@ -253,16 +228,5 @@ export class Memory {
     }
     this.active_start = to_start
     this.allocation_cursor = to_cursor
-    this.collections++
-  }
-
-  stats() {
-    return {
-      used_bytes: this.allocation_cursor - this.active_start,
-      semispace_bytes: this.semispace_bytes,
-      collections: this.collections,
-      allocations: this.allocations,
-      roots: this.root_count,
-    }
   }
 }

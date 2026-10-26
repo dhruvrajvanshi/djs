@@ -1,0 +1,5 @@
+SyntaxError: syntax-undeclared-private-in.js:1:11: Undeclared private name: #missing
+1|  const x = #missing in {};
+              ^~~
+2|  console.log("unreachable");
+3|  

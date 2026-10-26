@@ -1,0 +1,5 @@
+SyntaxError: syntax-await-in-function.js:1:23: Unsupported syntax: await inside an ordinary function
+1|  function f() { return await Promise.resolve(1); }
+                          ^~~
+2|  console.log("unreachable");
+3|  

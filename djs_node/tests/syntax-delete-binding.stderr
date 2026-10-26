@@ -1,0 +1,5 @@
+SyntaxError: syntax-delete-binding.js:1:1: Cannot delete a binding in strict mode
+1|  delete variable
+    ^~~
+2|  console.log("unreachable");
+3|  

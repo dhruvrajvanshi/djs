@@ -1,0 +1,5 @@
+SyntaxError: syntax-nested-import.js:1:11: Unsupported syntax: nested import
+1|  if (true) import 'dependency';
+              ^~~
+2|  console.log("unreachable");
+3|  

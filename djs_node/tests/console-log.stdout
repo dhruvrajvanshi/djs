@@ -1,0 +1,12 @@
+
+hello world
+undefined null true false 0 0 42 NaN Infinity
+[object Object] [Function] TypeError: failure
+%s literal line
+break 😀
+return
+true true
+Error:  TypeError: 
+Error: TypeError: nested
+42: null [object Object]
+-Infinity 1.25 1e+21 1e-7

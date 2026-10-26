@@ -1,0 +1,5 @@
+SyntaxError: syntax-error.js:1:15: Expected an expression
+1|  const value = ;
+                  ^~~
+2|  console.log("unreachable");
+3|  

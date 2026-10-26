@@ -263,6 +263,6 @@ it calls it, and with which arguments.
 3. If the VM needs it, add its name to `REQUIRED` in
    [runtime/realm.ts](../runtime/realm.ts) and follow the checklist in
    [realm.md](realm.md#adding-something-the-vm-uses).
-4. Add tests in `e2e/` that run a program and check its output. For example,
-   [`e2e/array_string.test.js`](../e2e/array_string.test.js) runs the same code
-   in Node and compares the results.
+4. Add a program to `tests/` with its expected output in a `.stdout` file
+   next to it. Take the expected output from running the same program in
+   Node, as in [`tests/array-methods.js`](../tests/array-methods.js).

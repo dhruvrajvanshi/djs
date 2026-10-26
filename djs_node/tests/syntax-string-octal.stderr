@@ -1,0 +1,5 @@
+SyntaxError: syntax-string-octal.js:1:13: Legacy octal escape
+1|  console.log('\012');
+                ^~~
+2|  console.log("unreachable");
+3|  

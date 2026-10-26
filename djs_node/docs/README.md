@@ -26,7 +26,7 @@ operations the VM provides.
 | [`stdlib/js/`](../stdlib/js/) | The ECMAScript builtins | [realm.js](../stdlib/js/realm.js), which lists the globals |
 | [`stdlib/node/`](../stdlib/node/) | The `node:*` modules | [index.js](../stdlib/node/index.js) |
 | [`host/`](../host/) | File system and stdout access, provided by Node | [node.ts](../host/node.ts) |
-| [`e2e/`](../e2e/), [`unit/`](../unit/) | Tests. Tests that run a program and check its output go in `e2e/` | [helpers.js](../e2e/helpers.js) |
+| [`tests/`](../tests/), [`e2e/`](../e2e/) | Tests. Each `tests/<name>.js` is a program whose expected stdout, stderr and exit status are in `<name>.stdout`, `<name>.stderr` and `<name>.status` (each optional; missing means empty, or 0 for status) | [fixtures.test.js](../e2e/fixtures.test.js) |
 
 ## How a program runs
 

@@ -1,0 +1,5 @@
+SyntaxError: syntax-undeclared-private.js:1:32: Undeclared private name: #missing
+1|  class C { read() { return this.#missing; } }
+                                   ^~~
+2|  console.log("unreachable");
+3|  
