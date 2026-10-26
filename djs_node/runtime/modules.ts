@@ -53,11 +53,16 @@ const BUILTINS = new Map([
   ["node:console", new URL("../stdlib/node/console.js", import.meta.url)],
   ["node:path", new URL("../stdlib/node/path.js", import.meta.url)],
   ["node:fs", new URL("../stdlib/node/fs.js", import.meta.url)],
+  ["node:assert", new URL("../stdlib/node/assert.js", import.meta.url)],
+  [
+    "node:assert/strict",
+    new URL("../stdlib/node/assert/strict.js", import.meta.url),
+  ],
   [
     "node:fs/promises",
     new URL("../stdlib/node/fs/promises.js", import.meta.url),
   ],
-  ["node:url", new URL("../stdlib/node/url.js", import.meta.url)]
+  ["node:url", new URL("../stdlib/node/url.js", import.meta.url)],
 ])
 
 export const MODULE_STATE = Object.freeze({
