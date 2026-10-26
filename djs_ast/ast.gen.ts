@@ -344,6 +344,7 @@ export class ImportStmt {
     readonly default_import: Ident | null,
     readonly named_imports: readonly ImportSpecifier[],
     readonly module_specifier: Text,
+    readonly is_type_only: boolean,
   ) {}
 
   get kind(): "Import" {
@@ -534,8 +535,15 @@ export const Stmt = {
     default_import: Ident | null,
     named_imports: readonly ImportSpecifier[],
     module_specifier: Text,
+    is_type_only: boolean,
   ): ImportStmt =>
-    new ImportStmt(span, default_import, named_imports, module_specifier),
+    new ImportStmt(
+      span,
+      default_import,
+      named_imports,
+      module_specifier,
+      is_type_only,
+    ),
 
   ImportStarAs: (
     span: Span,

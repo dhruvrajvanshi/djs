@@ -2038,9 +2038,20 @@ function parser_impl(
         null,
         [],
         module_specifier.text,
+        false,
       )
     }
     if (at(t.Star)) return parse_import_star_as_stmt(start)
+    let is_type_only = false
+    if (
+      flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+      at_soft_keyword("type") &&
+      (next_is(t.LBrace) ||
+        (next_is(t.Ident) && !next_is_soft_keyword("from")))
+    ) {
+      advance()
+      is_type_only = true
+    }
     let default_import: Ident | null = null
     if (at(t.Ident)) {
       const token = advance()
@@ -2059,6 +2070,7 @@ function parser_impl(
           default_import,
           [],
           from_clause.text,
+          is_type_only,
         )
       } else {
         emit_error("Expected a comma or 'from'")
@@ -2081,6 +2093,7 @@ function parser_impl(
       default_import,
       import_specifiers,
       from_clause.text,
+      is_type_only,
     )
   }
   function parse_type_decl(export_token: Token | null): Stmt | Err {

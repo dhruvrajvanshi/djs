@@ -58,6 +58,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     default_import: Option(Ident),
     named_imports: List(() => ImportSpecifier),
     module_specifier: Text,
+    is_type_only: "boolean",
   },
   ImportStarAs: {
     as_name: Ident,

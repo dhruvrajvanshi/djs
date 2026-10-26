@@ -631,6 +631,7 @@ function prepare_statements(
       case "Import": {
         if (fn.id !== 0 || scope !== fn.scope)
           unsupported(stmt, "nested import")
+        if (stmt.is_type_only) break
         const bindings = []
         if (stmt.default_import) {
           bindings.push({
@@ -640,7 +641,7 @@ function prepare_statements(
           })
         }
         for (const item of stmt.named_imports) {
-          if (item.type_only) unsupported(stmt, "type-only imports")
+          if (item.type_only) continue
           const imported =
             item.imported_name.kind === "Ident"
               ? item.imported_name.ident.text
