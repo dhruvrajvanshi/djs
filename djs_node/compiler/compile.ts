@@ -172,6 +172,7 @@ export interface ExportBinding {
 export interface ImportBinding {
   imported: string
   slot: number
+  span: Span
 }
 
 /** A module-scope binding the realm gives to the VM; see docs/realm.md. */
@@ -634,6 +635,7 @@ function prepare_statements(
           bindings.push({
             imported: "default",
             slot: declare_binding(scope, stmt.default_import.text, true).slot,
+            span: stmt.default_import.span,
           })
         }
         for (const item of stmt.named_imports) {
@@ -648,6 +650,7 @@ function prepare_statements(
           bindings.push({
             imported,
             slot: declare_binding(scope, local, true).slot,
+            span: item.span,
           })
         }
         state.unit.imports.push({
@@ -670,7 +673,11 @@ function prepare_statements(
           const exported = export_name(item, item.as_name ?? item.local_name)
           // A re-export is an import into a slot no source name can reach.
           const slot = declare_binding(scope, `*export ${exported}*`, true).slot
-          bindings.push({ imported: export_name(item, item.local_name), slot })
+          bindings.push({
+            imported: export_name(item, item.local_name),
+            slot,
+            span: item.span,
+          })
           export_binding(state, item, exported, slot)
         }
         state.unit.imports.push({

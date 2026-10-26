@@ -293,7 +293,12 @@ export async function load_module(
         const slot = target.exports.get(binding.imported)
         if (slot === undefined)
           throw new SyntaxError(
-            `${declaration.specifier} does not export ${binding.imported}`,
+            located_message(path, source, [
+              {
+                message: `The requested module '${declaration.specifier}' does not provide an export named '${binding.imported}'`,
+                span: binding.span,
+              },
+            ]),
           )
         imports.set(binding.slot, Object.freeze({ module_id: target.id, slot }))
       }

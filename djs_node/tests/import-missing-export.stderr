@@ -1,1 +1,5 @@
-SyntaxError: ./import-missing-export/dependency.js does not export missing
+SyntaxError: import-missing-export.js:1:10: The requested module './import-missing-export/dependency.js' does not provide an export named 'missing'
+1|  import { missing } from "./import-missing-export/dependency.js";
+             ^~~
+2|  console.log("unreachable");
+3|  
