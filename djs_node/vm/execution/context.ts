@@ -14,7 +14,11 @@ export const CONTEXT_STATE = Object.freeze({
 })
 export type ContextStatus = (typeof CONTEXT_STATE)[keyof typeof CONTEXT_STATE]
 
-/** The caller owns allocation/disposal of all roots. */
+/**
+ * A stack of frames that runs, suspends at `await` and resumes as a unit. Each
+ * module evaluation, async function call, job and JavaScript call made from VM
+ * code gets its own. The caller owns allocation/disposal of all roots.
+ */
 export class Context {
   readonly id: number
   readonly result: Root

@@ -10,6 +10,7 @@ operations the VM provides.
 | Page | Read it when |
 | --- | --- |
 | This page | You are new and want the layout, how a program runs, and the vocabulary |
+| [interpreter.md](interpreter.md) | You want to know how bytecode runs: registers, environments, calls, exceptions and `await` |
 | [stdlib.md](stdlib.md) | You are changing or adding a builtin, such as `Array.prototype.map` |
 | [realm.md](realm.md) | You want to know how the stdlib is loaded, or you are changing something the VM relies on |
 | [object-model.md](object-model.md) | You want to know how the VM represents objects: arrays and `String` objects, internal slots, built-in functions |
@@ -42,6 +43,7 @@ operations the VM provides.
    instruction at a time. Some instructions need a builtin: throwing a
    `TypeError`, giving an array literal its prototype, or converting an object
    with `ToPrimitive`. The interpreter gets those from the realm.
+   [interpreter.md](interpreter.md) explains this step.
 
 ## Vocabulary
 
