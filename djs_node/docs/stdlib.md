@@ -245,10 +245,9 @@ it calls it, and with which arguments.
   overwrite `f.call`, so `f.call(…)` might run something else.
 - **Hidden state.** If the spec names it as a slot (`[[PromiseState]]`), use a
   slot. Otherwise a private class field is fine.
-- **Not converted yet.** [`promise.js`](../stdlib/js/promise.js) and
-  [`iteration.js`](../stdlib/js/iteration.js) are still written as classes,
-  and `Promise` keeps its state in private fields. They predate the markers;
-  new builtins should use `well_known`.
+- **Not converted yet.** [`iteration.js`](../stdlib/js/iteration.js) is still
+  written as classes. It predates the markers; new builtins should use
+  `well_known`.
 - **No import cycles.** If two builtins need each other, put them in the same
   module.
   [`fundamental.js`](../stdlib/js/fundamental.js) holds `%Object%`,

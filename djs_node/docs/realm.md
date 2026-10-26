@@ -60,10 +60,16 @@ gathers the declarations from all the loaded modules and:
   When `initialize_binding` ([vm/semantics/bindings.ts](../vm/semantics/bindings.ts)) later sets a
   marked variable, it hands the function to `set_realm_intrinsic`.
 
-**3. Fill.** `define_globals(runtime, REALM)` runs the stdlib. Each
+**3. Fill.** `define_globals(runtime, REALM)` runs the stdlib with
+`evaluate_realm_module` ([runtime/modules.ts](../runtime/modules.ts)). Each
 well-known literal fills in the object allocated for it (`fill_well_known` in
 the compiler), and the marked functions reach the VM as they are defined.
 Then the exports of `realm.js` become the globals.
+
+This step is synchronous: each module runs to completion before the next, and
+no jobs or host operations run in between. Unlike a program module, a stdlib
+module gets no promise, since `%Promise%` itself is defined by the stdlib. A
+stdlib module that suspends at a top-level `await` makes the VM panic.
 
 **4. Node globals.** `define_globals(runtime, NODE_GLOBALS)` does the same for
 [`stdlib/node/index.js`](../stdlib/node/index.js).
@@ -101,7 +107,7 @@ are therefore the same kind of object as `new TypeError()` in a program.
 | [`ToPrimitive`](https://tc39.es/ecma262/#sec-toprimitive) | An operator such as `+` or `<` meets an object | `(value, hint)`; returns a primitive | `coerce_value` ([vm/execution/calls.ts](../vm/execution/calls.ts)) |
 | [`ToString`](https://tc39.es/ecma262/#sec-tostring) | An object is used as a property key, including on the left of `in` | `(value)`; returns a string | `coerce_value` |
 | [`ToNumber`](https://tc39.es/ecma262/#sec-tonumber) | Unary `+`, `-` or `~` meets an object | `(value)`; returns a number | `coerce_value` |
-| [`NewPromiseCapability`](https://tc39.es/ecma262/#sec-newpromisecapability) | An async function is called | `()`; returns `{ promise, resolve, reject }` | `call_async_function` |
+| [`NewPromiseCapability`](https://tc39.es/ecma262/#sec-newpromisecapability) | An async function is called, or a program module is evaluated | `()`; returns `{ promise, resolve, reject }` | `settle_with_promise` ([vm/execution/calls.ts](../vm/execution/calls.ts)) |
 | [`Await`](https://tc39.es/ecma262/#await) | `await value` | `(value, on_fulfilled, on_rejected)`; arranges for exactly one callback to run | `await_value` ([vm/execution/calls.ts](../vm/execution/calls.ts)) |
 
 ### Internal methods
@@ -129,7 +135,8 @@ error message. That only happens if the stdlib has a bug.
   up a global or reads a property to find one.
 - **Final shape.** Everything about a well-known object is in its declaration.
   Code doesn't change its prototype, attributes or internal methods later.
-- **Synchronous.** Functions the VM calls must not use `await`.
+- **Synchronous.** Functions the VM calls must not use `await`, and stdlib
+  modules must not use top-level `await`.
 
 ## Adding something the VM uses
 

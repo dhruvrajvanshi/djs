@@ -193,6 +193,8 @@ export interface CompiledModule {
   /** Element indices absent from array literals, for CREATE_ARRAY. */
   array_holes: number[][]
   classes: ClassDescriptor[]
+  /** Slot names passed to has_slot, get_slot and set_slot. */
+  slot_names: string[]
   entry: FunctionId
 }
 
@@ -228,6 +230,7 @@ export function compile_module(
     object_templates: [],
     array_holes: [],
     classes: [],
+    slot_names: [],
     entry: 0 as FunctionId,
   }
   const state: CompilerState = {
@@ -1664,6 +1667,9 @@ function compile_expr(
         const name = expr.args[1]
         if (name?.kind !== "String")
           throw syntax_error(expr, "Slot names must be string literals")
+        const slot_name = decode_string(name.text, name)
+        if (!state.unit.slot_names.includes(slot_name))
+          state.unit.slot_names.push(slot_name)
         callee = load_name(state, fn, scope, target.ident.text)
         receiver = constant(state, fn, undefined)
       } else {

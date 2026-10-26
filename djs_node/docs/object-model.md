@@ -149,6 +149,9 @@ in its own way and `set_slot` refuses to change them:
 
 Every other slot is stored like a private class field, with one hidden key
 per slot name (`slot_key` in [vm/semantics/slots.ts](../vm/semantics/slots.ts)).
+The compiler lists the slot names a module passes to `has_slot`, `get_slot`
+and `set_slot` (`slot_names`), and linking creates their keys, so the realm's
+roots don't grow while code runs.
 
 ## Built-in functions
 

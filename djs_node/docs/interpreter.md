@@ -214,25 +214,32 @@ An async function runs in its own context, which `AWAIT` suspends:
    rejected, the context throws as if from the `AWAIT` instruction, so a
    surrounding `try` catches it.
 
-When an async function is called, `call_async_function` creates its promise
-with the stdlib's `NewPromiseCapability`. When the function's context
-finishes, `run_task` settles that promise with the result or the error.
+An async function call and a program module's evaluation each get a promise,
+created by `settle_with_promise` ([vm/execution/calls.ts](../vm/execution/calls.ts))
+with the stdlib's `NewPromiseCapability`. When the context finishes,
+`run_task` settles that promise with the result or the error.
 
 ## The event loop
 
-`evaluate_context` ([vm/execution/interpreter.ts](../vm/execution/interpreter.ts))
-runs a module's context, then repeats these steps until the module finishes:
+`evaluate_module` ([runtime/modules.ts](../runtime/modules.ts)) runs a program
+module's context, then `run_event_loop` repeats these steps:
 
 1. Turn finished host operations, such as file reads, into jobs
    (`drain_completions` in [runtime/scheduler.ts](../runtime/scheduler.ts)).
+   Running a job also runs every context it made `READY`.
 2. Run every queued job (`drain_jobs`).
-3. Run the module's context again if it is `READY`.
+3. If the module's promise rejected, stop and report the error.
 4. If no jobs are queued but host operations are still pending, wait for the
    next one to finish. This is where the VM yields to Node's event loop.
+5. Once nothing is queued or pending, stop if the promise is fulfilled.
 
-If nothing is queued or pending and the module still hasn't finished, its
+The host reads the promise's state from its `[[PromiseState]]` slot. If
+nothing is queued or pending and the promise is still pending, the module's
 top-level `await` can never settle. djs_node then exits with code 13, as Node
 does.
+
+The stdlib is not evaluated this way: it runs synchronously while the realm
+is set up ([realm.md](realm.md#step-by-step)).
 
 ## Instruction limit
 

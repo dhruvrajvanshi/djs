@@ -11,14 +11,32 @@ import type { Runtime } from "./runtime.ts"
 import { resolve, isAbsolute } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { compile_module } from "../compiler/compile.ts"
-import { write_string } from "../vm/records/string.ts"
+import { read_string, write_string } from "../vm/records/string.ts"
 import { create_environment } from "../vm/records/environment.ts"
 import { create_function } from "../vm/semantics/objects.ts"
 import { load_binding, initialize_binding } from "../vm/semantics/bindings.ts"
-import { THROW, clear_exception } from "../vm/semantics/errors.ts"
+import { declare_slot, get_slot } from "../vm/semantics/slots.ts"
+import {
+  THROW,
+  clear_exception,
+  take_exception,
+} from "../vm/semantics/errors.ts"
+import { to_string } from "../vm/semantics/operations.ts"
 import { NATIVE_MODULES, NATIVE_CODE } from "../vm/execution/intrinsics.ts"
-import { create_context, dispose_context } from "../vm/execution/calls.ts"
-import { evaluate_context } from "../vm/execution/interpreter.ts"
+import { panic } from "../utils.ts"
+import type { HostError } from "../host/node.ts"
+import { CONTEXT_STATE } from "../vm/execution/context.ts"
+import {
+  create_context,
+  dispose_context,
+  settle_with_promise,
+} from "../vm/execution/calls.ts"
+import { run_task } from "../vm/execution/interpreter.ts"
+import {
+  drain_completions,
+  drain_jobs,
+  wait_for_completion,
+} from "./scheduler.ts"
 
 const BUILTINS = new Map([
   ["djs:abstract", new URL("../stdlib/js/abstract.js", import.meta.url)],
@@ -34,9 +52,8 @@ export const MODULE_STATE = Object.freeze({
   LINKING: 0,
   LINKED: 1,
   EVALUATING: 2,
-  AWAITING: 3,
-  EVALUATED: 4,
-  ERRORED: 5,
+  EVALUATED: 3,
+  ERRORED: 4,
 })
 export type ModuleStatus = (typeof MODULE_STATE)[keyof typeof MODULE_STATE]
 
@@ -126,6 +143,7 @@ function link_code(runtime: Runtime, unit: CompiledModule) {
       return id
     }),
   )
+  for (const name of unit.slot_names) declare_slot(runtime, name)
   const id = runtime.loader.code.length as CodeId
   runtime.loader.code.push({
     unit,
@@ -271,29 +289,41 @@ export async function load_module(
   }
 }
 
-export async function evaluate_module(
-  runtime: Runtime,
-  module: ModuleRecord,
-  ancestors: Set<number> = new Set(),
-): Promise<ModuleRecord> {
-  if (module.status === MODULE_STATE.EVALUATED) return module
+// Returns false if the module was already evaluated.
+function start_evaluation(module: ModuleRecord, ancestors: Set<number>) {
+  if (module.status === MODULE_STATE.EVALUATED) return false
   if (module.status === MODULE_STATE.ERRORED)
     throw new Error(`Module evaluation failed: ${module.identity}`)
   if (ancestors.has(module.id))
     throw new SyntaxError("Cyclic module evaluation is not implemented yet")
+  module.status = MODULE_STATE.EVALUATING
+  return true
+}
+
+/**
+ * Evaluates a stdlib module and its dependencies as part of setting up the
+ * realm. Realm setup is synchronous, so the stdlib can't use top-level await.
+ */
+export function evaluate_realm_module(
+  runtime: Runtime,
+  module: ModuleRecord,
+  ancestors: Set<number> = new Set(),
+) {
+  if (!start_evaluation(module, ancestors)) return
   const chain = new Set(ancestors).add(module.id)
   let context
   try {
-    module.status = MODULE_STATE.EVALUATING
     for (const id of module.dependencies)
-      await evaluate_module(runtime, runtime.loader.modules[id], chain)
+      evaluate_realm_module(runtime, runtime.loader.modules[id], chain)
     context = create_context(runtime, module.code_id!, module.environment)
-    context.module = module
-    await evaluate_context(runtime, context)
+    runtime.scheduler.task_steps = 0
+    run_task(runtime, context)
+    if (context.status === CONTEXT_STATE.FAILED)
+      throw new Error(to_string(runtime, context.error))
+    if (context.status !== CONTEXT_STATE.DONE)
+      panic("Stdlib modules must evaluate synchronously")
     module.status = MODULE_STATE.EVALUATED
-    // Module evaluation fulfills with undefined; exports live in its environment.
     write_undefined(runtime.memory, module.error)
-    return module
   } catch (error) {
     module.status = MODULE_STATE.ERRORED
     if (context) runtime.memory.copy_value(module.error, context.error)
@@ -301,6 +331,84 @@ export async function evaluate_module(
     throw error
   } finally {
     if (context) dispose_context(runtime, context)
+  }
+}
+
+/**
+ * Evaluates a program module and its dependencies. Like an async function
+ * call, the module's context settles a promise when it finishes. This runs
+ * jobs and host operations until that promise rejects, or until it is
+ * fulfilled and nothing is left to run.
+ */
+export async function evaluate_module(
+  runtime: Runtime,
+  module: ModuleRecord,
+  ancestors: Set<number> = new Set(),
+): Promise<ModuleRecord> {
+  if (!start_evaluation(module, ancestors)) return module
+  const chain = new Set(ancestors).add(module.id)
+  const { memory } = runtime
+  const promise = memory.alloc_root()
+  let context
+  let guest_error = false
+  try {
+    for (const id of module.dependencies)
+      await evaluate_module(runtime, runtime.loader.modules[id], chain)
+    context = create_context(runtime, module.code_id!, module.environment)
+    if (settle_with_promise(runtime, context, promise) === THROW) {
+      take_exception(runtime, module.error)
+      guest_error = true
+      throw new Error(to_string(runtime, module.error))
+    }
+    // Include all callbacks and await helpers in this module evaluation's budget.
+    runtime.scheduler.task_steps = 0
+    run_task(runtime, context)
+    await run_event_loop(runtime, promise)
+    if (promise_state(runtime, promise) === "rejected") {
+      get_slot(runtime, module.error, promise, "[[PromiseResult]]")
+      guest_error = true
+      throw new Error(to_string(runtime, module.error))
+    }
+    module.status = MODULE_STATE.EVALUATED
+    // Module evaluation fulfills with undefined; exports live in its environment.
+    write_undefined(memory, module.error)
+    return module
+  } catch (error) {
+    module.status = MODULE_STATE.ERRORED
+    if (!guest_error) write_string(memory, module.error, error.message)
+    throw error
+  } finally {
+    if (context) dispose_context(runtime, context)
+    memory.free_root(promise)
+  }
+}
+
+function promise_state(runtime: Runtime, promise: Root) {
+  const state = runtime.memory.alloc_root()
+  try {
+    get_slot(runtime, state, promise, "[[PromiseState]]")
+    return read_string(runtime.memory, state)
+  } finally {
+    runtime.memory.free_root(state)
+  }
+}
+
+async function run_event_loop(runtime: Runtime, promise: Root) {
+  const { scheduler } = runtime
+  while (true) {
+    drain_completions(runtime)
+    drain_jobs(runtime)
+    if (scheduler.has_jobs() || scheduler.completions.length !== 0) continue
+    const state = promise_state(runtime, promise)
+    if (state === "rejected") return
+    if (scheduler.pending_operations !== 0) {
+      await wait_for_completion(runtime)
+      continue
+    }
+    if (state === "fulfilled") return
+    const error: HostError = new Error("Top-level await did not settle")
+    error.exit_code = 13
+    throw error
   }
 }
 

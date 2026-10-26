@@ -2,7 +2,7 @@ import type { Root } from "../storage/value.ts"
 import { panic } from "../../utils.ts"
 import type { BytecodeOffset, RegisterIndex } from "../../compiler/bytecode.ts"
 import type { FunctionId } from "../../compiler/compile.ts"
-import type { CodeId, ModuleRecord } from "../../runtime/modules.ts"
+import type { CodeId } from "../../runtime/modules.ts"
 
 export const CONTEXT_STATE = Object.freeze({
   READY: 0,
@@ -27,8 +27,7 @@ export class Context {
   frame: Frame | null = null
   steps = 0
   await_rejected = false
-  /** The module this context evaluates, if any; not owned by the context. */
-  module?: ModuleRecord
+  /** Resolving functions of the promise this context settles when it finishes. */
   settle?: { resolve: Root; reject: Root }
 
   constructor(id: number, result: Root, error: Root) {

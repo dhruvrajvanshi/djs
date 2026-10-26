@@ -12,7 +12,6 @@ import { KINDS } from "../storage/layout.ts"
 import type { BindingLocation, FunctionId } from "../../compiler/compile.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import type { CodeId } from "../../runtime/modules.ts"
-import { MODULE_STATE } from "../../runtime/modules.ts"
 import { write_string } from "../records/string.ts"
 import { has_property_list, set_prototype } from "../records/object.ts"
 import {
@@ -172,6 +171,11 @@ export function dispose_context(runtime: Runtime, context: Context) {
   while (context.frame !== null) pop_frame(runtime, context)
   runtime.memory.free_root(context.result)
   runtime.memory.free_root(context.error)
+  if (context.settle) {
+    runtime.memory.free_root(context.settle.resolve)
+    runtime.memory.free_root(context.settle.reject)
+    context.settle = undefined
+  }
   context.status = CONTEXT_STATE.DISPOSED
 }
 
@@ -350,13 +354,14 @@ export function invoke_sync(
   }
 }
 
-// Each async call runs in its own context, so AWAIT suspends only that call.
-function call_async_function(
+/**
+ * Makes `context` settle a new %Promise%, written to `promise`, when it
+ * finishes. Async function calls and module evaluations both work this way.
+ */
+export function settle_with_promise(
   runtime: Runtime,
-  destination: Root,
-  callee: Root,
-  receiver: Root | undefined,
-  arguments_: Root[],
+  context: Context,
+  promise: Root,
 ): Status {
   const new_capability = runtime.realm.intrinsics.get("NewPromiseCapability")
   if (new_capability === undefined) panic("Promise is not initialized")
@@ -373,7 +378,7 @@ function call_async_function(
       return throw_value(runtime, capability.error)
     }
     for (const [name, target] of [
-      ["promise", destination],
+      ["promise", promise],
       ["resolve", resolve],
       ["reject", reject],
     ] as [string, Root][]) {
@@ -384,8 +389,23 @@ function call_async_function(
     dispose_context(runtime, capability)
     memory.free_root(key)
   }
-  const context = create_empty_context(runtime)
   context.settle = { resolve, reject }
+  return OK
+}
+
+// Each async call runs in its own context, so AWAIT suspends only that call.
+function call_async_function(
+  runtime: Runtime,
+  destination: Root,
+  callee: Root,
+  receiver: Root | undefined,
+  arguments_: Root[],
+): Status {
+  const context = create_empty_context(runtime)
+  if (settle_with_promise(runtime, context, destination) === THROW) {
+    dispose_context(runtime, context)
+    return THROW
+  }
   if (
     enter_function(
       runtime,
@@ -403,9 +423,8 @@ function call_async_function(
   return OK
 }
 
-export function settle_async_function(runtime: Runtime, context: Context) {
+export function settle_context(runtime: Runtime, context: Context) {
   const { resolve, reject } = context.settle!
-  context.settle = undefined
   const fulfilled = context.status === CONTEXT_STATE.DONE
   let settlement
   try {
@@ -419,8 +438,6 @@ export function settle_async_function(runtime: Runtime, context: Context) {
   } finally {
     if (settlement) dispose_context(runtime, settlement)
     dispose_context(runtime, context)
-    runtime.memory.free_root(resolve)
-    runtime.memory.free_root(reject)
   }
 }
 
@@ -607,7 +624,6 @@ export function await_value(
   const fulfilled = memory.alloc_root(),
     rejected = memory.alloc_root()
   context.status = CONTEXT_STATE.WAITING
-  if (context.module) context.module.status = MODULE_STATE.AWAITING
   let registration
   try {
     resume_function(runtime, fulfilled, context, destination, false)

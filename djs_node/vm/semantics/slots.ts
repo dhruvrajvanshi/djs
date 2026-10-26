@@ -46,6 +46,14 @@ function slot_key(runtime: Runtime, name: string): Root {
   return key
 }
 
+/**
+ * Creates a slot's key when its code is linked, so the realm's roots don't
+ * grow while code runs.
+ */
+export function declare_slot(runtime: Runtime, name: string) {
+  if (!VM_SLOTS.has(name)) slot_key(runtime, name)
+}
+
 export function has_slot(runtime: Runtime, object: Root, name: string) {
   const { memory } = runtime
   if (!has_property_list(memory, object)) return false

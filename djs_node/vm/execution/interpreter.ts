@@ -24,15 +24,8 @@ import {
   register_index,
   bytecode_offset,
 } from "../../compiler/bytecode.ts"
-import type { HostError } from "../../host/node.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import type { CodeId, LinkedCode } from "../../runtime/modules.ts"
-import { MODULE_STATE } from "../../runtime/modules.ts"
-import {
-  drain_completions,
-  drain_jobs,
-  wait_for_completion,
-} from "../../runtime/scheduler.ts"
 import { write_string } from "../records/string.ts"
 import { load_symbol_description } from "../records/symbol.ts"
 import { is_object, set_prototype } from "../records/object.ts"
@@ -82,7 +75,7 @@ import {
   await_value,
   call_function,
   pop_frame,
-  settle_async_function,
+  settle_context,
   coerce_value,
   construct_function,
   invoke_sync,
@@ -888,7 +881,6 @@ export function run_interpreter(runtime: Runtime, context: Context) {
   const { memory } = runtime
   // Widened so TS doesn't keep the narrowed status across calls that change it.
   context.status = CONTEXT_STATE.RUNNING as ContextStatus
-  if (context.module) context.module.status = MODULE_STATE.EVALUATING
   const temporary = memory.alloc_root(),
     operand = memory.alloc_root(),
     property_key = memory.alloc_root()
@@ -1248,33 +1240,7 @@ export function run_task(runtime: Runtime, context: Context) {
     (context.status === CONTEXT_STATE.DONE ||
       context.status === CONTEXT_STATE.FAILED)
   )
-    settle_async_function(runtime, context)
-}
-
-export async function evaluate_context(runtime: Runtime, context: Context) {
-  // Include all callbacks and await helpers in this module evaluation's budget.
-  runtime.scheduler.task_steps = 0
-  run_task(runtime, context)
-  while (true) {
-    drain_completions(runtime)
-    drain_jobs(runtime)
-    if (context.status === CONTEXT_STATE.READY) run_task(runtime, context)
-    if (context.status === CONTEXT_STATE.FAILED)
-      throw new Error(to_string(runtime, context.error))
-    if (
-      runtime.scheduler.has_jobs() ||
-      runtime.scheduler.completions.length !== 0
-    )
-      continue
-    if (runtime.scheduler.pending_operations !== 0) {
-      await wait_for_completion(runtime)
-      continue
-    }
-    if (context.status === CONTEXT_STATE.DONE) return
-    const error: HostError = new Error("Top-level await did not settle")
-    error.exit_code = 13
-    throw error
-  }
+    settle_context(runtime, context)
 }
 
 // Restores the environment of the frame's code at the handler, which is the
