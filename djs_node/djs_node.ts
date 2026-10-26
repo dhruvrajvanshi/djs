@@ -37,7 +37,12 @@ export async function main(arguments_: string[] = process.argv.slice(2)) {
   if (dump_ir) {
     for (const path of modules) {
       const source = await readFile(path, "utf8")
-      process.stdout.write(disassemble_module(compile_module(source, path)))
+      process.stdout.write(
+        disassemble_module(
+          compile_module(source, path),
+          process.stdout.hasColors?.() ?? false,
+        ),
+      )
     }
     return
   }

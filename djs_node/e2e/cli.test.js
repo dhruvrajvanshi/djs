@@ -41,8 +41,8 @@ test("--dump-ir prints all supplied modules without linking or executing them", 
   assert.equal(result.stderr, "")
   assert.equal((result.stdout.match(/^Module /gm) ?? []).length, 2)
   assert.ok(result.stdout.startsWith('Module "first.js"\n'))
-  assert.match(result.stdout, /Function 1 "answer"/)
-  assert.match(result.stdout, /THROW src=\d+/)
+  assert.match(result.stdout, /function answer\(\) #1/)
+  assert.match(result.stdout, /THROW %\d+/)
   assert.match(result.stdout, /\nModule "second.js"\n/)
 })
 
