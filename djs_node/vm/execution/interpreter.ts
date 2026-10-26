@@ -126,6 +126,46 @@ function close_iterator(runtime: Runtime, iterator: Root): Status {
   }
 }
 
+/** Calls `body` with `fixed` followed by the values `iterable` yields. */
+function with_spread_arguments(
+  runtime: Runtime,
+  fixed: Root[],
+  iterable: Root,
+  body: (arguments_: Root[]) => Status,
+): Status {
+  const { memory } = runtime
+  const iterator = memory.alloc_root(),
+    next = memory.alloc_root(),
+    result = memory.alloc_root(),
+    done = memory.alloc_root()
+  const values: Root[] = []
+  try {
+    if (op.GET_ITERATOR(runtime, iterator, next, iterable, result) === THROW)
+      return THROW
+    while (true) {
+      if (invoke_sync(runtime, result, next, iterator, []) === THROW)
+        return THROW
+      if (!is_object(memory, result))
+        return throw_error(
+          runtime,
+          "TypeError",
+          "Iterator result is not an object",
+        )
+      const done_key = runtime.realm.property_names.get("done")!
+      if (get_value(runtime, done, result, done_key) === THROW) return THROW
+      if (truthy(runtime, done)) break
+      const value = memory.alloc_root()
+      values.push(value)
+      const value_key = runtime.realm.property_names.get("value")!
+      if (get_value(runtime, value, result, value_key) === THROW) return THROW
+    }
+    return body([...fixed, ...values])
+  } finally {
+    for (const root of [iterator, next, result, done, ...values])
+      memory.free_root(root)
+  }
+}
+
 function load_property_key(
   runtime: Runtime,
   destination: Root,
@@ -1080,6 +1120,24 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             reg(a),
             reg(b),
             Array.from({ length: e }, (_, index) => reg(d + index)),
+          )
+          break
+        case OP.CALL_SPREAD:
+          status = with_spread_arguments(
+            runtime,
+            Array.from({ length: e }, (_, index) => reg(d + index)),
+            reg(d + e),
+            (arguments_) =>
+              op.CALL(runtime, fiber, reg(a), reg(b), reg(c), arguments_),
+          )
+          break
+        case OP.CONSTRUCT_SPREAD:
+          status = with_spread_arguments(
+            runtime,
+            Array.from({ length: e }, (_, index) => reg(d + index)),
+            reg(d + e),
+            (arguments_) =>
+              op.CONSTRUCT(runtime, fiber, reg(a), reg(b), arguments_),
           )
           break
         case OP.RETURN:

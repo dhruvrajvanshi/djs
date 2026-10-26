@@ -118,6 +118,13 @@ export const OP = Object.freeze({
   CALL: 29,
   /** `dst, callee, _, first, =count`: same layout as CALL. */
   CONSTRUCT: 30,
+  /**
+   * `dst, callee, receiver, first, =count`: like CALL, followed by the
+   * values of the iterable in register `first + count` (`f(a, ...b)`).
+   */
+  CALL_SPREAD: 74,
+  /** `dst, callee, _, first, =count`: same layout as CALL_SPREAD. */
+  CONSTRUCT_SPREAD: 75,
   /** `src` */
   RETURN: 31,
   /** `dst, src` */

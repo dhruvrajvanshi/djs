@@ -12,6 +12,7 @@ import type {
   ObjectKey,
   PropExpr,
   IndexExpr,
+  CallExpr,
   Ident,
   ObjectLiteralEntry,
   VarExpr,
@@ -1529,14 +1530,180 @@ function create_object(
   return dst
 }
 
+/**
+ * An optional chain: `a?.b.c()` is one chain, and a nullish `a` skips the
+ * rest of it. `exits` are the JUMPs taken on a nullish `?.` operand, patched
+ * by `end_chain` once the outermost member is compiled.
+ */
+interface Chain {
+  exits: number[]
+}
+
+function compile_chain(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  expr: PropExpr | IndexExpr | CallExpr,
+) {
+  const chain: Chain = { exits: [] }
+  return end_chain(
+    state,
+    fn,
+    chain,
+    chain_member(state, fn, scope, expr, chain),
+  )
+}
+
+function end_chain(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  chain: Chain,
+  value: number,
+  nullish_value: Literal = undefined,
+) {
+  if (chain.exits.length === 0) return value
+  const dst = allocate(fn)
+  emit(fn, OP.MOVE, dst, value)
+  const end = emit(fn, OP.JUMP, 0)
+  for (const exit of chain.exits) fn.instructions[exit][1] = position(fn)
+  emit(fn, OP.LOAD_CONST, dst, literal(state, nullish_value))
+  fn.instructions[end][1] = position(fn)
+  return dst
+}
+
+function exit_chain_if_nullish(
+  fn: FunctionBuilder,
+  chain: Chain,
+  value: number,
+) {
+  const skip = emit(fn, OP.JUMP_IF_NOT_NULLISH, value, 0)
+  chain.exits.push(emit(fn, OP.JUMP, 0))
+  fn.instructions[skip][2] = position(fn)
+}
+
+/** Compiles `expr` as part of `chain` unless parentheses end the chain. */
+function chain_operand(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  expr: Expr,
+  chain: Chain,
+) {
+  return expr.kind === "Prop" || expr.kind === "Index" || expr.kind === "Call"
+    ? chain_member(state, fn, scope, expr, chain)
+    : compile_expr(state, fn, scope, expr)
+}
+
+function chain_member(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  expr: PropExpr | IndexExpr | CallExpr,
+  chain: Chain,
+): number {
+  if (expr.kind === "Call") return compile_call(state, fn, scope, expr, chain)
+  const reference = property_reference(state, fn, scope, expr, chain)
+  const dst = allocate(fn)
+  emit(
+    fn,
+    reference.private ? OP.GET_PRIVATE : OP.GET_PROP,
+    dst,
+    reference.object,
+    reference.key,
+  )
+  return dst
+}
+
+function compile_call(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  expr: CallExpr,
+  chain: Chain,
+) {
+  let callee, receiver
+  let target = expr.callee
+  while (target.kind === "Paren") target = target.expr
+  const construct = target.kind === "New"
+  if (construct) {
+    callee = compile_expr(
+      state,
+      fn,
+      scope,
+      (target as Extract<Expr, { kind: "New" }>).expr,
+    )
+    receiver = constant(state, fn, undefined)
+  } else if (target.kind === "Prop" || target.kind === "Index") {
+    // `(a?.b)()` keeps `a` as the receiver but ends the chain at the parens.
+    const parenthesized = target !== expr.callee
+    const callee_chain = parenthesized ? { exits: [] } : chain
+    const reference = property_reference(state, fn, scope, target, callee_chain)
+    receiver = reference.object
+    callee = allocate(fn)
+    emit(
+      fn,
+      reference.private ? OP.GET_PRIVATE : OP.GET_PROP,
+      callee,
+      receiver,
+      reference.key,
+    )
+    if (parenthesized) callee = end_chain(state, fn, callee_chain, callee)
+  } else if (
+    target.kind === "Var" &&
+    SLOT_OPERATIONS.includes(native_import(state, scope, target.ident.text)!)
+  ) {
+    const name = expr.args[1]
+    if (name?.kind !== "String")
+      throw syntax_error(expr, "Slot names must be string literals")
+    const slot_name = decode_string(name.text, name)
+    if (!state.unit.slot_names.includes(slot_name))
+      state.unit.slot_names.push(slot_name)
+    callee = load_name(state, fn, scope, target.ident.text)
+    receiver = constant(state, fn, undefined)
+  } else {
+    callee = chain_operand(state, fn, scope, expr.callee, chain)
+    receiver = constant(state, fn, undefined)
+  }
+  if (expr.is_optional) exit_chain_if_nullish(fn, chain, callee)
+  const args = allocate(fn, expr.args.length + (expr.spread ? 1 : 0))
+  for (let i = 0; i < expr.args.length; i++) {
+    emit(fn, OP.MOVE, args + i, compile_expr(state, fn, scope, expr.args[i]))
+  }
+  if (expr.spread)
+    emit(
+      fn,
+      OP.MOVE,
+      args + expr.args.length,
+      compile_expr(state, fn, scope, expr.spread),
+    )
+  const dst = allocate(fn)
+  emit(
+    fn,
+    expr.spread
+      ? construct
+        ? OP.CONSTRUCT_SPREAD
+        : OP.CALL_SPREAD
+      : construct
+        ? OP.CONSTRUCT
+        : OP.CALL,
+    dst,
+    callee,
+    receiver,
+    args,
+    expr.args.length,
+  )
+  return dst
+}
+
 function property_reference(
   state: CompilerState,
   fn: FunctionBuilder,
   scope: Scope,
   expr: PropExpr | IndexExpr,
+  chain: Chain,
 ) {
-  if (expr.is_optional) unsupported(expr, "optional chaining")
-  const object = compile_expr(state, fn, scope, expr.lhs)
+  const object = chain_operand(state, fn, scope, expr.lhs, chain)
+  if (expr.is_optional) exit_chain_if_nullish(fn, chain, object)
   const key =
     expr.kind === "Prop"
       ? expr.property.text.startsWith("#")
@@ -1620,83 +1787,9 @@ function compile_expr(
     case "Paren":
       return compile_expr(state, fn, scope, expr.expr)
     case "Prop":
-    case "Index": {
-      const reference = property_reference(state, fn, scope, expr)
-      const dst = allocate(fn)
-      emit(
-        fn,
-        reference.private ? OP.GET_PRIVATE : OP.GET_PROP,
-        dst,
-        reference.object,
-        reference.key,
-      )
-      return dst
-    }
-    case "Call": {
-      if (expr.is_optional || expr.spread)
-        unsupported(expr, "optional/spread calls")
-      let callee, receiver
-      let target = expr.callee
-      while (target.kind === "Paren") target = target.expr
-      const construct = target.kind === "New"
-      if (construct) {
-        callee = compile_expr(
-          state,
-          fn,
-          scope,
-          (target as Extract<Expr, { kind: "New" }>).expr,
-        )
-        receiver = constant(state, fn, undefined)
-      } else if (target.kind === "Prop" || target.kind === "Index") {
-        const reference = property_reference(state, fn, scope, target)
-        receiver = reference.object
-        callee = allocate(fn)
-        emit(
-          fn,
-          reference.private ? OP.GET_PRIVATE : OP.GET_PROP,
-          callee,
-          receiver,
-          reference.key,
-        )
-      } else if (
-        target.kind === "Var" &&
-        SLOT_OPERATIONS.includes(
-          native_import(state, scope, target.ident.text)!,
-        )
-      ) {
-        const name = expr.args[1]
-        if (name?.kind !== "String")
-          throw syntax_error(expr, "Slot names must be string literals")
-        const slot_name = decode_string(name.text, name)
-        if (!state.unit.slot_names.includes(slot_name))
-          state.unit.slot_names.push(slot_name)
-        callee = load_name(state, fn, scope, target.ident.text)
-        receiver = constant(state, fn, undefined)
-      } else {
-        callee = compile_expr(state, fn, scope, expr.callee)
-        receiver = constant(state, fn, undefined)
-      }
-      const args = allocate(fn, expr.args.length)
-      for (let i = 0; i < expr.args.length; i++) {
-        emit(
-          fn,
-          OP.MOVE,
-          args + i,
-          compile_expr(state, fn, scope, expr.args[i]),
-        )
-      }
-      const dst = allocate(fn)
-      emit(
-        fn,
-        construct ? OP.CONSTRUCT : OP.CALL,
-        dst,
-        callee,
-        receiver,
-        args,
-        expr.args.length,
-      )
-      return dst
-    }
+    case "Index":
+    case "Call":
+      return compile_chain(state, fn, scope, expr)
     case "Array": {
       const first = allocate(fn, expr.items.length)
       const holes = []
@@ -1743,10 +1836,12 @@ function compile_expr(
       while (target.kind === "Paren") target = target.expr
       const dst = allocate(fn)
       if (target.kind === "Prop" || target.kind === "Index") {
-        const reference = property_reference(state, fn, scope, target)
+        const chain: Chain = { exits: [] }
+        const reference = property_reference(state, fn, scope, target, chain)
         if (reference.private)
           throw syntax_error(expr, "Cannot delete a private field")
         emit(fn, OP.DELETE_PROP, dst, reference.object, reference.key)
+        return end_chain(state, fn, chain, dst, true)
       } else {
         if (target.kind === "Var")
           throw syntax_error(expr, "Cannot delete a binding in strict mode")

@@ -83,6 +83,18 @@ const OPERANDS: Record<string, Operand[] | Formatter> = {
     dsts: [register(dst)],
     args: [register(callee), register_list(first, count)],
   }),
+  CALL_SPREAD: ([dst, callee, receiver, first, count]) => ({
+    dsts: [register(dst)],
+    args: [
+      register(callee),
+      `this=${register(receiver)}`,
+      register_list(first, count, true),
+    ],
+  }),
+  CONSTRUCT_SPREAD: ([dst, callee, , first, count]) => ({
+    dsts: [register(dst)],
+    args: [register(callee), register_list(first, count, true)],
+  }),
   RETURN: ["reg"],
   AWAIT: ["dst", "reg"],
   THROW: ["reg"],
@@ -162,8 +174,14 @@ function register(index: number): string {
   return `%${index}`
 }
 
-function register_list(first: number, count: number): string {
-  return `(${Array.from({ length: count }, (_, i) => register(first + i)).join(", ")})`
+function register_list(
+  first: number,
+  count: number,
+  spread: boolean = false,
+): string {
+  const items = Array.from({ length: count }, (_, i) => register(first + i))
+  if (spread) items.push(`...${register(first + count)}`)
+  return `(${items.join(", ")})`
 }
 
 function function_ref(unit: CompiledModule, id: number): string {
