@@ -1,8 +1,8 @@
 import type { Brand } from "../utils.ts"
-import type { Root } from "../vm/storage/value.ts"
+import type { Handle, Persistent } from "../vm/storage/value.ts"
 import {
-  TAGS,
-  kind_of,
+  VALUE_TAGS,
+  heap_type_of,
   tag_of,
   write_boolean,
   write_null,
@@ -15,14 +15,14 @@ import { resolve, isAbsolute, dirname, join } from "node:path"
 import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { compile_module, located_message } from "../compiler/compile.ts"
-import { read_string, write_string } from "../vm/records/string.ts"
-import { create_environment } from "../vm/records/environment.ts"
-import { is_object } from "../vm/records/object.ts"
+import { read_string, write_string } from "../vm/heap_types/string.ts"
+import { create_environment } from "../vm/heap_types/environment.ts"
+import { is_object } from "../vm/heap_types/object.ts"
 import { get_property } from "../vm/semantics/properties.ts"
-import { KINDS } from "../vm/storage/layout.ts"
+import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import { create_function } from "../vm/semantics/objects.ts"
 import { load_binding, initialize_binding } from "../vm/semantics/bindings.ts"
-import { declare_slot, get_slot } from "../vm/semantics/slots.ts"
+import { declare_slot, get_slot } from "../vm/semantics/internal_slots.ts"
 import {
   THROW,
   clear_exception,
@@ -78,7 +78,7 @@ export type CodeId = Brand<number, "CodeId">
 
 export interface LinkedCode {
   unit: CompiledModule
-  constants: Root[]
+  constants: Persistent[]
   scope_ids: number[]
   block_scope_ids: number[][]
   bytecodes: Uint8Array[]
@@ -109,9 +109,9 @@ export class ModuleRecord {
   readonly exports: Map<string, ModuleBinding>
   /** Names that `export *` gets from more than one binding. */
   readonly ambiguous_exports = new Set<string>()
-  /** Owned roots. `error` holds the evaluation error, or undefined. */
-  readonly environment: Root
-  readonly error: Root
+  /** `error` holds the evaluation error, or undefined. */
+  readonly environment: Persistent
+  readonly error: Persistent
 
   constructor(fields: {
     id: number
@@ -120,8 +120,8 @@ export class ModuleRecord {
     code_id: CodeId | null
     scope_id: number
     exports: Map<string, ModuleBinding>
-    environment: Root
-    error: Root
+    environment: Persistent
+    error: Persistent
   }) {
     this.id = fields.id
     this.identity = fields.identity
@@ -145,14 +145,15 @@ export class ModuleLoader {
 function link_code(runtime: Runtime, unit: CompiledModule) {
   const constants = []
   for (const literal of unit.literals) {
-    const root = runtime.memory.alloc_root()
-    if (typeof literal === "string") write_string(runtime.memory, root, literal)
+    const constant = runtime.heap.handles.persistent()
+    if (typeof literal === "string")
+      write_string(runtime.heap, constant, literal)
     else if (typeof literal === "number")
-      write_number(runtime.memory, root, literal)
+      write_number(runtime.heap, constant, literal)
     else if (typeof literal === "boolean")
-      write_boolean(runtime.memory, root, literal)
-    else if (literal === null) write_null(runtime.memory, root)
-    constants.push(root)
+      write_boolean(runtime.heap, constant, literal)
+    else if (literal === null) write_null(runtime.heap, constant)
+    constants.push(constant)
   }
   const scope_ids = unit.functions.map((fn) => {
     const id = runtime.loader.scopes.length
@@ -347,11 +348,11 @@ function instantiate_module(
     exports: new Map(
       exports.map((item) => [item.name, { module_id: id, slot: item.slot }]),
     ),
-    environment: runtime.memory.alloc_root(),
-    error: runtime.memory.alloc_root(),
+    environment: runtime.heap.handles.persistent(),
+    error: runtime.heap.handles.persistent(),
   })
   create_environment(
-    runtime.memory,
+    runtime.heap,
     module.environment,
     undefined,
     runtime.loader.scopes[scope_id].binding_flags.length,
@@ -377,21 +378,21 @@ function load_native_module(
     scope_id,
     exports: names.map((name, slot) => ({ name, slot })),
   })
-  const value = runtime.memory.alloc_root()
-  try {
-    for (let slot = 0; slot < names.length; slot++) {
-      create_function(runtime, value, NATIVE_CODE, ids.get(names[slot])!)
-      initialize_binding(runtime, module.environment, slot, value)
+  return runtime.heap.handles.scope(() => {
+    const value = runtime.heap.handles.local()
+    try {
+      for (let slot = 0; slot < names.length; slot++) {
+        create_function(runtime, value, NATIVE_CODE, ids.get(names[slot])!)
+        initialize_binding(runtime, module.environment, slot, value)
+      }
+      module.status = MODULE_STATE.EVALUATED
+      return module
+    } catch (error) {
+      module.status = MODULE_STATE.ERRORED
+      write_string(runtime.heap, module.error, error.message)
+      throw error
     }
-    module.status = MODULE_STATE.EVALUATED
-    return module
-  } catch (error) {
-    module.status = MODULE_STATE.ERRORED
-    write_string(runtime.memory, module.error, error.message)
-    throw error
-  } finally {
-    runtime.memory.free_root(value)
-  }
+  })
 }
 
 export async function load_module(
@@ -466,7 +467,7 @@ export async function load_module(
     return module
   } catch (error) {
     module.status = MODULE_STATE.ERRORED
-    write_string(runtime.memory, module.error, error.message)
+    write_string(runtime.heap, module.error, error.message)
     throw error
   }
 }
@@ -542,11 +543,11 @@ export function evaluate_realm_module(
     if (fiber.status !== FIBER_STATE.DONE)
       panic("Stdlib modules must evaluate synchronously")
     module.status = MODULE_STATE.EVALUATED
-    write_undefined(runtime.memory, module.error)
+    write_undefined(runtime.heap, module.error)
   } catch (error) {
     module.status = MODULE_STATE.ERRORED
-    if (fiber) runtime.memory.copy_value(module.error, fiber.error)
-    else write_string(runtime.memory, module.error, error.message)
+    if (fiber) runtime.heap.copy_value(module.error, fiber.error)
+    else write_string(runtime.heap, module.error, error.message)
     throw error
   } finally {
     if (fiber) dispose_fiber(runtime, fiber)
@@ -566,8 +567,9 @@ export async function evaluate_module(
 ): Promise<ModuleRecord> {
   if (!start_evaluation(module, ancestors)) return module
   const chain = new Set(ancestors).add(module.id)
-  const { memory } = runtime
-  const promise = memory.alloc_root()
+  const { heap } = runtime
+  // Not a local handle: evaluation awaits, and scopes can't span an await.
+  const promise = heap.handles.persistent()
   let fiber
   let guest_error = false
   try {
@@ -588,15 +590,15 @@ export async function evaluate_module(
     }
     module.status = MODULE_STATE.EVALUATED
     // Module evaluation fulfills with undefined; exports live in its environment.
-    write_undefined(memory, module.error)
+    write_undefined(heap, module.error)
     return module
   } catch (error) {
     module.status = MODULE_STATE.ERRORED
-    if (!guest_error) write_string(memory, module.error, error.message)
+    if (!guest_error) write_string(heap, module.error, error.message)
     throw error
   } finally {
     if (fiber) dispose_fiber(runtime, fiber)
-    memory.free_root(promise)
+    heap.handles.release(promise)
   }
 }
 
@@ -604,38 +606,33 @@ export async function evaluate_module(
 export class UncaughtException extends Error {}
 
 // The value's stack if it has one, since that already starts with its message.
-function error_report(runtime: Runtime, value: Root) {
-  const { memory } = runtime
-  if (!is_object(memory, value)) return to_string(runtime, value)
-  const key = memory.alloc_root(),
-    stack = memory.alloc_root()
-  try {
-    write_string(memory, key, "stack")
+function error_report(runtime: Runtime, value: Handle) {
+  const { heap } = runtime
+  if (!is_object(heap, value)) return to_string(runtime, value)
+  return heap.handles.scope(() => {
+    const key = heap.handles.local(),
+      stack = heap.handles.local()
+    write_string(heap, key, "stack")
     const accessor = get_property(runtime, stack, value, key)
     if (
       !accessor &&
-      tag_of(memory, stack) === TAGS.REF &&
-      kind_of(memory, stack) === KINDS.STRING
+      tag_of(heap, stack) === VALUE_TAGS.REF &&
+      heap_type_of(heap, stack) === HEAP_TYPES.STRING
     )
-      return read_string(memory, stack)
+      return read_string(heap, stack)
     return to_string(runtime, value)
-  } finally {
-    memory.free_root(key)
-    memory.free_root(stack)
-  }
+  })
 }
 
-function promise_state(runtime: Runtime, promise: Root) {
-  const state = runtime.memory.alloc_root()
-  try {
+function promise_state(runtime: Runtime, promise: Handle) {
+  return runtime.heap.handles.scope(() => {
+    const state = runtime.heap.handles.local()
     get_slot(runtime, state, promise, "[[PromiseState]]")
-    return read_string(runtime.memory, state)
-  } finally {
-    runtime.memory.free_root(state)
-  }
+    return read_string(runtime.heap, state)
+  })
 }
 
-async function run_event_loop(runtime: Runtime, promise: Root) {
+async function run_event_loop(runtime: Runtime, promise: Handle) {
   const { scheduler } = runtime
   while (true) {
     drain_completions(runtime)
@@ -658,7 +655,7 @@ export function read_export(
   runtime: Runtime,
   module: ModuleRecord,
   name: string,
-  destination: Root,
+  destination: Handle,
 ) {
   const binding = module.exports.get(name)
   if (binding === undefined) throw new SyntaxError(`Missing export: ${name}`)

@@ -1,7 +1,7 @@
-import type { Root } from "../storage/value.ts"
+import type { Handle } from "../storage/value.ts"
 import { write_undefined } from "../storage/value.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
-import { write_string } from "../records/string.ts"
+import { write_string } from "../heap_types/string.ts"
 import { invoke_sync } from "../execution/calls.ts"
 import { panic } from "../../utils.ts"
 
@@ -18,48 +18,44 @@ export function throw_error(
   name: string,
   message: string,
 ): typeof THROW {
-  const error = runtime.memory.alloc_root()
-  try {
+  return runtime.heap.handles.scope(() => {
+    const error = runtime.heap.handles.local()
     create_error(runtime, error, name, message)
     return throw_value(runtime, error)
-  } finally {
-    runtime.memory.free_root(error)
-  }
+  })
 }
 
 /** Calls the registered %name% constructor. A throwing constructor's exception is the result. */
 export function create_error(
   runtime: Runtime,
-  destination: Root,
+  destination: Handle,
   name: string,
   message: string,
 ) {
   const constructor = runtime.realm.intrinsics.get(`%${name}%`)
   // Errors can only reach guest code once the stdlib has registered them.
   if (constructor === undefined) panic(`${name}: ${message}`)
-  const text = runtime.memory.alloc_root()
-  try {
-    write_string(runtime.memory, text, message)
+  runtime.heap.handles.scope(() => {
+    const text = runtime.heap.handles.local()
+    write_string(runtime.heap, text, message)
     if (
       invoke_sync(runtime, destination, constructor, undefined, [text]) ===
       THROW
     )
       take_exception(runtime, destination)
-  } finally {
-    runtime.memory.free_root(text)
-  }
+  })
 }
 
-export function throw_value(runtime: Runtime, value: Root): typeof THROW {
-  runtime.memory.copy_value(runtime.pending_exception, value)
+export function throw_value(runtime: Runtime, value: Handle): typeof THROW {
+  runtime.heap.copy_value(runtime.pending_exception, value)
   return THROW
 }
 
-export function take_exception(runtime: Runtime, destination: Root) {
-  runtime.memory.copy_value(destination, runtime.pending_exception)
+export function take_exception(runtime: Runtime, destination: Handle) {
+  runtime.heap.copy_value(destination, runtime.pending_exception)
   clear_exception(runtime)
 }
 
 export function clear_exception(runtime: Runtime) {
-  write_undefined(runtime.memory, runtime.pending_exception)
+  write_undefined(runtime.heap, runtime.pending_exception)
 }

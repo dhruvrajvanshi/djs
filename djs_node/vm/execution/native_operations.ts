@@ -1,9 +1,9 @@
 import { panic } from "../../utils.ts"
-import type { Memory } from "../storage/memory.ts"
-import type { Root } from "../storage/value.ts"
+import type { Heap } from "../storage/heap.ts"
+import type { Handle } from "../storage/value.ts"
 import {
-  TAGS,
-  kind_of,
+  VALUE_TAGS,
+  heap_type_of,
   read_number,
   set_ref,
   tag_of,
@@ -12,7 +12,7 @@ import {
   write_number,
   write_undefined,
 } from "../storage/value.ts"
-import { KINDS } from "../storage/layout.ts"
+import { HEAP_TYPES } from "../storage/layout.ts"
 import { INSTRUCTION_BYTES, NATIVE_MARKERS } from "../../compiler/bytecode.ts"
 import type { CompiledModule } from "../../compiler/compile.ts"
 import type { Frame } from "./fiber.ts"
@@ -33,22 +33,25 @@ import {
   string_code_unit_at,
   string_length,
   write_string,
-} from "../records/string.ts"
-import { create_symbol, load_symbol_description } from "../records/symbol.ts"
-import { byte_buffer_view, create_byte_buffer } from "../records/byte_buffer.ts"
+} from "../heap_types/string.ts"
+import { create_symbol, load_symbol_description } from "../heap_types/symbol.ts"
+import {
+  byte_buffer_view,
+  create_byte_buffer,
+} from "../heap_types/byte_buffer.ts"
 import {
   has_property_list,
   is_object,
   object_prototype_reference,
   set_prototype,
   try_set_prototype,
-} from "../records/object.ts"
+} from "../heap_types/object.ts"
 import {
   BUILTIN_CONSTRUCTOR,
   function_code_id,
   function_flags,
   set_builtin_steps,
-} from "../records/function.ts"
+} from "../heap_types/function.ts"
 import {
   create_array,
   create_function,
@@ -65,7 +68,12 @@ import {
   has_property,
   ordinary_own_property_keys,
 } from "../semantics/properties.ts"
-import { has_slot, get_slot, set_slot, init_slot } from "../semantics/slots.ts"
+import {
+  has_slot,
+  get_slot,
+  set_slot,
+  init_slot,
+} from "../semantics/internal_slots.ts"
 import {
   OK,
   THROW,
@@ -82,20 +90,20 @@ export const RESUME_CODE = 0xfffffffe
 // Returns -1 after raising, since valid arguments are never negative.
 function integer(
   runtime: Runtime,
-  value: Root,
+  value: Handle,
   name: string,
   maximum: number = Number.MAX_SAFE_INTEGER,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   if (value === undefined) {
     throw_error(runtime, "TypeError", `${name} is required`)
     return -1
   }
-  if (tag_of(memory, value) !== TAGS.NUMBER) {
+  if (tag_of(heap, value) !== VALUE_TAGS.NUMBER) {
     throw_error(runtime, "TypeError", "Expected a numeric value")
     return -1
   }
-  const number = read_number(memory, value)
+  const number = read_number(heap, value)
   if (!Number.isSafeInteger(number) || number < 0 || number > maximum) {
     throw_error(runtime, "RangeError", `Invalid ${name}`)
     return -1
@@ -104,24 +112,27 @@ function integer(
 }
 
 // Returns undefined after raising.
-function string(runtime: Runtime, value: Root, name: string) {
-  if (value === undefined || kind_of(runtime.memory, value) !== KINDS.STRING) {
+function string(runtime: Runtime, value: Handle, name: string) {
+  if (
+    value === undefined ||
+    heap_type_of(runtime.heap, value) !== HEAP_TYPES.STRING
+  ) {
     throw_error(runtime, "TypeError", `${name} must be a string`)
     return undefined
   }
-  return read_string(runtime.memory, value)
+  return read_string(runtime.heap, value)
 }
 
-function is_string(memory: Memory, value: Root) {
-  return value !== undefined && kind_of(memory, value) === KINDS.STRING
+function is_string(heap: Heap, value: Handle) {
+  return value !== undefined && heap_type_of(heap, value) === HEAP_TYPES.STRING
 }
 
 /** Runs synchronously when both callbacks are omitted, otherwise settles them later. */
 function host_operation(
   runtime: Runtime,
-  destination: Root,
-  resolve: Root,
-  reject: Root,
+  destination: Handle,
+  resolve: Handle,
+  reject: Handle,
   run_sync: () => unknown,
   run_async: () => Promise<unknown>,
   options: OperationOptions,
@@ -145,26 +156,26 @@ function host_operation(
   }
   if (check_callbacks(runtime, resolve, reject) === THROW) return THROW
   start_operation(runtime, resolve, reject, run_async, options)
-  write_undefined(runtime.memory, destination)
+  write_undefined(runtime.heap, destination)
   return OK
 }
 
 // An omitted prototype argument selects the default.
-function is_prototype(memory: Memory, value: Root | undefined) {
+function is_prototype(heap: Heap, value: Handle | undefined) {
   return (
     value === undefined ||
-    tag_of(memory, value) === TAGS.NULL ||
-    has_property_list(memory, value)
+    tag_of(heap, value) === VALUE_TAGS.NULL ||
+    has_property_list(heap, value)
   )
 }
 
-function check_callbacks(runtime: Runtime, resolve: Root, reject: Root) {
-  const { memory } = runtime
+function check_callbacks(runtime: Runtime, resolve: Handle, reject: Handle) {
+  const { heap } = runtime
   if (
     resolve === undefined ||
     reject === undefined ||
-    kind_of(memory, resolve) !== KINDS.FUNCTION ||
-    kind_of(memory, reject) !== KINDS.FUNCTION
+    heap_type_of(heap, resolve) !== HEAP_TYPES.FUNCTION ||
+    heap_type_of(heap, reject) !== HEAP_TYPES.FUNCTION
   )
     return throw_error(
       runtime,
@@ -180,8 +191,8 @@ function check_callbacks(runtime: Runtime, resolve: Root, reject: Root) {
  */
 type NativeOperation = (
   runtime: Runtime,
-  destination: Root,
-  arguments_: Root[],
+  destination: Handle,
+  arguments_: Handle[],
 ) => Status
 
 /** Keyed by exported name. A name's position here is its operation ID. */
@@ -194,7 +205,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
   ordinary_define_own_property(runtime, destination, [o, key, desc]) {
     const status = define_own_property(runtime, o, key, desc, true)
     if (status === THROW) clear_exception(runtime)
-    write_boolean(runtime.memory, destination, status === OK)
+    write_boolean(runtime.heap, destination, status === OK)
     return OK
   },
   /**
@@ -204,7 +215,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    */
   ordinary_delete(runtime, destination, [o, key]) {
     write_boolean(
-      runtime.memory,
+      runtime.heap,
       destination,
       has_properties(runtime, o) && delete_property(runtime, o, key),
     )
@@ -216,7 +227,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-ordinaryownpropertykeys
    */
   ordinary_own_property_keys(runtime, destination, [o]) {
-    if (!has_property_list(runtime.memory, o))
+    if (!has_property_list(runtime.heap, o))
       return throw_error(runtime, "TypeError", "Expected an object")
     ordinary_own_property_keys(runtime, destination, o)
     return OK
@@ -226,25 +237,28 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * `undefined`.
    */
   symbol_create(runtime, destination, [description]) {
-    const { memory } = runtime
+    const { heap } = runtime
     if (
       description !== undefined &&
-      tag_of(memory, description) !== TAGS.UNDEFINED &&
-      kind_of(memory, description) !== KINDS.STRING
+      tag_of(heap, description) !== VALUE_TAGS.UNDEFINED &&
+      heap_type_of(heap, description) !== HEAP_TYPES.STRING
     )
       return throw_error(
         runtime,
         "TypeError",
         "Symbol description must be a string or undefined",
       )
-    create_symbol(memory, destination, description)
+    create_symbol(heap, destination, description)
     return OK
   },
   symbol_description(runtime, destination, [symbol]) {
-    const { memory } = runtime
-    if (symbol === undefined || kind_of(memory, symbol) !== KINDS.SYMBOL)
+    const { heap } = runtime
+    if (
+      symbol === undefined ||
+      heap_type_of(heap, symbol) !== HEAP_TYPES.SYMBOL
+    )
       return throw_error(runtime, "TypeError", "Expected a symbol")
-    load_symbol_description(memory, destination, symbol)
+    load_symbol_description(heap, destination, symbol)
     return OK
   },
   /**
@@ -258,35 +272,31 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     const symbol = runtime.realm.well_known_symbols.get(symbol_name)
     if (symbol === undefined)
       return throw_error(runtime, "TypeError", "Unknown well-known symbol")
-    runtime.memory.copy_value(destination, symbol)
+    runtime.heap.copy_value(destination, symbol)
     return OK
   },
   string_code_unit_at(runtime, destination, [s, index]) {
-    const { memory } = runtime
-    if (!is_string(memory, s))
+    const { heap } = runtime
+    if (!is_string(heap, s))
       return throw_error(runtime, "TypeError", "Expected a string")
     const string_index = integer(runtime, index, "string index")
     if (string_index < 0) return THROW
-    if (string_index >= string_length(memory, s))
+    if (string_index >= string_length(heap, s))
       return throw_error(runtime, "RangeError", "Invalid string index")
-    write_number(
-      memory,
-      destination,
-      string_code_unit_at(memory, s, string_index),
-    )
+    write_number(heap, destination, string_code_unit_at(heap, s, string_index))
     return OK
   },
   string_slice(runtime, destination, [s, start, end]) {
-    const { memory } = runtime
-    if (!is_string(memory, s))
+    const { heap } = runtime
+    if (!is_string(heap, s))
       return throw_error(runtime, "TypeError", "Expected a string")
     const start_index = integer(runtime, start, "start")
     if (start_index < 0) return THROW
     const end_index = integer(runtime, end, "end")
     if (end_index < 0) return THROW
-    if (end_index < start_index || end_index > string_length(memory, s))
+    if (end_index < start_index || end_index > string_length(heap, s))
       return throw_error(runtime, "RangeError", "Invalid string range")
-    slice_string(memory, destination, s, start_index, end_index)
+    slice_string(heap, destination, s, start_index, end_index)
     return OK
   },
   /**
@@ -295,8 +305,11 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * instead of appending character by character.
    */
   string_from_utf16(runtime, destination, [buffer, start, end]) {
-    const { memory } = runtime
-    if (buffer === undefined || kind_of(memory, buffer) !== KINDS.BYTE_BUFFER)
+    const { heap } = runtime
+    if (
+      buffer === undefined ||
+      heap_type_of(heap, buffer) !== HEAP_TYPES.BYTE_BUFFER
+    )
       return throw_error(runtime, "TypeError", "Expected a byte buffer")
     const start_index = integer(runtime, start, "start")
     if (start_index < 0) return THROW
@@ -304,10 +317,10 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     if (end_index < 0) return THROW
     if (
       end_index < start_index ||
-      end_index * 2 > byte_buffer_view(memory, buffer).length
+      end_index * 2 > byte_buffer_view(heap, buffer).length
     )
       return throw_error(runtime, "RangeError", "Invalid code unit range")
-    string_from_utf16(memory, destination, buffer, start_index, end_index)
+    string_from_utf16(heap, destination, buffer, start_index, end_index)
     return OK
   },
   /**
@@ -316,10 +329,10 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-stringcreate
    */
   string_create(runtime, destination, [value, proto]) {
-    const { memory } = runtime
-    if (!is_string(memory, value))
+    const { heap } = runtime
+    if (!is_string(heap, value))
       return throw_error(runtime, "TypeError", "Expected a string")
-    if (!is_prototype(memory, proto))
+    if (!is_prototype(heap, proto))
       return throw_error(runtime, "TypeError", "Expected an object")
     create_string_object(runtime, destination, value, proto)
     return OK
@@ -332,42 +345,42 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
   array_create(runtime, destination, [length, proto]) {
     const array_length = integer(runtime, length, "array length", 0xffffffff)
     if (array_length < 0) return THROW
-    if (!is_prototype(runtime.memory, proto))
+    if (!is_prototype(runtime.heap, proto))
       return throw_error(runtime, "TypeError", "Expected an object")
     create_array(runtime, destination, array_length, proto)
     return OK
   },
-  is_constructor({ memory }, destination, [f]) {
+  is_constructor({ heap }, destination, [f]) {
     let result = false
-    if (f !== undefined && kind_of(memory, f) === KINDS.FUNCTION) {
-      const code = function_code_id(memory, f)
-      const flags = function_flags(memory, f)
+    if (f !== undefined && heap_type_of(heap, f) === HEAP_TYPES.FUNCTION) {
+      const code = function_code_id(heap, f)
+      const flags = function_flags(heap, f)
       result =
         code === BUILTIN_CODE
           ? Boolean(flags & BUILTIN_CONSTRUCTOR)
           : code !== NATIVE_CODE && code !== RESUME_CODE && !(flags & 14)
     }
-    write_boolean(memory, destination, result)
+    write_boolean(heap, destination, result)
     return OK
   },
-  is_array({ memory }, destination, [o]) {
+  is_array({ heap }, destination, [o]) {
     write_boolean(
-      memory,
+      heap,
       destination,
-      o !== undefined && kind_of(memory, o) === KINDS.ARRAY,
+      o !== undefined && heap_type_of(heap, o) === HEAP_TYPES.ARRAY,
     )
     return OK
   },
   has_property(runtime, destination, [o, key]) {
-    const { memory } = runtime
-    if (!is_object(memory, o))
+    const { heap } = runtime
+    if (!is_object(heap, o))
       return throw_error(runtime, "TypeError", "Expected an object")
-    write_boolean(memory, destination, has_property(runtime, o, key))
+    write_boolean(heap, destination, has_property(runtime, o, key))
     return OK
   },
   delete_property_or_throw(runtime, destination, [o, key]) {
-    const { memory } = runtime
-    if (!is_object(memory, o))
+    const { heap } = runtime
+    if (!is_object(heap, o))
       return throw_error(runtime, "TypeError", "Expected an object")
     if (!delete_property(runtime, o, key))
       return throw_error(
@@ -375,7 +388,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
         "TypeError",
         "Cannot delete non-configurable property",
       )
-    write_boolean(memory, destination, true)
+    write_boolean(heap, destination, true)
     return OK
   },
   /**
@@ -384,8 +397,8 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p
    */
   get_own_property(runtime, destination, [o, key]) {
-    const { memory } = runtime
-    if (!is_object(memory, o))
+    const { heap } = runtime
+    if (!is_object(heap, o))
       return throw_error(runtime, "TypeError", "Expected an object")
     get_own_property_descriptor(runtime, destination, o, key)
     return OK
@@ -399,7 +412,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    */
   define_property_or_throw(runtime, destination, [o, key, desc]) {
     if (define_own_property(runtime, o, key, desc) === THROW) return THROW
-    write_undefined(runtime.memory, destination)
+    write_undefined(runtime.heap, destination)
     return OK
   },
   /**
@@ -408,12 +421,12 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-createbuiltinfunction
    */
   create_builtin_function(runtime, destination, [behaviour, length, name]) {
-    const { memory } = runtime
+    const { heap } = runtime
     if (
       behaviour === undefined ||
-      kind_of(memory, behaviour) !== KINDS.FUNCTION ||
+      heap_type_of(heap, behaviour) !== HEAP_TYPES.FUNCTION ||
       [NATIVE_CODE, RESUME_CODE, BUILTIN_CODE].includes(
-        function_code_id(memory, behaviour),
+        function_code_id(heap, behaviour),
       )
     )
       return throw_error(runtime, "TypeError", "Expected a JavaScript function")
@@ -421,23 +434,21 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     if (function_length < 0) return THROW
     const function_name = string(runtime, name, "name")
     if (function_name === undefined) return THROW
-    const result = memory.alloc_root(),
-      key = memory.alloc_root(),
-      value = memory.alloc_root()
-    try {
+    return heap.handles.scope(() => {
+      const result = heap.handles.local(),
+        key = heap.handles.local(),
+        value = heap.handles.local()
       create_function(runtime, result, BUILTIN_CODE, 0)
-      set_builtin_steps(memory, result, behaviour, false)
-      write_string(memory, key, "length")
-      write_number(memory, value, function_length)
+      set_builtin_steps(heap, result, behaviour, false)
+      write_string(heap, key, "length")
+      write_number(heap, value, function_length)
       define_property(runtime, result, key, value, 4)
-      write_string(memory, key, "name")
-      write_string(memory, value, function_name)
+      write_string(heap, key, "name")
+      write_string(heap, value, function_name)
       define_property(runtime, result, key, value, 4)
-      memory.copy_value(destination, result)
+      heap.copy_value(destination, result)
       return OK
-    } finally {
-      for (const root of [result, key, value]) memory.free_root(root)
-    }
+    })
   },
   /**
    * Creates an ordinary object whose prototype is `proto` (an object or
@@ -446,39 +457,36 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-ordinaryobjectcreate
    */
   ordinary_object_create(runtime, destination, [proto, slots]) {
-    const { memory } = runtime
-    if (proto === undefined || !is_prototype(memory, proto))
+    const { heap } = runtime
+    if (proto === undefined || !is_prototype(heap, proto))
       return throw_error(runtime, "TypeError", "Expected an object")
-    const object = memory.alloc_root(),
-      key = memory.alloc_root(),
-      name = memory.alloc_root(),
-      empty = memory.alloc_root()
-    try {
+    return heap.handles.scope(() => {
+      const object = heap.handles.local(),
+        key = heap.handles.local(),
+        name = heap.handles.local(),
+        empty = heap.handles.local()
       create_object(runtime, object)
-      set_prototype(memory, object, proto)
-      if (slots !== undefined && tag_of(memory, slots) !== TAGS.UNDEFINED) {
-        if (kind_of(memory, slots) !== KINDS.ARRAY)
+      set_prototype(heap, object, proto)
+      if (slots !== undefined && tag_of(heap, slots) !== VALUE_TAGS.UNDEFINED) {
+        if (heap_type_of(heap, slots) !== HEAP_TYPES.ARRAY)
           return throw_error(runtime, "TypeError", "Expected slot names")
-        write_string(memory, key, "length")
+        write_string(heap, key, "length")
         get_property(runtime, name, slots, key)
-        const count = read_number(memory, name)
+        const count = read_number(heap, name)
         for (let index = 0; index < count; index++) {
-          write_string(memory, key, String(index))
+          write_string(heap, key, String(index))
           get_property(runtime, name, slots, key)
-          if (!is_string(memory, name))
+          if (!is_string(heap, name))
             return throw_error(runtime, "TypeError", "Expected a slot name")
           if (
-            init_slot(runtime, object, read_string(memory, name), empty) ===
-            THROW
+            init_slot(runtime, object, read_string(heap, name), empty) === THROW
           )
             return THROW
         }
       }
-      memory.copy_value(destination, object)
+      heap.copy_value(destination, object)
       return OK
-    } finally {
-      for (const root of [object, key, name, empty]) memory.free_root(root)
-    }
+    })
   },
   /**
    * Sets `o`'s prototype to `proto`. Returns `false` if that would create a
@@ -486,21 +494,21 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-ordinarysetprototypeof
    */
   ordinary_set_prototype_of(runtime, destination, [o, proto]) {
-    const { memory } = runtime
+    const { heap } = runtime
     if (
-      !has_property_list(memory, o) ||
+      !has_property_list(heap, o) ||
       proto === undefined ||
-      !is_prototype(memory, proto)
+      !is_prototype(heap, proto)
     )
       return throw_error(runtime, "TypeError", "Expected an object")
-    write_boolean(memory, destination, try_set_prototype(memory, o, proto))
+    write_boolean(heap, destination, try_set_prototype(heap, o, proto))
     return OK
   },
   has_slot(runtime, destination, [o, name]) {
     const slot_name = string(runtime, name, "Slot name")
     if (slot_name === undefined) return THROW
     write_boolean(
-      runtime.memory,
+      runtime.heap,
       destination,
       o !== undefined && has_slot(runtime, o, slot_name),
     )
@@ -525,16 +533,16 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     if (o === undefined || value === undefined)
       return throw_error(runtime, "TypeError", "Expected an object and value")
     if (set_slot(runtime, o, slot_name, value) === THROW) return THROW
-    write_undefined(runtime.memory, destination)
+    write_undefined(runtime.heap, destination)
     return OK
   },
   ordinary_get_prototype_of(runtime, destination, [o]) {
-    const { memory } = runtime
-    if (!has_property_list(memory, o))
+    const { heap } = runtime
+    if (!has_property_list(heap, o))
       return throw_error(runtime, "TypeError", "Expected an ordinary object")
-    const prototype = object_prototype_reference(memory, o)
-    if (prototype) set_ref(memory, destination, prototype)
-    else write_null(memory, destination)
+    const prototype = object_prototype_reference(heap, o)
+    if (prototype) set_ref(heap, destination, prototype)
+    else write_null(heap, destination)
     return OK
   },
   /**
@@ -551,26 +559,29 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
         lines.push(`\n    at ${frame_location(unit, frame)}`)
       }
     }
-    write_string(runtime.memory, destination, lines.join(""))
+    write_string(runtime.heap, destination, lines.join(""))
     return OK
   },
   write_stdout(runtime, destination, [text]) {
-    const { memory } = runtime
-    if (!is_string(memory, text))
+    const { heap } = runtime
+    if (!is_string(heap, text))
       return throw_error(runtime, "TypeError", "write_stdout requires a string")
-    runtime.host.write_stdout(read_string(memory, text))
-    write_undefined(memory, destination)
+    runtime.host.write_stdout(read_string(heap, text))
+    write_undefined(heap, destination)
     return OK
   },
   process_cwd(runtime, destination) {
-    write_string(runtime.memory, destination, runtime.host.cwd())
+    write_string(runtime.heap, destination, runtime.host.cwd())
     return OK
   },
   host_enqueue_promise_job(runtime, destination, [job]) {
-    if (job === undefined || kind_of(runtime.memory, job) !== KINDS.FUNCTION)
+    if (
+      job === undefined ||
+      heap_type_of(runtime.heap, job) !== HEAP_TYPES.FUNCTION
+    )
       return throw_error(runtime, "TypeError", "Job is not callable")
     enqueue_job(runtime, job)
-    write_undefined(runtime.memory, destination)
+    write_undefined(runtime.heap, destination)
     return OK
   },
   byte_buffer(runtime, destination, [length]) {
@@ -578,13 +589,13 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     if (byte_length < 0) return THROW
     if (byte_length > 0x7ffffff0)
       return throw_error(runtime, "RangeError", "Invalid byte buffer length")
-    create_byte_buffer(runtime.memory, destination, byte_length)
+    create_byte_buffer(runtime.heap, destination, byte_length)
     return OK
   },
   string_from_code_unit(runtime, destination, [unit]) {
     const code_unit = integer(runtime, unit, "code unit", 0xffff)
     if (code_unit < 0) return THROW
-    write_string(runtime.memory, destination, String.fromCharCode(code_unit))
+    write_string(runtime.heap, destination, String.fromCharCode(code_unit))
     return OK
   },
   /**
@@ -607,7 +618,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
       () => runtime.host.open(file_path, open_flags, file_mode),
       { syscall: "open", path: file_path },
     )
-    write_undefined(runtime.memory, destination)
+    write_undefined(runtime.heap, destination)
     return OK
   },
   /**
@@ -621,16 +632,19 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     destination,
     [handle, buffer, offset, length, resolve, reject],
   ) {
-    const { memory } = runtime
+    const { heap } = runtime
     const file_handle = integer(runtime, handle, "file handle")
     if (file_handle < 0) return THROW
     const buffer_offset = integer(runtime, offset, "buffer offset", 0xffffffff)
     if (buffer_offset < 0) return THROW
     const read_length = integer(runtime, length, "read length", 0xffffffff)
     if (read_length < 0) return THROW
-    if (buffer === undefined || kind_of(memory, buffer) !== KINDS.BYTE_BUFFER)
+    if (
+      buffer === undefined ||
+      heap_type_of(heap, buffer) !== HEAP_TYPES.BYTE_BUFFER
+    )
       return throw_error(runtime, "TypeError", "Expected a byte buffer")
-    const capacity = byte_buffer_view(memory, buffer).length
+    const capacity = byte_buffer_view(heap, buffer).length
     if (buffer_offset > capacity || read_length > capacity - buffer_offset)
       return throw_error(
         runtime,
@@ -650,7 +664,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
         syscall: "read",
       },
     )
-    write_undefined(memory, destination)
+    write_undefined(heap, destination)
     return OK
   },
   io_close(runtime, destination, [handle, resolve, reject]) {
@@ -664,7 +678,7 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
       () => runtime.host.close(file_handle),
       { syscall: "close" },
     )
-    write_undefined(runtime.memory, destination)
+    write_undefined(runtime.heap, destination)
     return OK
   },
   /**
@@ -789,8 +803,8 @@ export const CALL_ID = native_operation_id("call")
 export function call_native_operation(
   runtime: Runtime,
   id: number,
-  destination: Root,
-  arguments_: Root[],
+  destination: Handle,
+  arguments_: Handle[],
 ): Status {
   const operation = NATIVE_OPERATION_HANDLERS[id]
   if (operation === undefined) panic(`Invalid native operation ID: ${id}`)

@@ -1,10 +1,10 @@
-import type { Root } from "../vm/storage/value.ts"
-import { kind_of, write_number } from "../vm/storage/value.ts"
-import { KINDS } from "../vm/storage/layout.ts"
+import type { Handle, Persistent } from "../vm/storage/value.ts"
+import { heap_type_of, write_number } from "../vm/storage/value.ts"
+import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import type { Runtime } from "./runtime.ts"
 import type { HostError } from "../host/node.ts"
-import { write_string } from "../vm/records/string.ts"
-import { byte_buffer_view } from "../vm/records/byte_buffer.ts"
+import { write_string } from "../vm/heap_types/string.ts"
+import { byte_buffer_view } from "../vm/heap_types/byte_buffer.ts"
 import { create_error } from "../vm/semantics/errors.ts"
 import { define_property } from "../vm/semantics/properties.ts"
 import { create_object } from "../vm/semantics/objects.ts"
@@ -23,17 +23,17 @@ export interface Completion {
   path?: string
 }
 
-/** Callers own allocation and disposal of every stored root. */
+/** Whoever takes a job or completes an operation releases its handles. */
 export interface Job {
-  callee: Root
-  value: Root
+  callee: Persistent
+  value: Persistent
   has_argument: boolean
 }
 
 export interface Operation {
-  resolve: Root
-  reject: Root
-  buffer: Root | null
+  resolve: Persistent
+  reject: Persistent
+  buffer: Persistent | null
   offset: number
   length: number
 }
@@ -82,7 +82,7 @@ export class Scheduler {
     return operation
   }
 
-  /** Caller must release the operation's roots first. */
+  /** Caller must release the operation's handles first. */
   release_operation(id: number) {
     this.operation(id)
     this.operations[id] = null
@@ -97,14 +97,21 @@ function notify(runtime: Runtime) {
   if (wake) wake()
 }
 
-export function enqueue_job(runtime: Runtime, callee: Root, argument?: Root) {
-  const { memory, scheduler } = runtime
-  if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
+export function enqueue_job(
+  runtime: Runtime,
+  callee: Handle,
+  argument?: Handle,
+) {
+  const { heap, scheduler } = runtime
+  if (
+    callee === undefined ||
+    heap_type_of(heap, callee) !== HEAP_TYPES.FUNCTION
+  )
     panic("Job is not callable")
-  const fn = memory.alloc_root(),
-    value = memory.alloc_root()
-  memory.copy_value(fn, callee)
-  if (argument !== undefined) memory.copy_value(value, argument)
+  const fn = heap.handles.persistent(),
+    value = heap.handles.persistent()
+  heap.copy_value(fn, callee)
+  if (argument !== undefined) heap.copy_value(value, argument)
   scheduler.enqueue_job({
     callee: fn,
     value,
@@ -114,7 +121,7 @@ export function enqueue_job(runtime: Runtime, callee: Root, argument?: Root) {
 }
 
 export interface OperationOptions {
-  buffer?: Root
+  buffer?: Handle
   offset?: number
   length?: number
   syscall?: string
@@ -123,33 +130,31 @@ export interface OperationOptions {
 
 export function start_operation(
   runtime: Runtime,
-  resolve: Root,
-  reject: Root,
+  resolve: Handle,
+  reject: Handle,
   begin: () => unknown | PromiseLike<unknown>,
   { buffer, offset = 0, length = 0, syscall, path }: OperationOptions = {},
 ) {
-  const { memory, scheduler } = runtime
+  const { heap, scheduler } = runtime
   if (
     resolve === undefined ||
     reject === undefined ||
-    kind_of(memory, resolve) !== KINDS.FUNCTION ||
-    kind_of(memory, reject) !== KINDS.FUNCTION
+    heap_type_of(heap, resolve) !== HEAP_TYPES.FUNCTION ||
+    heap_type_of(heap, reject) !== HEAP_TYPES.FUNCTION
   )
     panic("I/O operation requires resolve and reject callbacks")
-  const resolve_root = memory.alloc_root(),
-    reject_root = memory.alloc_root(),
-    buffer_root = buffer === undefined ? null : memory.alloc_root()
-  memory.copy_value(resolve_root, resolve)
-  memory.copy_value(reject_root, reject)
-  if (buffer !== undefined && buffer_root !== null)
-    memory.copy_value(buffer_root, buffer)
-  const id = scheduler.allocate_operation({
-    resolve: resolve_root,
-    reject: reject_root,
-    buffer: buffer_root,
+  const operation = {
+    resolve: heap.handles.persistent(),
+    reject: heap.handles.persistent(),
+    buffer: buffer === undefined ? null : heap.handles.persistent(),
     offset,
     length,
-  })
+  }
+  heap.copy_value(operation.resolve, resolve)
+  heap.copy_value(operation.reject, reject)
+  if (buffer !== undefined && operation.buffer !== null)
+    heap.copy_value(operation.buffer, buffer)
+  const id = scheduler.allocate_operation(operation)
   Promise.resolve()
     .then(begin)
     .then(
@@ -166,65 +171,59 @@ export function start_operation(
 
 export function operation_error(
   runtime: Runtime,
-  destination: Root,
+  destination: Handle,
   error: HostError,
   syscall?: string,
   path?: string,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   create_error(runtime, destination, "Error", String(error?.message ?? error))
-  const key = memory.alloc_root(),
-    value = memory.alloc_root()
-  try {
+  heap.handles.scope(() => {
+    const key = heap.handles.local(),
+      value = heap.handles.local()
     for (const [name, item] of Object.entries({
       code: error?.code,
       syscall,
       path,
     })) {
       if (item === undefined) continue
-      write_string(memory, key, name)
+      write_string(heap, key, name)
       write_primitive(runtime, value, item)
       define_property(runtime, destination, key, value)
     }
-  } finally {
-    memory.free_root(key)
-    memory.free_root(value)
-  }
+  })
 }
 
 /** Host results are primitives or flat records of primitives, such as lstat's. */
 export function write_host_value(
   runtime: Runtime,
-  destination: Root,
+  destination: Handle,
   value: unknown,
 ) {
   if (value === null || typeof value !== "object")
     return write_primitive(runtime, destination, value)
-  const { memory } = runtime
+  const { heap } = runtime
   create_object(runtime, destination)
-  const key = memory.alloc_root(),
-    item = memory.alloc_root()
-  try {
+  heap.handles.scope(() => {
+    const key = heap.handles.local(),
+      item = heap.handles.local()
     for (const [name, field] of Object.entries(value)) {
-      write_string(memory, key, name)
+      write_string(heap, key, name)
       write_primitive(runtime, item, field)
       define_property(runtime, destination, key, item)
     }
-  } finally {
-    memory.free_root(key)
-    memory.free_root(item)
-  }
+  })
 }
 
 export function drain_completions(runtime: Runtime) {
-  const { memory, scheduler } = runtime
+  const { heap, scheduler } = runtime
   while (scheduler.completions.length) {
     const completion = scheduler.completions.shift()!
     const { resolve, reject, buffer, offset, length } = scheduler.operation(
       completion.id,
     )
-    const value = memory.alloc_root()
-    try {
+    heap.handles.scope(() => {
+      const value = heap.handles.local()
       let rejected = completion.rejected
       try {
         if (rejected) throw completion.error
@@ -232,9 +231,9 @@ export function drain_completions(runtime: Runtime) {
           const bytes = completion.result
           if (!(bytes instanceof Uint8Array) || bytes.length > length)
             throw new TypeError("Host read returned invalid bytes")
-          // Resolve the rooted buffer again here; it may have moved while waiting.
-          byte_buffer_view(memory, buffer).set(bytes, offset)
-          write_number(memory, value, bytes.length)
+          // Resolve the buffer's address again here; it may have moved while waiting.
+          byte_buffer_view(heap, buffer).set(bytes, offset)
+          write_number(heap, value, bytes.length)
         } else write_host_value(runtime, value, completion.result)
       } catch (error) {
         rejected = true
@@ -246,19 +245,20 @@ export function drain_completions(runtime: Runtime) {
           completion.path,
         )
       }
-      enqueue_job(runtime, rejected ? reject : resolve, value)
-    } finally {
-      memory.free_root(value)
-      memory.free_root(resolve)
-      memory.free_root(reject)
-      if (buffer !== null) memory.free_root(buffer)
-      scheduler.release_operation(completion.id)
-    }
+      try {
+        enqueue_job(runtime, rejected ? reject : resolve, value)
+      } finally {
+        heap.handles.release(resolve)
+        heap.handles.release(reject)
+        if (buffer !== null) heap.handles.release(buffer)
+        scheduler.release_operation(completion.id)
+      }
+    })
   }
 }
 
 export function drain_jobs(runtime: Runtime) {
-  const { memory, scheduler } = runtime
+  const { heap, scheduler } = runtime
   while (scheduler.has_jobs()) {
     const { callee, value, has_argument } = scheduler.take_job()!
     let job
@@ -277,8 +277,8 @@ export function drain_jobs(runtime: Runtime) {
         if (active.status === FIBER_STATE.READY) run_task(runtime, active)
     } finally {
       if (job) dispose_fiber(runtime, job)
-      memory.free_root(callee)
-      memory.free_root(value)
+      heap.handles.release(callee)
+      heap.handles.release(value)
     }
   }
 }

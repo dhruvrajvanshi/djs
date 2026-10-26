@@ -1,7 +1,7 @@
 import { panic } from "../../utils.ts"
-import type { Root } from "../storage/value.ts"
+import type { Handle, Persistent } from "../storage/value.ts"
 import {
-  kind_of,
+  heap_type_of,
   read_boolean,
   read_number,
   write_boolean,
@@ -9,13 +9,13 @@ import {
   write_undefined,
   write_uninitialized,
 } from "../storage/value.ts"
-import { KINDS } from "../storage/layout.ts"
+import { HEAP_TYPES } from "../storage/layout.ts"
 import { FUNCTION_DERIVED } from "../../compiler/bytecode.ts"
 import type { BindingLocation, FunctionId } from "../../compiler/compile.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import type { CodeId } from "../../runtime/modules.ts"
-import { write_string } from "../records/string.ts"
-import { has_property_list, set_prototype } from "../records/object.ts"
+import { write_string } from "../heap_types/string.ts"
+import { has_property_list, set_prototype } from "../heap_types/object.ts"
 import {
   BUILTIN_CONSTRUCTOR,
   function_code_id,
@@ -25,12 +25,12 @@ import {
   load_function_environment,
   load_function_new_target,
   load_function_receiver,
-} from "../records/function.ts"
-import { create_environment } from "../records/environment.ts"
+} from "../heap_types/function.ts"
+import { create_environment } from "../heap_types/environment.ts"
 import {
   create_value_array,
   load_value_array_element,
-} from "../records/value_array.ts"
+} from "../heap_types/value_array.ts"
 import {
   create_arguments_object,
   create_array,
@@ -60,12 +60,12 @@ import { run_task } from "./interpreter.ts"
 export function create_fiber(
   runtime: Runtime,
   code_id: CodeId,
-  environment: Root,
+  environment: Handle,
 ): Fiber {
   const fiber = new Fiber(
     runtime.fibers.length,
-    runtime.memory.alloc_root(),
-    runtime.memory.alloc_root(),
+    runtime.heap.handles.persistent(),
+    runtime.heap.handles.persistent(),
   )
   push_frame(
     runtime,
@@ -86,96 +86,85 @@ function push_frame(
   fiber: Fiber,
   code_id: CodeId,
   function_id: FunctionId,
-  environment: Root,
-  receiver: Root | undefined,
-  arguments_: Root[],
-  destination: Root | null,
-  new_target?: Root,
+  environment: Handle,
+  receiver: Handle | undefined,
+  arguments_: Handle[],
+  destination: Handle | null,
+  new_target?: Handle,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   const fn = runtime.loader.code[code_id].unit.functions[function_id]
   if (!fn) panic("Invalid function descriptor")
-  const env = memory.alloc_root()
-  const this_value = memory.alloc_root()
-  memory.copy_value(env, environment)
-  if (receiver !== undefined) memory.copy_value(this_value, receiver)
-  const target = memory.alloc_root()
-  if (new_target !== undefined) memory.copy_value(target, new_target)
-  const registers: Root[] = []
+  // The frame owns these handles; pop_frame releases them.
+  const env = heap.handles.persistent()
+  const this_value = heap.handles.persistent()
+  heap.copy_value(env, environment)
+  if (receiver !== undefined) heap.copy_value(this_value, receiver)
+  const target = heap.handles.persistent()
+  if (new_target !== undefined) heap.copy_value(target, new_target)
+  const registers: Persistent[] = []
   for (let index = 0; index < fn.slot_count; index++)
-    registers.push(memory.alloc_root())
+    registers.push(heap.handles.persistent())
   const frame = new Frame({
     caller: fiber.frame,
     code_id,
     function_id,
-    return_root: destination,
-    environment_root: env,
-    this_root: this_value,
-    new_target_root: target,
+    destination: destination,
+    environment: env,
+    this_value: this_value,
+    new_target: target,
     registers,
   })
-  const bind = (location: BindingLocation, value: Root) => {
+  const bind = (location: BindingLocation, value: Handle) => {
     if ("register" in location)
-      memory.copy_value(registers[location.register], value)
+      heap.copy_value(registers[location.register], value)
     else initialize_binding(runtime, env, location.slot, value)
   }
-  if (fn.arguments_slot !== null) {
-    const args = memory.alloc_root()
-    try {
+  const { arguments_slot, parameters, rest } = fn
+  heap.handles.scope(() => {
+    if (arguments_slot !== null) {
+      const args = heap.handles.local()
       create_arguments_object(runtime, args, arguments_)
-      initialize_binding(runtime, env, fn.arguments_slot, args)
-    } finally {
-      memory.free_root(args)
+      initialize_binding(runtime, env, arguments_slot, args)
     }
-  }
-  for (let index = 0; index < fn.parameters.length; index++) {
-    const argument = arguments_[index]
-    if (argument === undefined) {
-      const empty = memory.alloc_root()
-      try {
-        bind(fn.parameters[index], empty)
-      } finally {
-        memory.free_root(empty)
-      }
-    } else bind(fn.parameters[index], argument)
-  }
-  if (fn.rest !== null) {
-    const rest = memory.alloc_root(),
-      key = memory.alloc_root()
-    try {
-      const start = fn.parameters.length
+    const empty = heap.handles.local()
+    for (let index = 0; index < parameters.length; index++)
+      bind(parameters[index], arguments_[index] ?? empty)
+    if (rest !== null) {
+      const array = heap.handles.local(),
+        key = heap.handles.local()
+      const start = parameters.length
       const count = Math.max(0, arguments_.length - start)
-      create_array(runtime, rest, count)
+      create_array(runtime, array, count)
       for (let index = 0; index < count; index++) {
-        write_string(memory, key, String(index))
-        define_property(runtime, rest, key, arguments_[start + index])
+        write_string(heap, key, String(index))
+        define_property(runtime, array, key, arguments_[start + index])
       }
-      bind(fn.rest, rest)
-    } finally {
-      memory.free_root(rest)
-      memory.free_root(key)
+      bind(rest, array)
     }
-  }
+  })
   fiber.frame = frame
 }
 
 export function pop_frame(runtime: Runtime, fiber: Fiber) {
   const frame = fiber.frame!
-  for (const register of frame.registers) runtime.memory.free_root(register)
-  runtime.memory.free_root(frame.environment_root)
-  runtime.memory.free_root(frame.this_root)
-  runtime.memory.free_root(frame.new_target_root)
+  const { handles } = runtime.heap
+  for (const register of frame.registers) handles.release(register)
+  handles.release(frame.environment)
+  handles.release(frame.this_value)
+  handles.release(frame.new_target)
   fiber.frame = frame.caller
 }
 
 export function dispose_fiber(runtime: Runtime, fiber: Fiber) {
   if (fiber.status === FIBER_STATE.DISPOSED) return
   while (fiber.frame !== null) pop_frame(runtime, fiber)
-  runtime.memory.free_root(fiber.result)
-  runtime.memory.free_root(fiber.error)
+  const { handles } = runtime.heap
+  handles.release(fiber.result)
+  handles.release(fiber.error)
   if (fiber.settle) {
-    runtime.memory.free_root(fiber.settle.resolve)
-    runtime.memory.free_root(fiber.settle.reject)
+    handles.release(fiber.settle.resolve)
+    handles.release(fiber.settle.reject)
     fiber.settle = undefined
   }
   fiber.status = FIBER_STATE.DISPOSED
@@ -184,36 +173,36 @@ export function dispose_fiber(runtime: Runtime, fiber: Fiber) {
 export function call_function(
   runtime: Runtime,
   fiber: Fiber,
-  destination: Root,
-  callee: Root,
-  receiver: Root | undefined,
-  arguments_: Root[],
+  destination: Handle,
+  callee: Handle,
+  receiver: Handle | undefined,
+  arguments_: Handle[],
 ): Status {
-  const { memory } = runtime
-  if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
+  const { heap } = runtime
+  if (
+    callee === undefined ||
+    heap_type_of(heap, callee) !== HEAP_TYPES.FUNCTION
+  )
     return throw_error(runtime, "TypeError", "Value is not callable")
-  const code_id = function_code_id(memory, callee),
-    function_id = callee_function_id(memory, callee)
+  const code_id = function_code_id(heap, callee),
+    function_id = callee_function_id(heap, callee)
   if (code_id === RESUME_CODE) {
-    const captured = memory.alloc_root(),
-      value = memory.alloc_root()
-    try {
-      load_function_environment(memory, captured, callee)
-      load_value_array_element(memory, value, captured, 0)
-      const target = read_number(memory, value) as Root
-      load_value_array_element(memory, value, captured, 1)
+    heap.handles.scope(() => {
+      const captured = heap.handles.local(),
+        value = heap.handles.local()
+      load_function_environment(heap, captured, callee)
+      load_value_array_element(heap, value, captured, 0)
+      const target = read_number(heap, value) as Handle
+      load_value_array_element(heap, value, captured, 1)
       resume_fiber(
         runtime,
         runtime.fibers[function_id],
         target,
         arguments_[0],
-        read_boolean(memory, value),
+        read_boolean(heap, value),
       )
-      write_undefined(memory, destination)
-    } finally {
-      memory.free_root(captured)
-      memory.free_root(value)
-    }
+      write_undefined(heap, destination)
+    })
     return OK
   }
   if (code_id === BUILTIN_CODE)
@@ -257,33 +246,33 @@ export function call_function(
 function enter_function(
   runtime: Runtime,
   fiber: Fiber,
-  destination: Root,
-  callee: Root,
-  receiver: Root | undefined,
-  arguments_: Root[],
-  target?: Root,
+  destination: Handle,
+  callee: Handle,
+  receiver: Handle | undefined,
+  arguments_: Handle[],
+  target?: Handle,
 ): Status {
-  const { memory } = runtime
-  const code_id = function_code_id(memory, callee),
-    function_id = callee_function_id(memory, callee)
-  const parent = memory.alloc_root(),
-    environment = memory.alloc_root(),
-    this_value = memory.alloc_root(),
-    new_target = memory.alloc_root()
-  try {
-    load_function_environment(memory, parent, callee)
+  const { heap } = runtime
+  const code_id = function_code_id(heap, callee),
+    function_id = callee_function_id(heap, callee)
+  return heap.handles.scope(() => {
+    const parent = heap.handles.local(),
+      environment = heap.handles.local(),
+      this_value = heap.handles.local(),
+      new_target = heap.handles.local()
+    load_function_environment(heap, parent, callee)
     const fn = runtime.loader.code[code_id].unit.functions[function_id]
-    const flags = function_flags(memory, callee)
+    const flags = function_flags(heap, callee)
     if (flags & 1)
       return throw_error(runtime, "TypeError", "Class constructor requires new")
     if (flags & 4) {
-      load_function_receiver(memory, this_value, callee)
+      load_function_receiver(heap, this_value, callee)
       receiver = this_value
-      load_function_new_target(memory, new_target, callee)
+      load_function_new_target(heap, new_target, callee)
     }
-    if (target !== undefined) memory.copy_value(new_target, target)
+    if (target !== undefined) heap.copy_value(new_target, target)
     create_environment(
-      memory,
+      heap,
       environment,
       parent,
       fn.binding_count,
@@ -301,46 +290,39 @@ function enter_function(
       new_target,
     )
     return OK
-  } finally {
-    memory.free_root(new_target)
-    memory.free_root(parent)
-    memory.free_root(environment)
-    memory.free_root(this_value)
-  }
+  })
 }
 
 export function coerce_value(
   runtime: Runtime,
-  destination: Root,
-  source: Root,
+  destination: Handle,
+  source: Handle,
   operation: string,
   hint?: string,
 ): Status {
   const helper = runtime.realm.intrinsics.get(operation)
   if (helper === undefined) {
-    runtime.memory.copy_value(destination, source)
+    runtime.heap.copy_value(destination, source)
     return OK
   }
-  const hint_value = runtime.memory.alloc_root()
-  try {
-    if (hint !== undefined) write_string(runtime.memory, hint_value, hint)
+  return runtime.heap.handles.scope(() => {
+    const hint_value = runtime.heap.handles.local()
+    if (hint !== undefined) write_string(runtime.heap, hint_value, hint)
     return invoke_sync(runtime, destination, helper, undefined, [
       source,
       hint_value,
     ])
-  } finally {
-    runtime.memory.free_root(hint_value)
-  }
+  })
 }
 
 // A synchronous language operation may execute user code (valueOf/toString).
-// Keep that execution in a rooted VM fiber and preserve thrown guest values.
+// Keep that execution in a VM fiber and preserve thrown guest values.
 export function invoke_sync(
   runtime: Runtime,
-  destination: Root,
-  callee: Root,
-  receiver: Root | undefined,
-  args: Root[],
+  destination: Handle,
+  callee: Handle,
+  receiver: Handle | undefined,
+  args: Handle[],
 ): Status {
   const fiber = create_call_fiber(runtime, callee, receiver, args)
   try {
@@ -349,7 +331,7 @@ export function invoke_sync(
       return throw_value(runtime, fiber.error)
     if (fiber.status !== FIBER_STATE.DONE)
       panic("Internal operations must complete synchronously")
-    runtime.memory.copy_value(destination, fiber.result)
+    runtime.heap.copy_value(destination, fiber.result)
     return OK
   } finally {
     dispose_fiber(runtime, fiber)
@@ -363,45 +345,44 @@ export function invoke_sync(
 export function settle_with_promise(
   runtime: Runtime,
   fiber: Fiber,
-  promise: Root,
+  promise: Handle,
 ): Status {
   const new_capability = runtime.realm.intrinsics.get("NewPromiseCapability")
   if (new_capability === undefined) panic("Promise is not initialized")
-  const { memory } = runtime
-  const key = memory.alloc_root(),
-    resolve = memory.alloc_root(),
-    reject = memory.alloc_root()
+  const { heap } = runtime
   const capability = create_call_fiber(runtime, new_capability, undefined, [])
   try {
     run_task(runtime, capability)
-    if (capability.status === FIBER_STATE.FAILED) {
-      memory.free_root(resolve)
-      memory.free_root(reject)
+    if (capability.status === FIBER_STATE.FAILED)
       return throw_value(runtime, capability.error)
-    }
-    for (const [name, target] of [
-      ["promise", promise],
-      ["resolve", resolve],
-      ["reject", reject],
-    ] as [string, Root][]) {
-      write_string(memory, key, name)
-      get_property(runtime, target, capability.result, key)
-    }
+    // The fiber owns these until dispose_fiber releases them.
+    const resolve = heap.handles.persistent(),
+      reject = heap.handles.persistent()
+    fiber.settle = { resolve, reject }
+    heap.handles.scope(() => {
+      const key = heap.handles.local()
+      for (const [name, target] of [
+        ["promise", promise],
+        ["resolve", resolve],
+        ["reject", reject],
+      ] as [string, Handle][]) {
+        write_string(heap, key, name)
+        get_property(runtime, target, capability.result, key)
+      }
+    })
+    return OK
   } finally {
     dispose_fiber(runtime, capability)
-    memory.free_root(key)
   }
-  fiber.settle = { resolve, reject }
-  return OK
 }
 
 // Each async call runs in its own fiber, so AWAIT suspends only that call.
 function call_async_function(
   runtime: Runtime,
-  destination: Root,
-  callee: Root,
-  receiver: Root | undefined,
-  arguments_: Root[],
+  destination: Handle,
+  callee: Handle,
+  receiver: Handle | undefined,
+  arguments_: Handle[],
 ): Status {
   const fiber = create_empty_fiber(runtime)
   if (settle_with_promise(runtime, fiber, destination) === THROW) {
@@ -446,8 +427,8 @@ export function settle_fiber(runtime: Runtime, fiber: Fiber) {
 function create_empty_fiber(runtime: Runtime): Fiber {
   const fiber = new Fiber(
     runtime.fibers.length,
-    runtime.memory.alloc_root(),
-    runtime.memory.alloc_root(),
+    runtime.heap.handles.persistent(),
+    runtime.heap.handles.persistent(),
   )
   runtime.fibers.push(fiber)
   return fiber
@@ -455,9 +436,9 @@ function create_empty_fiber(runtime: Runtime): Fiber {
 
 export function create_call_fiber(
   runtime: Runtime,
-  callee: Root,
-  receiver: Root | undefined,
-  arguments_: Root[],
+  callee: Handle,
+  receiver: Handle | undefined,
+  arguments_: Handle[],
 ): Fiber {
   const fiber = create_empty_fiber(runtime)
   if (
@@ -479,14 +460,14 @@ export function create_call_fiber(
 export function resume_fiber(
   runtime: Runtime,
   fiber: Fiber,
-  destination: Root,
-  argument: Root | undefined,
+  destination: Handle,
+  argument: Handle | undefined,
   rejected: boolean,
 ) {
   if (fiber.status !== FIBER_STATE.WAITING) return
   if (argument !== undefined)
-    runtime.memory.copy_value(rejected ? fiber.error : destination, argument)
-  else write_undefined(runtime.memory, rejected ? fiber.error : destination)
+    runtime.heap.copy_value(rejected ? fiber.error : destination, argument)
+  else write_undefined(runtime.heap, rejected ? fiber.error : destination)
   fiber.await_rejected = rejected
   fiber.status = FIBER_STATE.READY
 }
@@ -497,15 +478,15 @@ export function resume_fiber(
 function enter_builtin(
   runtime: Runtime,
   fiber: Fiber,
-  destination: Root,
-  callee: Root,
-  receiver: Root | undefined,
-  arguments_: Root[],
-  new_target?: Root,
+  destination: Handle,
+  callee: Handle,
+  receiver: Handle | undefined,
+  arguments_: Handle[],
+  new_target?: Handle,
 ): Status {
-  const steps = runtime.memory.alloc_root()
-  try {
-    if (!load_builtin_steps(runtime.memory, steps, callee))
+  return runtime.heap.handles.scope(() => {
+    const steps = runtime.heap.handles.local()
+    if (!load_builtin_steps(runtime.heap, steps, callee))
       panic("Built-in function has no steps")
     return enter_function(
       runtime,
@@ -516,26 +497,24 @@ function enter_builtin(
       arguments_,
       new_target,
     )
-  } finally {
-    runtime.memory.free_root(steps)
-  }
+  })
 }
 
 export function construct_function(
   runtime: Runtime,
   fiber: Fiber,
-  destination: Root,
-  callee: Root,
-  arguments_: Root[],
-  new_target: Root = callee,
+  destination: Handle,
+  callee: Handle,
+  arguments_: Handle[],
+  new_target: Handle = callee,
 ): Status {
-  const { memory } = runtime
-  if (kind_of(memory, callee) !== KINDS.FUNCTION)
+  const { heap } = runtime
+  if (heap_type_of(heap, callee) !== HEAP_TYPES.FUNCTION)
     return throw_error(runtime, "TypeError", "Value is not a constructor")
-  const code = function_code_id(memory, callee),
-    id = callee_function_id(memory, callee)
+  const code = function_code_id(heap, callee),
+    id = callee_function_id(heap, callee)
   if (code === BUILTIN_CODE) {
-    if (!(function_flags(memory, callee) & BUILTIN_CONSTRUCTOR))
+    if (!(function_flags(heap, callee) & BUILTIN_CONSTRUCTOR))
       return throw_error(runtime, "TypeError", "Value is not a constructor")
     return enter_builtin(
       runtime,
@@ -553,28 +532,28 @@ export function construct_function(
     runtime.loader.code[code].unit.functions[id].flags & 14
   )
     return throw_error(runtime, "TypeError", "Value is not a constructor")
-  const receiver = memory.alloc_root(),
-    key = memory.alloc_root(),
-    prototype = memory.alloc_root(),
-    parent = memory.alloc_root(),
-    environment = memory.alloc_root()
-  try {
-    load_function_environment(memory, parent, callee)
+  return heap.handles.scope(() => {
+    const receiver = heap.handles.local(),
+      key = heap.handles.local(),
+      prototype = heap.handles.local(),
+      parent = heap.handles.local(),
+      environment = heap.handles.local()
+    load_function_environment(heap, parent, callee)
     const { unit, scope_ids } = runtime.loader.code[code],
       fn = unit.functions[id]
     if (fn.flags & FUNCTION_DERIVED) {
       // A derived constructor's this is bound by its super() call.
-      write_uninitialized(memory, receiver)
+      write_uninitialized(heap, receiver)
     } else {
       create_object(runtime, receiver)
       // Constructors in the supported subset have data-valued prototype properties.
-      write_string(memory, key, "prototype")
+      write_string(heap, key, "prototype")
       get_property(runtime, prototype, new_target, key)
-      if (has_property_list(memory, prototype))
-        set_prototype(memory, receiver, prototype)
+      if (has_property_list(heap, prototype))
+        set_prototype(heap, receiver, prototype)
     }
     create_environment(
-      memory,
+      heap,
       environment,
       parent,
       fn.binding_count,
@@ -593,60 +572,55 @@ export function construct_function(
     )
     fiber.frame!.is_construct_call = true
     return OK
-  } finally {
-    for (const root of [receiver, key, prototype, parent, environment])
-      memory.free_root(root)
-  }
+  })
 }
 
 function resume_function(
   runtime: Runtime,
-  destination: Root,
+  destination: Handle,
   fiber: Fiber,
-  destination_root: Root,
+  awaiting: Handle,
   rejected: boolean,
 ) {
-  const { memory } = runtime
-  const target = memory.alloc_root(),
-    flag = memory.alloc_root(),
-    captured = memory.alloc_root()
-  try {
-    write_number(memory, target, destination_root)
-    write_boolean(memory, flag, rejected)
-    create_value_array(memory, captured, [target, flag])
+  const { heap } = runtime
+  heap.handles.scope(() => {
+    const target = heap.handles.local(),
+      flag = heap.handles.local(),
+      captured = heap.handles.local()
+    write_number(heap, target, awaiting)
+    write_boolean(heap, flag, rejected)
+    create_value_array(heap, captured, [target, flag])
     create_function(runtime, destination, RESUME_CODE, fiber.id, captured, 2)
-  } finally {
-    for (const root of [target, flag, captured]) memory.free_root(root)
-  }
+  })
 }
 
 export function await_value(
   runtime: Runtime,
   fiber: Fiber,
-  destination: Root,
-  source: Root,
+  destination: Handle,
+  source: Handle,
 ) {
   const await_promise = runtime.realm.intrinsics.get("Await")
   if (await_promise === undefined) panic("Promise is not initialized")
-  const { memory } = runtime
-  const fulfilled = memory.alloc_root(),
-    rejected = memory.alloc_root()
+  const { heap } = runtime
   fiber.status = FIBER_STATE.WAITING
-  let registration
-  try {
-    resume_function(runtime, fulfilled, fiber, destination, false)
-    resume_function(runtime, rejected, fiber, destination, true)
-    registration = create_call_fiber(runtime, await_promise, undefined, [
-      source,
-      fulfilled,
-      rejected,
-    ])
-    run_task(runtime, registration)
-    if (registration.status === FIBER_STATE.FAILED)
-      resume_fiber(runtime, fiber, destination, registration.error, true)
-  } finally {
-    if (registration) dispose_fiber(runtime, registration)
-    memory.free_root(fulfilled)
-    memory.free_root(rejected)
-  }
+  heap.handles.scope(() => {
+    const fulfilled = heap.handles.local(),
+      rejected = heap.handles.local()
+    let registration
+    try {
+      resume_function(runtime, fulfilled, fiber, destination, false)
+      resume_function(runtime, rejected, fiber, destination, true)
+      registration = create_call_fiber(runtime, await_promise, undefined, [
+        source,
+        fulfilled,
+        rejected,
+      ])
+      run_task(runtime, registration)
+      if (registration.status === FIBER_STATE.FAILED)
+        resume_fiber(runtime, fiber, destination, registration.error, true)
+    } finally {
+      if (registration) dispose_fiber(runtime, registration)
+    }
+  })
 }

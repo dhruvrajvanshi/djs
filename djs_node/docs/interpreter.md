@@ -69,12 +69,13 @@ exception-handler table.
 
 While a function runs, a local value lives in one of two places.
 
-**Registers** are a fixed-size array in the call's frame. They are allocated
-when the function is called and freed when it returns. Temporaries live here,
+**Registers** are a fixed-size array of persistent handles in the call's
+frame ([object-model.md](object-model.md#values-addresses-and-handles)). They
+are allocated when the function is called and released when it returns. Temporaries live here,
 and so does every variable that no nested function uses. In the example above,
 `a` is register 0 and `x` is register 1.
 
-**Environments** are heap records that hold **bindings** (variables) in
+**Environments** are heap objects that hold **bindings** (variables) in
 numbered slots, and each one links to a parent environment. A variable that a
 nested function uses is *captured*: it has to outlive the frame, so it lives
 in an environment. Module-level variables always live in the module's

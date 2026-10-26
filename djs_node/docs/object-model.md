@@ -4,22 +4,45 @@ How the VM represents JavaScript objects: what kind of object each one is,
 how its internal methods are chosen, where its internal slots live, and how
 built-in functions work.
 
-## Heap kinds
+## Values, addresses and handles
 
-Every value that lives in the heap starts with a **heap kind** (`KINDS` in
-[vm/storage/layout.ts](../vm/storage/layout.ts)). The kind is set when the value is allocated
-and never changes. These kinds are objects a program can see:
+Every guest value is an eight-byte **value**: a number, or a tagged
+`undefined`, `null`, boolean or reference to a heap object (`VALUE_TAGS` in
+[vm/storage/value.ts](../vm/storage/value.ts)).
 
-| Heap kind | What it is | Created by ([vm/semantics/objects.ts](../vm/semantics/objects.ts)) |
+The heap ([vm/storage/heap.ts](../vm/storage/heap.ts)) is a copying garbage
+collector, so a heap object moves whenever anything is allocated. VM code
+therefore never keeps an **`Address`** (a byte offset into the heap) across an
+allocation. It refers to values through **handles** instead: slots in the
+`HandleTable` ([vm/storage/handles.ts](../vm/storage/handles.ts)) that the
+collector updates when it moves objects. A handle has one of two lifetimes:
+
+| Lifetime | Created with | Released | Used for |
+| --- | --- | --- | --- |
+| Local | `heap.handles.local()` | When the innermost `heap.handles.scope(() => …)` returns | Temporaries inside one VM function |
+| Persistent | `heap.handles.persistent()` | By its owner, with `heap.handles.release` | Frame registers, fiber results, realm intrinsics, queued jobs |
+
+A function that writes a result takes a `destination` handle from its caller,
+so most VM code only creates locals. A scope can't span an `await` in host
+code; such code uses a persistent handle.
+
+## Heap types
+
+Every heap object starts with a **heap type** (`HEAP_TYPES` in
+[vm/storage/layout.ts](../vm/storage/layout.ts)). The type is set when the object is allocated
+and never changes. These types are objects a program can see:
+
+| Heap type | What it is | Created by ([vm/semantics/objects.ts](../vm/semantics/objects.ts)) |
 | --- | --- | --- |
-| `KINDS.OBJECT` | An ordinary object | `create_object` |
-| `KINDS.FUNCTION` | A function, including built-in functions | `create_function` |
-| `KINDS.ARRAY` | An array | `create_array` |
-| `KINDS.STRING_OBJECT` | A `String` object, such as `new String("ab")` | `create_string_object` |
-| `KINDS.ERROR` | An ordinary object with the `[[ErrorData]]` slot | `ordinary_object_create(proto, ["[[ErrorData]]"])` |
+| `HEAP_TYPES.OBJECT` | An ordinary object | `create_object` |
+| `HEAP_TYPES.FUNCTION` | A function, including built-in functions | `create_function` |
+| `HEAP_TYPES.ARRAY` | An array | `create_array` |
+| `HEAP_TYPES.STRING_OBJECT` | A `String` object, such as `new String("ab")` | `create_string_object` |
+| `HEAP_TYPES.ERROR` | An ordinary object with the `[[ErrorData]]` slot | `ordinary_object_create(proto, ["[[ErrorData]]"])` |
 
-The other kinds (`STRING`, `SYMBOL`, `PROPERTY`, `ENVIRONMENT`, …) are
-primitives and the VM's own bookkeeping records.
+The other types (`STRING`, `SYMBOL`, `PROPERTY`, `ENVIRONMENT`, …) are
+primitives and the VM's own bookkeeping objects. Each has a module in
+[vm/heap_types/](../vm/heap_types/) that creates and reads it.
 
 ## Internal methods and exotic objects
 
@@ -32,10 +55,10 @@ replaces some of the defaults. Arrays are the common case: assigning
 `[[DefineOwnProperty]]`.
 
 When the VM runs an internal method on an object, it checks the object's heap
-kind and uses that kind's version. So an array keeps behaving like an array
+type and uses that type's version. So an array keeps behaving like an array
 even if its prototype is changed.
 
-Each kind's internal methods are defined once, for every object of that kind:
+Each heap type's internal methods are defined once, for every object of that type:
 either natively in the VM, or in the stdlib with a module-level
 `internal_method(kind, "[[X]]", fn)` statement ([stdlib.md](stdlib.md#functions-the-vm-calls)).
 
@@ -71,12 +94,12 @@ Spec: [10.4.2 Array Exotic Objects](https://tc39.es/ecma262/#sec-array-exotic-ob
 
 | | |
 | --- | --- |
-| Heap kind | `KINDS.ARRAY` |
+| Heap type | `HEAP_TYPES.ARRAY` |
 | Created by | Array literals, rest parameters, and `array_create`, including for well-known objects |
 | Initial state | An own `length` property: `0` (or the given length), writable, non-enumerable, non-configurable |
 | Internal methods that differ | `[[DefineOwnProperty]]` |
 | Where they are implemented | In JavaScript: `array_define_own_property` in [stdlib/js/array.js](../stdlib/js/array.js), registered with `internal_method("array", "[[DefineOwnProperty]]", …)` |
-| How the VM dispatches | Every property definition or assignment on a `KINDS.ARRAY` object calls the registered function (`exotic_define_own_property` in [vm/semantics/properties.ts](../vm/semantics/properties.ts)) |
+| How the VM dispatches | Every property definition or assignment on a `HEAP_TYPES.ARRAY` object calls the registered function (`exotic_define_own_property` in [vm/semantics/properties.ts](../vm/semantics/properties.ts)) |
 | Recognized by | `is_array` (the spec's [IsArray](https://tc39.es/ecma262/#sec-isarray)) |
 
 `array_define_own_property` keeps `length` consistent with the elements:
@@ -98,7 +121,7 @@ primitives.
 
 | | |
 | --- | --- |
-| Heap kind | `KINDS.STRING_OBJECT` |
+| Heap type | `HEAP_TYPES.STRING_OBJECT` |
 | Created by | `string_create`, including for well-known objects, and `new String(…)` |
 | Initial state | The `[[StringData]]` slot: the empty string, or the given string |
 | Internal methods that differ | `[[GetOwnProperty]]`, `[[DefineOwnProperty]]` and `[[OwnPropertyKeys]]` |
@@ -111,14 +134,14 @@ the empty string as its `[[StringData]]`. Its literal also lists
 internal slot whose value is the empty String"); that member sets the same
 value again.
 
-### Adding an exotic kind
+### Adding an exotic heap type
 
-The kinds above are built into the VM. A new one needs work in every layer:
+The types above are built into the VM. A new one needs work in every layer:
 
-1. **VM:** a heap kind in `KINDS` and its entry in `LAYOUTS`, which drives
+1. **VM:** a heap type in `HEAP_TYPES` and its entry in `LAYOUTS`, which drives
    allocation and garbage collection tracing
    ([vm/storage/layout.ts](../vm/storage/layout.ts)), plus a module in
-   [vm/records/](../vm/records/) that creates and reads it.
+   [vm/heap_types/](../vm/heap_types/) that creates and reads it.
 2. **Dispatch:** the internal methods that differ, either natively or by
    looking up a registered function the way `exotic_define_own_property` does.
 3. **Compiler:** add its creation operation to `CREATION_OPERATIONS` and
@@ -126,7 +149,7 @@ The kinds above are built into the VM. A new one needs work in every layer:
    ([compiler/compile.ts](../compiler/compile.ts)).
 4. **Realm:** allocate it in `allocate` ([runtime/realm.ts](../runtime/realm.ts)).
 5. **Native operations:** a creation operation that follows the spec's
-   creation algorithm, and a way to recognize the kind.
+   creation algorithm, and a way to recognize the type.
 6. **Docs:** a section on this page.
 
 ## Internal slots
@@ -135,7 +158,7 @@ An object's slots are set when it is created, either by `[slot("[[Name]]")]`
 members of a well-known object or by the list passed to
 `ordinary_object_create`. Code reads and changes them with `has_slot`,
 `get_slot` and `set_slot` ([native-operations.md](native-operations.md#internal-slots)).
-All of this is implemented in [vm/semantics/slots.ts](../vm/semantics/slots.ts).
+All of this is implemented in [vm/semantics/internal_slots.ts](../vm/semantics/internal_slots.ts).
 
 A few slots are part of how the VM represents objects, so the VM stores them
 in its own way and `set_slot` refuses to change them:
@@ -145,23 +168,23 @@ in its own way and `set_slot` refuses to change them:
 | `[[Prototype]]` | The object's prototype pointer | The prototype or `null` | `ordinary_set_prototype_of`, which checks for cycles |
 | `[[Extensible]]` | Not stored; all objects are currently extensible | `true` | Not supported yet |
 | `[[StringData]]` | Inside the `String` object | The string | Can't be changed |
-| `[[ErrorData]]` | The object's heap kind, `KINDS.ERROR` | `null` | Can't be changed |
+| `[[ErrorData]]` | The object's heap type, `HEAP_TYPES.ERROR` | `null` | Can't be changed |
 
 Every other slot is stored like a private class field, with one hidden key
-per slot name (`slot_key` in [vm/semantics/slots.ts](../vm/semantics/slots.ts)).
+per slot name (`slot_key` in [vm/semantics/internal_slots.ts](../vm/semantics/internal_slots.ts)).
 The compiler lists the slot names a module passes to `has_slot`, `get_slot`
 and `set_slot` (`slot_names`), and linking creates their keys, so the realm's
-roots don't grow while code runs.
+persistent handles don't grow while code runs.
 
 ## Built-in functions
 
 A [built-in function](https://tc39.es/ecma262/#sec-built-in-function-objects)
-is a `KINDS.FUNCTION` object whose code ID is `BUILTIN_CODE`
+is a `HEAP_TYPES.FUNCTION` object whose code ID is `BUILTIN_CODE`
 ([vm/execution/native_operations.ts](../vm/execution/native_operations.ts)). Instead of bytecode of its own, it
 holds a reference to another function, its **steps**: the function expression
 written in its `well_known` declaration, or the `behaviour` passed to
 `create_builtin_function`. `set_builtin_steps` and `load_builtin_steps` in
-[vm/records/function.ts](../vm/records/function.ts) store and read it, along with a
+[vm/heap_types/function.ts](../vm/heap_types/function.ts) store and read it, along with a
 `BUILTIN_CONSTRUCTOR` flag saying whether it can be used with `new`.
 
 Calls go through `enter_builtin` ([vm/execution/calls.ts](../vm/execution/calls.ts)):

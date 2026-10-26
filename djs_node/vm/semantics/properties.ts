@@ -1,8 +1,8 @@
-import type { HeapRef, Root } from "../storage/value.ts"
+import type { Address, Handle } from "../storage/value.ts"
 import {
-  TAGS,
+  VALUE_TAGS,
   get_ref,
-  kind_of,
+  heap_type_of,
   read_number,
   set_ref,
   tag_of,
@@ -10,23 +10,23 @@ import {
   write_number,
   write_undefined,
 } from "../storage/value.ts"
-import { KINDS } from "../storage/layout.ts"
+import { HEAP_TYPES } from "../storage/layout.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import {
   heap_string_code_unit_at,
   heap_string_length,
   read_string,
   write_string,
-} from "../records/string.ts"
-import { byte_buffer_view } from "../records/byte_buffer.ts"
-import { string_reference } from "../records/string_object.ts"
+} from "../heap_types/string.ts"
+import { byte_buffer_view } from "../heap_types/byte_buffer.ts"
+import { string_reference } from "../heap_types/string_object.ts"
 import {
   has_property_list,
   is_object,
   object_properties,
   object_prototype_reference,
-} from "../records/object.ts"
-import type { PropertyKey } from "../records/property.ts"
+} from "../heap_types/object.ts"
+import type { PropertyKey } from "../heap_types/property.ts"
 import {
   find_property,
   insert_property,
@@ -39,7 +39,7 @@ import {
   set_property_flags,
   store_property_setter,
   store_property_value,
-} from "../records/property.ts"
+} from "../heap_types/property.ts"
 import { create_array, create_object } from "./objects.ts"
 import { same_value, to_string, truthy, write_primitive } from "./operations.ts"
 import { invoke_sync, coerce_value } from "../execution/calls.ts"
@@ -47,20 +47,20 @@ import { panic } from "../../utils.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 
-export type { PropertyKey } from "../records/property.ts"
+export type { PropertyKey } from "../heap_types/property.ts"
 
 /** Values whose properties the VM can read without boxing. */
-export function has_properties(runtime: Runtime, value: Root) {
-  const kind = kind_of(runtime.memory, value)
+export function has_properties(runtime: Runtime, value: Handle) {
+  const type = heap_type_of(runtime.heap, value)
   return (
-    kind === KINDS.STRING ||
-    kind === KINDS.SYMBOL ||
-    is_object(runtime.memory, value)
+    type === HEAP_TYPES.STRING ||
+    type === HEAP_TYPES.SYMBOL ||
+    is_object(runtime.heap, value)
   )
 }
 
-export function property_key(runtime: Runtime, key: Root): PropertyKey {
-  return kind_of(runtime.memory, key) === KINDS.SYMBOL
+export function property_key(runtime: Runtime, key: Handle): PropertyKey {
+  return heap_type_of(runtime.heap, key) === HEAP_TYPES.SYMBOL
     ? key
     : to_string(runtime, key)
 }
@@ -78,33 +78,33 @@ function array_index(name: string) {
 /** Physical properties point into the heap; virtual properties store host data. */
 export interface OwnProperty {
   flags: number
-  property?: HeapRef
+  property?: Address
   value?: string | number
 }
 
-// Virtual descriptors contain only host numbers/strings, never unrooted VM refs.
+// Virtual descriptors contain only host numbers/strings, never heap addresses.
 function virtual_property(
   runtime: Runtime,
-  object: Root,
+  object: Handle,
   name: PropertyKey,
 ): OwnProperty | undefined {
-  const { memory } = runtime
+  const { heap } = runtime
   if (typeof name !== "string") return undefined
-  const reference = string_reference(memory, object)
+  const reference = string_reference(heap, object)
   if (reference) {
-    const length = heap_string_length(memory, reference)
+    const length = heap_string_length(heap, reference)
     if (name === "length") return { flags: 0, value: length }
     const index = array_index(name)
     if (index >= 0 && index < length)
       return {
         flags: 2,
         value: String.fromCharCode(
-          heap_string_code_unit_at(memory, reference, index),
+          heap_string_code_unit_at(heap, reference, index),
         ),
       }
   }
-  if (kind_of(memory, object) === KINDS.BYTE_BUFFER) {
-    const bytes = byte_buffer_view(memory, object)
+  if (heap_type_of(heap, object) === HEAP_TYPES.BYTE_BUFFER) {
+    const bytes = byte_buffer_view(heap, object)
     if (name === "length") return { flags: 0, value: bytes.length }
     const index = array_index(name)
     if (index >= 0 && index < bytes.length)
@@ -114,110 +114,106 @@ function virtual_property(
 
 export function own_property(
   runtime: Runtime,
-  object: Root,
+  object: Handle,
   name: PropertyKey,
 ): OwnProperty | undefined {
-  const { memory } = runtime
+  const { heap } = runtime
   const virtual = virtual_property(runtime, object, name)
   if (virtual) return virtual
-  const kind = kind_of(memory, object)
+  const type = heap_type_of(heap, object)
   if (
-    kind === KINDS.STRING ||
-    kind === KINDS.SYMBOL ||
-    kind === KINDS.BYTE_BUFFER
+    type === HEAP_TYPES.STRING ||
+    type === HEAP_TYPES.SYMBOL ||
+    type === HEAP_TYPES.BYTE_BUFFER
   )
     return undefined
-  const property = find_property(memory, object, name, true)
+  const property = find_property(heap, object, name, true)
   return property
-    ? { property, flags: property_flags(memory, property) }
+    ? { property, flags: property_flags(heap, property) }
     : undefined
 }
 
 // Strings and symbols inherit from the realm's prototypes.
-function prototype_reference(runtime: Runtime, value: Root): HeapRef {
-  const { memory, realm } = runtime
-  const kind = kind_of(memory, value)
+function prototype_reference(runtime: Runtime, value: Handle): Address {
+  const { heap, realm } = runtime
+  const type = heap_type_of(heap, value)
   const prototype =
-    kind === KINDS.STRING
+    type === HEAP_TYPES.STRING
       ? realm.string_prototype
-      : kind === KINDS.SYMBOL
+      : type === HEAP_TYPES.SYMBOL
         ? realm.symbol_prototype
         : null
   if (prototype !== null)
-    return prototype === undefined ? 0 : get_ref(memory, prototype)
-  if (kind === KINDS.BYTE_BUFFER) return 0
-  return object_prototype_reference(memory, value)
+    return prototype === undefined ? 0 : get_ref(heap, prototype)
+  if (type === HEAP_TYPES.BYTE_BUFFER) return 0
+  return object_prototype_reference(heap, value)
 }
 
 // Return an accessor flag; only the interpreter invokes guest getters.
 export function get_property(
   runtime: Runtime,
-  destination: Root,
-  object: Root,
-  key: Root,
+  destination: Handle,
+  object: Handle,
+  key: Handle,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   const name = property_key(runtime, key)
-  const current = memory.alloc_root()
-  try {
-    memory.copy_value(current, object)
+  return heap.handles.scope(() => {
+    const current = heap.handles.local()
+    heap.copy_value(current, object)
     while (true) {
       const descriptor = own_property(runtime, current, name)
       if (descriptor) {
         if (descriptor.property)
-          load_property_value(memory, destination, descriptor.property)
+          load_property_value(heap, destination, descriptor.property)
         else write_primitive(runtime, destination, descriptor.value)
         return descriptor.flags & 16 ? 1 : 0
       }
       const prototype = prototype_reference(runtime, current)
       if (!prototype) break
-      set_ref(memory, current, prototype)
+      set_ref(heap, current, prototype)
     }
-    write_undefined(memory, destination)
+    write_undefined(heap, destination)
     return 0
-  } finally {
-    memory.free_root(current)
-  }
+  })
 }
 
 export function has_property(
   runtime: Runtime,
-  object: Root,
-  key: Root,
+  object: Handle,
+  key: Handle,
   own: boolean = false,
 ) {
-  const { memory } = runtime
-  const name = property_key(runtime, key),
-    current = memory.alloc_root()
-  try {
-    memory.copy_value(current, object)
+  const { heap } = runtime
+  const name = property_key(runtime, key)
+  return heap.handles.scope(() => {
+    const current = heap.handles.local()
+    heap.copy_value(current, object)
     while (true) {
       if (own_property(runtime, current, name)) return true
       if (own) return false
       const prototype = prototype_reference(runtime, current)
       if (!prototype) return false
-      set_ref(memory, current, prototype)
+      set_ref(heap, current, prototype)
     }
-  } finally {
-    memory.free_root(current)
-  }
+  })
 }
 
 /** Returns false when the property is non-configurable. */
-export function delete_property(runtime: Runtime, object: Root, key: Root) {
+export function delete_property(runtime: Runtime, object: Handle, key: Handle) {
   const name = property_key(runtime, key)
   if (virtual_property(runtime, object, name)) return false
-  if (!has_property_list(runtime.memory, object)) return true
-  return remove_property(runtime.memory, object, name)
+  if (!has_property_list(runtime.heap, object)) return true
+  return remove_property(runtime.heap, object, name)
 }
 
 export function define_property(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  value: Root,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   flags: number = 7,
-  setter?: Root,
+  setter?: Handle,
 ) {
   if (!try_define_property(runtime, object, key, value, flags, setter))
     panic("Cannot redefine property")
@@ -226,47 +222,45 @@ export function define_property(
 /** Returns false when an existing non-configurable property forbids the change. */
 export function try_define_property(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  value: Root,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   flags: number = 7,
-  setter?: Root,
+  setter?: Handle,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   const name = flags & 8 ? undefined : property_key(runtime, key)
   const virtual =
     name === undefined ? undefined : virtual_property(runtime, object, name)
   if (virtual) {
-    const previous = memory.alloc_root()
-    try {
+    return heap.handles.scope(() => {
+      const previous = heap.handles.local()
       write_primitive(runtime, previous, virtual.value)
       return flags === virtual.flags && same_value(runtime, previous, value)
-    } finally {
-      memory.free_root(previous)
-    }
+    })
   }
   return ordinary_define_property(runtime, object, key, value, flags, setter)
 }
 
 function ordinary_define_property(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  value: Root,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   flags: number = 7,
-  setter?: Root,
+  setter?: Handle,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   const private_key = Boolean(flags & 8)
   const property = find_property(
-    memory,
+    heap,
     object,
     private_key ? key : property_key(runtime, key),
     true,
     private_key,
   )
   if (property !== 0) {
-    const previous_flags = property_flags(memory, property)
+    const previous_flags = property_flags(heap, property)
     if (!(previous_flags & 4)) {
       if (
         (flags & (2 | 4 | 16)) !== (previous_flags & (2 | 16)) ||
@@ -274,56 +268,51 @@ function ordinary_define_property(
       )
         return false
       if (previous_flags & 16 || !(previous_flags & 1)) {
-        const previous = memory.alloc_root()
-        try {
+        const same = heap.handles.scope(() => {
+          const previous = heap.handles.local()
           if (flags & 16 && setter !== undefined)
-            load_property_setter(memory, previous, property)
-          else load_property_value(memory, previous, property)
-          if (!same_value(runtime, previous, value)) return false
-        } finally {
-          memory.free_root(previous)
-        }
+            load_property_setter(heap, previous, property)
+          else load_property_value(heap, previous, property)
+          return same_value(runtime, previous, value)
+        })
+        if (!same) return false
       }
     }
     if (flags & 16) {
       if (!(previous_flags & 16)) {
-        set_property_flags(memory, property, flags)
-        const empty = memory.alloc_root()
-        try {
-          store_property_value(memory, property, empty)
-          store_property_setter(memory, property, empty)
-        } finally {
-          memory.free_root(empty)
-        }
+        set_property_flags(heap, property, flags)
+        heap.handles.scope(() => {
+          const empty = heap.handles.local()
+          store_property_value(heap, property, empty)
+          store_property_setter(heap, property, empty)
+        })
       }
-      if (setter === undefined) store_property_value(memory, property, value)
-      else store_property_setter(memory, property, value)
-      set_property_flags(memory, property, flags)
+      if (setter === undefined) store_property_value(heap, property, value)
+      else store_property_setter(heap, property, value)
+      set_property_flags(heap, property, flags)
       return true
     }
-    set_property_flags(memory, property, flags)
-    store_property_value(memory, property, value)
+    set_property_flags(heap, property, flags)
+    store_property_value(heap, property, value)
     if (previous_flags & 16) {
-      const empty = memory.alloc_root()
-      try {
-        store_property_setter(memory, property, empty)
-      } finally {
-        memory.free_root(empty)
-      }
+      heap.handles.scope(() => {
+        const empty = heap.handles.local()
+        store_property_setter(heap, property, empty)
+      })
     }
     return true
   }
-  const normalized = memory.alloc_root()
-  try {
+  return heap.handles.scope(() => {
+    const normalized = heap.handles.local()
     if (
       private_key ||
-      kind_of(memory, key) === KINDS.STRING ||
-      kind_of(memory, key) === KINDS.SYMBOL
+      heap_type_of(heap, key) === HEAP_TYPES.STRING ||
+      heap_type_of(heap, key) === HEAP_TYPES.SYMBOL
     )
-      memory.copy_value(normalized, key)
-    else write_string(memory, normalized, to_string(runtime, key))
+      heap.copy_value(normalized, key)
+    else write_string(heap, normalized, to_string(runtime, key))
     insert_property(
-      memory,
+      heap,
       object,
       normalized,
       flags,
@@ -331,26 +320,24 @@ function ordinary_define_property(
       Boolean(flags & 16 && setter !== undefined),
     )
     return true
-  } finally {
-    memory.free_root(normalized)
-  }
+  })
 }
 
 export type DefineValue = (
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  value: Root,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   flags?: number,
-  setter?: Root,
+  setter?: Handle,
   value_only?: boolean,
 ) => Status
 
 function define_ordinary_value(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  value: Root,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   flags?: number,
 ) {
   if (!try_define_property(runtime, object, key, value, flags))
@@ -361,19 +348,21 @@ function define_ordinary_value(
 /** Loads the setter into `setter` when the assignment must call one. */
 export function set_property(
   runtime: Runtime,
-  setter: Root,
-  object: Root,
-  key: Root,
-  value: Root,
+  setter: Handle,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   define: DefineValue = define_ordinary_value,
 ): Status {
-  const { memory } = runtime
-  write_undefined(memory, setter)
-  if (kind_of(memory, object) === KINDS.BYTE_BUFFER) {
+  const { heap } = runtime
+  write_undefined(heap, setter)
+  if (heap_type_of(heap, object) === HEAP_TYPES.BYTE_BUFFER) {
     const name =
-        kind_of(memory, key) === KINDS.SYMBOL ? "" : to_string(runtime, key),
+        heap_type_of(heap, key) === HEAP_TYPES.SYMBOL
+          ? ""
+          : to_string(runtime, key),
       index = Number(name),
-      bytes = byte_buffer_view(memory, object)
+      bytes = byte_buffer_view(heap, object)
     if (name === "length")
       return throw_error(runtime, "TypeError", "Byte buffer length is readonly")
     if (
@@ -383,14 +372,14 @@ export function set_property(
       index >= bytes.length
     )
       return throw_error(runtime, "RangeError", "Invalid byte buffer index")
-    if (tag_of(memory, value) !== TAGS.NUMBER)
+    if (tag_of(heap, value) !== VALUE_TAGS.NUMBER)
       return throw_error(runtime, "TypeError", "Expected a numeric value")
-    bytes[index] = read_number(memory, value)
+    bytes[index] = read_number(heap, value)
     return OK
   }
   const name = property_key(runtime, key)
   if (
-    kind_of(memory, object) === KINDS.STRING ||
+    heap_type_of(heap, object) === HEAP_TYPES.STRING ||
     virtual_property(runtime, object, name)
   )
     return throw_error(
@@ -398,15 +387,15 @@ export function set_property(
       "TypeError",
       "Cannot assign to readonly string property",
     )
-  const current = memory.alloc_root()
-  try {
-    memory.copy_value(current, object)
+  return heap.handles.scope(() => {
+    const current = heap.handles.local()
+    heap.copy_value(current, object)
     while (true) {
       const descriptor = own_property(runtime, current, name)
       if (descriptor) {
         if (descriptor.flags & 16) {
-          load_property_setter(memory, setter, descriptor.property!)
-          if (tag_of(memory, setter) === TAGS.UNDEFINED)
+          load_property_setter(heap, setter, descriptor.property!)
+          if (tag_of(heap, setter) === VALUE_TAGS.UNDEFINED)
             return throw_error(runtime, "TypeError", "Property has no setter")
           return OK
         }
@@ -420,9 +409,9 @@ export function set_property(
       }
       const prototype = prototype_reference(runtime, current)
       if (!prototype) break
-      set_ref(memory, current, prototype)
+      set_ref(heap, current, prototype)
     }
-    if (!has_property_list(memory, object))
+    if (!has_property_list(heap, object))
       return throw_error(runtime, "TypeError", "Expected an object")
     const own = own_property(runtime, object, name)
     return define(
@@ -434,35 +423,33 @@ export function set_property(
       undefined,
       Boolean(own),
     )
-  } finally {
-    memory.free_root(current)
-  }
+  })
 }
 
 export function private_property(
   runtime: Runtime,
-  destination: Root,
-  object: Root,
-  key: Root,
-  value: Root | undefined,
+  destination: Handle,
+  object: Handle,
+  key: Handle,
+  value: Handle | undefined,
   initialize: boolean = false,
   has: boolean = false,
   readonly: boolean = false,
 ): Status {
-  const { memory } = runtime
-  if (has && kind_of(memory, object) === KINDS.BYTE_BUFFER) {
-    write_boolean(memory, destination, false)
+  const { heap } = runtime
+  if (has && heap_type_of(heap, object) === HEAP_TYPES.BYTE_BUFFER) {
+    write_boolean(heap, destination, false)
     return OK
   }
-  if (!has_property_list(memory, object))
+  if (!has_property_list(heap, object))
     return throw_error(
       runtime,
       "TypeError",
       has ? "Private brand check requires an object" : "Expected an object",
     )
-  const property = find_property(memory, object, key, true, true)
+  const property = find_property(heap, object, key, true, true)
   if (has) {
-    write_boolean(memory, destination, property !== 0)
+    write_boolean(heap, destination, property !== 0)
     return OK
   }
   if (initialize) {
@@ -476,47 +463,42 @@ export function private_property(
   } else {
     if (property === 0)
       return throw_error(runtime, "TypeError", "Invalid private field receiver")
-    if (value === undefined) load_property_value(memory, destination, property)
+    if (value === undefined) load_property_value(heap, destination, property)
     else {
-      if (!(property_flags(memory, property) & 1))
+      if (!(property_flags(heap, property) & 1))
         return throw_error(runtime, "TypeError", "Private method is readonly")
-      store_property_value(memory, property, value)
+      store_property_value(heap, property, value)
     }
   }
   return OK
 }
 
-/** Own string keys in property order, followed by rooted symbol keys. */
-function own_property_keys(runtime: Runtime, object: Root) {
-  const { memory } = runtime
+/**
+ * Own string keys in property order, followed by symbol keys. The symbols are
+ * local handles in the caller's scope, since creating the result moves them.
+ */
+function own_property_keys(runtime: Runtime, object: Handle) {
+  const { heap } = runtime
   const names = []
-  // Symbol keys are rooted individually since creating the result moves them.
-  const symbols: Root[] = []
-  const key = memory.alloc_root()
-  try {
-    let property = object_properties(memory, object)
-    while (property) {
-      if (!(property_flags(memory, property) & 8)) {
-        load_property_key(memory, key, property)
-        if (kind_of(memory, key) === KINDS.SYMBOL) {
-          const symbol = memory.alloc_root()
-          memory.copy_value(symbol, key)
-          symbols.push(symbol)
-        } else names.push(read_string(memory, key))
-      }
-      property = next_property(memory, property)
+  const symbols: Handle[] = []
+  const key = heap.handles.local()
+  let property = object_properties(heap, object)
+  while (property) {
+    if (!(property_flags(heap, property) & 8)) {
+      load_property_key(heap, key, property)
+      if (heap_type_of(heap, key) === HEAP_TYPES.SYMBOL) {
+        const symbol = heap.handles.local()
+        heap.copy_value(symbol, key)
+        symbols.push(symbol)
+      } else names.push(read_string(heap, key))
     }
-  } catch (error) {
-    for (const symbol of symbols) memory.free_root(symbol)
-    throw error
-  } finally {
-    memory.free_root(key)
+    property = next_property(heap, property)
   }
   names.reverse()
   symbols.reverse()
-  if (kind_of(memory, object) === KINDS.STRING_OBJECT) {
-    const reference = string_reference(memory, object)
-    const length = heap_string_length(memory, reference)
+  if (heap_type_of(heap, object) === HEAP_TYPES.STRING_OBJECT) {
+    const reference = string_reference(heap, object)
+    const length = heap_string_length(heap, reference)
     for (let index = 0; index < length; index++) names.push(String(index))
     names.unshift("length")
   }
@@ -531,78 +513,70 @@ function own_property_keys(runtime: Runtime, object: Root) {
 
 export function ordinary_own_property_keys(
   runtime: Runtime,
-  destination: Root,
-  object: Root,
+  destination: Handle,
+  object: Handle,
 ) {
-  const { memory } = runtime
-  const { names: ordered, symbols } = own_property_keys(runtime, object)
-  const key = memory.alloc_root(),
-    value = memory.alloc_root()
-  try {
+  const { heap } = runtime
+  heap.handles.scope(() => {
+    const { names: ordered, symbols } = own_property_keys(runtime, object)
+    const key = heap.handles.local(),
+      value = heap.handles.local()
     create_array(runtime, destination, ordered.length + symbols.length)
     for (let index = 0; index < ordered.length; index++) {
-      write_string(memory, key, String(index))
-      write_string(memory, value, ordered[index])
+      write_string(heap, key, String(index))
+      write_string(heap, value, ordered[index])
       ordinary_define_property(runtime, destination, key, value, 7)
     }
     for (let index = 0; index < symbols.length; index++) {
-      write_string(memory, key, String(ordered.length + index))
+      write_string(heap, key, String(ordered.length + index))
       ordinary_define_property(runtime, destination, key, symbols[index], 7)
     }
-  } finally {
-    memory.free_root(key)
-    memory.free_root(value)
-    for (const symbol of symbols) memory.free_root(symbol)
-  }
+  })
 }
 
 export function get_own_property_descriptor(
   runtime: Runtime,
-  destination: Root,
-  object: Root,
-  key: Root,
+  destination: Handle,
+  object: Handle,
+  key: Handle,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   const descriptor = own_property(runtime, object, property_key(runtime, key))
   if (!descriptor) {
-    write_undefined(memory, destination)
+    write_undefined(heap, destination)
     return
   }
-  const value = memory.alloc_root(),
-    setter = memory.alloc_root(),
-    name = memory.alloc_root()
-  try {
+  heap.handles.scope(() => {
+    const value = heap.handles.local(),
+      setter = heap.handles.local(),
+      name = heap.handles.local()
     // Snapshot referenced values before allocating the result object.
     if (descriptor.property) {
-      load_property_value(memory, value, descriptor.property)
+      load_property_value(heap, value, descriptor.property)
       if (descriptor.flags & 16)
-        load_property_setter(memory, setter, descriptor.property)
+        load_property_setter(heap, setter, descriptor.property)
     } else if (typeof descriptor.value === "string")
-      write_string(memory, value, descriptor.value!)
+      write_string(heap, value, descriptor.value!)
     else {
       // The virtual numeric fields are length and byte-buffer elements.
-      write_number(memory, value, descriptor.value!)
+      write_number(heap, value, descriptor.value!)
     }
     create_object(runtime, destination)
-    write_string(memory, name, descriptor.flags & 16 ? "get" : "value")
+    write_string(heap, name, descriptor.flags & 16 ? "get" : "value")
     define_property(runtime, destination, name, value)
-    write_string(memory, name, descriptor.flags & 16 ? "set" : "writable")
+    write_string(heap, name, descriptor.flags & 16 ? "set" : "writable")
     if (!(descriptor.flags & 16))
-      write_boolean(memory, setter, Boolean(descriptor.flags & 1))
+      write_boolean(heap, setter, Boolean(descriptor.flags & 1))
     define_property(runtime, destination, name, setter)
     for (const [field, mask] of [
       ["enumerable", 2],
       ["configurable", 4],
     ] as [string, number][]) {
-      write_string(memory, name, field)
-      write_boolean(memory, value, Boolean(descriptor.flags & mask))
+      write_string(heap, name, field)
+      write_boolean(heap, value, Boolean(descriptor.flags & mask))
       define_property(runtime, destination, name, value)
     }
-  } finally {
-    memory.free_root(value)
-    memory.free_root(setter)
-    memory.free_root(name)
-  }
+  })
 }
 
 // Descriptors from native operations are trusted records of data fields.
@@ -610,42 +584,42 @@ export function get_own_property_descriptor(
 // before calling us.
 export function define_own_property(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  descriptor: Root,
+  object: Handle,
+  key: Handle,
+  descriptor: Handle,
   ordinary: boolean = false,
 ): Status {
-  const { memory } = runtime
+  const { heap } = runtime
   if (!ordinary) {
     const status = dispatch_define(runtime, object, key, descriptor)
     if (status !== null) return status
   }
-  if (!has_property_list(memory, object))
+  if (!has_property_list(heap, object))
     return throw_error(runtime, "TypeError", "Expected an object")
-  if (!is_object(memory, descriptor))
+  if (!is_object(heap, descriptor))
     return throw_error(runtime, "TypeError", "Expected a property descriptor")
-  const name = memory.alloc_root(),
-    value = memory.alloc_root(),
-    getter = memory.alloc_root(),
-    setter = memory.alloc_root()
-  try {
+  return heap.handles.scope(() => {
+    const name = heap.handles.local(),
+      value = heap.handles.local(),
+      getter = heap.handles.local(),
+      setter = heap.handles.local()
     const previous = own_property(runtime, object, property_key(runtime, key))
     let flags = previous?.flags ?? 0
     if (flags & 16) flags &= ~1
     if (previous?.property) {
-      load_property_value(memory, value, previous.property)
+      load_property_value(heap, value, previous.property)
       if (flags & 16) {
-        load_property_value(memory, getter, previous.property)
-        load_property_setter(memory, setter, previous.property)
+        load_property_value(heap, getter, previous.property)
+        load_property_setter(heap, setter, previous.property)
       }
     } else if (previous) {
       if (typeof previous.value === "string")
-        write_string(memory, value, previous.value!)
-      else write_number(memory, value, previous.value!)
+        write_string(heap, value, previous.value!)
+      else write_number(heap, value, previous.value!)
     }
     // Fields are absent, present, or THROW for accessor fields.
-    function field(field_name: string, target: Root) {
-      write_string(memory, name, field_name)
+    function field(field_name: string, target: Handle) {
+      write_string(heap, name, field_name)
       if (!has_property(runtime, descriptor, name)) return false
       if (get_property(runtime, target, descriptor, name))
         return throw_error(
@@ -661,129 +635,119 @@ export function define_own_property(
     if (has_setter === THROW) return THROW
     const has_value = field("value", value)
     if (has_value === THROW) return THROW
-    const writable = memory.alloc_root()
-    try {
-      const has_writable = field("writable", writable)
-      if (has_writable === THROW) return THROW
-      if ((accessor || has_setter) && (has_value || has_writable))
+    const writable = heap.handles.local()
+    const has_writable = field("writable", writable)
+    if (has_writable === THROW) return THROW
+    if ((accessor || has_setter) && (has_value || has_writable))
+      return throw_error(
+        runtime,
+        "TypeError",
+        "Invalid mixed property descriptor",
+      )
+    if (accessor || has_setter) {
+      if (
+        (accessor &&
+          tag_of(heap, getter) !== VALUE_TAGS.UNDEFINED &&
+          heap_type_of(heap, getter) !== HEAP_TYPES.FUNCTION) ||
+        (has_setter &&
+          tag_of(heap, setter) !== VALUE_TAGS.UNDEFINED &&
+          heap_type_of(heap, setter) !== HEAP_TYPES.FUNCTION)
+      )
         return throw_error(
           runtime,
           "TypeError",
-          "Invalid mixed property descriptor",
+          "Accessor must be callable or undefined",
         )
-      if (accessor || has_setter) {
-        if (
-          (accessor &&
-            tag_of(memory, getter) !== TAGS.UNDEFINED &&
-            kind_of(memory, getter) !== KINDS.FUNCTION) ||
-          (has_setter &&
-            tag_of(memory, setter) !== TAGS.UNDEFINED &&
-            kind_of(memory, setter) !== KINDS.FUNCTION)
-        )
-          return throw_error(
-            runtime,
-            "TypeError",
-            "Accessor must be callable or undefined",
-          )
-        if (!accessor && flags & 16) {
-          const current = own_property(
-            runtime,
-            object,
-            property_key(runtime, key),
-          )
-          load_property_value(memory, getter, current!.property!)
-        }
-        if (!(flags & 16) && !has_setter) write_undefined(memory, setter)
-        flags = (flags & ~1) | 16
-      } else if (has_value || has_writable) {
-        if (flags & 16) {
-          flags &= ~16
-          if (!has_value) write_undefined(memory, value)
-        }
-        if (has_writable)
-          flags = truthy(runtime, writable) ? flags | 1 : flags & ~1
-      }
-      for (const [field_name, mask] of [
-        ["enumerable", 2],
-        ["configurable", 4],
-      ] as [string, number][]) {
-        const present = field(field_name, writable)
-        if (present === THROW) return THROW
-        if (present)
-          flags = truthy(runtime, writable) ? flags | mask : flags & ~mask
-      }
-      if (flags & 16) {
-        // Validate a non-configurable accessor's two fields before changing either.
+      if (!accessor && flags & 16) {
         const current = own_property(
           runtime,
           object,
           property_key(runtime, key),
         )
-        if (current && !(current.flags & 4)) {
-          if (flags !== (current.flags & ~1))
-            return throw_error(runtime, "TypeError", "Cannot redefine property")
-          load_property_value(memory, value, current!.property!)
-          if (!same_reference(runtime, value, getter))
-            return throw_error(runtime, "TypeError", "Cannot redefine property")
-          load_property_setter(memory, value, current!.property!)
-          if (!same_reference(runtime, value, setter))
-            return throw_error(runtime, "TypeError", "Cannot redefine property")
-          return OK
-        }
-        if (!try_define_property(runtime, object, key, getter, flags))
-          return throw_error(runtime, "TypeError", "Cannot redefine property")
-        const property = own_property(
-          runtime,
-          object,
-          property_key(runtime, key),
-        )!.property!
-        store_property_setter(memory, property, setter)
-      } else if (!try_define_property(runtime, object, key, value, flags))
-        return throw_error(runtime, "TypeError", "Cannot redefine property")
-      return OK
-    } finally {
-      memory.free_root(writable)
+        load_property_value(heap, getter, current!.property!)
+      }
+      if (!(flags & 16) && !has_setter) write_undefined(heap, setter)
+      flags = (flags & ~1) | 16
+    } else if (has_value || has_writable) {
+      if (flags & 16) {
+        flags &= ~16
+        if (!has_value) write_undefined(heap, value)
+      }
+      if (has_writable)
+        flags = truthy(runtime, writable) ? flags | 1 : flags & ~1
     }
-  } finally {
-    for (const root of [name, value, getter, setter]) memory.free_root(root)
-  }
+    for (const [field_name, mask] of [
+      ["enumerable", 2],
+      ["configurable", 4],
+    ] as [string, number][]) {
+      const present = field(field_name, writable)
+      if (present === THROW) return THROW
+      if (present)
+        flags = truthy(runtime, writable) ? flags | mask : flags & ~mask
+    }
+    if (flags & 16) {
+      // Validate a non-configurable accessor's two fields before changing either.
+      const current = own_property(runtime, object, property_key(runtime, key))
+      if (current && !(current.flags & 4)) {
+        if (flags !== (current.flags & ~1))
+          return throw_error(runtime, "TypeError", "Cannot redefine property")
+        load_property_value(heap, value, current!.property!)
+        if (!same_reference(runtime, value, getter))
+          return throw_error(runtime, "TypeError", "Cannot redefine property")
+        load_property_setter(heap, value, current!.property!)
+        if (!same_reference(runtime, value, setter))
+          return throw_error(runtime, "TypeError", "Cannot redefine property")
+        return OK
+      }
+      if (!try_define_property(runtime, object, key, getter, flags))
+        return throw_error(runtime, "TypeError", "Cannot redefine property")
+      const property = own_property(
+        runtime,
+        object,
+        property_key(runtime, key),
+      )!.property!
+      store_property_setter(heap, property, setter)
+    } else if (!try_define_property(runtime, object, key, value, flags))
+      return throw_error(runtime, "TypeError", "Cannot redefine property")
+    return OK
+  })
 }
 
-function same_reference(runtime: Runtime, left: Root, right: Root) {
-  const { memory } = runtime
+function same_reference(runtime: Runtime, left: Handle, right: Handle) {
+  const { heap } = runtime
   return (
-    tag_of(memory, left) === tag_of(memory, right) &&
-    (tag_of(memory, left) === TAGS.UNDEFINED ||
-      get_ref(memory, left) === get_ref(memory, right))
+    tag_of(heap, left) === tag_of(heap, right) &&
+    (tag_of(heap, left) === VALUE_TAGS.UNDEFINED ||
+      get_ref(heap, left) === get_ref(heap, right))
   )
 }
 
 function invoke_define(
   runtime: Runtime,
-  method: Root,
-  object: Root,
-  key: Root,
-  descriptor: Root,
+  method: Handle,
+  object: Handle,
+  key: Handle,
+  descriptor: Handle,
 ): Status {
-  const { memory } = runtime
-  const result = memory.alloc_root(),
-    normalized = memory.alloc_root()
-  try {
+  const { heap } = runtime
+  return heap.handles.scope(() => {
+    const result = heap.handles.local(),
+      normalized = heap.handles.local()
     if (
-      kind_of(memory, key) === KINDS.STRING ||
-      kind_of(memory, key) === KINDS.SYMBOL
+      heap_type_of(heap, key) === HEAP_TYPES.STRING ||
+      heap_type_of(heap, key) === HEAP_TYPES.SYMBOL
     )
-      memory.copy_value(normalized, key)
-    else if (is_object(memory, key)) {
+      heap.copy_value(normalized, key)
+    else if (is_object(heap, key)) {
       if (coerce_value(runtime, normalized, key, "ToString") === THROW)
         return THROW
-    } else write_string(memory, normalized, to_string(runtime, key))
+    } else write_string(heap, normalized, to_string(runtime, key))
     if (
       invoke_sync(runtime, result, method, object, [normalized, descriptor]) ===
       THROW
     )
       return THROW
-    if (tag_of(memory, result) !== TAGS.BOOLEAN)
+    if (tag_of(heap, result) !== VALUE_TAGS.BOOLEAN)
       return throw_error(
         runtime,
         "TypeError",
@@ -792,25 +756,22 @@ function invoke_define(
     if (!truthy(runtime, result))
       return throw_error(runtime, "TypeError", "Cannot define property")
     return OK
-  } finally {
-    memory.free_root(result)
-    memory.free_root(normalized)
-  }
+  })
 }
 
 // Array exotic objects define properties through the stdlib's
 // @internal_method("array", "[[DefineOwnProperty]]"); other objects are ordinary.
-function exotic_define_own_property(runtime: Runtime, object: Root) {
-  if (kind_of(runtime.memory, object) !== KINDS.ARRAY) return undefined
+function exotic_define_own_property(runtime: Runtime, object: Handle) {
+  if (heap_type_of(runtime.heap, object) !== HEAP_TYPES.ARRAY) return undefined
   return runtime.realm.intrinsics.get("array [[DefineOwnProperty]]")
 }
 
 // Returns null when the object is ordinary.
 function dispatch_define(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  descriptor: Root,
+  object: Handle,
+  key: Handle,
+  descriptor: Handle,
 ): Status | null {
   const method = exotic_define_own_property(runtime, object)
   if (method === undefined) return null
@@ -819,27 +780,27 @@ function dispatch_define(
 
 export function define_value_property(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  value: Root,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   flags: number = 7,
-  setter?: Root,
+  setter?: Handle,
   value_only: boolean = false,
 ): Status {
-  const { memory } = runtime
+  const { heap } = runtime
   const method = exotic_define_own_property(runtime, object)
   if (method === undefined) {
     if (!try_define_property(runtime, object, key, value, flags, setter))
       return throw_error(runtime, "TypeError", "Cannot redefine property")
     return OK
   }
-  const descriptor = memory.alloc_root(),
-    name = memory.alloc_root(),
-    field = memory.alloc_root()
-  try {
+  return heap.handles.scope(() => {
+    const descriptor = heap.handles.local(),
+      name = heap.handles.local(),
+      field = heap.handles.local()
     create_object(runtime, descriptor)
     write_string(
-      memory,
+      heap,
       name,
       flags & 16 ? (setter === undefined ? "get" : "set") : "value",
     )
@@ -851,13 +812,11 @@ export function define_value_property(
         ["configurable", 4],
       ] as [string, number][]) {
         if (mask === 1 && flags & 16) continue
-        write_string(memory, name, text)
-        write_boolean(memory, field, Boolean(flags & mask))
+        write_string(heap, name, text)
+        write_boolean(heap, field, Boolean(flags & mask))
         define_property(runtime, descriptor, name, field)
       }
     }
     return invoke_define(runtime, method, object, key, descriptor)
-  } finally {
-    for (const root of [descriptor, name, field]) memory.free_root(root)
-  }
+  })
 }

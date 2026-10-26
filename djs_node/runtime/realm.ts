@@ -1,11 +1,11 @@
 import type { Runtime } from "./runtime.ts"
 import type { ModuleRecord } from "./modules.ts"
 import type { RealmDeclaration } from "../compiler/compile.ts"
-import type { Memory } from "../vm/storage/memory.ts"
-import type { Root } from "../vm/storage/value.ts"
+import type { Heap } from "../vm/storage/heap.ts"
+import type { Handle, Persistent } from "../vm/storage/value.ts"
 import { write_number, write_undefined } from "../vm/storage/value.ts"
-import { write_string } from "../vm/records/string.ts"
-import { create_symbol } from "../vm/records/symbol.ts"
+import { write_string } from "../vm/heap_types/string.ts"
+import { create_symbol } from "../vm/heap_types/symbol.ts"
 import {
   create_object,
   create_function,
@@ -40,34 +40,34 @@ const PROPERTY_NAMES = Object.freeze([
   "length",
 ])
 
-/** Every root here is owned by the realm and lives as long as the runtime. */
+/** Every handle here is owned by the realm and lives as long as the runtime. */
 export class Realm {
   /** The realm's well-known objects, abstract operations and internal methods by name. */
-  intrinsics = new Map<string, Root>()
+  intrinsics = new Map<string, Persistent>()
   /** Private keys of internal slots the VM does not represent itself. */
-  slot_keys = new Map<string, Root>()
+  slot_keys = new Map<string, Persistent>()
   /** Keyed by name without the "Symbol." prefix. */
-  well_known_symbols = new Map<string, Root>()
-  property_names = new Map<string, Root>()
-  globals = new Map<string, Root>()
+  well_known_symbols = new Map<string, Persistent>()
+  property_names = new Map<string, Persistent>()
+  globals = new Map<string, Persistent>()
   // Undefined until create_realm allocates them; objects created before then
   // have a null prototype.
-  object_prototype?: Root
-  function_prototype?: Root
-  array_prototype?: Root
-  string_prototype?: Root
-  symbol_prototype?: Root
+  object_prototype?: Persistent
+  function_prototype?: Persistent
+  array_prototype?: Persistent
+  string_prototype?: Persistent
+  symbol_prototype?: Persistent
 
-  constructor(memory: Memory) {
+  constructor(heap: Heap) {
     for (const [name, value] of [
       ["undefined", undefined],
       ["NaN", NaN],
       ["Infinity", Infinity],
     ] as [string, number | undefined][]) {
-      const root = memory.alloc_root()
-      if (value === undefined) write_undefined(memory, root)
-      else write_number(memory, root, value)
-      this.globals.set(name, root)
+      const global = heap.handles.persistent()
+      if (value === undefined) write_undefined(heap, global)
+      else write_number(heap, global, value)
+      this.globals.set(name, global)
     }
   }
 }
@@ -83,33 +83,31 @@ const PROTOTYPE_FIELDS = Object.freeze({
 export function set_realm_intrinsic(
   runtime: Runtime,
   name: string,
-  value: Root,
+  value: Handle,
 ) {
-  const root = runtime.memory.alloc_root()
-  runtime.memory.copy_value(root, value)
-  runtime.realm.intrinsics.set(name, root)
+  const intrinsic = runtime.heap.handles.persistent()
+  runtime.heap.copy_value(intrinsic, value)
+  runtime.realm.intrinsics.set(name, intrinsic)
   const field = PROTOTYPE_FIELDS[name as keyof typeof PROTOTYPE_FIELDS]
-  if (field) runtime.realm[field] = root
+  if (field) runtime.realm[field] = intrinsic
 }
 
 /** Allocates the symbols and property keys the VM uses directly. */
 export function create_well_known_values(runtime: Runtime) {
-  const { memory, realm } = runtime
-  const description = memory.alloc_root()
-  try {
+  const { heap, realm } = runtime
+  heap.handles.scope(() => {
+    const description = heap.handles.local()
     for (const name of WELL_KNOWN_SYMBOLS) {
-      const symbol = memory.alloc_root()
-      write_string(memory, description, `Symbol.${name}`)
-      create_symbol(memory, symbol, description)
+      const symbol = heap.handles.persistent()
+      write_string(heap, description, `Symbol.${name}`)
+      create_symbol(heap, symbol, description)
       realm.well_known_symbols.set(name, symbol)
     }
-  } finally {
-    memory.free_root(description)
-  }
+  })
   for (const name of PROPERTY_NAMES) {
-    const root = memory.alloc_root()
-    write_string(memory, root, name)
-    realm.property_names.set(name, root)
+    const key = heap.handles.persistent()
+    write_string(heap, key, name)
+    realm.property_names.set(name, key)
   }
 }
 
@@ -136,7 +134,7 @@ const REQUIRED = Object.freeze([
 ])
 
 // Allocated first, so every later object and function inherits from them.
-const ROOTS = ["%Object.prototype%", "%Function.prototype%"]
+const ALLOCATED_FIRST = ["%Object.prototype%", "%Function.prototype%"]
 
 function declaration_name(declaration: RealmDeclaration) {
   return declaration.kind === "internal_method"
@@ -171,38 +169,34 @@ export function create_realm(runtime: Runtime) {
       ;(scope.intrinsic_bindings ??= new Map()).set(declaration.slot, name)
       continue
     }
-    const object = runtime.memory.alloc_root()
-    try {
+    runtime.heap.handles.scope(() => {
+      const object = runtime.heap.handles.local()
       allocate(runtime, object, declaration.object)
       initialize_binding(runtime, module.environment, declaration.slot, object)
       set_realm_intrinsic(runtime, name, object)
-    } finally {
-      runtime.memory.free_root(object)
-    }
+    })
   }
 }
 
 function rank(name: string) {
-  const index = ROOTS.indexOf(name)
-  return index === -1 ? ROOTS.length : index
+  const index = ALLOCATED_FIRST.indexOf(name)
+  return index === -1 ? ALLOCATED_FIRST.length : index
 }
 
 function allocate(
   runtime: Runtime,
-  destination: Root,
+  destination: Handle,
   kind: Extract<RealmDeclaration, { kind: "well_known" }>["object"],
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   if (kind === "function")
     create_function(runtime, destination, BUILTIN_CODE, 0)
   else if (kind === "array") create_array(runtime, destination, 0)
   else if (kind === "string") {
-    const empty = memory.alloc_root()
-    try {
-      write_string(memory, empty, "")
+    heap.handles.scope(() => {
+      const empty = heap.handles.local()
+      write_string(heap, empty, "")
       create_string_object(runtime, destination, empty)
-    } finally {
-      memory.free_root(empty)
-    }
+    })
   } else create_object(runtime, destination)
 }
