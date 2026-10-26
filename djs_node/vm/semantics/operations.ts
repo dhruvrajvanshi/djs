@@ -18,12 +18,13 @@ import { read_string, write_string } from "../records/string.ts"
 import {
   has_error_prototype,
   has_property_list,
-  is_object,
   prototype_of_reference,
 } from "../records/object.ts"
-import { get_property, has_property } from "./properties.ts"
+import { get_property } from "./properties.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
+import { OP } from "../../compiler/bytecode.ts"
+import type { Opcode } from "../../compiler/bytecode.ts"
 
 export function to_string(runtime: Runtime, value: Root): string {
   const { memory } = runtime
@@ -149,178 +150,143 @@ function check_primitive(runtime: Runtime, value: Root): Status {
   return OK
 }
 
-export function binary_operation(
+// Applied to primitives; operands that were objects are converted first.
+const PRIMITIVE_OPERATORS: Partial<
+  Record<Opcode, (a: any, b: any) => unknown>
+> = {
+  [OP.ADD]: (a, b) => a + b,
+  [OP.SUB]: (a, b) => a - b,
+  [OP.MUL]: (a, b) => a * b,
+  [OP.DIV]: (a, b) => a / b,
+  [OP.MOD]: (a, b) => a % b,
+  [OP.EXP]: (a, b) => a ** b,
+  [OP.BIT_AND]: (a, b) => a & b,
+  [OP.BIT_OR]: (a, b) => a | b,
+  [OP.BIT_XOR]: (a, b) => a ^ b,
+  [OP.SHL]: (a, b) => a << b,
+  [OP.SHR]: (a, b) => a >> b,
+  [OP.USHR]: (a, b) => a >>> b,
+  [OP.LT]: (a, b) => a < b,
+  [OP.LT_EQ]: (a, b) => a <= b,
+  [OP.GT]: (a, b) => a > b,
+  [OP.GT_EQ]: (a, b) => a >= b,
+}
+
+export function primitive_operation(
   runtime: Runtime,
   destination: Root,
   left: Root,
   right: Root,
-  operator: string,
+  opcode: Opcode,
 ): Status {
-  const { memory } = runtime
-  if (operator === "in") {
-    if (!is_object(memory, right))
-      panic("Right operand of in must be an object")
-    write_boolean(memory, destination, has_property(runtime, right, left))
-    return OK
-  }
-  if (operator === "instanceof") {
-    if (kind_of(memory, right) !== KINDS.FUNCTION)
-      return throw_error(runtime, "TypeError", "Expected a constructor")
-    const key = memory.alloc_root(),
-      prototype = memory.alloc_root()
-    try {
-      write_string(memory, key, "prototype")
-      get_property(runtime, prototype, right, key)
-      if (!has_property_list(memory, prototype))
-        return throw_error(runtime, "TypeError", "Expected an object")
-      let found = false
-      if (is_object_kind(kind_of(memory, left))) {
-        let reference = get_ref(memory, left)
-        while (reference !== 0) {
-          reference = prototype_of_reference(memory, reference)
-          if (reference === get_ref(memory, prototype)) {
-            found = true
-            break
-          }
-        }
-      }
-      write_boolean(memory, destination, found)
-      return OK
-    } finally {
-      memory.free_root(key)
-      memory.free_root(prototype)
-    }
-  }
-  if (
-    ["===", "!==", "==", "!="].includes(operator) &&
-    (kind_of(memory, left) > KINDS.STRING ||
-      kind_of(memory, right) > KINDS.STRING)
-  ) {
-    const equal =
-      tag_of(memory, left) === TAGS.REF &&
-      tag_of(memory, right) === TAGS.REF &&
-      get_ref(memory, left) === get_ref(memory, right)
-    write_boolean(
-      memory,
-      destination,
-      operator === "===" || operator === "==" ? equal : !equal,
-    )
-    return OK
-  }
   if (check_primitive(runtime, left) === THROW) return THROW
   if (check_primitive(runtime, right) === THROW) return THROW
+  const operator = PRIMITIVE_OPERATORS[opcode]
+  if (operator === undefined) panic(`Not a primitive operator: ${opcode}`)
   // Host operators perform JavaScript coercion on the guest primitives.
-  const a: any = primitive(runtime, left),
-    b: any = primitive(runtime, right)
-  let result
-  switch (operator) {
-    case "+":
-      result = a + b
-      break
-    case "-":
-      result = a - b
-      break
-    case "*":
-      result = a * b
-      break
-    case "/":
-      result = a / b
-      break
-    case "%":
-      result = a % b
-      break
-    case "**":
-      result = a ** b
-      break
-    case "===":
-      result = a === b
-      break
-    case "!==":
-      result = a !== b
-      break
-    case "==":
-      result = a == b
-      break
-    case "!=":
-      result = a != b
-      break
-    case "<":
-      result = a < b
-      break
-    case "<=":
-      result = a <= b
-      break
-    case ">":
-      result = a > b
-      break
-    case ">=":
-      result = a >= b
-      break
-    case "&":
-      result = a & b
-      break
-    case "|":
-      result = a | b
-      break
-    case "^":
-      result = a ^ b
-      break
-    case "<<":
-      result = a << b
-      break
-    case ">>":
-      result = a >> b
-      break
-    case ">>>":
-      result = a >>> b
-      break
-    default:
-      panic(`Unsupported binary operator: ${operator}`)
-  }
-  write_primitive(runtime, destination, result)
+  write_primitive(
+    runtime,
+    destination,
+    operator(primitive(runtime, left), primitive(runtime, right)),
+  )
   return OK
 }
 
-export function unary_operation(
+/** Objects and symbols are equal only to themselves. */
+function equals(runtime: Runtime, left: Root, right: Root, loose: boolean) {
+  const { memory } = runtime
+  if (
+    kind_of(memory, left) > KINDS.STRING ||
+    kind_of(memory, right) > KINDS.STRING
+  )
+    return (
+      tag_of(memory, left) === TAGS.REF &&
+      tag_of(memory, right) === TAGS.REF &&
+      get_ref(memory, left) === get_ref(memory, right)
+    )
+  const a = primitive(runtime, left),
+    b = primitive(runtime, right)
+  return loose ? a == b : a === b
+}
+
+export function strict_equals(runtime: Runtime, left: Root, right: Root) {
+  return equals(runtime, left, right, false)
+}
+
+/** For operands that ToPrimitive has already converted where `==` requires. */
+export function loose_equals(runtime: Runtime, left: Root, right: Root) {
+  return equals(runtime, left, right, true)
+}
+
+export function instance_of(
+  runtime: Runtime,
+  destination: Root,
+  left: Root,
+  right: Root,
+): Status {
+  const { memory } = runtime
+  if (kind_of(memory, right) !== KINDS.FUNCTION)
+    return throw_error(runtime, "TypeError", "Expected a constructor")
+  const key = memory.alloc_root(),
+    prototype = memory.alloc_root()
+  try {
+    write_string(memory, key, "prototype")
+    get_property(runtime, prototype, right, key)
+    if (!has_property_list(memory, prototype))
+      return throw_error(runtime, "TypeError", "Expected an object")
+    let found = false
+    if (is_object_kind(kind_of(memory, left))) {
+      let reference = get_ref(memory, left)
+      while (reference !== 0) {
+        reference = prototype_of_reference(memory, reference)
+        if (reference === get_ref(memory, prototype)) {
+          found = true
+          break
+        }
+      }
+    }
+    write_boolean(memory, destination, found)
+    return OK
+  } finally {
+    memory.free_root(key)
+    memory.free_root(prototype)
+  }
+}
+
+export function type_of(runtime: Runtime, destination: Root, source: Root) {
+  const { memory } = runtime
+  const tag = tag_of(memory, source)
+  const kind = kind_of(memory, source)
+  const result =
+    tag === TAGS.UNDEFINED
+      ? "undefined"
+      : tag === TAGS.NUMBER
+        ? "number"
+        : tag === TAGS.BOOLEAN
+          ? "boolean"
+          : kind === KINDS.STRING
+            ? "string"
+            : kind === KINDS.SYMBOL
+              ? "symbol"
+              : kind === KINDS.FUNCTION
+                ? "function"
+                : "object"
+  write_string(memory, destination, result)
+}
+
+/** NEGATE, TO_NUMBER and BIT_NOT, on a primitive operand. */
+export function numeric_unary_operation(
   runtime: Runtime,
   destination: Root,
   source: Root,
-  operator: string,
+  opcode: Opcode,
 ): Status {
-  const { memory } = runtime
-  if (operator === "!") {
-    write_boolean(memory, destination, !truthy(runtime, source))
-    return OK
-  }
-  if (operator === "void") {
-    write_undefined(memory, destination)
-    return OK
-  }
-  if (operator === "typeof") {
-    const tag = tag_of(memory, source)
-    const kind = kind_of(memory, source)
-    const result =
-      tag === TAGS.UNDEFINED
-        ? "undefined"
-        : tag === TAGS.NUMBER
-          ? "number"
-          : tag === TAGS.BOOLEAN
-            ? "boolean"
-            : kind === KINDS.STRING
-              ? "string"
-              : kind === KINDS.SYMBOL
-                ? "symbol"
-                : kind === KINDS.FUNCTION
-                  ? "function"
-                  : "object"
-    write_string(memory, destination, result)
-    return OK
-  }
   if (check_primitive(runtime, source) === THROW) return THROW
   const value: any = primitive(runtime, source)
-  if (operator === "+") write_number(memory, destination, +value)
-  else if (operator === "-") write_number(memory, destination, -value)
-  else if (operator === "~") write_number(memory, destination, ~value)
-  else panic(`Unsupported unary operator: ${operator}`)
+  const { memory } = runtime
+  if (opcode === OP.NEGATE) write_number(memory, destination, -value)
+  else if (opcode === OP.TO_NUMBER) write_number(memory, destination, +value)
+  else if (opcode === OP.BIT_NOT) write_number(memory, destination, ~value)
+  else panic(`Not a numeric unary operator: ${opcode}`)
   return OK
 }

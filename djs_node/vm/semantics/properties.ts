@@ -556,43 +556,6 @@ export function ordinary_own_property_keys(
   }
 }
 
-/**
- * Snapshots the enumerable string keys of an object and its prototype chain
- * for for-in. Shadowed keys appear once, under the nearest object.
- */
-export function for_in_keys(runtime: Runtime, destination: Root, object: Root) {
-  const { memory } = runtime
-  const visited = new Set<string>()
-  const keys = []
-  const current = memory.alloc_root(),
-    value = memory.alloc_root()
-  try {
-    memory.copy_value(current, object)
-    while (true) {
-      const { names, symbols } = own_property_keys(runtime, current)
-      for (const symbol of symbols) memory.free_root(symbol)
-      for (const name of names) {
-        if (visited.has(name)) continue
-        visited.add(name)
-        if ((own_property(runtime, current, name)?.flags ?? 0) & 2)
-          keys.push(name)
-      }
-      const prototype = prototype_reference(runtime, current)
-      if (!prototype) break
-      set_ref(memory, current, prototype)
-    }
-    create_array(runtime, destination, keys.length)
-    for (let index = 0; index < keys.length; index++) {
-      write_string(memory, current, String(index))
-      write_string(memory, value, keys[index])
-      ordinary_define_property(runtime, destination, current, value, 7)
-    }
-  } finally {
-    memory.free_root(current)
-    memory.free_root(value)
-  }
-}
-
 export function get_own_property_descriptor(
   runtime: Runtime,
   destination: Root,

@@ -1,6 +1,6 @@
 import type { Brand } from "../utils.ts"
 import type { Instruction } from "./bytecode.ts"
-import type { Scope, ResolvedBinding, Environment } from "./scopes.ts"
+import type { Binding, Scope, ResolvedBinding, Environment } from "./scopes.ts"
 import type {
   Class,
   Span,
@@ -26,8 +26,10 @@ import {
 import { parse_source_file } from "djs_parser"
 import {
   OP,
+  FUNCTION_ENVIRONMENT,
   INSTRUCTION_BYTES,
   NATIVE_MARKERS,
+  NO_HOLES,
   encode_instructions,
 } from "./bytecode.ts"
 import { create_scope, declare_binding, resolve_binding } from "./scopes.ts"
@@ -104,21 +106,59 @@ export type Literal = string | number | boolean | null | undefined
 
 export type FunctionId = Brand<number, "FunctionId">
 
+/** Where a parameter lives: a register, or a slot of the function environment. */
+export type BindingLocation = { register: number } | { slot: number }
+
+/**
+ * A throw from an instruction in [start, end) continues at `target`, with the
+ * exception in `register`. `environment` is a block index or
+ * FUNCTION_ENVIRONMENT.
+ */
+export interface ExceptionHandler {
+  start: number
+  end: number
+  target: number
+  register: number
+  environment: number
+}
+
 export interface FunctionDescriptor {
   id: FunctionId
   name: string
   params: number
   length: number
   flags: number
-  parameter_slots: number[]
-  rest_slot: number | null
+  parameters: BindingLocation[]
+  rest: BindingLocation | null
   arguments_slot: number | null
   binding_flags: boolean[]
   binding_count: number
   /** Binding flags of each environment pushed by PUSH_ENV/COPY_ENV. */
   block_binding_flags: boolean[][]
   slot_count: number
+  handlers: ExceptionHandler[]
   bytecode: Uint8Array
+}
+
+export const PROPERTY_KIND = Object.freeze({ VALUE: 0, GETTER: 1, SETTER: 2 })
+export type PropertyKind = (typeof PROPERTY_KIND)[keyof typeof PROPERTY_KIND]
+
+/** `key` is the literal index of a static key, or null for a computed key. */
+export interface ObjectTemplate {
+  entries: { key: number | null; kind: PropertyKind }[]
+}
+
+/** A public method or accessor, keyed as in ObjectTemplate. */
+export interface ClassMember {
+  function: FunctionId
+  key: number | null
+  kind: PropertyKind
+  is_static: boolean
+}
+
+export interface ClassDescriptor {
+  constructor_function: FunctionId
+  members: ClassMember[]
 }
 
 export interface ExportBinding {
@@ -149,6 +189,10 @@ export interface CompiledModule {
   imports: { specifier: string; bindings: ImportBinding[] }[]
   exports: ExportBinding[]
   realm: RealmDeclaration[]
+  object_templates: ObjectTemplate[]
+  /** Element indices absent from array literals, for CREATE_ARRAY. */
+  array_holes: number[][]
+  classes: ClassDescriptor[]
   entry: FunctionId
 }
 
@@ -163,6 +207,8 @@ export interface CompilerState {
   registrations: Set<Stmt>
   /** Names of module-level function declarations. */
   functions: Set<string>
+  /** Indices of object templates and hole lists, by their JSON. */
+  template_ids: Map<string, number>
 }
 
 export function compile_module(
@@ -179,6 +225,9 @@ export function compile_module(
     imports: [],
     exports: [],
     realm: [],
+    object_templates: [],
+    array_holes: [],
+    classes: [],
     entry: 0 as FunctionId,
   }
   const state: CompilerState = {
@@ -188,6 +237,7 @@ export function compile_module(
     well_known: new Map(),
     registrations: new Set(),
     functions: new Set(),
+    template_ids: new Map(),
   }
   try {
     compile_function(state, null, null, ast.stmts, "<module>", [], null, {
@@ -204,7 +254,11 @@ export function compile_module(
     Object.freeze(fn.binding_flags)
     fn.block_binding_flags.forEach(Object.freeze)
     Object.freeze(fn.block_binding_flags)
-    Object.freeze(fn.parameter_slots)
+    fn.parameters.forEach(Object.freeze)
+    Object.freeze(fn.parameters)
+    if (fn.rest) Object.freeze(fn.rest)
+    fn.handlers.forEach(Object.freeze)
+    Object.freeze(fn.handlers)
     // A typed array cannot be frozen. Expose a fresh copy so compilation output
     // remains immutable even if a consumer modifies its instruction view.
     const bytecode = fn.bytecode
@@ -221,7 +275,27 @@ export function compile_module(
   }
   unit.exports.forEach(Object.freeze)
   unit.realm.forEach(Object.freeze)
-  for (const key of ["functions", "literals", "imports", "exports", "realm"])
+  for (const template of unit.object_templates) {
+    template.entries.forEach(Object.freeze)
+    Object.freeze(template.entries)
+    Object.freeze(template)
+  }
+  unit.array_holes.forEach(Object.freeze)
+  for (const descriptor of unit.classes) {
+    descriptor.members.forEach(Object.freeze)
+    Object.freeze(descriptor.members)
+    Object.freeze(descriptor)
+  }
+  for (const key of [
+    "functions",
+    "literals",
+    "imports",
+    "exports",
+    "realm",
+    "object_templates",
+    "array_holes",
+    "classes",
+  ])
     Object.freeze(unit[key as keyof CompiledModule])
   return Object.freeze(unit)
 }
@@ -248,24 +322,14 @@ function init_import_meta(
   scope: Scope,
   url: string,
 ) {
-  const meta = allocate(fn)
-  emit(fn, OP.CREATE_OBJECT, meta)
+  const meta = create_object(
+    state,
+    fn,
+    [{ key: literal(state, "url"), kind: PROPERTY_KIND.VALUE }],
+    [constant(state, fn, url)],
+  )
   emit(fn, OP.SET_PROTO, meta, constant(state, fn, null))
-  emit(
-    fn,
-    OP.DEFINE_PROP,
-    meta,
-    constant(state, fn, "url"),
-    constant(state, fn, url),
-    7,
-  )
-  emit(
-    fn,
-    OP.INIT_BINDING,
-    0,
-    declare_binding(scope, IMPORT_META, true).slot,
-    meta,
-  )
+  init_binding(fn, declare_binding(scope, IMPORT_META, true), meta)
 }
 
 function located_error(
@@ -327,7 +391,119 @@ function constant(state: CompilerState, fn: FunctionBuilder, value: Literal) {
 
 function declare_pattern(scope: Scope, pattern: Pattern, readonly: boolean) {
   if (pattern.kind !== "Var") unsupported(pattern, "binding destructuring")
-  return declare_binding(scope, pattern.ident.text, readonly)
+  return declare_local(scope, pattern.ident.text, readonly)
+}
+
+// Variables that no closure uses live in registers, except module-level ones,
+// which imports, exports and the realm address by slot.
+function declare_local(scope: Scope, name: string, readonly: boolean = false) {
+  const fn = scope.owner
+  const in_register =
+    !(fn.parent === null && scope === fn.scope) &&
+    !fn.captured.has(name) &&
+    name !== "arguments"
+  return declare_binding(
+    scope,
+    name,
+    readonly,
+    in_register ? allocate(fn) : null,
+  )
+}
+
+/** Names that functions nested in a function's body refer to. */
+class CaptureFinder extends ASTVisitorBase {
+  depth = 0
+  names = new Set<string>()
+  override visit_expr(expr: Expr) {
+    if (expr.kind === "Var" && this.depth) this.names.add(expr.ident.text)
+    const nested = expr.kind === "ArrowFn"
+    if (nested) this.depth++
+    super.visit_expr(expr)
+    if (nested) this.depth--
+  }
+  override visit_pattern(pattern: Pattern) {
+    if (pattern.kind === "Var" && this.depth) this.names.add(pattern.ident.text)
+    super.visit_pattern(pattern)
+  }
+  override visit_object_literal_entry(entry: ObjectLiteralEntry) {
+    if (entry.kind === "Ident" && this.depth) this.names.add(entry.ident.text)
+    super.visit_object_literal_entry(entry)
+  }
+  override visit_func(node: Func) {
+    this.depth++
+    super.visit_func(node)
+    this.depth--
+  }
+  override visit_class(node: Class) {
+    this.depth++
+    super.visit_class(node)
+    this.depth--
+  }
+}
+
+function captured_names(
+  params: readonly Param[],
+  stmts: readonly Stmt[],
+  expression_body: Expr | null,
+) {
+  const finder = new CaptureFinder()
+  for (const param of params) finder.visit_param(param)
+  for (const stmt of stmts) finder.visit_stmt(stmt)
+  if (expression_body) finder.visit_expr(expression_body)
+  return finder.names
+}
+
+function location(binding: Binding): BindingLocation {
+  return binding.register === null
+    ? { slot: binding.slot }
+    : { register: binding.register }
+}
+
+function throw_error(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  type: string,
+  message: string,
+) {
+  emit(fn, OP.THROW_ERROR, literal(state, type), literal(state, message))
+}
+
+const UNINITIALIZED_MESSAGE = "Cannot access binding before initialization"
+
+function read_binding(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  binding: ResolvedBinding,
+  dst: number,
+) {
+  if (binding.register === null)
+    emit(fn, OP.LOAD_BINDING, dst, binding.depth, binding.slot)
+  else if (!binding.initialized)
+    throw_error(state, fn, "ReferenceError", UNINITIALIZED_MESSAGE)
+  else emit(fn, OP.MOVE, dst, binding.register)
+}
+
+/** Runs a declaration in the binding's own scope. */
+function init_binding(fn: FunctionBuilder, binding: Binding, value: number) {
+  if (binding.register === null)
+    emit(fn, OP.INIT_BINDING, 0, binding.slot, value)
+  else emit(fn, OP.MOVE, binding.register, value)
+  binding.initialized = true
+}
+
+function store_binding(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  binding: ResolvedBinding,
+  value: number,
+) {
+  if (binding.register === null)
+    emit(fn, OP.STORE_BINDING, binding.depth, binding.slot, value)
+  else if (!binding.initialized)
+    throw_error(state, fn, "ReferenceError", UNINITIALIZED_MESSAGE)
+  else if (binding.readonly)
+    throw_error(state, fn, "TypeError", "Assignment to constant binding")
+  else emit(fn, OP.MOVE, binding.register, value)
 }
 
 function export_binding(
@@ -389,7 +565,7 @@ function prepare_statements(
       case "ClassDecl": {
         const name = stmt.class_def.name?.text
         if (!name) throw syntax_error(stmt, "A class declaration needs a name")
-        const binding = declare_binding(scope, name)
+        const binding = declare_local(scope, name)
         if (stmt.is_exported) {
           if (fn.id !== 0 || scope !== fn.scope)
             unsupported(stmt, "nested export")
@@ -400,7 +576,7 @@ function prepare_statements(
       case "Func": {
         if (!stmt.func.name)
           throw syntax_error(stmt, "A function declaration needs a name")
-        const binding = declare_binding(scope, stmt.func.name!.text)
+        const binding = declare_local(scope, stmt.func.name!.text)
         if (fn.id === 0 && scope === fn.scope) state.functions.add(binding.name)
         if (stmt.is_exported) {
           if (fn.id !== 0 || scope !== fn.scope)
@@ -501,35 +677,51 @@ export interface FunctionBuilder {
   name: string
   params: number
   length: number
-  parameter_slots: number[]
-  rest_slot: number | null
+  parameters: BindingLocation[]
+  rest: BindingLocation | null
   arguments_slot: number | null
   binding_flags: boolean[]
   binding_count: number
   slot_count: number
   instructions: Instruction[]
+  handlers: ExceptionHandler[]
   parent: FunctionBuilder | null
   scope: Scope | null
   flags: number
+  /** Names that nested functions use; their bindings stay in environments. */
+  captured: Set<string>
   block_environments: Environment[]
+  /** Block indices of the environments pushed at the current compile position. */
+  environment_blocks: number[]
   /** Number of block environments pushed at the current compile position. */
   environment_depth: number
-  /** Environment depth at each enclosing try statement. */
-  try_environment_depths: number[]
   loops: Loop[]
-}
-
-interface LoopJump {
-  instruction: number
-  /** Set for JUMP_OUT: block environments still to pop after unwinding. */
-  pad_pops: number | null
+  regions: Region[]
+  /** Holds the value of a return that passes through regions. */
+  return_register: number | null
 }
 
 interface Loop {
   environment_depth: number
-  try_count: number
-  breaks: LoopJump[]
-  continues: LoopJump[]
+  /** The number of regions still enclosing the code after a break. */
+  break_regions: number
+  /** The number of regions still enclosing the code after a continue. */
+  continue_regions: number
+  breaks: number[]
+  continues: number[]
+}
+
+type Exit = { kind: "return" } | { kind: "break" | "continue"; loop: Loop }
+
+/**
+ * A try statement with a finally block, or a for-of body. Returns, breaks and
+ * continues that leave a region jump to a pad after it, which runs `cleanup`
+ * and then continues the exit outward.
+ */
+interface Region {
+  environment_depth: number
+  cleanup: () => void
+  exits: { exit: Exit; jumps: number[] }[]
 }
 
 export interface FunctionOptions {
@@ -552,20 +744,24 @@ function compile_function(
     name,
     params: params.length,
     length: params.length,
-    parameter_slots: [],
-    rest_slot: null,
+    parameters: [],
+    rest: null,
     arguments_slot: null,
     binding_flags: [],
     binding_count: 0,
     slot_count: 0,
     instructions: [],
+    handlers: [],
     parent,
     scope: null,
     flags: options.flags ?? 0,
+    captured: captured_names(params, stmts, expression_body),
     block_environments: [],
+    environment_blocks: [],
     environment_depth: 0,
-    try_environment_depths: [],
     loops: [],
+    regions: [],
+    return_register: null,
   }
   state.unit.functions.push(null!)
   const scope = create_scope(parent_scope, fn)
@@ -582,32 +778,26 @@ function compile_function(
           param,
           "A rest parameter must be last and cannot have a default",
         )
-      fn.rest_slot = declare_pattern(scope, pattern.pattern, false).slot
+      const binding = declare_pattern(scope, pattern.pattern, false)
+      binding.initialized = true
+      fn.rest = location(binding)
       continue
     }
-    const slot = declare_pattern(scope, pattern, false).slot
-    fn.parameter_slots.push(slot)
-    if (initializer) defaults.push({ slot, initializer })
+    const binding = declare_pattern(scope, pattern, false)
+    binding.initialized = true
+    fn.parameters.push(location(binding))
+    if (initializer) defaults.push({ binding, initializer })
   }
   if (options.build) options.build(fn, scope)
-  for (const { slot, initializer } of defaults) {
+  for (const { binding, initializer } of defaults) {
+    const resolved = { ...binding, depth: 0 }
     const value = allocate(fn)
-    emit(fn, OP.LOAD_BINDING, value, 0, slot)
-    const missing = allocate(fn)
-    emit(
+    read_binding(state, fn, resolved, value)
+    const skip = emit(fn, OP.JUMP_IF_NOT_UNDEFINED, value, 0)
+    store_binding(
+      state,
       fn,
-      OP.BINARY_OP,
-      missing,
-      value,
-      constant(state, fn, undefined),
-      literal(state, "==="),
-    )
-    const skip = emit(fn, OP.JUMP_IF_FALSY, missing, 0)
-    emit(
-      fn,
-      OP.STORE_BINDING,
-      0,
-      slot,
+      resolved,
       compile_expr(state, fn, scope, initializer),
     )
     fn.instructions[skip][2] = position(fn)
@@ -628,14 +818,36 @@ function compile_function(
     block_binding_flags: fn.block_environments.map(
       (environment) => environment.binding_flags,
     ),
-    parameter_slots: fn.parameter_slots,
-    rest_slot: fn.rest_slot,
+    parameters: fn.parameters,
+    rest: fn.rest,
     arguments_slot: fn.arguments_slot,
     slot_count: fn.slot_count,
+    handlers: fn.handlers,
     bytecode: encode_instructions(fn.instructions),
   }
   state.unit.functions[fn.id] = descriptor
   return fn.id
+}
+
+function function_id(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  func: Func,
+  name: string,
+  flags: number,
+) {
+  if (func.is_generator) unsupported(func, "generator functions")
+  return compile_function(
+    state,
+    fn,
+    scope,
+    func.body.stmts,
+    name,
+    func.params,
+    null,
+    { flags: func.is_async ? flags | 8 : flags },
+  )
 }
 
 function function_value(
@@ -646,19 +858,13 @@ function function_value(
   name: string = "",
   flags: number = 0,
 ) {
-  if (func.is_generator) unsupported(func, "generator functions")
-  const id = compile_function(
-    state,
-    fn,
-    scope,
-    func.body.stmts,
-    name,
-    func.params,
-    null,
-    { flags: func.is_async ? flags | 8 : flags },
-  )
   const dst = allocate(fn)
-  emit(fn, OP.CREATE_CLOSURE, dst, id)
+  emit(
+    fn,
+    OP.CREATE_CLOSURE,
+    dst,
+    function_id(state, fn, scope, func, name, flags),
+  )
   return dst
 }
 
@@ -678,13 +884,7 @@ function compile_statements(
         stmt.func,
         stmt.func.name!.text,
       )
-      emit(
-        fn,
-        OP.INIT_BINDING,
-        0,
-        scope.bindings.get(stmt.func.name!.text)!.slot,
-        value,
-      )
+      init_binding(fn, scope.bindings.get(stmt.func.name!.text)!, value)
     }
   }
   for (const stmt of stmts) {
@@ -736,79 +936,110 @@ function compile_stmt(
           : constant(state, fn, undefined)
         if (!item.init && stmt.decl.decl_type === "Const")
           throw syntax_error(stmt, "Missing const initializer")
-        emit(
+        init_binding(
           fn,
-          OP.INIT_BINDING,
-          0,
           scope.bindings.get(
             (item.pattern as Extract<Pattern, { kind: "Var" }>).ident.text,
-          )!.slot,
+          )!,
           value,
         )
       }
       return
     case "ClassDecl": {
       const value = class_value(state, fn, scope, stmt.class_def)
-      emit(
-        fn,
-        OP.INIT_BINDING,
-        0,
-        scope.bindings.get(stmt.class_def.name!.text)!.slot,
-        value,
-      )
+      init_binding(fn, scope.bindings.get(stmt.class_def.name!.text)!, value)
       return
     }
     case "Try": {
-      const exception = allocate(fn)
-      const start = emit(fn, OP.TRY, 0xffffffff, 0xffffffff, 0, exception)
-      fn.try_environment_depths.push(fn.environment_depth)
+      const environment = current_environment(fn)
+      const start = position(fn)
+      const link = stmt.finally_block ? allocate(fn) : 0
+      const finally_calls: number[] = []
+      const call_finally = () =>
+        finally_calls.push(emit(fn, OP.JUMP_AND_LINK, link, 0))
+      let region: Region | null = null
+      if (stmt.finally_block) {
+        region = {
+          environment_depth: fn.environment_depth,
+          cleanup: call_finally,
+          exits: [],
+        }
+        fn.regions.push(region)
+      }
+      const ends: number[] = []
+      const complete_normally = () => {
+        if (region) call_finally()
+        ends.push(emit(fn, OP.JUMP, 0))
+      }
       compile_stmt(state, fn, scope, { kind: "Block", block: stmt.try_block })
-      emit(fn, OP.LEAVE_TRY)
+      const try_end = position(fn)
+      complete_normally()
       if (stmt.catch_block) {
-        fn.instructions[start][1] = position(fn)
+        const exception = allocate(fn)
+        fn.handlers.push({
+          start,
+          end: try_end,
+          target: position(fn),
+          register: exception,
+          environment,
+        })
         const child = block_scope(fn, scope)
         const binding =
           stmt.catch_pattern &&
           declare_pattern(child, stmt.catch_pattern, false)
         prepare_statements(state, fn, child, stmt.catch_block.stmts)
         const pushed = push_environment(fn, child)
-        if (binding) emit(fn, OP.INIT_BINDING, 0, binding.slot, exception)
+        if (binding) init_binding(fn, binding, exception)
         compile_statements(state, fn, child, stmt.catch_block.stmts)
         if (pushed) pop_environment(fn)
-        emit(fn, OP.LEAVE_TRY)
+        complete_normally()
       }
-      if (stmt.finally_block) {
-        fn.instructions[start][2] = position(fn)
+      if (region) {
+        const protected_end = position(fn)
+        close_region(fn, region)
+        const exception = allocate(fn)
+        fn.handlers.push({
+          start,
+          end: protected_end,
+          target: position(fn),
+          register: exception,
+          environment,
+        })
+        call_finally()
+        emit(fn, OP.THROW, exception)
+        for (const call of finally_calls)
+          fn.instructions[call][2] = position(fn)
         compile_stmt(state, fn, scope, {
           kind: "Block",
-          block: stmt.finally_block,
+          block: stmt.finally_block!,
         })
-        emit(fn, OP.END_FINALLY)
+        emit(fn, OP.JUMP_INDIRECT, link)
       }
-      fn.try_environment_depths.pop()
-      fn.instructions[start][3] = position(fn)
+      for (const end of ends) fn.instructions[end][1] = position(fn)
       return
     }
     case "ExportDefault":
-      emit(
+      init_binding(
         fn,
-        OP.INIT_BINDING,
-        0,
-        scope.bindings.get("*default*")!.slot,
+        scope.bindings.get("*default*")!,
         compile_expr(state, fn, scope, stmt.value),
       )
       return
-    case "Return":
+    case "Return": {
       if (fn.id === 0)
         throw syntax_error(stmt, "Illegal return at module top level")
-      emit(
-        fn,
-        OP.RETURN,
-        stmt.value
-          ? compile_expr(state, fn, scope, stmt.value)
-          : constant(state, fn, undefined),
-      )
+      const value = stmt.value
+        ? compile_expr(state, fn, scope, stmt.value)
+        : constant(state, fn, undefined)
+      if (!fn.regions.length) {
+        emit(fn, OP.RETURN, value)
+        return
+      }
+      fn.return_register ??= allocate(fn)
+      emit(fn, OP.MOVE, fn.return_register, value)
+      emit_exit(fn, { kind: "return" })
       return
+    }
     case "Block": {
       const child = block_scope(fn, scope)
       prepare_statements(state, fn, child, stmt.block.stmts)
@@ -901,32 +1132,33 @@ function compile_stmt(
         iterable = compile_expr(state, fn, tdz, stmt.rhs)
         if (pushed) pop_environment(fn)
       } else iterable = compile_expr(state, fn, scope, stmt.rhs)
-      // For-of closes the iterator on abrupt exits from the body. `active` is
-      // only set while the body runs, so errors from the iterator itself do
-      // not close it.
       const iterator = allocate(fn)
       const next = allocate(fn)
-      const object = allocate(fn)
-      const index = allocate(fn)
-      const active = allocate(fn)
-      const set_active = (value: boolean) =>
-        emit(fn, OP.MOVE, active, constant(state, fn, value))
-      const exception = allocate(fn)
-      let handler = null
+      emit(
+        fn,
+        is_of ? OP.GET_ITERATOR : OP.GET_FOR_IN_ITERATOR,
+        iterator,
+        next,
+        iterable,
+      )
+      // For-of closes the iterator when the body exits abruptly. Errors from
+      // the iterator itself, raised by ITERATOR_NEXT, do not close it.
+      const environment = current_environment(fn)
+      let region: Region | null = null
       if (is_of) {
-        emit(fn, OP.GET_ITERATOR, iterator, next, iterable)
-        set_active(false)
-        handler = emit(fn, OP.TRY, 0xffffffff, 0xffffffff, 0, exception)
-        fn.try_environment_depths.push(fn.environment_depth)
-      } else emit(fn, OP.FOR_IN_START, iterator, object, index, iterable)
+        region = {
+          environment_depth: fn.environment_depth,
+          cleanup: () => emit(fn, OP.ITERATOR_CLOSE, iterator, 0),
+          exits: [],
+        }
+        fn.regions.push(region)
+      }
       const loop = enter_loop(fn)
+      if (region) loop.break_regions--
       const start = position(fn)
-      if (is_of) set_active(false)
       const value = allocate(fn)
-      const exit = is_of
-        ? emit(fn, OP.ITERATOR_NEXT, value, iterator, next, 0)
-        : emit(fn, OP.FOR_IN_NEXT, value, iterator, object, index, 0)
-      if (is_of) set_active(true)
+      const exit = emit(fn, OP.ITERATOR_NEXT, value, iterator, next, 0)
+      const body_start = position(fn)
       const child = create_scope(
         scope,
         fn,
@@ -936,29 +1168,27 @@ function compile_stmt(
       if (stmt.decl_type) {
         const binding = declare_pattern(child, stmt.lhs, readonly)
         pushed = push_environment(fn, child)
-        emit(fn, OP.INIT_BINDING, 0, binding.slot, value)
+        init_binding(fn, binding, value)
       } else store_pattern(state, fn, scope, stmt.lhs, value)
       compile_stmt(state, fn, child, stmt.body)
       if (pushed) pop_environment(fn)
       emit(fn, OP.JUMP, start)
-      fn.instructions[exit][is_of ? 4 : 5] = position(fn)
+      if (region) {
+        const body_end = position(fn)
+        close_region(fn, region)
+        const exception = allocate(fn)
+        fn.handlers.push({
+          start: body_start,
+          end: body_end,
+          target: position(fn),
+          register: exception,
+          environment,
+        })
+        emit(fn, OP.ITERATOR_CLOSE, iterator, 1)
+        emit(fn, OP.THROW, exception)
+      }
+      fn.instructions[exit][4] = position(fn)
       leave_loop(fn, loop, position(fn), start)
-      if (handler === null) return
-      emit(fn, OP.LEAVE_TRY)
-      fn.instructions[handler][1] = position(fn)
-      const skip_close = emit(fn, OP.JUMP_IF_FALSY, active, 0)
-      set_active(false)
-      emit(fn, OP.ITERATOR_CLOSE, iterator, 1)
-      fn.instructions[skip_close][2] = position(fn)
-      emit(fn, OP.THROW, exception)
-      fn.instructions[handler][2] = position(fn)
-      const skip_return = emit(fn, OP.JUMP_IF_FALSY, active, 0)
-      set_active(false)
-      emit(fn, OP.ITERATOR_CLOSE, iterator, 0)
-      fn.instructions[skip_return][2] = position(fn)
-      emit(fn, OP.END_FINALLY)
-      fn.try_environment_depths.pop()
-      fn.instructions[handler][3] = position(fn)
       return
     }
     case "Break":
@@ -967,20 +1197,10 @@ function compile_stmt(
       const loop = fn.loops.at(-1)
       if (!loop)
         throw syntax_error(stmt, `Illegal ${stmt.kind.toLowerCase()} statement`)
-      const jumps = stmt.kind === "Break" ? loop.breaks : loop.continues
-      if (fn.try_environment_depths.length > loop.try_count) {
-        // Enclosing try statements must run finally blocks first. Unwinding
-        // restores the outermost one's environment; its pad pops the rest.
-        jumps.push({
-          instruction: emit(fn, OP.JUMP_OUT, 0),
-          pad_pops:
-            fn.try_environment_depths[loop.try_count] - loop.environment_depth,
-        })
-      } else {
-        const pops = fn.environment_depth - loop.environment_depth
-        if (pops) emit(fn, OP.POP_ENV, pops)
-        jumps.push({ instruction: emit(fn, OP.JUMP, 0), pad_pops: null })
-      }
+      emit_exit(fn, {
+        kind: stmt.kind === "Break" ? "break" : "continue",
+        loop,
+      })
       return
     }
     default:
@@ -1004,7 +1224,7 @@ function store_pattern(
         pattern,
         `Assignment to undeclared binding: ${pattern.ident.text}`,
       )
-    emit(fn, OP.STORE_BINDING, binding.depth, binding.slot, value)
+    store_binding(state, fn, binding, value)
     return
   }
   if (pattern.kind === "Prop") {
@@ -1036,20 +1256,28 @@ function push_environment(fn: FunctionBuilder, scope: Scope) {
     scope.environment = parent
     return false
   }
-  emit(fn, OP.PUSH_ENV, fn.block_environments.push(scope.environment) - 1)
+  const block = fn.block_environments.push(scope.environment) - 1
+  emit(fn, OP.PUSH_ENV, block)
+  fn.environment_blocks.push(block)
   fn.environment_depth++
   return true
 }
 
 function pop_environment(fn: FunctionBuilder) {
   emit(fn, OP.POP_ENV, 1)
+  fn.environment_blocks.pop()
   fn.environment_depth--
+}
+
+function current_environment(fn: FunctionBuilder) {
+  return fn.environment_blocks.at(-1) ?? FUNCTION_ENVIRONMENT
 }
 
 function enter_loop(fn: FunctionBuilder): Loop {
   const loop = {
     environment_depth: fn.environment_depth,
-    try_count: fn.try_environment_depths.length,
+    break_regions: fn.regions.length,
+    continue_regions: fn.regions.length,
     breaks: [],
     continues: [],
   }
@@ -1057,8 +1285,6 @@ function enter_loop(fn: FunctionBuilder): Loop {
   return loop
 }
 
-// JUMP_OUT pads follow the loop so they lie outside every try statement
-// inside it, and inside every try statement enclosing it.
 function leave_loop(
   fn: FunctionBuilder,
   loop: Loop,
@@ -1066,48 +1292,86 @@ function leave_loop(
   continue_target: number,
 ) {
   fn.loops.pop()
-  let skip_pads = null
-  for (const [jumps, target] of [
-    [loop.breaks, break_target],
-    [loop.continues, continue_target],
-  ] as const) {
-    for (const { instruction, pad_pops } of jumps) {
-      if (pad_pops === null) {
-        fn.instructions[instruction][1] = target
-        continue
-      }
-      skip_pads ??= emit(fn, OP.JUMP, 0)
-      fn.instructions[instruction][1] = position(fn)
-      if (pad_pops) emit(fn, OP.POP_ENV, pad_pops)
-      emit(fn, OP.JUMP, target)
-    }
-  }
-  if (skip_pads !== null) fn.instructions[skip_pads][1] = position(fn)
+  for (const jump of loop.breaks) fn.instructions[jump][1] = break_target
+  for (const jump of loop.continues) fn.instructions[jump][1] = continue_target
 }
 
-const binary_operators: Record<string, string> = {
-  In: "in",
-  Add: "+",
-  Sub: "-",
-  Mul: "*",
-  Div: "/",
-  Mod: "%",
-  Exponent: "**",
-  BitXor: "^",
-  BitAnd: "&",
-  BitOr: "|",
-  Gt: ">",
-  Lt: "<",
-  Gte: ">=",
-  Lte: "<=",
-  EqEq: "==",
-  EqEqEq: "===",
-  NotEq: "!=",
-  NotEqEq: "!==",
-  LeftShift: "<<",
-  RightShift: ">>",
-  UnsignedRightShift: ">>>",
-  Instanceof: "instanceof",
+// Leaves the environments the exit's destination is outside of, without
+// changing the compile position's depth: code after the exit still runs there.
+function pop_environments(fn: FunctionBuilder, depth: number) {
+  if (fn.environment_depth > depth)
+    emit(fn, OP.POP_ENV, fn.environment_depth - depth)
+}
+
+function emit_exit(fn: FunctionBuilder, exit: Exit) {
+  const remaining =
+    exit.kind === "return"
+      ? 0
+      : exit.kind === "break"
+        ? exit.loop.break_regions
+        : exit.loop.continue_regions
+  if (fn.regions.length > remaining) {
+    const region = fn.regions.at(-1)!
+    pop_environments(fn, region.environment_depth)
+    let pending = region.exits.find(
+      (item) =>
+        item.exit.kind === exit.kind &&
+        (exit.kind === "return" ||
+          (item.exit as { loop: Loop }).loop === exit.loop),
+    )
+    if (!pending) region.exits.push((pending = { exit, jumps: [] }))
+    pending.jumps.push(emit(fn, OP.JUMP, 0))
+    return
+  }
+  if (exit.kind === "return") {
+    emit(fn, OP.RETURN, fn.return_register!)
+    return
+  }
+  pop_environments(fn, exit.loop.environment_depth)
+  const jumps = exit.kind === "break" ? exit.loop.breaks : exit.loop.continues
+  jumps.push(emit(fn, OP.JUMP, 0))
+}
+
+// Pads follow the region, outside its exception handlers, and continue each
+// exit from the region's environment depth.
+function close_region(fn: FunctionBuilder, region: Region) {
+  fn.regions.pop()
+  if (!region.exits.length) return
+  const skip = emit(fn, OP.JUMP, 0)
+  const depth = fn.environment_depth
+  fn.environment_depth = region.environment_depth
+  for (const { exit, jumps } of region.exits) {
+    for (const jump of jumps) fn.instructions[jump][1] = position(fn)
+    region.cleanup()
+    emit_exit(fn, exit)
+  }
+  fn.environment_depth = depth
+  fn.instructions[skip][1] = position(fn)
+}
+
+const binary_operators: Record<string, number> = {
+  In: OP.IN,
+  Add: OP.ADD,
+  Sub: OP.SUB,
+  Mul: OP.MUL,
+  Div: OP.DIV,
+  Mod: OP.MOD,
+  Exponent: OP.EXP,
+  BitXor: OP.BIT_XOR,
+  BitAnd: OP.BIT_AND,
+  BitOr: OP.BIT_OR,
+  Gt: OP.GT,
+  Lt: OP.LT,
+  Gte: OP.GT_EQ,
+  Lte: OP.LT_EQ,
+  EqEq: OP.EQ,
+  EqEqEq: OP.STRICT_EQ,
+  NotEq: OP.NOT_EQ,
+  NotEqEq: OP.STRICT_NOT_EQ,
+  LeftShift: OP.SHL,
+  RightShift: OP.SHR,
+  UnsignedRightShift: OP.USHR,
+  Instanceof: OP.INSTANCEOF,
 }
 
 function resolve_name(scope: Scope, name: string): ResolvedBinding | null {
@@ -1138,10 +1402,23 @@ function load_name(
     return dst
   }
   const binding = resolve_name(scope, name)
-  if (binding) emit(fn, OP.LOAD_BINDING, dst, binding.depth, binding.slot)
+  if (binding) read_binding(state, fn, binding, dst)
   else
     emit(fn, OP.LOAD_GLOBAL, dst, literal(state, name), allow_missing ? 1 : 0)
   return dst
+}
+
+/** The property name of a non-computed key. */
+function static_key(key: ObjectKey): string | null {
+  if (key.kind === "Ident") return key.ident.text
+  if (key.kind === "String") {
+    // The parser uses String keys for both quoted and numeric property names.
+    const text = key.text
+    return text[0] === '"' || text[0] === "'"
+      ? decode_string(text, key)
+      : String(Number(text.replaceAll("_", "")))
+  }
+  return null
 }
 
 function property_key(
@@ -1150,16 +1427,8 @@ function property_key(
   scope: Scope,
   key: ObjectKey,
 ) {
-  if (key.kind === "Ident") return constant(state, fn, key.ident.text)
-  if (key.kind === "String") {
-    // The parser uses String keys for both quoted and numeric property names.
-    const text = key.text
-    const name =
-      text[0] === '"' || text[0] === "'"
-        ? decode_string(text, key)
-        : String(Number(text.replaceAll("_", "")))
-    return constant(state, fn, name)
-  }
+  const name = static_key(key)
+  if (name !== null) return constant(state, fn, name)
   if (key.kind === "Computed") {
     const value = compile_expr(state, fn, scope, key.expr)
     const name = allocate(fn)
@@ -1169,26 +1438,92 @@ function property_key(
   unsupported(key)
 }
 
-function set_function_name(
+function property_kind(accessor?: import("djs_ast").AccessorType | null) {
+  return accessor === "Get"
+    ? PROPERTY_KIND.GETTER
+    : accessor === "Set"
+      ? PROPERTY_KIND.SETTER
+      : PROPERTY_KIND.VALUE
+}
+
+function accessor_prefix(kind: PropertyKind) {
+  return kind === PROPERTY_KIND.GETTER
+    ? "get"
+    : kind === PROPERTY_KIND.SETTER
+      ? "set"
+      : ""
+}
+
+/** The name of a method under a static key; computed keys name it at runtime. */
+function method_name(name: string | null, kind: PropertyKind) {
+  if (name === null) return ""
+  const prefix = accessor_prefix(kind)
+  return prefix ? `${prefix} ${name}` : name
+}
+
+/** A method closure for an object literal or a well-known object. */
+function method_value(
   state: CompilerState,
   fn: FunctionBuilder,
-  value: number,
+  scope: Scope,
+  method: import("djs_ast").MethodDef,
   key: number,
-  accessor?: import("djs_ast").AccessorType | null,
 ) {
-  let name = key
-  if (accessor) {
-    name = allocate(fn)
+  const name = static_key(method.name)
+  const kind = property_kind(method.accessor_type)
+  const value = function_value(
+    state,
+    fn,
+    scope,
+    method.body,
+    method_name(name, kind),
+    2,
+  )
+  if (name === null)
     emit(
       fn,
-      OP.BINARY_OP,
-      name,
-      constant(state, fn, accessor === "Set" ? "set " : "get "),
+      OP.SET_FUNCTION_NAME,
+      value,
       key,
-      literal(state, "+"),
+      literal(state, accessor_prefix(kind)),
     )
+  return value
+}
+
+function template_id(
+  state: CompilerState,
+  table: unknown[],
+  kind: string,
+  value: unknown,
+) {
+  const json = kind + JSON.stringify(value)
+  let id = state.template_ids.get(json)
+  if (id === undefined) {
+    id = table.push(value) - 1
+    state.template_ids.set(json, id)
   }
-  emit(fn, OP.DEFINE_PROP, value, constant(state, fn, "name"), name, 4)
+  return id
+}
+
+/** `values` holds each entry's operands in the order CREATE_OBJECT takes them. */
+function create_object(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  entries: ObjectTemplate["entries"],
+  values: number[],
+) {
+  const first = allocate(fn, values.length)
+  for (let i = 0; i < values.length; i++)
+    emit(fn, OP.MOVE, first + i, values[i])
+  const dst = allocate(fn)
+  emit(
+    fn,
+    OP.CREATE_OBJECT,
+    dst,
+    template_id(state, state.unit.object_templates, "object", { entries }),
+    first,
+  )
+  return dst
 }
 
 function property_reference(
@@ -1235,11 +1570,16 @@ function compile_expr(
         } else {
           value = compile_expr(state, fn, scope, fragment.expr)
         }
+        if (fragment.kind !== "Text") {
+          const text = allocate(fn)
+          emit(fn, OP.TO_STRING, text, value)
+          value = text
+        }
         if (result === undefined) {
           result = value
         } else {
           const dst = allocate(fn)
-          emit(fn, OP.BINARY_OP, dst, result, value, literal(state, "+"))
+          emit(fn, OP.ADD, dst, result, value)
           result = dst
         }
       }
@@ -1352,16 +1692,33 @@ function compile_expr(
       return dst
     }
     case "Array": {
-      const dst = allocate(fn)
-      emit(fn, OP.CREATE_ARRAY, dst, expr.items.length)
+      const first = allocate(fn, expr.items.length)
+      const holes = []
       for (let index = 0; index < expr.items.length; index++) {
         const item = expr.items[index]
-        if (item.kind === "Elision") continue
+        if (item.kind === "Elision") {
+          holes.push(index)
+          continue
+        }
         if (item.kind === "Spread") unsupported(item, "array spread")
-        const key = constant(state, fn, String(index))
-        const value = compile_expr(state, fn, scope, item.expr)
-        emit(fn, OP.DEFINE_PROP, dst, key, value, 7)
+        emit(
+          fn,
+          OP.MOVE,
+          first + index,
+          compile_expr(state, fn, scope, item.expr),
+        )
       }
+      const dst = allocate(fn)
+      emit(
+        fn,
+        OP.CREATE_ARRAY,
+        dst,
+        first,
+        expr.items.length,
+        holes.length
+          ? template_id(state, state.unit.array_holes, "holes", holes)
+          : NO_HOLES,
+      )
       return dst
     }
     case "ImportMeta":
@@ -1393,41 +1750,30 @@ function compile_expr(
       return dst
     }
     case "Object": {
-      const dst = allocate(fn)
-      emit(fn, OP.CREATE_OBJECT, dst)
+      const entries: ObjectTemplate["entries"] = []
+      const values = []
       for (const entry of expr.entries) {
-        let key, value
+        let name: string | null, key, value
+        let kind: PropertyKind = PROPERTY_KIND.VALUE
         if (entry.kind === "Ident") {
-          key = constant(state, fn, entry.ident.text)
+          name = entry.ident.text
           value = load_name(state, fn, scope, entry.ident.text)
         } else if (entry.kind === "Prop") {
-          key = property_key(state, fn, scope, entry.key)
+          name = static_key(entry.key)
+          if (name === null) key = property_key(state, fn, scope, entry.key)
           value = compile_expr(state, fn, scope, entry.value)
         } else if (entry.kind === "Method") {
-          key = property_key(state, fn, scope, entry.method.name)
-          value = function_value(
-            state,
-            fn,
-            scope,
-            entry.method.body,
-            "<method>",
-            2,
-          )
-          set_function_name(state, fn, value, key, entry.method.accessor_type)
+          name = static_key(entry.method.name)
+          if (name === null)
+            key = property_key(state, fn, scope, entry.method.name)
+          kind = property_kind(entry.method.accessor_type)
+          value = method_value(state, fn, scope, entry.method, key!)
         } else unsupported(entry)
-        if (entry.kind === "Method" && entry.method.accessor_type)
-          emit(
-            fn,
-            OP.DEFINE_PROP,
-            dst,
-            key,
-            value,
-            7 | 16,
-            entry.method.accessor_type === "Set" ? 1 : 0,
-          )
-        else emit(fn, OP.DEFINE_PROP, dst, key, value, 7)
+        entries.push({ key: name === null ? null : literal(state, name), kind })
+        if (key !== undefined) values.push(key)
+        values.push(value)
       }
-      return dst
+      return create_object(state, fn, entries, values)
     }
     case "Func":
       if (expr.func.name) unsupported(expr, "named function expressions")
@@ -1471,36 +1817,17 @@ function compile_expr(
       return value
     }
     case "BinOp": {
-      if (expr.operator === "And" || expr.operator === "Or") {
+      const short_circuit = {
+        And: OP.JUMP_IF_FALSY,
+        Or: OP.JUMP_IF_TRUTHY,
+        Coalesce: OP.JUMP_IF_NOT_NULLISH,
+      }[expr.operator as string]
+      if (short_circuit !== undefined) {
         const dst = allocate(fn)
         emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.lhs))
-        const branch = emit(fn, OP.JUMP_IF_FALSY, dst, 0)
-        let end
-        if (expr.operator === "Or") {
-          end = emit(fn, OP.JUMP, 0)
-          fn.instructions[branch][2] = position(fn)
-        }
+        const end = emit(fn, short_circuit, dst, 0)
         emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.rhs))
-        fn.instructions[end ?? branch][end === undefined ? 2 : 1] = position(fn)
-        return dst
-      }
-      if (expr.operator === "Coalesce") {
-        const dst = allocate(fn)
-        emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.lhs))
-        const present = allocate(fn)
-        emit(
-          fn,
-          OP.BINARY_OP,
-          present,
-          dst,
-          constant(state, fn, null),
-          literal(state, "!="),
-        )
-        const branch = emit(fn, OP.JUMP_IF_FALSY, present, 0)
-        const end = emit(fn, OP.JUMP, 0)
-        fn.instructions[branch][2] = position(fn)
-        emit(fn, OP.MOVE, dst, compile_expr(state, fn, scope, expr.rhs))
-        fn.instructions[end][1] = position(fn)
+        fn.instructions[end][2] = position(fn)
         return dst
       }
       if (expr.lhs.kind === "PrivateName") {
@@ -1512,12 +1839,12 @@ function compile_expr(
         emit(fn, OP.HAS_PRIVATE, dst, object, key)
         return dst
       }
-      const operator = binary_operators[expr.operator]
-      if (!operator) unsupported(expr, `binary ${expr.operator}`)
+      const opcode = binary_operators[expr.operator]
+      if (opcode === undefined) unsupported(expr, `binary ${expr.operator}`)
       const left = compile_expr(state, fn, scope, expr.lhs)
       const right = compile_expr(state, fn, scope, expr.rhs)
       const dst = allocate(fn)
-      emit(fn, OP.BINARY_OP, dst, left, right, literal(state, operator))
+      emit(fn, opcode, dst, left, right)
       return dst
     }
     case "Assign": {
@@ -1531,7 +1858,7 @@ function compile_expr(
             `Assignment to undeclared binding: ${pattern.ident.text}`,
           )
         const value = compile_expr(state, fn, scope, expr.value)
-        emit(fn, OP.STORE_BINDING, binding.depth, binding.slot, value)
+        store_binding(state, fn, binding, value)
         return value
       }
       if (pattern.kind === "Prop") {
@@ -1570,22 +1897,22 @@ function compile_expr(
     case "UnaryMinus":
     case "TypeOf":
     case "Void": {
-      const operator = {
-        Not: "!",
-        BitNot: "~",
-        UnaryPlus: "+",
-        UnaryMinus: "-",
-        TypeOf: "typeof",
-        Void: "void",
-      }[expr.kind]
       let operand = expr.expr
       while (operand.kind === "Paren") operand = operand.expr
       const value =
         expr.kind === "TypeOf" && operand.kind === "Var"
           ? load_name(state, fn, scope, operand.ident.text, true)
           : compile_expr(state, fn, scope, expr.expr)
+      if (expr.kind === "Void") return constant(state, fn, undefined)
       const dst = allocate(fn)
-      emit(fn, OP.UNARY_OP, dst, value, literal(state, operator))
+      const opcode = {
+        Not: OP.NOT,
+        BitNot: OP.BIT_NOT,
+        UnaryPlus: OP.TO_NUMBER,
+        UnaryMinus: OP.NEGATE,
+        TypeOf: OP.TYPEOF,
+      }[expr.kind]
+      emit(fn, opcode, dst, value)
       return dst
     }
     default:
@@ -1621,9 +1948,11 @@ export type ClassDefinition = Omit<Class, "body"> & {
   body: { members: readonly { method?: ClassElement; field?: ClassElement }[] }
 }
 
+// The class body is a block whose environment holds the class's inner name,
+// private names and computed keys, for its methods to capture.
 function class_value(
   state: CompilerState,
-  parent: FunctionBuilder,
+  fn: FunctionBuilder,
   parent_scope: Scope,
   cls: ClassDefinition,
 ): number {
@@ -1635,267 +1964,215 @@ function class_value(
       throw syntax_error(member, "Decorators are not supported")
   }
   if (cls.superclass) unsupported(cls, "class inheritance")
-  const id = compile_function(
+  const scope = create_scope(parent_scope, fn, { binding_flags: [] })
+  const class_binding = declare_binding(
+    scope,
+    cls.name?.text ?? "*class*",
+    true,
+  )
+  const pushed = push_environment(fn, scope)
+  scope.private_names = new Map()
+  const members = cls.body.members.map(
+    (member) => (member.method ?? member.field)!,
+  )
+  for (const member of members) {
+    const public_name =
+      member.name.kind === "Ident"
+        ? member.name.ident.text
+        : member.name.kind === "String"
+          ? decode_string(member.name.text, member.name)
+          : null
+    if (
+      (member.is_static && public_name === "prototype") ||
+      (!member.is_static && !member.body && public_name === "constructor")
+    )
+      throw syntax_error(member, `Invalid class element: ${public_name}`)
+    if (member.name.kind !== "Private") continue
+    const name = member.name.ident.text
+    if (name === "#constructor" || scope.private_names.has(name))
+      throw syntax_error(member, `Duplicate or invalid private name: ${name}`)
+    if (member.accessor_type) unsupported(member, "private accessors")
+    const hidden = `*private:${name}*`
+    scope.private_names.set(name, hidden)
+    init_binding(
+      fn,
+      declare_binding(scope, hidden, true),
+      create_object(state, fn, [], []),
+    )
+  }
+  const keys = new Map<ClassElement, string>()
+  const key_registers = new Map<ClassElement, number>()
+  const private_methods = new Map<ClassElement, Binding>()
+  for (let i = 0; i < members.length; i++) {
+    const member = members[i]
+    if (member.name.kind === "Computed") {
+      const hidden = `*key:${i}*`
+      const key = property_key(state, fn, scope, member.name)
+      init_binding(fn, declare_binding(scope, hidden, true), key)
+      keys.set(member, hidden)
+      key_registers.set(member, key)
+    }
+    if (member.body && member.name.kind === "Private")
+      private_methods.set(member, declare_binding(scope, `*method:${i}*`, true))
+  }
+  const key_of = (
+    owner: FunctionBuilder,
+    current: Scope,
+    member: ClassElement,
+  ) =>
+    member.name.kind === "Private"
+      ? private_name(state, owner, current, member.name.ident)
+      : keys.has(member)
+        ? load_name(state, owner, current, keys.get(member)!)
+        : property_key(state, owner, current, member.name)
+  const constructors = members.filter(
+    (member) =>
+      member.body &&
+      !member.is_static &&
+      member.name.kind !== "Private" &&
+      (member.name.ident?.text ??
+        (member.name.kind === "String"
+          ? decode_string(member.name.text, member.name)
+          : null)) === "constructor",
+  )
+  if (constructors.length > 1)
+    throw syntax_error(constructors[1], "Duplicate constructor")
+  const constructor = constructors[0]
+  if (
+    constructor?.accessor_type ||
+    constructor?.body!.is_async ||
+    constructor?.body!.is_generator
+  )
+    throw syntax_error(constructor, "Invalid constructor")
+  const constructor_function = compile_function(
     state,
-    parent,
-    parent_scope,
-    [],
-    "<class>",
-    [],
+    fn,
+    scope,
+    constructor?.body!.body.stmts ?? [],
+    cls.name?.text ?? "",
+    constructor?.body!.params ?? [],
     null,
     {
-      flags: 4,
-      build(fn: FunctionBuilder, scope: Scope) {
-        const name = cls.name?.text ?? "*class*"
-        declare_binding(scope, name, true)
-        scope.private_names = new Map()
-        const members = cls.body.members.map(
-          (member) => (member.method ?? member.field)!,
-        )
+      flags: 1,
+      build(owner: FunctionBuilder) {
+        const field_scope = create_scope(scope, owner)
+        const receiver = load_name(state, owner, field_scope, "this")
+        for (const [member, binding] of private_methods)
+          if (!member.is_static)
+            emit(
+              owner,
+              OP.INIT_PRIVATE,
+              receiver,
+              key_of(owner, field_scope, member),
+              load_name(state, owner, field_scope, binding.name),
+              1,
+            )
         for (const member of members) {
-          const public_name =
-            member.name.kind === "Ident"
-              ? member.name.ident.text
-              : member.name.kind === "String"
-                ? decode_string(member.name.text, member.name)
-                : null
+          if (member.body || member.is_static) continue
           if (
-            (member.is_static && public_name === "prototype") ||
-            (!member.is_static && !member.body && public_name === "constructor")
-          )
-            throw syntax_error(member, `Invalid class element: ${public_name}`)
-          if (member.name.kind !== "Private") continue
-          const name = member.name.ident.text
-          if (name === "#constructor" || scope.private_names.has(name))
-            throw syntax_error(
-              member,
-              `Duplicate or invalid private name: ${name}`,
-            )
-          if (member.accessor_type) unsupported(member, "private accessors")
-          const hidden = `*private:${name}*`
-          scope.private_names.set(name, hidden)
-          const binding = declare_binding(scope, hidden, true)
-          const token = allocate(fn)
-          emit(fn, OP.CREATE_OBJECT, token)
-          emit(fn, OP.INIT_BINDING, 0, binding.slot, token)
-        }
-        const keys = new Map<ClassElement, string>()
-        const private_methods = new Map<ClassElement, string>()
-        for (let i = 0; i < members.length; i++) {
-          const member = members[i]
-          if (member.name.kind === "Computed") {
-            const hidden = `*key:${i}*`
-            const binding = declare_binding(scope, hidden, true)
-            emit(
-              fn,
-              OP.INIT_BINDING,
-              0,
-              binding.slot,
-              property_key(state, fn, scope, member.name),
-            )
-            keys.set(member, hidden)
-          }
-          if (member.body && member.name.kind === "Private") {
-            const hidden = `*method:${i}*`
-            declare_binding(scope, hidden, true)
-            private_methods.set(member, hidden)
-          }
-        }
-        const key_of = (
-          owner: FunctionBuilder,
-          current: Scope,
-          member: ClassElement,
-        ) =>
-          member.name.kind === "Private"
-            ? private_name(state, owner, current, member.name.ident)
-            : keys.has(member)
-              ? load_name(state, owner, current, keys.get(member)!)
-              : property_key(state, owner, current, member.name)
-        const constructors = members.filter(
-          (member) =>
-            member.body &&
-            !member.is_static &&
             member.name.kind !== "Private" &&
-            (member.name.ident?.text ??
-              (member.name.kind === "String"
-                ? decode_string(member.name.text, member.name)
-                : null)) === "constructor",
-        )
-        if (constructors.length > 1)
-          throw syntax_error(constructors[1], "Duplicate constructor")
-        const constructor = constructors[0]
-        if (
-          constructor?.accessor_type ||
-          constructor?.body!.is_async ||
-          constructor?.body!.is_generator
-        )
-          throw syntax_error(constructor, "Invalid constructor")
-        const constructor_id = compile_function(
-          state,
-          fn,
-          scope,
-          constructor?.body!.body.stmts ?? [],
-          name,
-          constructor?.body!.params ?? [],
-          null,
-          {
-            flags: 1,
-            build(owner: FunctionBuilder) {
-              const field_scope = create_scope(scope, owner)
-              const receiver = load_name(state, owner, field_scope, "this")
-              for (const [member, hidden] of private_methods)
-                if (!member.is_static)
-                  emit(
-                    owner,
-                    OP.INIT_PRIVATE,
-                    receiver,
-                    key_of(owner, field_scope, member),
-                    load_name(state, owner, field_scope, hidden),
-                    1,
-                  )
-              for (const member of members) {
-                if (member.body || member.is_static) continue
-                if (
-                  member.name.kind !== "Private" &&
-                  member.name.ident?.text === "constructor"
-                )
-                  throw syntax_error(member, "Invalid field name: constructor")
-                const key = key_of(owner, field_scope, member)
-                const value = member.initializer
-                  ? compile_expr(state, owner, field_scope, member.initializer)
-                  : constant(state, owner, undefined)
-                emit(
-                  owner,
-                  member.name.kind === "Private"
-                    ? OP.INIT_PRIVATE
-                    : OP.DEFINE_PROP,
-                  receiver,
-                  key,
-                  value,
-                  member.name.kind === "Private" ? 0 : 7,
-                )
-              }
-            },
-          },
-        )
-        const ctor = allocate(fn),
-          prototype = allocate(fn)
-        emit(fn, OP.CREATE_CLOSURE, ctor, constructor_id)
-        emit(fn, OP.INIT_BINDING, 0, scope.bindings.get(name)!.slot, ctor)
-        emit(fn, OP.CREATE_OBJECT, prototype)
-        emit(
-          fn,
-          OP.DEFINE_PROP,
-          ctor,
-          constant(state, fn, "prototype"),
-          prototype,
-          0,
-        )
-        emit(
-          fn,
-          OP.DEFINE_PROP,
-          ctor,
-          constant(state, fn, "name"),
-          constant(state, fn, cls.name?.text ?? ""),
-          4,
-        )
-        emit(
-          fn,
-          OP.DEFINE_PROP,
-          ctor,
-          constant(state, fn, "length"),
-          constant(state, fn, state.unit.functions[constructor_id].length),
-          4,
-        )
-        emit(
-          fn,
-          OP.DEFINE_PROP,
-          prototype,
-          constant(state, fn, "constructor"),
-          ctor,
-          5,
-        )
-        for (const member of members) {
-          if (!member.body || member === constructor) continue
-          const value = function_value(
-            state,
-            fn,
-            scope,
-            member.body,
-            member.name.ident?.text ?? "<method>",
-            2,
+            member.name.ident?.text === "constructor"
           )
-          const key =
-            member.name.kind === "Private"
-              ? constant(state, fn, member.name.ident.text)
-              : key_of(fn, scope, member)
-          set_function_name(state, fn, value, key, member.accessor_type)
-          if (member.name.kind === "Private") {
-            emit(
-              fn,
-              OP.INIT_BINDING,
-              0,
-              scope.bindings.get(private_methods.get(member)!)!.slot,
-              value,
-            )
-            if (member.is_static)
-              emit(
-                fn,
-                OP.INIT_PRIVATE,
-                ctor,
-                key_of(fn, scope, member),
-                value,
-                1,
-              )
-          } else {
-            const flags = 5 | (member.accessor_type ? 16 : 0)
-            emit(
-              fn,
-              OP.DEFINE_PROP,
-              member.is_static ? ctor : prototype,
-              key,
-              value,
-              flags,
-              member.accessor_type === "Set" ? 1 : 0,
-            )
-          }
+            throw syntax_error(member, "Invalid field name: constructor")
+          const key = key_of(owner, field_scope, member)
+          const value = member.initializer
+            ? compile_expr(state, owner, field_scope, member.initializer)
+            : constant(state, owner, undefined)
+          emit(
+            owner,
+            member.name.kind === "Private" ? OP.INIT_PRIVATE : OP.DEFINE_PROP,
+            receiver,
+            key,
+            value,
+            member.name.kind === "Private" ? 0 : 7,
+          )
         }
-        for (const member of members)
-          if (!member.body && member.is_static) {
-            // Static field initializers receive the class as this, through a guest call.
-            const init_id = compile_function(
-              state,
-              fn,
-              scope,
-              [],
-              "<static field>",
-              [],
-              member.initializer,
-              { flags: 2 },
-            )
-            const init = allocate(fn),
-              value = allocate(fn)
-            emit(fn, OP.CREATE_CLOSURE, init, init_id)
-            const key = key_of(fn, scope, member)
-            emit(fn, OP.CALL, value, init, ctor, 0, 0)
-            emit(
-              fn,
-              member.name.kind === "Private" ? OP.INIT_PRIVATE : OP.DEFINE_PROP,
-              ctor,
-              key,
-              value,
-              member.name.kind === "Private" ? 0 : 7,
-            )
-          }
-        emit(fn, OP.RETURN, ctor)
       },
     },
   )
-  const closure = allocate(parent),
-    dst = allocate(parent)
-  emit(parent, OP.CREATE_CLOSURE, closure, id)
-  emit(parent, OP.CALL, dst, closure, constant(state, parent, undefined), 0, 0)
-  return dst
+  const descriptor: ClassDescriptor = {
+    constructor_function,
+    members: [],
+  }
+  const computed_keys = []
+  for (const member of members) {
+    if (
+      !member.body ||
+      member === constructor ||
+      member.name.kind === "Private"
+    )
+      continue
+    const name = static_key(member.name)
+    const kind = property_kind(member.accessor_type)
+    descriptor.members.push({
+      function: function_id(
+        state,
+        fn,
+        scope,
+        member.body,
+        method_name(name, kind),
+        2,
+      ),
+      key: name === null ? null : literal(state, name),
+      kind,
+      is_static: member.is_static,
+    })
+    if (name === null) computed_keys.push(key_registers.get(member)!)
+  }
+  const first = allocate(fn, computed_keys.length)
+  for (let i = 0; i < computed_keys.length; i++)
+    emit(fn, OP.MOVE, first + i, computed_keys[i])
+  const ctor = allocate(fn)
+  emit(
+    fn,
+    OP.CREATE_CLASS,
+    ctor,
+    state.unit.classes.push(descriptor) - 1,
+    first,
+  )
+  init_binding(fn, class_binding, ctor)
+  for (const [member, binding] of private_methods) {
+    const value = function_value(
+      state,
+      fn,
+      scope,
+      member.body!,
+      member.name.ident!.text,
+      2,
+    )
+    init_binding(fn, binding, value)
+    if (member.is_static)
+      emit(fn, OP.INIT_PRIVATE, ctor, key_of(fn, scope, member), value, 1)
+  }
+  for (const member of members)
+    if (!member.body && member.is_static) {
+      // Static field initializers receive the class as this, through a guest call.
+      const init_id = compile_function(
+        state,
+        fn,
+        scope,
+        [],
+        "<static field>",
+        [],
+        member.initializer,
+        { flags: 2 },
+      )
+      const init = allocate(fn),
+        value = allocate(fn)
+      emit(fn, OP.CREATE_CLOSURE, init, init_id)
+      const key = key_of(fn, scope, member)
+      emit(fn, OP.CALL, value, init, ctor, 0, 0)
+      emit(
+        fn,
+        member.name.kind === "Private" ? OP.INIT_PRIVATE : OP.DEFINE_PROP,
+        ctor,
+        key,
+        value,
+        member.name.kind === "Private" ? 0 : 7,
+      )
+    }
+  if (pushed) pop_environment(fn)
+  return ctor
 }
 
 const SLOT_OPERATIONS = ["has_slot", "get_slot", "set_slot"]
@@ -2082,8 +2359,9 @@ function fill_entry(
       if (entry.value.kind !== "Func")
         throw syntax_error(entry.value, "Expected a function expression")
       const name = entry.value.func.name?.text ?? ""
-      const id = state.unit.functions.length
-      const value = function_value(state, fn, scope, entry.value.func, name, 2)
+      const id = function_id(state, fn, scope, entry.value.func, name, 2)
+      const value = allocate(fn)
+      emit(fn, OP.CREATE_CLOSURE, value, id)
       emit(fn, OP.SET_BEHAVIOR, object, value, names.length === 2 ? 1 : 0)
       for (const [property, initial] of [
         ["length", state.unit.functions[id].length],
@@ -2119,8 +2397,7 @@ function fill_entry(
     value = compile_expr(state, fn, scope, initializer)
   } else {
     key = property_key(state, fn, scope, entry.method.name)
-    value = function_value(state, fn, scope, entry.method.body, "<method>", 2)
-    set_function_name(state, fn, value, key, accessor)
+    value = method_value(state, fn, scope, entry.method, key)
   }
   emit(
     fn,

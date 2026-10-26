@@ -11,11 +11,18 @@ export interface Environment {
   binding_flags: boolean[]
 }
 
+/** Variables no closure captures get a `register`, and no slot. */
 export interface Binding {
   name: string
   slot: number
+  register: number | null
   readonly: boolean
   owner: FunctionBuilder
+  /**
+   * For registers: whether code compiled from here on runs after the
+   * declaration. Code before it can only run in the temporal dead zone.
+   */
+  initialized: boolean
 }
 
 export interface ResolvedBinding extends Binding {
@@ -40,12 +47,20 @@ export function declare_binding(
   scope: Scope,
   name: string,
   readonly: boolean = false,
+  register: number | null = null,
 ): Binding {
   if (scope.bindings.has(name))
     throw new SyntaxError(`Duplicate binding: ${name}`)
-  const slot = scope.environment.binding_flags.length
-  const binding = { name, slot, readonly, owner: scope.owner }
-  scope.environment.binding_flags.push(readonly)
+  const slot = register === null ? scope.environment.binding_flags.length : -1
+  const binding = {
+    name,
+    slot,
+    register,
+    readonly,
+    owner: scope.owner,
+    initialized: false,
+  }
+  if (register === null) scope.environment.binding_flags.push(readonly)
   scope.bindings.set(name, binding)
   return binding
 }

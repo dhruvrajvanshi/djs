@@ -47,8 +47,8 @@ test("ordinary function closures resolve shared mutable cells", () => {
     next();
   `)
   assert.equal(code.functions.length, 3)
-  assert.deepEqual(code.functions[1].parameter_slots, [0])
-  assert.deepEqual(code.functions[1].binding_flags, [false, false])
+  assert.deepEqual(code.functions[1].parameters, [{ register: 0 }])
+  assert.deepEqual(code.functions[1].binding_flags, [false])
   const closure = instructions(code.functions[2])
   assert.ok(
     closure.some(
@@ -57,7 +57,7 @@ test("ordinary function closures resolve shared mutable cells", () => {
   )
   assert.ok(
     closure.some(
-      (op) => op.opcode === OP.LOAD_BINDING && op.b === 1 && op.c === 1,
+      (op) => op.opcode === OP.LOAD_BINDING && op.b === 1 && op.c === 0,
     ),
   )
   assert.ok(
@@ -67,17 +67,22 @@ test("ordinary function closures resolve shared mutable cells", () => {
   )
 })
 
-test("block shadowing uses distinct bindings and temporal-dead-zone loads", () => {
+test("block shadowing uses distinct variables and temporal-dead-zone checks", () => {
   const code = compile_module(
     "let x = 1; { console.log(x); let x = 2; } console.log(x);",
   )
-  assert.equal(code.functions[0].binding_count, 2)
-  const loads = instructions(code.functions[0]).filter(
-    (op) => op.opcode === OP.LOAD_BINDING,
+  assert.equal(code.functions[0].binding_count, 1)
+  const ops = instructions(code.functions[0])
+  assert.ok(
+    ops.some(
+      (op) =>
+        op.opcode === OP.THROW_ERROR &&
+        code.literals[op.a] === "ReferenceError",
+    ),
   )
   assert.deepEqual(
-    loads.map((op) => op.c),
-    [1, 0],
+    ops.filter((op) => op.opcode === OP.LOAD_BINDING).map((op) => op.c),
+    [0],
   )
 })
 

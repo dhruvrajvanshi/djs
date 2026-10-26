@@ -14,18 +14,6 @@ export const CONTEXT_STATE = Object.freeze({
 })
 export type ContextStatus = (typeof CONTEXT_STATE)[keyof typeof CONTEXT_STATE]
 
-export const HANDLER_PHASE = Object.freeze({ TRY: 0, CATCH: 1, FINALLY: 2 })
-type HandlerPhase = (typeof HANDLER_PHASE)[keyof typeof HANDLER_PHASE]
-// A JUMP completion's value is the target bytecode offset in the same frame.
-export const COMPLETION_KIND = Object.freeze({
-  NORMAL: 0,
-  RETURN: 1,
-  THROW: 2,
-  JUMP: 3,
-})
-export type CompletionKind =
-  (typeof COMPLETION_KIND)[keyof typeof COMPLETION_KIND]
-
 /** The caller owns allocation/disposal of all roots. */
 export class Context {
   readonly id: number
@@ -33,7 +21,6 @@ export class Context {
   readonly error: Root
   status: ContextStatus = CONTEXT_STATE.READY
   frame: Frame | null = null
-  handlers: Handler[] = []
   steps = 0
   await_rejected = false
   /** The module this context evaluates, if any; not owned by the context. */
@@ -44,10 +31,6 @@ export class Context {
     this.id = id
     this.result = result
     this.error = error
-  }
-
-  top_handler(): Handler | null {
-    return this.handlers.at(-1) ?? null
   }
 
   take_await_rejection(): boolean {
@@ -97,49 +80,5 @@ export class Frame {
     if (!Number.isInteger(index) || index < 0 || index >= this.registers.length)
       panic("Invalid register index")
     return this.registers[index]
-  }
-}
-
-/** completion_value_root and environment_root are owned by the handler. */
-export class Handler {
-  readonly frame: Frame
-  readonly start_pc: BytecodeOffset
-  readonly catch_pc: BytecodeOffset | null
-  readonly finally_pc: BytecodeOffset | null
-  readonly end_pc: BytecodeOffset
-  readonly exception_register: RegisterIndex
-  /** The frame environment when the handler was pushed. */
-  readonly environment_root: Root
-  readonly completion_value_root: Root
-  phase: HandlerPhase = HANDLER_PHASE.TRY
-  completion_kind: CompletionKind = COMPLETION_KIND.NORMAL
-
-  constructor(fields: {
-    frame: Frame
-    start_pc: BytecodeOffset
-    catch_pc: BytecodeOffset | null
-    finally_pc: BytecodeOffset | null
-    end_pc: BytecodeOffset
-    exception_register: RegisterIndex
-    completion_value_root: Root
-    environment_root: Root
-  }) {
-    this.frame = fields.frame
-    this.start_pc = fields.start_pc
-    this.catch_pc = fields.catch_pc
-    this.finally_pc = fields.finally_pc
-    this.end_pc = fields.end_pc
-    this.exception_register = fields.exception_register
-    this.completion_value_root = fields.completion_value_root
-    this.environment_root = fields.environment_root
-  }
-
-  enter_catch() {
-    this.phase = HANDLER_PHASE.CATCH
-  }
-
-  save_completion(kind: CompletionKind) {
-    this.phase = HANDLER_PHASE.FINALLY
-    this.completion_kind = kind
   }
 }

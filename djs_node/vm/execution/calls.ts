@@ -9,7 +9,7 @@ import {
   write_undefined,
 } from "../storage/value.ts"
 import { KINDS } from "../storage/layout.ts"
-import type { FunctionId } from "../../compiler/compile.ts"
+import type { BindingLocation, FunctionId } from "../../compiler/compile.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import type { CodeId } from "../../runtime/modules.ts"
 import { MODULE_STATE } from "../../runtime/modules.ts"
@@ -54,7 +54,7 @@ import {
   RESUME_CODE,
   call_intrinsic,
 } from "./intrinsics.ts"
-import { pop_handler, run_task } from "./interpreter.ts"
+import { run_task } from "./interpreter.ts"
 
 export function create_context(
   runtime: Runtime,
@@ -113,6 +113,11 @@ function push_frame(
     new_target_root: target,
     registers,
   })
+  const bind = (location: BindingLocation, value: Root) => {
+    if ("register" in location)
+      memory.copy_value(registers[location.register], value)
+    else initialize_binding(runtime, env, location.slot, value)
+  }
   if (fn.arguments_slot !== null) {
     const args = memory.alloc_root()
     try {
@@ -122,29 +127,29 @@ function push_frame(
       memory.free_root(args)
     }
   }
-  for (let index = 0; index < fn.parameter_slots.length; index++) {
+  for (let index = 0; index < fn.parameters.length; index++) {
     const argument = arguments_[index]
     if (argument === undefined) {
       const empty = memory.alloc_root()
       try {
-        initialize_binding(runtime, env, fn.parameter_slots[index], empty)
+        bind(fn.parameters[index], empty)
       } finally {
         memory.free_root(empty)
       }
-    } else initialize_binding(runtime, env, fn.parameter_slots[index], argument)
+    } else bind(fn.parameters[index], argument)
   }
-  if (fn.rest_slot !== null) {
+  if (fn.rest !== null) {
     const rest = memory.alloc_root(),
       key = memory.alloc_root()
     try {
-      const start = fn.parameter_slots.length
+      const start = fn.parameters.length
       const count = Math.max(0, arguments_.length - start)
       create_array(runtime, rest, count)
       for (let index = 0; index < count; index++) {
         write_string(memory, key, String(index))
         define_property(runtime, rest, key, arguments_[start + index])
       }
-      initialize_binding(runtime, env, fn.rest_slot, rest)
+      bind(fn.rest, rest)
     } finally {
       memory.free_root(rest)
       memory.free_root(key)
@@ -164,7 +169,6 @@ export function pop_frame(runtime: Runtime, context: Context) {
 
 export function dispose_context(runtime: Runtime, context: Context) {
   if (context.status === CONTEXT_STATE.DISPOSED) return
-  while (context.top_handler() !== null) pop_handler(runtime, context)
   while (context.frame !== null) pop_frame(runtime, context)
   runtime.memory.free_root(context.result)
   runtime.memory.free_root(context.error)
