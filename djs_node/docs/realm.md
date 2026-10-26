@@ -109,6 +109,8 @@ are therefore the same kind of object as `new TypeError()` in a program.
 | [`ToNumber`](https://tc39.es/ecma262/#sec-tonumber) | Unary `+`, `-` or `~` meets an object | `(value)`; returns a number | `coerce_value` |
 | [`NewPromiseCapability`](https://tc39.es/ecma262/#sec-newpromisecapability) | An async function is called, or a program module is evaluated | `()`; returns `{ promise, resolve, reject }` | `settle_with_promise` ([vm/execution/calls.ts](../vm/execution/calls.ts)) |
 | [`Await`](https://tc39.es/ecma262/#await) | `await value` | `(value, on_fulfilled, on_rejected)`; arranges for exactly one callback to run | `await_value` ([vm/execution/calls.ts](../vm/execution/calls.ts)) |
+| [`RegExpCreate`](https://tc39.es/ecma262/#sec-regexpcreate) | A regular expression literal is evaluated | `(pattern, flags)`, both strings; returns a new `%RegExp%` object | `CREATE_REGEXP` ([vm/execution/interpreter.ts](../vm/execution/interpreter.ts)) |
+| [`CopyDataProperties`](https://tc39.es/ecma262/#sec-copydataproperties) | `{ ...source }` in an object literal | `(target, source)`; copies `source`'s own enumerable properties onto `target` | `COPY_DATA_PROPERTIES` ([vm/execution/interpreter.ts](../vm/execution/interpreter.ts)) |
 
 ### Internal methods
 

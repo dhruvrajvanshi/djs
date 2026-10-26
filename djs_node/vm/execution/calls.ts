@@ -7,8 +7,10 @@ import {
   write_boolean,
   write_number,
   write_undefined,
+  write_uninitialized,
 } from "../storage/value.ts"
 import { KINDS } from "../storage/layout.ts"
+import { FUNCTION_DERIVED } from "../../compiler/bytecode.ts"
 import type { BindingLocation, FunctionId } from "../../compiler/compile.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import type { CodeId } from "../../runtime/modules.ts"
@@ -525,6 +527,7 @@ export function construct_function(
   destination: Root,
   callee: Root,
   arguments_: Root[],
+  new_target: Root = callee,
 ): Status {
   const { memory } = runtime
   if (kind_of(memory, callee) !== KINDS.FUNCTION)
@@ -541,7 +544,7 @@ export function construct_function(
       callee,
       undefined,
       arguments_,
-      callee,
+      new_target,
     )
   }
   if (
@@ -559,12 +562,17 @@ export function construct_function(
     load_function_environment(memory, parent, callee)
     const { unit, scope_ids } = runtime.loader.code[code],
       fn = unit.functions[id]
-    create_object(runtime, receiver)
-    // Constructors in the supported subset have data-valued prototype properties.
-    write_string(memory, key, "prototype")
-    get_property(runtime, prototype, callee, key)
-    if (has_property_list(memory, prototype))
-      set_prototype(memory, receiver, prototype)
+    if (fn.flags & FUNCTION_DERIVED) {
+      // A derived constructor's this is bound by its super() call.
+      write_uninitialized(memory, receiver)
+    } else {
+      create_object(runtime, receiver)
+      // Constructors in the supported subset have data-valued prototype properties.
+      write_string(memory, key, "prototype")
+      get_property(runtime, prototype, new_target, key)
+      if (has_property_list(memory, prototype))
+        set_prototype(memory, receiver, prototype)
+    }
     create_environment(
       memory,
       environment,
@@ -581,7 +589,7 @@ export function construct_function(
       receiver,
       arguments_,
       destination,
-      callee,
+      new_target,
     )
     fiber.frame!.is_construct_call = true
     return OK

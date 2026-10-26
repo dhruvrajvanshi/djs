@@ -69,6 +69,10 @@ export const OP = Object.freeze({
   CREATE_ARRAY: 13,
   /** `dst, #function` */
   CREATE_CLOSURE: 14,
+  /** `dst, pattern, flags`: a regular expression literal. */
+  CREATE_REGEXP: 76,
+  /** `object, src`: copies `src`'s own enumerable properties, as `{ ...src }`. */
+  COPY_DATA_PROPERTIES: 77,
   /**
    * `dst, #class, first`: a class's constructor, prototype and methods.
    * Computed keys are from `first`. Fields are added by later instructions.
@@ -116,15 +120,20 @@ export const OP = Object.freeze({
 
   /** `dst, callee, receiver, first, =count` */
   CALL: 29,
-  /** `dst, callee, _, first, =count`: same layout as CALL. */
+  /**
+   * `dst, callee, new_target, first, =count`: same layout as CALL. An
+   * undefined `new_target` means the callee itself; super() passes its own.
+   */
   CONSTRUCT: 30,
   /**
    * `dst, callee, receiver, first, =count`: like CALL, followed by the
    * values of the iterable in register `first + count` (`f(a, ...b)`).
    */
   CALL_SPREAD: 74,
-  /** `dst, callee, _, first, =count`: same layout as CALL_SPREAD. */
+  /** `dst, callee, new_target, first, =count`: same layout as CALL_SPREAD. */
   CONSTRUCT_SPREAD: 75,
+  /** `src`: binds a derived constructor's this, after its super() call. */
+  BIND_THIS: 78,
   /** `src` */
   RETURN: 31,
   /** `dst, src` */
@@ -209,6 +218,12 @@ export const OP = Object.freeze({
 export type Opcode = (typeof OP)[keyof typeof OP]
 
 export const NO_HOLES = 0xffffffff
+
+/**
+ * FunctionDescriptor.flags bit of a class constructor with an `extends`
+ * clause. Construction leaves its this uninitialized until super() binds it.
+ */
+export const FUNCTION_DERIVED = 16
 
 /** ExceptionHandler.environment for the function's own environment. */
 export const FUNCTION_ENVIRONMENT = 0xffffffff

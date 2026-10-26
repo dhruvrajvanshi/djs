@@ -44,6 +44,9 @@ type Formatter = (words: number[], context: Context) => Formatted
 // Operand order matches the fixed-width words read by the interpreter.
 const OPERANDS: Record<string, Operand[] | Formatter> = {
   LOAD_CONST: ["dst", "literal"],
+  CREATE_REGEXP: ["dst", "reg", "reg"],
+  COPY_DATA_PROPERTIES: ["reg", "reg"],
+  BIND_THIS: ["reg"],
   MOVE: ["dst", "reg"],
   LOAD_THIS: ["dst"],
   LOAD_NEW_TARGET: ["dst"],

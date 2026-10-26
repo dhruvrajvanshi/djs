@@ -130,6 +130,8 @@ const REQUIRED = Object.freeze([
   "ToNumber",
   "NewPromiseCapability",
   "Await",
+  "RegExpCreate",
+  "CopyDataProperties",
   "array [[DefineOwnProperty]]",
 ])
 

@@ -430,6 +430,29 @@ const op = {
     if (status === THROW) clear_exception(runtime)
     return OK
   },
+  CREATE_REGEXP(
+    runtime: Runtime,
+    destination: Root,
+    pattern: Root,
+    flags: Root,
+  ): Status {
+    const create = runtime.realm.intrinsics.get("RegExpCreate")
+    if (create === undefined) panic("RegExp is not initialized")
+    return invoke_sync(runtime, destination, create, undefined, [
+      pattern,
+      flags,
+    ])
+  },
+  COPY_DATA_PROPERTIES(
+    runtime: Runtime,
+    object: Root,
+    source: Root,
+    temporary: Root,
+  ): Status {
+    const copy = runtime.realm.intrinsics.get("CopyDataProperties")
+    if (copy === undefined) panic("CopyDataProperties is not initialized")
+    return invoke_sync(runtime, temporary, copy, undefined, [object, source])
+  },
   GET_FOR_IN_ITERATOR(
     runtime: Runtime,
     iterator: Root,
@@ -735,9 +758,29 @@ const op = {
     fiber: Fiber,
     destination: Root,
     callee: Root,
+    new_target: Root,
     arguments_: Root[],
   ): Status {
-    return construct_function(runtime, fiber, destination, callee, arguments_)
+    return construct_function(
+      runtime,
+      fiber,
+      destination,
+      callee,
+      arguments_,
+      tag_of(runtime.memory, new_target) === TAGS.UNDEFINED
+        ? callee
+        : new_target,
+    )
+  },
+  BIND_THIS(runtime: Runtime, frame: Frame, value: Root): Status {
+    if (tag_of(runtime.memory, frame.this_root) !== TAGS.UNINITIALIZED)
+      return throw_error(
+        runtime,
+        "ReferenceError",
+        "Super constructor may only be called once",
+      )
+    runtime.memory.copy_value(frame.this_root, value)
+    return OK
   },
   PUSH_ENV(
     memory: Memory,
@@ -905,10 +948,16 @@ const op = {
     write_string(memory, destination, to_string(runtime, source))
     return OK
   },
-  LOAD_THIS(memory: Memory, destination: Root, fiber: Fiber, frame: Frame) {
-    memory.copy_value(destination, frame.this_root)
+  LOAD_THIS(runtime: Runtime, destination: Root, frame: Frame): Status {
+    if (tag_of(runtime.memory, frame.this_root) === TAGS.UNINITIALIZED)
+      return throw_error(runtime, "ReferenceError", UNBOUND_THIS_MESSAGE)
+    runtime.memory.copy_value(destination, frame.this_root)
+    return OK
   },
 }
+
+const UNBOUND_THIS_MESSAGE =
+  "Must call super constructor in derived class before accessing 'this'"
 
 export function run_interpreter(runtime: Runtime, fiber: Fiber) {
   const { memory } = runtime
@@ -946,7 +995,10 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           op.MOVE(memory, reg(a), reg(b))
           break
         case OP.LOAD_THIS:
-          op.LOAD_THIS(memory, reg(a), fiber, frame)
+          status = op.LOAD_THIS(runtime, reg(a), frame)
+          break
+        case OP.BIND_THIS:
+          status = op.BIND_THIS(runtime, frame, reg(a))
           break
         case OP.LOAD_NEW_TARGET:
           op.LOAD_NEW_TARGET(memory, reg(a), fiber, frame)
@@ -1115,6 +1167,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             fiber,
             reg(a),
             reg(b),
+            reg(c),
             Array.from({ length: e }, (_, index) => reg(d + index)),
           )
           break
@@ -1133,10 +1186,22 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             Array.from({ length: e }, (_, index) => reg(d + index)),
             reg(d + e),
             (arguments_) =>
-              op.CONSTRUCT(runtime, fiber, reg(a), reg(b), arguments_),
+              op.CONSTRUCT(runtime, fiber, reg(a), reg(b), reg(c), arguments_),
           )
           break
         case OP.RETURN:
+          if (
+            frame.is_construct_call &&
+            tag_of(memory, frame.this_root) === TAGS.UNINITIALIZED &&
+            !is_object(memory, reg(a))
+          ) {
+            status = throw_error(
+              runtime,
+              "ReferenceError",
+              UNBOUND_THIS_MESSAGE,
+            )
+            break
+          }
           if (op.RETURN(runtime, fiber, reg(a))) return
           break
         case OP.AWAIT:
@@ -1175,6 +1240,12 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           break
         case OP.GET_ITERATOR:
           status = op.GET_ITERATOR(runtime, reg(a), reg(b), reg(c), temporary)
+          break
+        case OP.COPY_DATA_PROPERTIES:
+          status = op.COPY_DATA_PROPERTIES(runtime, reg(a), reg(b), temporary)
+          break
+        case OP.CREATE_REGEXP:
+          status = op.CREATE_REGEXP(runtime, reg(a), reg(b), reg(c))
           break
         case OP.GET_FOR_IN_ITERATOR:
           status = op.GET_FOR_IN_ITERATOR(runtime, reg(a), reg(b), reg(c))

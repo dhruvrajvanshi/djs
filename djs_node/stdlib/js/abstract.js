@@ -4,6 +4,8 @@ import {
   call,
   string_create,
   define_property_or_throw,
+  get_own_property,
+  ordinary_own_property_keys,
 } from "djs:native"
 
 function is_object(value) {
@@ -81,6 +83,23 @@ export function create_non_enumerable_data_property_or_throw(
     configurable: true,
   })
 }
+
+// 7.3.25 CopyDataProperties ( target, source, excludedItems )
+export function copy_data_properties(target, source) {
+  if (source === null || source === undefined) return target
+  const from = to_object(source)
+  const keys = ordinary_own_property_keys(from)
+  let index = 0
+  while (index < keys.length) {
+    const key = keys[index]
+    const descriptor = get_own_property(from, key)
+    if (descriptor !== undefined && descriptor.enumerable)
+      create_data_property_or_throw(target, key, from[key])
+    index = index + 1
+  }
+  return target
+}
+abstract_operation("CopyDataProperties", copy_data_properties)
 
 export function get_prototype_from_constructor(constructor, default_prototype) {
   const prototype = constructor.prototype

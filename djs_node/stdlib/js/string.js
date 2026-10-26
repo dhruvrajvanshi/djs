@@ -479,14 +479,25 @@ function pad(value, maximum, fill, start) {
   return start ? padding + text : text + padding
 }
 
-function substitution(replacement, match, position, text) {
+// 22.1.3.19.1 GetSubstitution ( matched, str, position, captures, namedCaptures, replacementTemplate )
+export function substitution(
+  replacement,
+  match,
+  position,
+  text,
+  captures = [],
+) {
   let result = ""
   let index = 0
   let next
   while (index < replacement.length) {
     if (unit(replacement, index) === 36 && index + 1 < replacement.length) {
       next = unit(replacement, index + 1)
-      if (next === 36) {
+      const group = capture_reference(replacement, index + 1, captures.length)
+      if (group > 0) {
+        result = result + (captures[group - 1] ?? "")
+        index = index + (group > 9 ? 3 : 2)
+      } else if (next === 36) {
         result = result + "$"
         index = index + 2
       } else if (next === 38) {
@@ -510,7 +521,34 @@ function substitution(replacement, match, position, text) {
   }
   return result
 }
+// The group number of a $n or $nn reference at `index`, or 0. A two-digit
+// reference wins when that group exists.
+function capture_reference(replacement, index, count) {
+  const first = unit(replacement, index) - 48
+  if (first < 0 || first > 9) return 0
+  if (index + 1 < replacement.length) {
+    const second = unit(replacement, index + 1) - 48
+    if (second >= 0 && second <= 9 && first * 10 + second >= 1) {
+      if (first * 10 + second <= count) return first * 10 + second
+    }
+  }
+  return first >= 1 && first <= count ? first : 0
+}
+
+// 22.1.3.19 String.prototype.replace ( searchValue, replaceValue )
 function replace(value, search, replacement, all) {
+  require_object_coercible(value)
+  if (search !== undefined && search !== null) {
+    const replacer = search[Symbol.replace]
+    if (replacer !== undefined && replacer !== null) {
+      if (all && has_slot(search, "[[RegExpMatcher]]")) {
+        const flags = to_string(search.flags)
+        if (find(flags, "g", 0) < 0)
+          throw new TypeError("replaceAll requires a global RegExp")
+      }
+      return call(replacer, search, value, replacement)
+    }
+  }
   const text = text_receiver(value)
   const needle = to_string(search)
   const functional = typeof replacement === "function"

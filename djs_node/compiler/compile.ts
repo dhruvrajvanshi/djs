@@ -4,11 +4,8 @@ import type { Binding, Scope, ResolvedBinding, Environment } from "./scopes.ts"
 import type {
   Class,
   Span,
-  Stmt,
   Param,
-  Expr,
   Func,
-  Pattern,
   ObjectKey,
   PropExpr,
   IndexExpr,
@@ -16,8 +13,12 @@ import type {
   Ident,
   ObjectLiteralEntry,
   VarExpr,
+  ArrayLiteralMember,
 } from "djs_ast"
 import {
+  Expr,
+  Stmt,
+  Pattern,
   ASTVisitorBase,
   QualifiedName,
   VarDeclStmt,
@@ -31,6 +32,7 @@ import {
   INSTRUCTION_BYTES,
   NATIVE_MARKERS,
   NO_HOLES,
+  FUNCTION_DERIVED,
   encode_instructions,
 } from "./bytecode.ts"
 import { create_scope, declare_binding, resolve_binding } from "./scopes.ts"
@@ -417,9 +419,154 @@ function constant(state: CompilerState, fn: FunctionBuilder, value: Literal) {
   return dst
 }
 
-function declare_pattern(scope: Scope, pattern: Pattern, readonly: boolean) {
-  if (pattern.kind !== "Var") unsupported(pattern, "binding destructuring")
-  return declare_local(scope, pattern.ident.text, readonly)
+/** Declares every name a binding pattern introduces. */
+function declare_pattern(
+  scope: Scope,
+  pattern: Pattern,
+  readonly: boolean,
+): Binding[] {
+  switch (pattern.kind) {
+    case "Var":
+      return [declare_local(scope, pattern.ident.text, readonly)]
+    case "Assignment":
+    case "Rest":
+      return declare_pattern(scope, pattern.pattern, readonly)
+    case "Array":
+      return pattern.items.flatMap((item) =>
+        declare_pattern(scope, item, readonly),
+      )
+    case "Object":
+      return [
+        ...pattern.properties.flatMap((property) =>
+          declare_pattern(scope, property.value, readonly),
+        ),
+        ...(pattern.rest ? declare_pattern(scope, pattern.rest, readonly) : []),
+      ]
+    case "Elision":
+      return []
+    case "Prop":
+      throw syntax_error(pattern, "Invalid destructuring target")
+  }
+}
+
+/**
+ * The binding that receives a parameter's argument. A destructured parameter
+ * gets a hidden one, and its names are declared to be initialized later.
+ */
+function parameter_binding(scope: Scope, pattern: Pattern, index: number) {
+  if (pattern.kind === "Var") return declare_pattern(scope, pattern, false)[0]
+  declare_pattern(scope, pattern, false)
+  return declare_local(scope, `*parameter ${index}*`)
+}
+
+/** Initializes the bindings `declare_pattern` declared in `scope`. */
+function init_pattern(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  pattern: Pattern,
+  value: number,
+) {
+  destructure(state, fn, scope, pattern, value, (target, item) => {
+    if (target.kind !== "Var")
+      throw syntax_error(target, "Invalid destructuring target")
+    init_binding(fn, scope.bindings.get(target.ident.text)!, item)
+  })
+}
+
+/**
+ * Takes `value` apart as `pattern` describes, passing each leaf pattern (a
+ * name or, in assignments, a property) and its value to `assign`.
+ */
+function destructure(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  pattern: Pattern,
+  value: number,
+  assign: (target: Pattern, value: number) => void,
+) {
+  switch (pattern.kind) {
+    case "Assignment": {
+      const result = allocate(fn)
+      emit(fn, OP.MOVE, result, value)
+      const skip = emit(fn, OP.JUMP_IF_NOT_UNDEFINED, result, 0)
+      emit(
+        fn,
+        OP.MOVE,
+        result,
+        compile_expr(state, fn, scope, pattern.initializer),
+      )
+      fn.instructions[skip][2] = position(fn)
+      destructure(state, fn, scope, pattern.pattern, result, assign)
+      return
+    }
+    case "Object": {
+      if (pattern.rest) unsupported(pattern.rest, "object rest")
+      if (pattern.properties.length === 0) {
+        // `{}` still requires an object-coercible value.
+        const check = allocate(fn)
+        emit(fn, OP.GET_PROP, check, value, constant(state, fn, "constructor"))
+      }
+      for (const property of pattern.properties) {
+        const key = property_key(state, fn, scope, property.key)
+        const item = allocate(fn)
+        emit(fn, OP.GET_PROP, item, value, key)
+        destructure(state, fn, scope, property.value, item, assign)
+      }
+      return
+    }
+    case "Array": {
+      const iterator = allocate(fn)
+      const next = allocate(fn)
+      emit(fn, OP.GET_ITERATOR, iterator, next, value)
+      const done = constant(state, fn, false)
+      // Reads the next value, or undefined once the iterator is exhausted.
+      const step = (item: number) => {
+        emit(fn, OP.LOAD_CONST, item, literal(state, undefined))
+        const skip = emit(fn, OP.JUMP_IF_TRUTHY, done, 0)
+        const exhausted = emit(fn, OP.ITERATOR_NEXT, item, iterator, next, 0)
+        const end = emit(fn, OP.JUMP, 0)
+        fn.instructions[exhausted][4] = position(fn)
+        emit(fn, OP.LOAD_CONST, done, literal(state, true))
+        emit(fn, OP.LOAD_CONST, item, literal(state, undefined))
+        fn.instructions[skip][2] = position(fn)
+        fn.instructions[end][1] = position(fn)
+      }
+      for (const element of pattern.items) {
+        if (element.kind === "Rest") {
+          const rest = allocate(fn)
+          emit(fn, OP.CREATE_ARRAY, rest, 0, 0, NO_HOLES)
+          const index = constant(state, fn, 0)
+          const one = constant(state, fn, 1)
+          const key = allocate(fn)
+          const skip = emit(fn, OP.JUMP_IF_TRUTHY, done, 0)
+          const start = position(fn)
+          const item = allocate(fn)
+          const exhausted = emit(fn, OP.ITERATOR_NEXT, item, iterator, next, 0)
+          emit(fn, OP.TO_PROPERTY_KEY, key, index)
+          emit(fn, OP.DEFINE_PROP, rest, key, item, 7)
+          emit(fn, OP.ADD, index, index, one)
+          emit(fn, OP.JUMP, start)
+          fn.instructions[exhausted][4] = position(fn)
+          emit(fn, OP.LOAD_CONST, done, literal(state, true))
+          fn.instructions[skip][2] = position(fn)
+          destructure(state, fn, scope, element.pattern, rest, assign)
+          continue
+        }
+        const item = allocate(fn)
+        step(item)
+        if (element.kind !== "Elision")
+          destructure(state, fn, scope, element, item, assign)
+      }
+      const skip = emit(fn, OP.JUMP_IF_TRUTHY, done, 0)
+      emit(fn, OP.ITERATOR_CLOSE, iterator, 0)
+      fn.instructions[skip][2] = position(fn)
+      return
+    }
+    default:
+      assign(pattern, value)
+  }
 }
 
 // Variables that no closure uses live in registers, except module-level ones,
@@ -568,7 +715,7 @@ function prepare_statements(
       case "VarDecl":
         if (stmt.decl.decl_type === "Var") unsupported(stmt, "var declarations")
         for (const item of stmt.decl.declarators) {
-          const binding = declare_pattern(
+          const bindings = declare_pattern(
             scope,
             item.pattern,
             stmt.decl.decl_type === "Const",
@@ -576,7 +723,8 @@ function prepare_statements(
           if (stmt.decl.is_exported) {
             if (fn.id !== 0 || scope !== fn.scope)
               unsupported(stmt, "nested export")
-            export_binding(state, stmt, binding.name, binding.slot)
+            for (const binding of bindings)
+              export_binding(state, stmt, binding.name, binding.slot)
           }
         }
         if (
@@ -740,9 +888,15 @@ export interface FunctionBuilder {
   regions: Region[]
   /** Holds the value of a return that passes through regions. */
   return_register: number | null
+  /** The hidden binding `super.x` reads x from, in a derived class's methods. */
+  super_home?: string
+  /** Initializes a derived class's fields; super() calls it. */
+  initialize_fields?: () => void
 }
 
 interface Loop {
+  /** A switch statement, which `break` exits but `continue` passes over. */
+  is_switch?: boolean
   environment_depth: number
   /** The number of regions still enclosing the code after a break. */
   break_regions: number
@@ -768,6 +922,7 @@ interface Region {
 export interface FunctionOptions {
   flags?: number
   build?: (fn: FunctionBuilder, scope: Scope) => void
+  super_home?: string
 }
 
 function compile_function(
@@ -805,11 +960,17 @@ function compile_function(
     loops: [],
     regions: [],
     return_register: null,
+    super_home: options.super_home,
   }
   state.unit.functions.push(null!)
   const scope = create_scope(parent_scope, fn)
   fn.scope = scope
-  const defaults = []
+  // Defaults and destructuring, applied in parameter order.
+  const defaults: {
+    binding: Binding
+    initializer: Expr | null
+    pattern: Pattern | null
+  }[] = []
   for (const [index, param] of params.entries()) {
     const { pattern, initializer } =
       param.pattern.kind === "Assignment" ? param.pattern : param
@@ -821,29 +982,35 @@ function compile_function(
           param,
           "A rest parameter must be last and cannot have a default",
         )
-      const binding = declare_pattern(scope, pattern.pattern, false)
+      const binding = parameter_binding(scope, pattern.pattern, index)
       binding.initialized = true
       fn.rest = location(binding)
+      if (pattern.pattern.kind !== "Var")
+        defaults.push({ binding, initializer: null, pattern: pattern.pattern })
       continue
     }
-    const binding = declare_pattern(scope, pattern, false)
+    const binding = parameter_binding(scope, pattern, index)
     binding.initialized = true
     fn.parameters.push(location(binding))
-    if (initializer) defaults.push({ binding, initializer })
+    if (initializer || pattern.kind !== "Var")
+      defaults.push({
+        binding,
+        initializer: initializer ?? null,
+        pattern: pattern.kind === "Var" ? null : pattern,
+      })
   }
   if (options.build) options.build(fn, scope)
-  for (const { binding, initializer } of defaults) {
+  for (const { binding, initializer, pattern } of defaults) {
     const resolved = { ...binding, depth: 0 }
     const value = allocate(fn)
     read_binding(state, fn, resolved, value)
-    const skip = emit(fn, OP.JUMP_IF_NOT_UNDEFINED, value, 0)
-    store_binding(
-      state,
-      fn,
-      resolved,
-      compile_expr(state, fn, scope, initializer),
-    )
-    fn.instructions[skip][2] = position(fn)
+    if (initializer) {
+      const skip = emit(fn, OP.JUMP_IF_NOT_UNDEFINED, value, 0)
+      emit(fn, OP.MOVE, value, compile_expr(state, fn, scope, initializer))
+      store_binding(state, fn, resolved, value)
+      fn.instructions[skip][2] = position(fn)
+    }
+    if (pattern) init_pattern(state, fn, scope, pattern, value)
   }
   prepare_statements(state, fn, scope, stmts)
   compile_statements(state, fn, scope, stmts)
@@ -880,6 +1047,7 @@ function function_id(
   func: Func,
   name: string,
   flags: number,
+  super_home?: string,
 ) {
   if (func.is_generator) unsupported(func, "generator functions")
   return compile_function(
@@ -890,7 +1058,7 @@ function function_id(
     name,
     func.params,
     null,
-    { flags: func.is_async ? flags | 8 : flags },
+    { flags: func.is_async ? flags | 8 : flags, super_home },
   )
 }
 
@@ -901,13 +1069,14 @@ function function_value(
   func: Func,
   name: string = "",
   flags: number = 0,
+  super_home?: string,
 ) {
   const dst = allocate(fn)
   emit(
     fn,
     OP.CREATE_CLOSURE,
     dst,
-    function_id(state, fn, scope, func, name, flags),
+    function_id(state, fn, scope, func, name, flags, super_home),
   )
   return dst
 }
@@ -982,6 +1151,7 @@ function compile_stmt_kind(
     case "Empty":
     case "Interface":
     case "Declare":
+    case "TypeAlias":
       return
     case "Func":
       unsupported(stmt, "function declarations outside blocks")
@@ -1007,13 +1177,7 @@ function compile_stmt_kind(
           : constant(state, fn, undefined)
         if (!item.init && stmt.decl.decl_type === "Const")
           throw syntax_error(stmt, "Missing const initializer")
-        init_binding(
-          fn,
-          scope.bindings.get(
-            (item.pattern as Extract<Pattern, { kind: "Var" }>).ident.text,
-          )!,
-          value,
-        )
+        init_pattern(state, fn, scope, item.pattern, value)
       }
       return
     case "ClassDecl": {
@@ -1055,12 +1219,12 @@ function compile_stmt_kind(
           environment,
         })
         const child = block_scope(fn, scope)
-        const binding =
-          stmt.catch_pattern &&
+        if (stmt.catch_pattern)
           declare_pattern(child, stmt.catch_pattern, false)
         prepare_statements(state, fn, child, stmt.catch_block.stmts)
         const pushed = push_environment(fn, child)
-        if (binding) init_binding(fn, binding, exception)
+        if (stmt.catch_pattern)
+          init_pattern(state, fn, child, stmt.catch_pattern, exception)
         compile_statements(state, fn, child, stmt.catch_block.stmts)
         if (pushed) pop_environment(fn)
         complete_normally()
@@ -1109,6 +1273,43 @@ function compile_stmt_kind(
       fn.return_register ??= allocate(fn)
       emit(fn, OP.MOVE, fn.return_register, value)
       emit_exit(fn, { kind: "return" })
+      return
+    }
+    case "Switch": {
+      const discriminant = compile_expr(state, fn, scope, stmt.condition)
+      // All cases share one scope.
+      const child = block_scope(fn, scope)
+      const stmts = stmt.cases.flatMap((item) => item.body)
+      prepare_statements(state, fn, child, stmts)
+      const pushed = push_environment(fn, child)
+      compile_statements(
+        state,
+        fn,
+        child,
+        stmts.filter((item) => item.kind === "Func"),
+      )
+      const loop = enter_loop(fn)
+      loop.is_switch = true
+      const matches = stmt.cases.map((item) => {
+        if (!item.test) return null
+        const test = compile_expr(state, fn, child, item.test)
+        const equal = allocate(fn)
+        emit(fn, OP.STRICT_EQ, equal, discriminant, test)
+        return emit(fn, OP.JUMP_IF_TRUTHY, equal, 0)
+      })
+      const fallback = emit(fn, OP.JUMP, 0)
+      let default_target = null
+      for (const [index, item] of stmt.cases.entries()) {
+        const match = matches[index]
+        if (match === null) default_target = position(fn)
+        else fn.instructions[match][2] = position(fn)
+        for (const body_stmt of item.body)
+          if (body_stmt.kind !== "Func")
+            compile_stmt(state, fn, child, body_stmt)
+      }
+      fn.instructions[fallback][1] = default_target ?? position(fn)
+      leave_loop(fn, loop, position(fn), 0)
+      if (pushed) pop_environment(fn)
       return
     }
     case "Block": {
@@ -1237,9 +1438,9 @@ function compile_stmt_kind(
       )
       let pushed = false
       if (stmt.decl_type) {
-        const binding = declare_pattern(child, stmt.lhs, readonly)
+        declare_pattern(child, stmt.lhs, readonly)
         pushed = push_environment(fn, child)
-        init_binding(fn, binding, value)
+        init_pattern(state, fn, child, stmt.lhs, value)
       } else store_pattern(state, fn, scope, stmt.lhs, value)
       compile_stmt(state, fn, child, stmt.body)
       if (pushed) pop_environment(fn)
@@ -1265,7 +1466,10 @@ function compile_stmt_kind(
     case "Break":
     case "Continue": {
       if (stmt.label) unsupported(stmt, `labeled ${stmt.kind.toLowerCase()}`)
-      const loop = fn.loops.at(-1)
+      let index = fn.loops.length - 1
+      if (stmt.kind === "Continue")
+        while (index >= 0 && fn.loops[index].is_switch) index--
+      const loop = fn.loops[index]
       if (!loop)
         throw syntax_error(stmt, `Illegal ${stmt.kind.toLowerCase()} statement`)
       emit_exit(fn, {
@@ -1307,7 +1511,9 @@ function store_pattern(
     emit(fn, is_private ? OP.SET_PRIVATE : OP.SET_PROP, object, key, value)
     return
   }
-  unsupported(pattern, "assignment destructuring")
+  destructure(state, fn, scope, pattern, value, (target, item) =>
+    store_pattern(state, fn, scope, target, item),
+  )
 }
 
 // Inside loops, a block's bindings get a fresh environment on each entry so
@@ -1656,7 +1862,8 @@ function chain_operand(
   expr: Expr,
   chain: Chain,
 ) {
-  while (expr.kind === "NonNull") expr = expr.expr
+  while (expr.kind === "NonNull" || expr.kind === "TypeApplication")
+    expr = expr.expr
   return expr.kind === "Prop" || expr.kind === "Index" || expr.kind === "Call"
     ? chain_member(state, fn, scope, expr, chain)
     : compile_expr(state, fn, scope, expr)
@@ -1694,12 +1901,26 @@ function compile_call(
   let callee, receiver
   let target = expr.callee
   let parenthesized = false
-  while (target.kind === "Paren" || target.kind === "NonNull") {
+  while (
+    target.kind === "Paren" ||
+    target.kind === "NonNull" ||
+    target.kind === "TypeApplication"
+  ) {
     if (target.kind === "Paren") parenthesized = true
     target = target.expr
   }
-  const construct = target.kind === "New"
-  if (construct) {
+  const super_call = target.kind === "Super"
+  const construct = target.kind === "New" || super_call
+  if (super_call) {
+    if (!(fn.flags & FUNCTION_DERIVED))
+      throw syntax_error(
+        expr,
+        "super() is only valid in a derived class constructor",
+      )
+    callee = load_name(state, fn, scope, SUPER_CONSTRUCTOR)
+    receiver = allocate(fn)
+    emit(fn, OP.LOAD_NEW_TARGET, receiver)
+  } else if (target.kind === "New") {
     callee = compile_expr(
       state,
       fn,
@@ -1711,13 +1932,17 @@ function compile_call(
     // `(a?.b)()` keeps `a` as the receiver but ends the chain at the parens.
     const callee_chain = parenthesized ? { exits: [] } : chain
     const reference = property_reference(state, fn, scope, target, callee_chain)
-    receiver = reference.object
+    // super.method() reads the method from the home object but calls it on this.
+    receiver =
+      target.lhs.kind === "Super"
+        ? load_name(state, fn, scope, "this")
+        : reference.object
     callee = allocate(fn)
     emit(
       fn,
       reference.private ? OP.GET_PRIVATE : OP.GET_PROP,
       callee,
-      receiver,
+      reference.object,
       reference.key,
     )
     if (parenthesized) callee = end_chain(state, fn, callee_chain, callee)
@@ -1765,7 +1990,89 @@ function compile_call(
     args,
     expr.args.length,
   )
+  if (super_call) {
+    emit(fn, OP.BIND_THIS, dst)
+    fn.initialize_fields?.()
+  }
   return dst
+}
+
+/**
+ * An array literal with spread elements. Their lengths are only known at run
+ * time, so each element is defined at a running index.
+ */
+function compile_spread_array(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  items: readonly ArrayLiteralMember[],
+) {
+  const array = allocate(fn)
+  emit(fn, OP.CREATE_ARRAY, array, 0, 0, NO_HOLES)
+  const index = constant(state, fn, 0)
+  const one = constant(state, fn, 1)
+  const key = allocate(fn)
+  const append = (value: number) => {
+    emit(fn, OP.TO_PROPERTY_KEY, key, index)
+    emit(fn, OP.DEFINE_PROP, array, key, value, 7)
+    emit(fn, OP.ADD, index, index, one)
+  }
+  for (const item of items) {
+    if (item.kind === "Elision") {
+      emit(fn, OP.ADD, index, index, one)
+    } else if (item.kind === "Expr") {
+      append(compile_expr(state, fn, scope, item.expr))
+    } else {
+      const iterable = compile_expr(state, fn, scope, item.expr)
+      const iterator = allocate(fn)
+      const next = allocate(fn)
+      emit(fn, OP.GET_ITERATOR, iterator, next, iterable)
+      const start = position(fn)
+      const value = allocate(fn)
+      const exit = emit(fn, OP.ITERATOR_NEXT, value, iterator, next, 0)
+      append(value)
+      emit(fn, OP.JUMP, start)
+      fn.instructions[exit][4] = position(fn)
+    }
+  }
+  // Trailing elisions still count toward the length.
+  emit(fn, OP.SET_PROP, array, constant(state, fn, "length"), index)
+  return array
+}
+
+/** Reads and writes the binding an assignment or update expression targets. */
+function binding_target(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  ident: Ident,
+) {
+  const binding = resolve_name(scope, ident.text)
+  if (!binding)
+    throw syntax_error(ident, `Assignment to undeclared binding: ${ident.text}`)
+  return {
+    read: () => load_name(state, fn, scope, ident.text),
+    write: (value: number) => store_binding(state, fn, binding, value),
+  }
+}
+
+/** Reads and writes a property whose object and key are already evaluated. */
+function property_target(
+  fn: FunctionBuilder,
+  object: number,
+  key: number,
+  is_private: boolean,
+) {
+  return {
+    read: () => {
+      const dst = allocate(fn)
+      emit(fn, is_private ? OP.GET_PRIVATE : OP.GET_PROP, dst, object, key)
+      return dst
+    },
+    write: (value: number) => {
+      emit(fn, is_private ? OP.SET_PRIVATE : OP.SET_PROP, object, key, value)
+    },
+  }
 }
 
 function property_reference(
@@ -1808,6 +2115,14 @@ function compile_expr_kind(
   switch (expr.kind) {
     case "String":
       return constant(state, fn, decode_string(expr.text, expr))
+    case "Regex": {
+      const end = expr.text.lastIndexOf("/")
+      const pattern = constant(state, fn, expr.text.slice(1, end))
+      const flags = constant(state, fn, expr.text.slice(end + 1))
+      const dst = allocate(fn)
+      emit(fn, OP.CREATE_REGEXP, dst, pattern, flags)
+      return dst
+    }
     case "TemplateLiteral": {
       let result: number | undefined
       for (const fragment of expr.fragments) {
@@ -1868,12 +2183,16 @@ function compile_expr_kind(
       return load_name(state, fn, scope, expr.ident.text)
     case "Paren":
     case "NonNull":
+    case "TypeApplication":
+    case "As":
       return compile_expr(state, fn, scope, expr.expr)
     case "Prop":
     case "Index":
     case "Call":
       return compile_chain(state, fn, scope, expr)
     case "Array": {
+      if (expr.items.some((item) => item.kind === "Spread"))
+        return compile_spread_array(state, fn, scope, expr.items)
       const first = allocate(fn, expr.items.length)
       const holes = []
       for (let index = 0; index < expr.items.length; index++) {
@@ -1882,7 +2201,6 @@ function compile_expr_kind(
           holes.push(index)
           continue
         }
-        if (item.kind === "Spread") unsupported(item, "array spread")
         emit(
           fn,
           OP.MOVE,
@@ -1905,6 +2223,13 @@ function compile_expr_kind(
     }
     case "ImportMeta":
       return load_name(state, fn, scope, IMPORT_META)
+    case "Super": {
+      let owner: FunctionBuilder | null = fn
+      while (owner && owner.flags & 4) owner = owner.parent
+      if (!owner?.super_home)
+        throw syntax_error(expr, "'super' keyword unexpected here")
+      return load_name(state, fn, scope, owner.super_home)
+    }
     case "NewTarget": {
       let owner: FunctionBuilder | null = fn
       while (owner && owner.flags & 4) owner = owner.parent
@@ -1936,7 +2261,15 @@ function compile_expr_kind(
     case "Object": {
       const entries: ObjectTemplate["entries"] = []
       const values = []
+      // Entries after a spread are defined one by one, after the copy.
+      let object: number | null = null
       for (const entry of expr.entries) {
+        if (entry.kind === "Spread") {
+          object ??= create_object(state, fn, entries, values)
+          const source = compile_expr(state, fn, scope, entry.expr)
+          emit(fn, OP.COPY_DATA_PROPERTIES, object, source)
+          continue
+        }
         let name: string | null, key, value
         let kind: PropertyKind = PROPERTY_KIND.VALUE
         if (entry.kind === "Ident") {
@@ -1953,11 +2286,23 @@ function compile_expr_kind(
           kind = property_kind(entry.method.accessor_type)
           value = method_value(state, fn, scope, entry.method, key!)
         } else unsupported(entry)
+        if (object !== null) {
+          emit(
+            fn,
+            OP.DEFINE_PROP,
+            object,
+            key ?? constant(state, fn, name!),
+            value,
+            kind === PROPERTY_KIND.VALUE ? 7 : 6 | 16,
+            kind === PROPERTY_KIND.SETTER ? 1 : 0,
+          )
+          continue
+        }
         entries.push({ key: name === null ? null : literal(state, name), kind })
         if (key !== undefined) values.push(key)
         values.push(value)
       }
-      return create_object(state, fn, entries, values)
+      return object ?? create_object(state, fn, entries, values)
     }
     case "Func":
       if (expr.func.name) unsupported(expr, "named function expressions")
@@ -2032,31 +2377,94 @@ function compile_expr_kind(
       return dst
     }
     case "Assign": {
-      if (expr.operator !== "Eq") unsupported(expr, "compound assignment")
       const pattern = expr.pattern
-      if (pattern.kind === "Var") {
-        const binding = resolve_name(scope, pattern.ident.text)
-        if (!binding)
-          throw syntax_error(
-            pattern,
-            `Assignment to undeclared binding: ${pattern.ident.text}`,
-          )
+      if (
+        (pattern.kind === "Object" || pattern.kind === "Array") &&
+        expr.operator === "Eq"
+      ) {
         const value = compile_expr(state, fn, scope, expr.value)
-        store_binding(state, fn, binding, value)
+        store_pattern(state, fn, scope, pattern, value)
         return value
       }
-      if (pattern.kind === "Prop") {
+      let read, write
+      if (pattern.kind === "Var") {
+        ;({ read, write } = binding_target(state, fn, scope, pattern.ident))
+      } else if (pattern.kind === "Prop") {
         const object = compile_expr(state, fn, scope, pattern.expr)
         const is_private = pattern.key.kind === "Private"
         const key = is_private
           ? private_name(state, fn, scope, pattern.key.ident)
           : property_key(state, fn, scope, pattern.key)
+        ;({ read, write } = property_target(fn, object, key, is_private))
+      } else {
+        unsupported(pattern, "assignment destructuring")
+      }
+      if (expr.operator === "Eq") {
         const value = compile_expr(state, fn, scope, expr.value)
-        emit(fn, is_private ? OP.SET_PRIVATE : OP.SET_PROP, object, key, value)
+        write(value)
         return value
       }
-      unsupported(pattern, "assignment destructuring")
-      break
+      const short_circuit = {
+        AndEq: OP.JUMP_IF_FALSY,
+        OrEq: OP.JUMP_IF_TRUTHY,
+        NullishEq: OP.JUMP_IF_NOT_NULLISH,
+      }[expr.operator as string]
+      if (short_circuit !== undefined) {
+        const dst = allocate(fn)
+        emit(fn, OP.MOVE, dst, read())
+        const end = emit(fn, short_circuit, dst, 0)
+        const value = compile_expr(state, fn, scope, expr.value)
+        write(value)
+        emit(fn, OP.MOVE, dst, value)
+        fn.instructions[end][2] = position(fn)
+        return dst
+      }
+      // Each compound operator is its binary operator's name plus "Eq".
+      const opcode = binary_operators[expr.operator.slice(0, -"Eq".length)]
+      const current = read()
+      const value = compile_expr(state, fn, scope, expr.value)
+      const dst = allocate(fn)
+      emit(fn, opcode, dst, current, value)
+      write(dst)
+      return dst
+    }
+    case "PreIncrement":
+    case "PreDecrement":
+    case "PostIncrement":
+    case "PostDecrement": {
+      let target = expr.value
+      while (target.kind === "Paren") target = target.expr
+      let read, write
+      if (target.kind === "Var") {
+        ;({ read, write } = binding_target(state, fn, scope, target.ident))
+      } else if (
+        (target.kind === "Prop" || target.kind === "Index") &&
+        !target.is_optional
+      ) {
+        const reference = property_reference(state, fn, scope, target, {
+          exits: [],
+        })
+        ;({ read, write } = property_target(
+          fn,
+          reference.object,
+          reference.key,
+          reference.private,
+        ))
+      } else {
+        throw syntax_error(target, "Invalid update expression target")
+      }
+      const old_value = allocate(fn)
+      emit(fn, OP.TO_NUMBER, old_value, read())
+      const new_value = allocate(fn)
+      emit(
+        fn,
+        expr.kind.endsWith("Increment") ? OP.ADD : OP.SUB,
+        new_value,
+        old_value,
+        constant(state, fn, 1),
+      )
+      write(new_value)
+      return expr.kind.startsWith("Post") ? old_value : new_value
     }
     case "Ternary": {
       const dst = allocate(fn)
@@ -2147,7 +2555,6 @@ function class_value(
     if (member.decorators.length)
       throw syntax_error(member, "Decorators are not supported")
   }
-  if (cls.superclass) unsupported(cls, "class inheritance")
   const scope = create_scope(parent_scope, fn, { binding_flags: [] })
   const class_binding = declare_binding(
     scope,
@@ -2155,6 +2562,32 @@ function class_value(
     true,
   )
   const pushed = push_environment(fn, scope)
+  const derived = cls.superclass !== null
+  let superclass: number | null = null
+  let super_prototype: number | null = null
+  if (cls.superclass) {
+    superclass = compile_expr(state, fn, scope, cls.superclass)
+    super_prototype = allocate(fn)
+    emit(
+      fn,
+      OP.GET_PROP,
+      super_prototype,
+      superclass,
+      constant(state, fn, "prototype"),
+    )
+    init_binding(
+      fn,
+      declare_binding(scope, SUPER_CONSTRUCTOR, true),
+      superclass,
+    )
+    init_binding(
+      fn,
+      declare_binding(scope, SUPER_PROTOTYPE, true),
+      super_prototype,
+    )
+  }
+  const home = (is_static: boolean) =>
+    derived ? (is_static ? SUPER_CONSTRUCTOR : SUPER_PROTOTYPE) : undefined
   scope.private_names = new Map()
   const members = cls.body.members.map(
     (member) => (member.method ?? member.field)!,
@@ -2228,48 +2661,85 @@ function class_value(
     constructor?.body!.is_generator
   )
     throw syntax_error(constructor, "Invalid constructor")
+  // A derived class without a constructor gets constructor(...args) { super(...args) }.
+  const args = { span: cls.span, text: "args" }
+  const default_params: Param[] = derived
+    ? [
+        {
+          span: cls.span,
+          pattern: Pattern.Rest(cls.span, Pattern.Var(cls.span, args)),
+          is_optional: false,
+          type_annotation: null,
+          initializer: null,
+        },
+      ]
+    : []
+  const default_body = derived
+    ? [
+        Stmt.Expr(
+          cls.span,
+          Expr.Call(
+            cls.span,
+            Expr.Super(cls.span),
+            [],
+            Expr.Var(cls.span, "", args),
+            false,
+          ),
+        ),
+      ]
+    : []
+  const initialize_fields = (owner: FunctionBuilder) => {
+    const field_scope = create_scope(scope, owner)
+    const receiver = load_name(state, owner, field_scope, "this")
+    for (const [member, binding] of private_methods)
+      if (!member.is_static)
+        emit(
+          owner,
+          OP.INIT_PRIVATE,
+          receiver,
+          key_of(owner, field_scope, member),
+          load_name(state, owner, field_scope, binding.name),
+          1,
+        )
+    for (const member of members) {
+      if (member.body || member.is_static) continue
+      if (
+        member.name.kind !== "Private" &&
+        member.name.ident?.text === "constructor"
+      )
+        throw syntax_error(member, "Invalid field name: constructor")
+      const key = key_of(owner, field_scope, member)
+      const value = member.initializer
+        ? compile_expr(state, owner, field_scope, member.initializer)
+        : constant(state, owner, undefined)
+      emit(
+        owner,
+        member.name.kind === "Private" ? OP.INIT_PRIVATE : OP.DEFINE_PROP,
+        receiver,
+        key,
+        value,
+        member.name.kind === "Private" ? 0 : 7,
+      )
+    }
+  }
   const constructor_function = compile_function(
     state,
     fn,
     scope,
-    constructor?.body!.body.stmts ?? [],
+    constructor?.body!.body.stmts ?? default_body,
     cls.name?.text ?? "",
-    constructor?.body!.params ?? [],
+    constructor?.body!.params ?? default_params,
     null,
     {
-      flags: 1,
+      flags: derived ? 1 | FUNCTION_DERIVED : 1,
+      super_home: home(false),
       build(owner: FunctionBuilder) {
-        const field_scope = create_scope(scope, owner)
-        const receiver = load_name(state, owner, field_scope, "this")
-        for (const [member, binding] of private_methods)
-          if (!member.is_static)
-            emit(
-              owner,
-              OP.INIT_PRIVATE,
-              receiver,
-              key_of(owner, field_scope, member),
-              load_name(state, owner, field_scope, binding.name),
-              1,
-            )
-        for (const member of members) {
-          if (member.body || member.is_static) continue
-          if (
-            member.name.kind !== "Private" &&
-            member.name.ident?.text === "constructor"
-          )
-            throw syntax_error(member, "Invalid field name: constructor")
-          const key = key_of(owner, field_scope, member)
-          const value = member.initializer
-            ? compile_expr(state, owner, field_scope, member.initializer)
-            : constant(state, owner, undefined)
-          emit(
-            owner,
-            member.name.kind === "Private" ? OP.INIT_PRIVATE : OP.DEFINE_PROP,
-            receiver,
-            key,
-            value,
-            member.name.kind === "Private" ? 0 : 7,
-          )
+        if (!derived) return initialize_fields(owner)
+        const depth = owner.environment_depth
+        owner.initialize_fields = () => {
+          if (owner.environment_depth !== depth)
+            unsupported(cls, "super() inside a block with captured bindings")
+          initialize_fields(owner)
         }
       },
     },
@@ -2296,6 +2766,7 @@ function class_value(
         member.body,
         method_name(name, kind),
         2,
+        home(member.is_static),
       ),
       key: name === null ? null : literal(state, name),
       kind,
@@ -2314,6 +2785,12 @@ function class_value(
     state.unit.classes.push(descriptor) - 1,
     first,
   )
+  if (superclass !== null) {
+    emit(fn, OP.SET_PROTO, ctor, superclass)
+    const prototype = allocate(fn)
+    emit(fn, OP.GET_PROP, prototype, ctor, constant(state, fn, "prototype"))
+    emit(fn, OP.SET_PROTO, prototype, super_prototype!)
+  }
   init_binding(fn, class_binding, ctor)
   for (const [member, binding] of private_methods) {
     const value = function_value(
@@ -2323,6 +2800,7 @@ function class_value(
       member.body!,
       member.name.ident!.text,
       2,
+      home(member.is_static),
     )
     init_binding(fn, binding, value)
     if (member.is_static)
@@ -2339,7 +2817,7 @@ function class_value(
         "<static field>",
         [],
         member.initializer,
-        { flags: 2 },
+        { flags: 2, super_home: home(true) },
       )
       const init = allocate(fn),
         value = allocate(fn)
@@ -2360,6 +2838,11 @@ function class_value(
 }
 
 const SLOT_OPERATIONS = ["has_slot", "get_slot", "set_slot"]
+
+// Hidden class-scope bindings of a derived class: its superclass and the
+// superclass's prototype, which super() and super.x read.
+const SUPER_CONSTRUCTOR = "*super*"
+const SUPER_PROTOTYPE = "*super prototype*"
 
 /** The djs:native export a module-level name imports, if any. */
 function native_import(state: CompilerState, scope: Scope, name: string) {
