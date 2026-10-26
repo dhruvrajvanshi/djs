@@ -1702,6 +1702,9 @@ export type TypeAnnotation =
   | FuncTypeAnnotation
   | QualifiedTypeAnnotation
   | ObjectTypeAnnotation
+  | TypeOfTypeAnnotation
+  | KeyOfTypeAnnotation
+  | IndexedAccessTypeAnnotation
 export class IdentTypeAnnotation {
   constructor(
     readonly span: Span,
@@ -1843,6 +1846,53 @@ export class ObjectTypeAnnotation {
     return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
+export class TypeOfTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly head: Ident,
+    readonly tail: readonly Ident[],
+  ) {}
+
+  get kind(): "TypeOf" {
+    return "TypeOf"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class KeyOfTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly operand: TypeAnnotation,
+  ) {}
+
+  get kind(): "KeyOf" {
+    return "KeyOf"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class IndexedAccessTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly object: TypeAnnotation,
+    readonly index: TypeAnnotation,
+  ) {}
+
+  get kind(): "IndexedAccess" {
+    return "IndexedAccess"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
 
 export const TypeAnnotation = {
   Ident: (
@@ -1892,6 +1942,22 @@ export const TypeAnnotation = {
 
   Object: (span: Span, members: readonly TypeMember[]): ObjectTypeAnnotation =>
     new ObjectTypeAnnotation(span, members),
+
+  TypeOf: (
+    span: Span,
+    head: Ident,
+    tail: readonly Ident[],
+  ): TypeOfTypeAnnotation => new TypeOfTypeAnnotation(span, head, tail),
+
+  KeyOf: (span: Span, operand: TypeAnnotation): KeyOfTypeAnnotation =>
+    new KeyOfTypeAnnotation(span, operand),
+
+  IndexedAccess: (
+    span: Span,
+    object: TypeAnnotation,
+    index: TypeAnnotation,
+  ): IndexedAccessTypeAnnotation =>
+    new IndexedAccessTypeAnnotation(span, object, index),
 } as const
 
 export interface FuncTypeParam {

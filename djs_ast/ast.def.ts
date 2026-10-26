@@ -189,6 +189,12 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     tail: List(Ident),
   },
   Object: { members: List(() => TypeMember) },
+  TypeOf: { head: Ident, tail: List(Ident) },
+  KeyOf: { operand: () => TypeAnnotation },
+  IndexedAccess: {
+    object: () => TypeAnnotation,
+    index: () => TypeAnnotation,
+  },
 })
 
 export const Pattern = Enum("Pattern", ["span", "visit"], {

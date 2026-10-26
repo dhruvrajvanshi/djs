@@ -1127,6 +1127,7 @@ function parser_impl(
     }
   }
   function parse_type_annotation(): TypeAnnotation | Err {
+    if (at(t.VBar)) advance()
     let lhs = parse_array_type_annotation_or_below()
     if (lhs === ERR) return ERR
     while (true) {
@@ -1146,6 +1147,18 @@ function parser_impl(
       switch (self.current_token.kind) {
         case t.LSquare: {
           advance()
+          if (!at(t.RSquare)) {
+            const index = parse_type_annotation()
+            if (index === ERR) return ERR
+            const end = expect(t.RSquare)
+            if (end === ERR) return ERR
+            head = TypeAnnotation.IndexedAccess(
+              Span.between(head, end),
+              head,
+              index,
+            )
+            break
+          }
           const end = expect(t.RSquare)
           if (end === ERR) return ERR
           head = TypeAnnotation.Array(Span.between(head, end), head)
@@ -1186,6 +1199,12 @@ function parser_impl(
             annot.item,
           )
         }
+        if (self.current_token.text === "keyof") {
+          const start = advance()
+          const operand = parse_array_type_annotation_or_below()
+          if (operand === ERR) return ERR
+          return TypeAnnotation.KeyOf(Span.between(start, operand), operand)
+        }
         const leading_trivia = self.current_token.leading_trivia
         const ident = parse_ident()
         if (ident === ERR) return ERR
@@ -1205,6 +1224,23 @@ function parser_impl(
           span: tok.span,
           text: "null",
         })
+      }
+      case t.Typeof: {
+        const start = advance()
+        const head = parse_ident()
+        if (head === ERR) return ERR
+        const tail: Ident[] = []
+        while (at(t.Dot)) {
+          advance()
+          const ident = parse_member_ident_name()
+          if (ident === ERR) return ERR
+          tail.push(ident)
+        }
+        return TypeAnnotation.TypeOf(
+          Span.between(start, tail.at(-1) ?? head),
+          head,
+          tail,
+        )
       }
       case t.Undefined: {
         const tok = advance()

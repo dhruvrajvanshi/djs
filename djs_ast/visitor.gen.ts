@@ -504,6 +504,22 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
+      case "TypeOf": {
+        this.visit_ident(type_annotation.head)
+        for (const tail of type_annotation.tail) {
+          this.visit_ident(tail)
+        }
+        break
+      }
+      case "KeyOf": {
+        this.visit_type_annotation(type_annotation.operand)
+        break
+      }
+      case "IndexedAccess": {
+        this.visit_type_annotation(type_annotation.object)
+        this.visit_type_annotation(type_annotation.index)
+        break
+      }
     }
   }
   visit_type_param(node: ast.TypeParam): void {
