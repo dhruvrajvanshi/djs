@@ -56,6 +56,7 @@ const BUILTINS = new Map([
     "node:fs/promises",
     new URL("../stdlib/node/fs/promises.js", import.meta.url),
   ],
+  ["node:url", new URL("../stdlib/node/url.js", import.meta.url)]
 ])
 
 export const MODULE_STATE = Object.freeze({
