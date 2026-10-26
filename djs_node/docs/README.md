@@ -21,7 +21,7 @@ operations the VM provides.
 | Directory | Contents | Start with |
 | --- | --- | --- |
 | [`compiler/`](../compiler/) | Parses source (through `djs_parser`) and emits bytecode | `compile_module` in [compile.ts](../compiler/compile.ts) |
-| [`vm/`](../vm/) | `storage/`: the heap and boxed values. `records/`: one module per heap kind. `semantics/`: JavaScript operations on them. `execution/`: the interpreter, calls and native operations | `run_interpreter` in [interpreter.ts](../vm/execution/interpreter.ts) |
+| [`vm/`](../vm/) | `storage/`: the heap, handles and boxed values. `heap_types/`: one module per heap type. `semantics/`: JavaScript operations on them. `execution/`: the interpreter, calls and native operations | `run_interpreter` in [interpreter.ts](../vm/execution/interpreter.ts) |
 | [`runtime/`](../runtime/) | The `Runtime`, the realm, module loading and linking, the job queue, bootstrap | `bootstrap` in [bootstrap.ts](../runtime/bootstrap.ts) |
 | [`stdlib/js/`](../stdlib/js/) | The ECMAScript builtins | [realm.js](../stdlib/js/realm.js), which lists the globals |
 | [`stdlib/node/`](../stdlib/node/) | The `node:*` modules | [index.js](../stdlib/node/index.js) |

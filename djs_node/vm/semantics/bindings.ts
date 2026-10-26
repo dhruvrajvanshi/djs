@@ -1,30 +1,28 @@
 import { panic } from "../../utils.ts"
-import type { Root } from "../storage/value.ts"
-import { TAGS, tag_of } from "../storage/value.ts"
+import type { Handle } from "../storage/value.ts"
+import { VALUE_TAGS, tag_of } from "../storage/value.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import {
   environment_scope_id,
   environment_slot_uninitialized,
   load_environment_slot,
   store_environment_slot,
-} from "../records/environment.ts"
+} from "../heap_types/environment.ts"
 import { set_realm_intrinsic } from "../../runtime/realm.ts"
 import { OK, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 
-function scope_of(runtime: Runtime, environment: Root) {
-  return runtime.loader.scopes[
-    environment_scope_id(runtime.memory, environment)
-  ]
+function scope_of(runtime: Runtime, environment: Handle) {
+  return runtime.loader.scopes[environment_scope_id(runtime.heap, environment)]
 }
 
 export function load_binding(
   runtime: Runtime,
-  destination: Root,
-  environment: Root,
+  destination: Handle,
+  environment: Handle,
   slot: number,
 ): Status {
-  const { memory } = runtime
+  const { heap } = runtime
   const imported = scope_of(runtime, environment).import_bindings?.get(slot)
   if (imported)
     return load_binding(
@@ -33,8 +31,8 @@ export function load_binding(
       runtime.loader.modules[imported.module_id].environment,
       imported.slot,
     )
-  load_environment_slot(memory, destination, environment, slot)
-  if (tag_of(memory, destination) === TAGS.UNINITIALIZED)
+  load_environment_slot(heap, destination, environment, slot)
+  if (tag_of(heap, destination) === VALUE_TAGS.UNINITIALIZED)
     return throw_error(
       runtime,
       "ReferenceError",
@@ -45,28 +43,28 @@ export function load_binding(
 
 export function initialize_binding(
   runtime: Runtime,
-  environment: Root,
+  environment: Handle,
   slot: number,
-  source: Root,
+  source: Handle,
 ) {
-  const { memory } = runtime
+  const { heap } = runtime
   const scope = scope_of(runtime, environment)
   if (scope.import_bindings?.has(slot))
     panic("Cannot initialize an imported binding")
-  if (!environment_slot_uninitialized(memory, environment, slot))
+  if (!environment_slot_uninitialized(heap, environment, slot))
     panic("Binding is already initialized")
-  store_environment_slot(memory, environment, slot, source)
+  store_environment_slot(heap, environment, slot, source)
   const intrinsic = scope.intrinsic_bindings?.get(slot)
   if (intrinsic !== undefined) set_realm_intrinsic(runtime, intrinsic, source)
 }
 
 export function store_binding(
   runtime: Runtime,
-  environment: Root,
+  environment: Handle,
   slot: number,
-  source: Root,
+  source: Handle,
 ): Status {
-  const { memory } = runtime
+  const { heap } = runtime
   const scope = scope_of(runtime, environment)
   if (scope.import_bindings?.has(slot))
     return throw_error(
@@ -74,7 +72,7 @@ export function store_binding(
       "TypeError",
       "Cannot assign to an imported binding",
     )
-  if (environment_slot_uninitialized(memory, environment, slot))
+  if (environment_slot_uninitialized(heap, environment, slot))
     return throw_error(
       runtime,
       "ReferenceError",
@@ -82,6 +80,6 @@ export function store_binding(
     )
   if (scope.binding_flags[slot])
     return throw_error(runtime, "TypeError", "Assignment to constant binding")
-  store_environment_slot(memory, environment, slot, source)
+  store_environment_slot(heap, environment, slot, source)
   return OK
 }

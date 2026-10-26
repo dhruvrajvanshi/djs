@@ -9,7 +9,7 @@ async function define_globals(runtime: Runtime, identity: string) {
   const module = await load_module(runtime, identity)
   evaluate_realm_module(runtime, module)
   for (const name of module.exports.keys()) {
-    const value = runtime.memory.alloc_root()
+    const value = runtime.heap.handles.persistent()
     read_export(runtime, module, name, value)
     runtime.realm.globals.set(name, value)
   }

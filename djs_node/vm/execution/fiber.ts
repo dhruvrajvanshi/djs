@@ -1,4 +1,4 @@
-import type { Root } from "../storage/value.ts"
+import type { Handle, Persistent } from "../storage/value.ts"
 import { panic } from "../../utils.ts"
 import type { BytecodeOffset, RegisterIndex } from "../../compiler/bytecode.ts"
 import type { FunctionId } from "../../compiler/compile.ts"
@@ -17,19 +17,20 @@ export type FiberStatus = (typeof FIBER_STATE)[keyof typeof FIBER_STATE]
 /**
  * A stack of frames that runs, suspends at `await` and resumes as a unit. Each
  * module evaluation, async function call, job and JavaScript call made from VM
- * code gets its own. The caller owns allocation/disposal of all roots.
+ * code gets its own. A fiber owns its handles and its frames'; dispose_fiber
+ * releases them.
  */
 export class Fiber {
   readonly id: number
-  readonly result: Root
-  readonly error: Root
+  readonly result: Persistent
+  readonly error: Persistent
   status: FiberStatus = FIBER_STATE.READY
   frame: Frame | null = null
   await_rejected = false
   /** Resolving functions of the promise this fiber settles when it finishes. */
-  settle?: { resolve: Root; reject: Root }
+  settle?: { resolve: Persistent; reject: Persistent }
 
-  constructor(id: number, result: Root, error: Root) {
+  constructor(id: number, result: Persistent, error: Persistent) {
     this.id = id
     this.result = result
     this.error = error
@@ -47,30 +48,32 @@ export class Frame {
   readonly code_id: CodeId
   readonly function_id: FunctionId
   pc = 0 as BytecodeOffset
-  readonly return_root: Root | null
-  readonly environment_root: Root
-  readonly this_root: Root
-  readonly new_target_root: Root
+  /** Where RETURN writes the result; null for a fiber's first frame. */
+  readonly destination: Handle | null
+  readonly environment: Persistent
+  readonly this_value: Persistent
+  readonly new_target: Persistent
   is_construct_call = false
-  readonly registers: Root[]
+  /** The frame owns these and its other persistent handles; pop_frame releases them. */
+  readonly registers: Persistent[]
 
   constructor(fields: {
     caller: Frame | null
     code_id: CodeId
     function_id: FunctionId
-    return_root: Root | null
-    environment_root: Root
-    this_root: Root
-    new_target_root: Root
-    registers: Root[]
+    destination: Handle | null
+    environment: Persistent
+    this_value: Persistent
+    new_target: Persistent
+    registers: Persistent[]
   }) {
     this.caller = fields.caller
     this.code_id = fields.code_id
     this.function_id = fields.function_id
-    this.return_root = fields.return_root
-    this.environment_root = fields.environment_root
-    this.this_root = fields.this_root
-    this.new_target_root = fields.new_target_root
+    this.destination = fields.destination
+    this.environment = fields.environment
+    this.this_value = fields.this_value
+    this.new_target = fields.new_target
     this.registers = fields.registers
   }
 
@@ -78,7 +81,7 @@ export class Frame {
     this.pc = (this.pc + bytes) as BytecodeOffset
   }
 
-  register(index: RegisterIndex): Root {
+  register(index: RegisterIndex): Handle {
     if (!Number.isInteger(index) || index < 0 || index >= this.registers.length)
       panic("Invalid register index")
     return this.registers[index]

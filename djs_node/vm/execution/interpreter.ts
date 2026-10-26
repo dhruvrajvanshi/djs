@@ -1,17 +1,17 @@
 import { panic } from "../../utils.ts"
-import type { Memory } from "../storage/memory.ts"
-import type { Root } from "../storage/value.ts"
+import type { Heap } from "../storage/heap.ts"
+import type { Handle } from "../storage/value.ts"
 import {
-  TAGS,
+  VALUE_TAGS,
   is_nullish,
-  kind_of,
+  heap_type_of,
   read_number,
   tag_of,
   write_boolean,
   write_number,
   write_undefined,
 } from "../storage/value.ts"
-import { KINDS } from "../storage/layout.ts"
+import { HEAP_TYPES } from "../storage/layout.ts"
 import type { FunctionId } from "../../compiler/compile.ts"
 import { PROPERTY_KIND } from "../../compiler/compile.ts"
 import type { Opcode } from "../../compiler/bytecode.ts"
@@ -26,16 +26,16 @@ import {
 } from "../../compiler/bytecode.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import type { CodeId, LinkedCode } from "../../runtime/modules.ts"
-import { write_string } from "../records/string.ts"
-import { load_symbol_description } from "../records/symbol.ts"
-import { is_object, set_prototype } from "../records/object.ts"
-import { set_builtin_steps } from "../records/function.ts"
+import { write_string } from "../heap_types/string.ts"
+import { load_symbol_description } from "../heap_types/symbol.ts"
+import { is_object, set_prototype } from "../heap_types/object.ts"
+import { set_builtin_steps } from "../heap_types/function.ts"
 import {
   copy_environment_bindings,
   create_environment,
   environment_at,
   environment_scope_id,
-} from "../records/environment.ts"
+} from "../heap_types/environment.ts"
 import {
   create_array,
   create_function,
@@ -66,7 +66,7 @@ import {
   load_binding,
   store_binding,
 } from "../semantics/bindings.ts"
-import { init_slot } from "../semantics/slots.ts"
+import { init_slot } from "../semantics/internal_slots.ts"
 import { OK, THROW, throw_error, clear_exception } from "../semantics/errors.ts"
 import type { Status } from "../semantics/errors.ts"
 import { FIBER_STATE } from "./fiber.ts"
@@ -81,7 +81,7 @@ import {
   invoke_sync,
 } from "./calls.ts"
 
-function check_properties(runtime: Runtime, value: Root): Status {
+function check_properties(runtime: Runtime, value: Handle): Status {
   if (!has_properties(runtime, value))
     return throw_error(runtime, "TypeError", "Expected an object")
   return OK
@@ -90,62 +90,59 @@ function check_properties(runtime: Runtime, value: Root): Status {
 // Reads a property, calling a getter synchronously.
 function get_value(
   runtime: Runtime,
-  destination: Root,
-  object: Root,
-  key: Root,
+  destination: Handle,
+  object: Handle,
+  key: Handle,
 ): Status {
   if (check_properties(runtime, object) === THROW) return THROW
   if (
     get_property(runtime, destination, object, key) &&
-    tag_of(runtime.memory, destination) !== TAGS.UNDEFINED
+    tag_of(runtime.heap, destination) !== VALUE_TAGS.UNDEFINED
   )
     return invoke_sync(runtime, destination, destination, object, [])
   return OK
 }
 
-function close_iterator(runtime: Runtime, iterator: Root): Status {
-  const { memory } = runtime
-  const method = memory.alloc_root(),
-    result = memory.alloc_root()
-  try {
+function close_iterator(runtime: Runtime, iterator: Handle): Status {
+  const { heap } = runtime
+  return heap.handles.scope(() => {
+    const method = heap.handles.local(),
+      result = heap.handles.local()
     const key = runtime.realm.property_names.get("return")!
     if (get_value(runtime, method, iterator, key) === THROW) return THROW
-    if (is_nullish(memory, method)) return OK
+    if (is_nullish(heap, method)) return OK
     if (invoke_sync(runtime, result, method, iterator, []) === THROW)
       return THROW
-    if (!is_object(memory, result))
+    if (!is_object(heap, result))
       return throw_error(
         runtime,
         "TypeError",
         "Iterator result is not an object",
       )
     return OK
-  } finally {
-    memory.free_root(method)
-    memory.free_root(result)
-  }
+  })
 }
 
 /** Calls `body` with `fixed` followed by the values `iterable` yields. */
 function with_spread_arguments(
   runtime: Runtime,
-  fixed: Root[],
-  iterable: Root,
-  body: (arguments_: Root[]) => Status,
+  fixed: Handle[],
+  iterable: Handle,
+  body: (arguments_: Handle[]) => Status,
 ): Status {
-  const { memory } = runtime
-  const iterator = memory.alloc_root(),
-    next = memory.alloc_root(),
-    result = memory.alloc_root(),
-    done = memory.alloc_root()
-  const values: Root[] = []
-  try {
+  const { heap } = runtime
+  return heap.handles.scope(() => {
+    const iterator = heap.handles.local(),
+      next = heap.handles.local(),
+      result = heap.handles.local(),
+      done = heap.handles.local()
+    const values: Handle[] = []
     if (op.GET_ITERATOR(runtime, iterator, next, iterable, result) === THROW)
       return THROW
     while (true) {
       if (invoke_sync(runtime, result, next, iterator, []) === THROW)
         return THROW
-      if (!is_object(memory, result))
+      if (!is_object(heap, result))
         return throw_error(
           runtime,
           "TypeError",
@@ -154,39 +151,36 @@ function with_spread_arguments(
       const done_key = runtime.realm.property_names.get("done")!
       if (get_value(runtime, done, result, done_key) === THROW) return THROW
       if (truthy(runtime, done)) break
-      const value = memory.alloc_root()
+      const value = heap.handles.local()
       values.push(value)
       const value_key = runtime.realm.property_names.get("value")!
       if (get_value(runtime, value, result, value_key) === THROW) return THROW
     }
     return body([...fixed, ...values])
-  } finally {
-    for (const root of [iterator, next, result, done, ...values])
-      memory.free_root(root)
-  }
+  })
 }
 
 function load_property_key(
   runtime: Runtime,
-  destination: Root,
-  source: Root,
+  destination: Handle,
+  source: Handle,
 ): Status {
-  runtime.memory.copy_value(destination, source)
-  if (is_object(runtime.memory, destination))
+  runtime.heap.copy_value(destination, source)
+  if (is_object(runtime.heap, destination))
     return coerce_value(runtime, destination, destination, "ToString")
   return OK
 }
 
 function create_block_environment(
-  memory: Memory,
-  destination: Root,
-  parent: Root,
+  heap: Heap,
+  destination: Handle,
+  parent: Handle,
   code: LinkedCode,
   function_id: FunctionId,
   block: number,
 ) {
   create_environment(
-    memory,
+    heap,
     destination,
     parent,
     code.unit.functions[function_id].block_binding_flags[block].length,
@@ -197,18 +191,18 @@ function create_block_environment(
 /** Copies the operands, converting objects with ToPrimitive. */
 function to_primitives(
   runtime: Runtime,
-  left_destination: Root,
-  right_destination: Root,
-  left: Root,
-  right: Root,
+  left_destination: Handle,
+  right_destination: Handle,
+  left: Handle,
+  right: Handle,
   hint?: string,
 ): Status {
-  const { memory } = runtime
-  memory.copy_value(left_destination, left)
-  memory.copy_value(right_destination, right)
+  const { heap } = runtime
+  heap.copy_value(left_destination, left)
+  heap.copy_value(right_destination, right)
   for (const value of [left_destination, right_destination])
     if (
-      is_object(memory, value) &&
+      is_object(heap, value) &&
       coerce_value(runtime, value, value, "ToPrimitive", hint) === THROW
     )
       return THROW
@@ -227,9 +221,9 @@ function accessor_prefix(kind: number) {
 // flags, or a configurable accessor.
 function define_member(
   runtime: Runtime,
-  object: Root,
-  key: Root,
-  value: Root,
+  object: Handle,
+  key: Handle,
+  value: Handle,
   kind: number,
   flags: number,
 ) {
@@ -249,39 +243,36 @@ function define_member(
 // SetFunctionName (ECMA-262 10.2.9).
 function set_function_name(
   runtime: Runtime,
-  target: Root,
-  key: Root,
+  target: Handle,
+  key: Handle,
   prefix: string,
 ) {
-  const { memory } = runtime
-  const name = memory.alloc_root(),
-    description = memory.alloc_root()
-  try {
+  const { heap } = runtime
+  heap.handles.scope(() => {
+    const name = heap.handles.local(),
+      description = heap.handles.local()
     let text
-    if (kind_of(memory, key) === KINDS.SYMBOL) {
-      load_symbol_description(memory, description, key)
+    if (heap_type_of(heap, key) === HEAP_TYPES.SYMBOL) {
+      load_symbol_description(heap, description, key)
       text =
-        tag_of(memory, description) === TAGS.UNDEFINED
+        tag_of(heap, description) === VALUE_TAGS.UNDEFINED
           ? ""
           : `[${to_string(runtime, description)}]`
     } else text = to_string(runtime, key)
-    write_string(memory, name, prefix ? `${prefix} ${text}` : text)
-    write_string(memory, description, "name")
+    write_string(heap, name, prefix ? `${prefix} ${text}` : text)
+    write_string(heap, description, "name")
     define_property(runtime, target, description, name, 4)
-  } finally {
-    memory.free_root(name)
-    memory.free_root(description)
-  }
+  })
 }
 
 function create_closure(
   runtime: Runtime,
   frame: Frame,
-  destination: Root,
+  destination: Handle,
   code: LinkedCode,
   code_id: CodeId,
   function_id: FunctionId,
-  env: Root,
+  env: Handle,
 ) {
   const fn = code.unit.functions[function_id]
   const lexical = fn.flags & 4
@@ -292,77 +283,77 @@ function create_closure(
     function_id,
     env,
     fn.flags,
-    lexical ? frame.this_root : undefined,
-    lexical ? frame.new_target_root : undefined,
+    lexical ? frame.this_value : undefined,
+    lexical ? frame.new_target : undefined,
     fn,
   )
 }
 
 const op = {
-  LOAD_CONST(memory: Memory, destination: Root, constant: Root) {
-    memory.copy_value(destination, constant)
+  LOAD_CONST(heap: Heap, destination: Handle, constant: Handle) {
+    heap.copy_value(destination, constant)
   },
-  MOVE(memory: Memory, destination: Root, source: Root) {
-    memory.copy_value(destination, source)
+  MOVE(heap: Heap, destination: Handle, source: Handle) {
+    heap.copy_value(destination, source)
   },
   LOAD_BINDING(
     runtime: Runtime,
-    destination: Root,
-    env: Root,
+    destination: Handle,
+    env: Handle,
     depth: number,
     slot: number,
-    temporary: Root,
+    temporary: Handle,
   ): Status {
-    environment_at(runtime.memory, temporary, env, depth)
+    environment_at(runtime.heap, temporary, env, depth)
     return load_binding(runtime, destination, temporary, slot)
   },
   INIT_BINDING(
     runtime: Runtime,
-    env: Root,
+    env: Handle,
     depth: number,
     slot: number,
-    value: Root,
-    temporary: Root,
+    value: Handle,
+    temporary: Handle,
   ) {
-    environment_at(runtime.memory, temporary, env, depth)
+    environment_at(runtime.heap, temporary, env, depth)
     initialize_binding(runtime, temporary, slot, value)
   },
   STORE_BINDING(
     runtime: Runtime,
-    env: Root,
+    env: Handle,
     depth: number,
     slot: number,
-    value: Root,
-    temporary: Root,
+    value: Handle,
+    temporary: Handle,
   ): Status {
-    environment_at(runtime.memory, temporary, env, depth)
+    environment_at(runtime.heap, temporary, env, depth)
     return store_binding(runtime, temporary, slot, value)
   },
   LOAD_GLOBAL(
     runtime: Runtime,
-    destination: Root,
+    destination: Handle,
     name: string,
     allow_unresolved: boolean,
   ): Status {
     const global = runtime.realm.globals.get(name)
     if (global === undefined) {
       if (allow_unresolved)
-        write_undefined(runtime.memory, destination) // typeof unresolvable name
+        write_undefined(runtime.heap, destination) // typeof unresolvable name
       else
         return throw_error(runtime, "ReferenceError", `${name} is not defined`)
-    } else runtime.memory.copy_value(destination, global)
+    } else runtime.heap.copy_value(destination, global)
     return OK
   },
   // Iteration ops call guest methods synchronously, like coercions.
   GET_ITERATOR(
     runtime: Runtime,
-    iterator: Root,
-    next: Root,
-    iterable: Root,
-    temporary: Root,
+    iterator: Handle,
+    next: Handle,
+    iterable: Handle,
+    temporary: Handle,
   ): Status {
-    const { memory } = runtime
-    if (is_nullish(memory, iterable))
+    const { heap } = runtime
+    if (is_nullish(heap, iterable))
       return throw_error(runtime, "TypeError", "Value is not iterable")
     if (
       get_value(
@@ -373,11 +364,11 @@ const op = {
       ) === THROW
     )
       return THROW
-    if (is_nullish(memory, temporary))
+    if (is_nullish(heap, temporary))
       return throw_error(runtime, "TypeError", "Value is not iterable")
     if (invoke_sync(runtime, iterator, temporary, iterable, []) === THROW)
       return THROW
-    if (!is_object(memory, iterator))
+    if (!is_object(heap, iterator))
       return throw_error(
         runtime,
         "TypeError",
@@ -394,17 +385,17 @@ const op = {
     runtime: Runtime,
     fiber: Fiber,
     frame: Frame,
-    destination: Root,
-    iterator: Root,
-    next: Root,
+    destination: Handle,
+    iterator: Handle,
+    next: Handle,
     done_target: number,
-    temporary: Root,
-    operand: Root,
+    temporary: Handle,
+    operand: Handle,
   ): Status {
-    const { memory } = runtime
+    const { heap } = runtime
     if (invoke_sync(runtime, temporary, next, iterator, []) === THROW)
       return THROW
-    if (!is_object(memory, temporary))
+    if (!is_object(heap, temporary))
       return throw_error(
         runtime,
         "TypeError",
@@ -423,7 +414,11 @@ const op = {
       runtime.realm.property_names.get("value")!,
     )
   },
-  ITERATOR_CLOSE(runtime: Runtime, iterator: Root, throwing: boolean): Status {
+  ITERATOR_CLOSE(
+    runtime: Runtime,
+    iterator: Handle,
+    throwing: boolean,
+  ): Status {
     const status = close_iterator(runtime, iterator)
     if (!throwing) return status
     // The pending throw wins over errors from closing.
@@ -432,9 +427,9 @@ const op = {
   },
   CREATE_REGEXP(
     runtime: Runtime,
-    destination: Root,
-    pattern: Root,
-    flags: Root,
+    destination: Handle,
+    pattern: Handle,
+    flags: Handle,
   ): Status {
     const create = runtime.realm.intrinsics.get("RegExpCreate")
     if (create === undefined) panic("RegExp is not initialized")
@@ -445,9 +440,9 @@ const op = {
   },
   COPY_DATA_PROPERTIES(
     runtime: Runtime,
-    object: Root,
-    source: Root,
-    temporary: Root,
+    object: Handle,
+    source: Handle,
+    temporary: Handle,
   ): Status {
     const copy = runtime.realm.intrinsics.get("CopyDataProperties")
     if (copy === undefined) panic("CopyDataProperties is not initialized")
@@ -455,9 +450,9 @@ const op = {
   },
   GET_FOR_IN_ITERATOR(
     runtime: Runtime,
-    iterator: Root,
-    next: Root,
-    source: Root,
+    iterator: Handle,
+    next: Handle,
+    source: Handle,
   ): Status {
     const enumerate = runtime.realm.intrinsics.get("EnumerateObjectProperties")
     if (enumerate === undefined) panic("for-in is not initialized")
@@ -472,52 +467,43 @@ const op = {
       runtime.realm.property_names.get("next")!,
     )
   },
-  LOAD_NEW_TARGET(
-    memory: Memory,
-    destination: Root,
-    fiber: Fiber,
-    frame: Frame,
-  ) {
-    memory.copy_value(destination, frame.new_target_root)
+  LOAD_NEW_TARGET(heap: Heap, destination: Handle, fiber: Fiber, frame: Frame) {
+    heap.copy_value(destination, frame.new_target)
   },
   TO_PROPERTY_KEY(
     runtime: Runtime,
-    destination: Root,
-    source: Root,
-    property_key: Root,
+    destination: Handle,
+    source: Handle,
+    property_key: Handle,
   ): Status {
     if (load_property_key(runtime, property_key, source) === THROW) return THROW
-    if (kind_of(runtime.memory, property_key) === KINDS.SYMBOL)
-      runtime.memory.copy_value(destination, property_key)
+    if (heap_type_of(runtime.heap, property_key) === HEAP_TYPES.SYMBOL)
+      runtime.heap.copy_value(destination, property_key)
     else
-      write_string(
-        runtime.memory,
-        destination,
-        to_string(runtime, property_key),
-      )
+      write_string(runtime.heap, destination, to_string(runtime, property_key))
     return OK
   },
   CREATE_ARRAY(
     runtime: Runtime,
-    destination: Root,
-    elements: (index: number) => Root,
+    destination: Handle,
+    elements: (index: number) => Handle,
     length: number,
     holes: readonly number[],
-    key: Root,
+    key: Handle,
   ) {
     create_array(runtime, destination, length)
     for (let index = 0; index < length; index++) {
       if (holes.includes(index)) continue
-      write_string(runtime.memory, key, String(index))
+      write_string(runtime.heap, key, String(index))
       define_property(runtime, destination, key, elements(index))
     }
   },
   DELETE_PROP(
     runtime: Runtime,
-    destination: Root,
-    object: Root,
-    key: Root,
-    property_key: Root,
+    destination: Handle,
+    object: Handle,
+    key: Handle,
+    property_key: Handle,
   ): Status {
     if (load_property_key(runtime, property_key, key) === THROW) return THROW
     if (check_properties(runtime, object) === THROW) return THROW
@@ -527,23 +513,23 @@ const op = {
         "TypeError",
         "Cannot delete non-configurable property",
       )
-    write_boolean(runtime.memory, destination, true)
+    write_boolean(runtime.heap, destination, true)
     return OK
   },
   GET_PROP(
     runtime: Runtime,
     fiber: Fiber,
-    destination: Root,
-    object: Root,
-    key: Root,
-    property_key: Root,
+    destination: Handle,
+    object: Handle,
+    key: Handle,
+    property_key: Handle,
   ): Status {
-    const { memory } = runtime
+    const { heap } = runtime
     if (load_property_key(runtime, property_key, key) === THROW) return THROW
     if (check_properties(runtime, object) === THROW) return THROW
     if (
       get_property(runtime, destination, object, property_key) &&
-      tag_of(memory, destination) !== TAGS.UNDEFINED
+      tag_of(heap, destination) !== VALUE_TAGS.UNDEFINED
     )
       return call_function(runtime, fiber, destination, destination, object, [])
     return OK
@@ -551,17 +537,17 @@ const op = {
   SET_PROP(
     runtime: Runtime,
     fiber: Fiber,
-    object: Root,
-    key: Root,
-    value: Root,
-    property_key: Root,
-    operand: Root,
-    temporary: Root,
+    object: Handle,
+    key: Handle,
+    value: Handle,
+    property_key: Handle,
+    operand: Handle,
+    temporary: Handle,
   ): Status {
-    const { memory } = runtime
+    const { heap } = runtime
     if (load_property_key(runtime, property_key, key) === THROW) return THROW
     if (check_properties(runtime, object) === THROW) return THROW
-    memory.copy_value(operand, value)
+    heap.copy_value(operand, value)
     if (
       set_property(
         runtime,
@@ -573,23 +559,23 @@ const op = {
       ) === THROW
     )
       return THROW
-    if (tag_of(memory, temporary) === TAGS.UNDEFINED) return OK
+    if (tag_of(heap, temporary) === VALUE_TAGS.UNDEFINED) return OK
     return call_function(runtime, fiber, fiber.result, temporary, object, [
       value,
     ])
   },
   DEFINE_PROP(
     runtime: Runtime,
-    object: Root,
-    key: Root,
-    value: Root,
+    object: Handle,
+    key: Handle,
+    value: Handle,
     flags: number,
-    setter: Root | undefined,
-    property_key: Root,
-    operand: Root,
+    setter: Handle | undefined,
+    property_key: Handle,
+    operand: Handle,
   ): Status {
     if (load_property_key(runtime, property_key, key) === THROW) return THROW
-    runtime.memory.copy_value(operand, value)
+    runtime.heap.copy_value(operand, value)
     return define_value_property(
       runtime,
       object,
@@ -599,17 +585,17 @@ const op = {
       setter,
     )
   },
-  SET_PROTO(memory: Memory, object: Root, prototype: Root) {
-    set_prototype(memory, object, prototype)
+  SET_PROTO(heap: Heap, object: Handle, prototype: Handle) {
+    set_prototype(heap, object, prototype)
   },
   SET_PRIVATE(
     runtime: Runtime,
-    object: Root,
-    key: Root,
-    value: Root,
+    object: Handle,
+    key: Handle,
+    value: Handle,
     initialize: boolean,
     readonly: boolean,
-    temporary: Root,
+    temporary: Handle,
   ): Status {
     return private_property(
       runtime,
@@ -624,9 +610,9 @@ const op = {
   },
   GET_PRIVATE(
     runtime: Runtime,
-    destination: Root,
-    object: Root,
-    key: Root,
+    destination: Handle,
+    object: Handle,
+    key: Handle,
     has: boolean,
   ): Status {
     return private_property(
@@ -639,23 +625,28 @@ const op = {
       has,
     )
   },
-  INIT_SLOT(runtime: Runtime, object: Root, name: string, value: Root): Status {
+  INIT_SLOT(
+    runtime: Runtime,
+    object: Handle,
+    name: string,
+    value: Handle,
+  ): Status {
     return init_slot(runtime, object, name, value)
   },
   SET_BEHAVIOR(
-    memory: Memory,
-    object: Root,
-    steps: Root,
+    heap: Heap,
+    object: Handle,
+    steps: Handle,
     constructor: boolean,
   ) {
-    set_builtin_steps(memory, object, steps, constructor)
+    set_builtin_steps(heap, object, steps, constructor)
   },
   CREATE_OBJECT(
     runtime: Runtime,
-    destination: Root,
+    destination: Handle,
     code: LinkedCode,
     template: number,
-    operands: (index: number) => Root,
+    operands: (index: number) => Handle,
   ) {
     create_object(runtime, destination)
     let next = 0
@@ -667,16 +658,16 @@ const op = {
   CREATE_CLASS(
     runtime: Runtime,
     frame: Frame,
-    destination: Root,
+    destination: Handle,
     code: LinkedCode,
     code_id: CodeId,
     class_id: number,
-    keys: (index: number) => Root,
-    env: Root,
-    temporary: Root,
-    operand: Root,
+    keys: (index: number) => Handle,
+    env: Handle,
+    temporary: Handle,
+    operand: Handle,
   ) {
-    const { memory } = runtime
+    const { heap } = runtime
     const descriptor = code.unit.classes[class_id]
     create_closure(
       runtime,
@@ -688,11 +679,11 @@ const op = {
       env,
     )
     create_object(runtime, temporary)
-    const key = memory.alloc_root()
-    try {
-      write_string(memory, key, "prototype")
+    heap.handles.scope(() => {
+      const key = heap.handles.local()
+      write_string(heap, key, "prototype")
       define_property(runtime, destination, key, temporary, 0)
-      write_string(memory, key, "constructor")
+      write_string(heap, key, "constructor")
       define_property(runtime, temporary, key, destination, 5)
       let next = 0
       for (const member of descriptor.members) {
@@ -718,31 +709,34 @@ const op = {
         const home = member.is_static ? destination : temporary
         define_member(runtime, home, name, operand, member.kind, 5)
       }
-    } finally {
-      memory.free_root(key)
-    }
+    })
   },
-  SET_FUNCTION_NAME(runtime: Runtime, target: Root, key: Root, prefix: string) {
+  SET_FUNCTION_NAME(
+    runtime: Runtime,
+    target: Handle,
+    key: Handle,
+    prefix: string,
+  ) {
     set_function_name(runtime, target, key, prefix)
   },
   CREATE_CLOSURE(
     runtime: Runtime,
     frame: Frame,
-    destination: Root,
+    destination: Handle,
     code: LinkedCode,
     code_id: CodeId,
     function_id: FunctionId,
-    env: Root,
+    env: Handle,
   ) {
     create_closure(runtime, frame, destination, code, code_id, function_id, env)
   },
   CALL(
     runtime: Runtime,
     fiber: Fiber,
-    destination: Root,
-    callee: Root,
-    receiver: Root,
-    arguments_: Root[],
+    destination: Handle,
+    callee: Handle,
+    receiver: Handle,
+    arguments_: Handle[],
   ): Status {
     return call_function(
       runtime,
@@ -756,10 +750,10 @@ const op = {
   CONSTRUCT(
     runtime: Runtime,
     fiber: Fiber,
-    destination: Root,
-    callee: Root,
-    new_target: Root,
-    arguments_: Root[],
+    destination: Handle,
+    callee: Handle,
+    new_target: Handle,
+    arguments_: Handle[],
   ): Status {
     return construct_function(
       runtime,
@@ -767,69 +761,62 @@ const op = {
       destination,
       callee,
       arguments_,
-      tag_of(runtime.memory, new_target) === TAGS.UNDEFINED
+      tag_of(runtime.heap, new_target) === VALUE_TAGS.UNDEFINED
         ? callee
         : new_target,
     )
   },
-  BIND_THIS(runtime: Runtime, frame: Frame, value: Root): Status {
-    if (tag_of(runtime.memory, frame.this_root) !== TAGS.UNINITIALIZED)
+  BIND_THIS(runtime: Runtime, frame: Frame, value: Handle): Status {
+    if (tag_of(runtime.heap, frame.this_value) !== VALUE_TAGS.UNINITIALIZED)
       return throw_error(
         runtime,
         "ReferenceError",
         "Super constructor may only be called once",
       )
-    runtime.memory.copy_value(frame.this_root, value)
+    runtime.heap.copy_value(frame.this_value, value)
     return OK
   },
   PUSH_ENV(
-    memory: Memory,
-    env: Root,
+    heap: Heap,
+    env: Handle,
     code: LinkedCode,
     function_id: FunctionId,
     block: number,
-    temporary: Root,
+    temporary: Handle,
   ) {
-    create_block_environment(memory, temporary, env, code, function_id, block)
-    memory.copy_value(env, temporary)
+    create_block_environment(heap, temporary, env, code, function_id, block)
+    heap.copy_value(env, temporary)
   },
   // Replaces the current environment with a sibling holding the same values,
   // giving each loop iteration fresh bindings.
   COPY_ENV(
-    memory: Memory,
-    env: Root,
+    heap: Heap,
+    env: Handle,
     code: LinkedCode,
     function_id: FunctionId,
     block: number,
-    temporary: Root,
-    operand: Root,
+    temporary: Handle,
+    operand: Handle,
   ) {
-    environment_at(memory, operand, env, 1)
-    create_block_environment(
-      memory,
-      temporary,
-      operand,
-      code,
-      function_id,
-      block,
-    )
-    copy_environment_bindings(memory, temporary, env)
-    memory.copy_value(env, temporary)
+    environment_at(heap, operand, env, 1)
+    create_block_environment(heap, temporary, operand, code, function_id, block)
+    copy_environment_bindings(heap, temporary, env)
+    heap.copy_value(env, temporary)
   },
-  POP_ENV(memory: Memory, env: Root, depth: number, temporary: Root) {
-    environment_at(memory, temporary, env, depth)
-    memory.copy_value(env, temporary)
+  POP_ENV(heap: Heap, env: Handle, depth: number, temporary: Handle) {
+    environment_at(heap, temporary, env, depth)
+    heap.copy_value(env, temporary)
   },
   // The handlers below return true when run_interpreter must stop.
-  RETURN(runtime: Runtime, fiber: Fiber, value: Root): boolean {
+  RETURN(runtime: Runtime, fiber: Fiber, value: Handle): boolean {
     return_value(runtime, fiber, value)
     return fiber.status === FIBER_STATE.DONE
   },
-  AWAIT(runtime: Runtime, fiber: Fiber, destination: Root, value: Root) {
+  AWAIT(runtime: Runtime, fiber: Fiber, destination: Handle, value: Handle) {
     await_value(runtime, fiber, destination, value)
     return true
   },
-  THROW(runtime: Runtime, fiber: Fiber, value: Root): boolean {
+  THROW(runtime: Runtime, fiber: Fiber, value: Handle): boolean {
     throw_value(runtime, fiber, value)
     return fiber.status === FIBER_STATE.FAILED
   },
@@ -842,22 +829,22 @@ const op = {
   JUMP_IF(frame: Frame, condition: boolean, target: number) {
     if (condition) frame.pc = bytecode_offset(target)
   },
-  JUMP_AND_LINK(memory: Memory, frame: Frame, link: Root, target: number) {
-    write_number(memory, link, frame.pc)
+  JUMP_AND_LINK(heap: Heap, frame: Frame, link: Handle, target: number) {
+    write_number(heap, link, frame.pc)
     frame.pc = bytecode_offset(target)
   },
-  JUMP_INDIRECT(memory: Memory, frame: Frame, link: Root) {
-    frame.pc = bytecode_offset(read_number(memory, link))
+  JUMP_INDIRECT(heap: Heap, frame: Frame, link: Handle) {
+    frame.pc = bytecode_offset(read_number(heap, link))
   },
   // `+` converts objects with no hint; the other operators prefer numbers.
   PRIMITIVE_OPERATOR(
     runtime: Runtime,
     opcode: Opcode,
-    destination: Root,
-    left: Root,
-    right: Root,
-    temporary: Root,
-    operand: Root,
+    destination: Handle,
+    left: Handle,
+    right: Handle,
+    temporary: Handle,
+    operand: Handle,
   ): Status {
     const hint = opcode === OP.ADD ? undefined : "number"
     if (to_primitives(runtime, temporary, operand, left, right, hint) === THROW)
@@ -867,31 +854,31 @@ const op = {
   EQUALITY(
     runtime: Runtime,
     opcode: Opcode,
-    destination: Root,
-    left: Root,
-    right: Root,
-    temporary: Root,
-    operand: Root,
+    destination: Handle,
+    left: Handle,
+    right: Handle,
+    temporary: Handle,
+    operand: Handle,
   ): Status {
-    const { memory } = runtime
+    const { heap } = runtime
     let equal
     if (opcode === OP.STRICT_EQ || opcode === OP.STRICT_NOT_EQ)
       equal = strict_equals(runtime, left, right)
     else {
-      memory.copy_value(temporary, left)
-      memory.copy_value(operand, right)
+      heap.copy_value(temporary, left)
+      heap.copy_value(operand, right)
       // == converts an object only when compared with a primitive.
       if (
-        is_object(memory, left) !== is_object(memory, right) &&
-        !is_nullish(memory, left) &&
-        !is_nullish(memory, right) &&
+        is_object(heap, left) !== is_object(heap, right) &&
+        !is_nullish(heap, left) &&
+        !is_nullish(heap, right) &&
         to_primitives(runtime, temporary, operand, left, right) === THROW
       )
         return THROW
       equal = loose_equals(runtime, temporary, operand)
     }
     write_boolean(
-      memory,
+      heap,
       destination,
       equal === (opcode === OP.EQ || opcode === OP.STRICT_EQ),
     )
@@ -899,59 +886,59 @@ const op = {
   },
   IN(
     runtime: Runtime,
-    destination: Root,
-    left: Root,
-    right: Root,
-    temporary: Root,
+    destination: Handle,
+    left: Handle,
+    right: Handle,
+    temporary: Handle,
   ): Status {
-    const { memory } = runtime
-    if (!is_object(memory, right))
+    const { heap } = runtime
+    if (!is_object(heap, right))
       return throw_error(
         runtime,
         "TypeError",
         "Right operand of in must be an object",
       )
-    memory.copy_value(temporary, left)
+    heap.copy_value(temporary, left)
     if (
-      is_object(memory, temporary) &&
+      is_object(heap, temporary) &&
       coerce_value(runtime, temporary, temporary, "ToString") === THROW
     )
       return THROW
-    write_boolean(memory, destination, has_property(runtime, right, temporary))
+    write_boolean(heap, destination, has_property(runtime, right, temporary))
     return OK
   },
   NUMERIC_UNARY(
     runtime: Runtime,
     opcode: Opcode,
-    destination: Root,
-    source: Root,
-    operand: Root,
+    destination: Handle,
+    source: Handle,
+    operand: Handle,
   ): Status {
-    runtime.memory.copy_value(operand, source)
+    runtime.heap.copy_value(operand, source)
     if (
-      is_object(runtime.memory, operand) &&
+      is_object(runtime.heap, operand) &&
       coerce_value(runtime, operand, operand, "ToNumber") === THROW
     )
       return THROW
     return numeric_unary_operation(runtime, destination, operand, opcode)
   },
-  TO_STRING(runtime: Runtime, destination: Root, source: Root): Status {
-    const { memory } = runtime
-    if (kind_of(memory, source) === KINDS.SYMBOL)
+  TO_STRING(runtime: Runtime, destination: Handle, source: Handle): Status {
+    const { heap } = runtime
+    if (heap_type_of(heap, source) === HEAP_TYPES.SYMBOL)
       return throw_error(
         runtime,
         "TypeError",
         "Cannot convert a Symbol value to a string",
       )
-    if (is_object(memory, source))
+    if (is_object(heap, source))
       return coerce_value(runtime, destination, source, "ToString")
-    write_string(memory, destination, to_string(runtime, source))
+    write_string(heap, destination, to_string(runtime, source))
     return OK
   },
-  LOAD_THIS(runtime: Runtime, destination: Root, frame: Frame): Status {
-    if (tag_of(runtime.memory, frame.this_root) === TAGS.UNINITIALIZED)
+  LOAD_THIS(runtime: Runtime, destination: Handle, frame: Frame): Status {
+    if (tag_of(runtime.heap, frame.this_value) === VALUE_TAGS.UNINITIALIZED)
       return throw_error(runtime, "ReferenceError", UNBOUND_THIS_MESSAGE)
-    runtime.memory.copy_value(destination, frame.this_root)
+    runtime.heap.copy_value(destination, frame.this_value)
     return OK
   },
 }
@@ -960,13 +947,13 @@ const UNBOUND_THIS_MESSAGE =
   "Must call super constructor in derived class before accessing 'this'"
 
 export function run_interpreter(runtime: Runtime, fiber: Fiber) {
-  const { memory } = runtime
+  const { heap } = runtime
   // Widened so TS doesn't keep the narrowed status across calls that change it.
   fiber.status = FIBER_STATE.RUNNING as FiberStatus
-  const temporary = memory.alloc_root(),
-    operand = memory.alloc_root(),
-    property_key = memory.alloc_root()
-  try {
+  heap.handles.scope(() => {
+    const temporary = heap.handles.local(),
+      operand = heap.handles.local(),
+      property_key = heap.handles.local()
     if (fiber.take_await_rejection()) {
       throw_value(runtime, fiber, fiber.error)
       if (fiber.status === FIBER_STATE.FAILED) return
@@ -985,14 +972,14 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
       )
       frame.advance_pc(INSTRUCTION_BYTES)
       const reg = (index: number) => frame.register(register_index(index))
-      const env = frame.environment_root
+      const env = frame.environment
       let status: Status = OK
       switch (opcode) {
         case OP.LOAD_CONST:
-          op.LOAD_CONST(memory, reg(a), code.constants[b])
+          op.LOAD_CONST(heap, reg(a), code.constants[b])
           break
         case OP.MOVE:
-          op.MOVE(memory, reg(a), reg(b))
+          op.MOVE(heap, reg(a), reg(b))
           break
         case OP.LOAD_THIS:
           status = op.LOAD_THIS(runtime, reg(a), frame)
@@ -1001,7 +988,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           status = op.BIND_THIS(runtime, frame, reg(a))
           break
         case OP.LOAD_NEW_TARGET:
-          op.LOAD_NEW_TARGET(memory, reg(a), fiber, frame)
+          op.LOAD_NEW_TARGET(heap, reg(a), fiber, frame)
           break
         case OP.LOAD_GLOBAL:
           status = op.LOAD_GLOBAL(
@@ -1021,13 +1008,13 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           status = op.STORE_BINDING(runtime, env, a, b, reg(c), temporary)
           break
         case OP.PUSH_ENV:
-          op.PUSH_ENV(memory, env, code, function_id, a, temporary)
+          op.PUSH_ENV(heap, env, code, function_id, a, temporary)
           break
         case OP.POP_ENV:
-          op.POP_ENV(memory, env, a, temporary)
+          op.POP_ENV(heap, env, a, temporary)
           break
         case OP.COPY_ENV:
-          op.COPY_ENV(memory, env, code, function_id, a, temporary, operand)
+          op.COPY_ENV(heap, env, code, function_id, a, temporary, operand)
           break
         case OP.CREATE_OBJECT:
           op.CREATE_OBJECT(runtime, reg(a), code, b, (index) => reg(c + index))
@@ -1113,7 +1100,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           status = op.DELETE_PROP(runtime, reg(a), reg(b), reg(c), property_key)
           break
         case OP.SET_PROTO:
-          op.SET_PROTO(memory, reg(a), reg(b))
+          op.SET_PROTO(heap, reg(a), reg(b))
           break
         case OP.TO_PROPERTY_KEY:
           status = op.TO_PROPERTY_KEY(runtime, reg(a), reg(b), property_key)
@@ -1149,7 +1136,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           )
           break
         case OP.SET_BEHAVIOR:
-          op.SET_BEHAVIOR(memory, reg(a), reg(b), c === 1)
+          op.SET_BEHAVIOR(heap, reg(a), reg(b), c === 1)
           break
         case OP.CALL:
           status = op.CALL(
@@ -1192,8 +1179,8 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
         case OP.RETURN:
           if (
             frame.is_construct_call &&
-            tag_of(memory, frame.this_root) === TAGS.UNINITIALIZED &&
-            !is_object(memory, reg(a))
+            tag_of(heap, frame.this_value) === VALUE_TAGS.UNINITIALIZED &&
+            !is_object(heap, reg(a))
           ) {
             status = throw_error(
               runtime,
@@ -1227,16 +1214,16 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           op.JUMP_IF(frame, truthy(runtime, reg(a)), b)
           break
         case OP.JUMP_IF_NOT_NULLISH:
-          op.JUMP_IF(frame, !is_nullish(memory, reg(a)), b)
+          op.JUMP_IF(frame, !is_nullish(heap, reg(a)), b)
           break
         case OP.JUMP_IF_NOT_UNDEFINED:
-          op.JUMP_IF(frame, tag_of(memory, reg(a)) !== TAGS.UNDEFINED, b)
+          op.JUMP_IF(frame, tag_of(heap, reg(a)) !== VALUE_TAGS.UNDEFINED, b)
           break
         case OP.JUMP_AND_LINK:
-          op.JUMP_AND_LINK(memory, frame, reg(a), b)
+          op.JUMP_AND_LINK(heap, frame, reg(a), b)
           break
         case OP.JUMP_INDIRECT:
-          op.JUMP_INDIRECT(memory, frame, reg(a))
+          op.JUMP_INDIRECT(heap, frame, reg(a))
           break
         case OP.GET_ITERATOR:
           status = op.GET_ITERATOR(runtime, reg(a), reg(b), reg(c), temporary)
@@ -1313,7 +1300,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           status = instance_of(runtime, reg(a), reg(b), reg(c))
           break
         case OP.NOT:
-          write_boolean(memory, reg(a), !truthy(runtime, reg(b)))
+          write_boolean(heap, reg(a), !truthy(runtime, reg(b)))
           break
         case OP.NEGATE:
         case OP.TO_NUMBER:
@@ -1334,17 +1321,13 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
         clear_exception(runtime)
         if (fiber.status === FIBER_STATE.FAILED) return
       }
-      // The helper root must not retain environments after the instruction.
-      write_undefined(memory, temporary)
-      write_undefined(memory, operand)
-      write_undefined(memory, property_key)
+      // The helper handles must not retain environments after the instruction.
+      write_undefined(heap, temporary)
+      write_undefined(heap, operand)
+      write_undefined(heap, property_key)
     }
     fiber.status = FIBER_STATE.READY
-  } finally {
-    memory.free_root(temporary)
-    memory.free_root(operand)
-    memory.free_root(property_key)
-  }
+  })
 }
 
 export function run_task(runtime: Runtime, fiber: Fiber) {
@@ -1377,22 +1360,22 @@ function restore_environment(
     environment === FUNCTION_ENVIRONMENT
       ? code.scope_ids[frame.function_id]
       : code.block_scope_ids[frame.function_id][environment]
-  const env = frame.environment_root
-  while (environment_scope_id(runtime.memory, env) !== scope)
-    environment_at(runtime.memory, env, env, 1)
+  const env = frame.environment
+  while (environment_scope_id(runtime.heap, env) !== scope)
+    environment_at(runtime.heap, env, env, 1)
 }
 
 // Unwinds frames to the innermost exception handler covering the throwing
 // instruction, which is the one before each frame's pc.
-function throw_value(runtime: Runtime, fiber: Fiber, source: Root) {
-  const { memory } = runtime
-  const value = memory.alloc_root()
-  memory.copy_value(value, source)
-  try {
+function throw_value(runtime: Runtime, fiber: Fiber, source: Handle) {
+  const { heap } = runtime
+  heap.handles.scope(() => {
+    const value = heap.handles.local()
+    heap.copy_value(value, source)
     while (true) {
       const frame = fiber.frame
       if (frame === null) {
-        memory.copy_value(fiber.error, value)
+        heap.copy_value(fiber.error, value)
         fiber.status = FIBER_STATE.FAILED
         return
       }
@@ -1402,36 +1385,26 @@ function throw_value(runtime: Runtime, fiber: Fiber, source: Root) {
       ].handlers.find(({ start, end }) => pc >= start && pc < end)
       if (handler) {
         restore_environment(runtime, frame, handler.environment)
-        memory.copy_value(
-          frame.register(register_index(handler.register)),
-          value,
-        )
+        heap.copy_value(frame.register(register_index(handler.register)), value)
         frame.pc = bytecode_offset(handler.target)
         return
       }
       pop_frame(runtime, fiber)
     }
-  } finally {
-    memory.free_root(value)
-  }
+  })
 }
 
-function return_value(runtime: Runtime, fiber: Fiber, source: Root) {
-  const { memory } = runtime
+function return_value(runtime: Runtime, fiber: Fiber, source: Handle) {
+  const { heap } = runtime
   const frame = fiber.frame!
   const caller = frame.caller
-  const value = memory.alloc_root()
-  try {
-    memory.copy_value(value, source)
-    if (frame.is_construct_call && !is_object(memory, value))
-      memory.copy_value(value, frame.this_root)
-    memory.copy_value(
-      caller === null ? fiber.result : frame.return_root!,
-      value,
-    )
+  heap.handles.scope(() => {
+    const value = heap.handles.local()
+    heap.copy_value(value, source)
+    if (frame.is_construct_call && !is_object(heap, value))
+      heap.copy_value(value, frame.this_value)
+    heap.copy_value(caller === null ? fiber.result : frame.destination!, value)
     pop_frame(runtime, fiber)
     if (caller === null) fiber.status = FIBER_STATE.DONE
-  } finally {
-    memory.free_root(value)
-  }
+  })
 }
