@@ -3,15 +3,3 @@ SyntaxError: syntax-string-code-point.js:1:13: Code point must be between 0x0 an
                 ^~~
 2|  console.log("unreachable");
 3|  
-
-syntax-string-code-point.js:1:13: Expected an expression
-1|  console.log('\u{110000}');
-                ^~~
-2|  console.log("unreachable");
-3|  
-
-syntax-string-code-point.js:1:24: Unclosed string literal
-1|  console.log('\u{110000}');
-                           ^~~
-2|  console.log("unreachable");
-3|  

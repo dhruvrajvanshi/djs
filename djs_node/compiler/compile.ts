@@ -225,7 +225,8 @@ export function compile_module(
   url: string = path,
 ): CompiledModule {
   const ast = parse_source_file(QualifiedName(), path, source)
-  if (ast.errors.length) throw located_error(path, source, ast.errors)
+  // Like V8, report only the first error. Later ones tend to be cascades.
+  if (ast.errors.length) throw located_error(path, source, [ast.errors[0]])
   const unit: CompiledModule = {
     path,
     functions: [],
