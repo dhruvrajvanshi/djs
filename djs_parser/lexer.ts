@@ -4,8 +4,6 @@ import assert, { AssertionError } from "node:assert"
 export type Lexer = {
   clone: () => Lexer
   next: () => Token
-  start_template_literal_interpolation: () => void
-  end_template_literal_interpolation: () => void
   enable_regex: () => void
   disable_regex: () => void
 }
@@ -16,7 +14,7 @@ export function Lexer(input: string) {
     span_start: 0,
     current_index: 0,
     regex_enabled: false,
-    template_literal_interpolation: false,
+    template_brace_depths: [],
     leading_trivia: "",
   })
 }
@@ -27,7 +25,12 @@ type LexerState = {
   span_start: number
   current_index: number
   regex_enabled: boolean
-  template_literal_interpolation: boolean
+  /**
+   * One entry per enclosing `${`, counting the braces opened inside it, so
+   * that only the `}` matching the `${` resumes the template. The array is
+   * replaced rather than mutated, which keeps `lexer_state_clone` shallow.
+   */
+  template_brace_depths: readonly number[]
   leading_trivia: string
 }
 
@@ -62,8 +65,6 @@ export function lexer_impl(self: LexerState): Lexer {
       return lexer_impl(lexer_state_clone(self))
     },
     next,
-    start_template_literal_interpolation,
-    end_template_literal_interpolation,
     enable_regex,
     disable_regex,
   }
@@ -72,12 +73,6 @@ export function lexer_impl(self: LexerState): Lexer {
   }
   function disable_regex(): void {
     self.regex_enabled = false
-  }
-  function start_template_literal_interpolation(): void {
-    self.template_literal_interpolation = true
-  }
-  function end_template_literal_interpolation(): void {
-    self.template_literal_interpolation = false
   }
   function at(text: string): boolean {
     for (let i = 0; i < text.length; i++) {
@@ -127,15 +122,23 @@ export function lexer_impl(self: LexerState): Lexer {
       return lex_ident_or_keyword()
     }
 
-    // '{' => self.lex_single_char_token(TokenKind::LBrace),
-    else if (at("{")) return lex_single_char_token(TokenKind.LBrace)
-    // '}' if self.template_literal_interpolation => {
-    //     self.end_template_literal_interpolation();
-    //     self.lex_template_literal_post_interpolation()
-    // }
-    else if (at("}") && self.template_literal_interpolation) {
-      self.template_literal_interpolation = false
-      return lex_template_literal_post_interpolation()
+    else if (at("{")) {
+      const depths = self.template_brace_depths
+      if (depths.length > 0)
+        self.template_brace_depths = [
+          ...depths.slice(0, -1),
+          depths[depths.length - 1] + 1,
+        ]
+      return lex_single_char_token(TokenKind.LBrace)
+    } else if (at("}") && self.template_brace_depths.length > 0) {
+      const depths = self.template_brace_depths
+      const depth = depths[depths.length - 1]
+      if (depth === 0) {
+        self.template_brace_depths = depths.slice(0, -1)
+        return lex_template_literal_post_interpolation()
+      }
+      self.template_brace_depths = [...depths.slice(0, -1), depth - 1]
+      return lex_single_char_token(TokenKind.RBrace)
     }
     // '}' => self.lex_single_char_token(TokenKind::RBrace),
     else if (at("}")) return lex_single_char_token(TokenKind.RBrace)
@@ -594,7 +597,7 @@ export function lexer_impl(self: LexerState): Lexer {
         if (next_char() === "{") {
           advance() // Consume $
           advance() // Consume {
-          self.template_literal_interpolation = true
+          self.template_brace_depths = [...self.template_brace_depths, 0]
           return make_token(TokenKind.TemplateLiteralFragment)
         } else {
           advance()
@@ -628,7 +631,7 @@ export function lexer_impl(self: LexerState): Lexer {
         if (next_char() === "{") {
           advance() // Consume $
           advance() // Consume {
-          self.template_literal_interpolation = true
+          self.template_brace_depths = [...self.template_brace_depths, 0]
           return make_token(TokenKind.TemplateLiteralFragment)
         } else {
           advance()

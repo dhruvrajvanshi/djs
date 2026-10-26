@@ -12,6 +12,7 @@ import {
   ForInit,
   type FuncTypeParam,
   type TypeMember,
+  TemplateLiteralTypeFragment,
   type Ident,
   type ImportSpecifier,
   type ExportSpecifier,
@@ -150,19 +151,41 @@ function parser_impl(
     t.Minus,
   )
 
-  const parse_shift_expr = define_binop_parser(
-    parse_additive_expr,
-    t.LessThanLessThan,
-    t.GreaterThanGreaterThan,
-    t.GreaterThanGreaterThanGreaterThan,
-  )
+  const parse_shift_expr = (): Expr | Err => {
+    let lhs = parse_additive_expr()
+    if (lhs === ERR) return ERR
+    while (true) {
+      let op: BinOp
+      if (at(t.LessThanLessThan) || at(t.GreaterThanGreaterThanGreaterThan)) {
+        op = parse_bin_op(advance().kind)
+      } else if (
+        at(t.GreaterThan) &&
+        next_is(t.GreaterThan) &&
+        next_token().span.start === self.current_token.span.stop
+      ) {
+        // The lexer leaves `>>` as two tokens so that `A<B<C>>` closes both
+        // type argument lists.
+        advance()
+        advance()
+        op = BinOp.RightShift
+      } else {
+        break
+      }
+      const rhs = parse_additive_expr()
+      if (rhs === ERR) return ERR
+      lhs = Expr.BinOp(Span.between(lhs.span, rhs.span), lhs, op, rhs)
+    }
+    return lhs
+  }
 
   const parse_as_expr = (): Expr | Err => {
     let lhs = parse_shift_expr()
     if (lhs === ERR) return lhs
     while (at(t.As)) {
       advance()
-      const ty = parse_type_annotation()
+      const ty = at(t.Const)
+        ? TypeAnnotation.Const(advance().span)
+        : parse_type_annotation()
       if (ty === ERR) return ERR
       lhs = Expr.As(Span.between(lhs, ty), lhs, ty)
     }
@@ -707,11 +730,9 @@ function parser_impl(
         fragments.push(TemplateLiteralFragment.Text(tok.span, tok.text))
 
         if (tok.text.endsWith("${")) {
-          self.lexer.start_template_literal_interpolation()
           const expr = parse_expr()
           if (expr === ERR) return ERR
           fragments.push(TemplateLiteralFragment.Expr(expr.span, expr))
-          self.lexer.end_template_literal_interpolation()
         } else if (tok.text.endsWith("`")) {
           break
         }
@@ -721,6 +742,28 @@ function parser_impl(
       }
     }
     return fragments
+  }
+  function parse_template_literal_type_fragments():
+    | TemplateLiteralTypeFragment[]
+    | Err {
+    const fragments: TemplateLiteralTypeFragment[] = []
+    while (true) {
+      if (!at(t.TemplateLiteralFragment)) {
+        emit_error("Unexpected end of template literal")
+        return ERR
+      }
+      const tok = advance()
+      fragments.push(TemplateLiteralTypeFragment.Text(tok.span, tok.text))
+      if (tok.text.endsWith("${")) {
+        const annotation = parse_type_annotation()
+        if (annotation === ERR) return ERR
+        fragments.push(
+          TemplateLiteralTypeFragment.Type(annotation.span, annotation),
+        )
+      } else if (tok.text.endsWith("`")) {
+        return fragments
+      }
+    }
   }
   function parse_decorators(): Expr[] | Err {
     const decorators: Expr[] = []
@@ -813,6 +856,15 @@ function parser_impl(
     ) {
       override_token = advance()
     }
+    let readonly_token: Token | null = null
+    if (
+      flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+      at_soft_keyword("readonly") &&
+      next_matches(Token.can_start_object_property_name) &&
+      next_token().line === self.current_token.line
+    ) {
+      readonly_token = advance()
+    }
 
     let accessor_type: AccessorType | null = null
     if (
@@ -847,12 +899,18 @@ function parser_impl(
       if (key === ERR) return ERR
       name = key
     }
-    const start = (static_token ?? override_token)?.span ?? name.span
+    const start =
+      (static_token ?? override_token ?? readonly_token)?.span ?? name.span
+    const is_optional =
+      flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS && at(t.Question)
+    if (is_optional) advance()
     if (!at(t.LParen) && !at(t.LessThan)) {
       if (accessor_type || is_async || is_generator) {
         emit_error("Expected a method")
         return ERR
       }
+      const type_annotation = parse_optional_type_annotation()
+      if (type_annotation === ERR) return ERR
       let initializer: Expr | null = null
       if (at(t.Eq)) {
         advance()
@@ -863,12 +921,22 @@ function parser_impl(
       if (expect_semi() === ERR) return ERR
       return ClassMember.FieldDef({
         decorators,
-        span: Span.between(start, initializer?.span ?? name.span),
+        span: Span.between(
+          start,
+          initializer ?? type_annotation ?? self.last_token ?? name,
+        ),
         name,
         is_static: static_token !== null,
         is_override: override_token !== null,
+        is_readonly: readonly_token !== null,
+        is_optional: Boolean(is_optional),
+        type_annotation,
         initializer,
       })
+    }
+    if (is_optional) {
+      emit_error("Optional methods are not supported")
+      return ERR
     }
 
     const type_params = parse_optional_type_params()
@@ -876,7 +944,7 @@ function parser_impl(
     const params_result = parse_params_with_parens()
     if (params_result === ERR) return ERR
     const [params] = params_result
-    const return_type = parse_optional_type_annotation()
+    const return_type = parse_optional_return_type()
     if (return_type === ERR) return ERR
 
     const body = parse_block()
@@ -946,7 +1014,7 @@ function parser_impl(
           const params_result = parse_params_with_parens()
           if (params_result === ERR) return ERR
           const [params] = params_result
-          const return_type = parse_optional_type_annotation()
+          const return_type = parse_optional_return_type()
           if (return_type === ERR) return ERR
 
           const body = parse_block()
@@ -1023,7 +1091,7 @@ function parser_impl(
     const params_result = parse_params_with_parens()
     if (params_result === ERR) return ERR
     const [params] = params_result
-    const return_type = parse_optional_type_annotation()
+    const return_type = parse_optional_return_type()
     if (return_type === ERR) return ERR
     const body = parse_block()
     if (body === ERR) return ERR
@@ -1124,6 +1192,9 @@ function parser_impl(
   function parse_param(): Param | Err {
     const pattern = parse_pattern()
     if (pattern === ERR) return ERR
+    const is_optional =
+      flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS && at(t.Question)
+    if (is_optional) advance()
     const type_annotation = parse_optional_type_annotation()
     if (type_annotation === ERR) return ERR
     let initializer: Expr | null = null
@@ -1136,9 +1207,37 @@ function parser_impl(
     return {
       span: pattern.span,
       pattern,
+      is_optional: Boolean(is_optional),
       type_annotation,
       initializer,
     }
+  }
+  function parse_optional_return_type(): TypeAnnotation | null | Err {
+    if (!(flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS) || !at(t.Colon))
+      return null
+    advance()
+    const start = self.current_token
+    const asserts =
+      at_soft_keyword("asserts") && next_matches(Token.is_valid_property_name)
+    if (asserts) advance()
+    if (asserts || (at(t.Ident) && next_is_soft_keyword("is"))) {
+      const param = parse_ident()
+      if (param === ERR) return ERR
+      let type_annotation: TypeAnnotation | null = null
+      if (at_soft_keyword("is")) {
+        advance()
+        const annotation = parse_type_annotation()
+        if (annotation === ERR) return ERR
+        type_annotation = annotation
+      }
+      return TypeAnnotation.Predicate(
+        Span.between(start, type_annotation ?? param),
+        asserts,
+        param,
+        type_annotation,
+      )
+    }
+    return parse_type_annotation()
   }
   function parse_optional_type_annotation(): TypeAnnotation | null | Err {
     if (flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS && at(t.Colon)) {
@@ -1150,14 +1249,26 @@ function parser_impl(
   }
   function parse_type_annotation(): TypeAnnotation | Err {
     if (at(t.VBar)) advance()
-    let lhs = parse_array_type_annotation_or_below()
+    let lhs = parse_intersection_type_annotation()
     if (lhs === ERR) return ERR
     while (true) {
       if (!at(t.VBar)) break
       advance()
-      const rhs = parse_array_type_annotation_or_below()
+      const rhs = parse_intersection_type_annotation()
       if (rhs === ERR) return ERR
       lhs = TypeAnnotation.Union(Span.between(lhs, rhs), lhs, rhs)
+    }
+    return lhs
+  }
+  function parse_intersection_type_annotation(): TypeAnnotation | Err {
+    if (at(t.Amp)) advance()
+    let lhs = parse_array_type_annotation_or_below()
+    if (lhs === ERR) return ERR
+    while (at(t.Amp)) {
+      advance()
+      const rhs = parse_array_type_annotation_or_below()
+      if (rhs === ERR) return ERR
+      lhs = TypeAnnotation.Intersection(Span.between(lhs, rhs), lhs, rhs)
     }
     return lhs
   }
@@ -1221,6 +1332,14 @@ function parser_impl(
             annot.item,
           )
         }
+        if (
+          self.current_token.text === "unique" &&
+          next_is_soft_keyword("symbol")
+        ) {
+          const start = advance()
+          const end = advance()
+          return TypeAnnotation.UniqueSymbol(Span.between(start, end))
+        }
         if (self.current_token.text === "keyof") {
           const start = advance()
           const operand = parse_array_type_annotation_or_below()
@@ -1246,6 +1365,35 @@ function parser_impl(
           span: tok.span,
           text: "null",
         })
+      }
+      case t.Import: {
+        const start = advance()
+        if (expect(t.LParen) === ERR) return ERR
+        const module_specifier = expect(t.String)
+        if (module_specifier === ERR) return ERR
+        const end = expect(t.RParen)
+        if (end === ERR) return ERR
+        const members: Ident[] = []
+        while (at(t.Dot)) {
+          advance()
+          const ident = parse_ident()
+          if (ident === ERR) return ERR
+          members.push(ident)
+        }
+        return TypeAnnotation.Import(
+          Span.between(start, members.at(-1) ?? end),
+          module_specifier.text,
+          members,
+        )
+      }
+      case t.TemplateLiteralFragment: {
+        const start = self.current_token
+        const fragments = parse_template_literal_type_fragments()
+        if (fragments === ERR) return ERR
+        return TypeAnnotation.TemplateLiteral(
+          Span.between(start, fragments.at(-1) ?? start),
+          fragments,
+        )
       }
       case t.Typeof: {
         const start = advance()
@@ -1274,6 +1422,21 @@ function parser_impl(
       case t.String: {
         const tok = advance()
         return TypeAnnotation.String(tok.span, tok.text)
+      }
+      case t.Number: {
+        const tok = advance()
+        return TypeAnnotation.Number(tok.span, tok.text)
+      }
+      case t.LSquare: {
+        const start = advance()
+        const items = parse_comma_separated_list(
+          t.RSquare,
+          parse_type_annotation,
+        )
+        if (items === ERR) return ERR
+        const end = expect(t.RSquare)
+        if (end === ERR) return ERR
+        return TypeAnnotation.Tuple(Span.between(start, end), items)
       }
       case t.LParen:
         return parse_parenthesized_or_func_type_annotation()
@@ -1392,9 +1555,9 @@ function parser_impl(
     const start = self.current_token
     const is_readonly =
       at_soft_keyword("readonly") &&
-      Token.is_valid_property_name(next_token())
+      Token.can_start_object_property_name(next_token())
     if (is_readonly) advance()
-    const name = parse_member_ident_name()
+    const name = parse_object_key()
     if (name === ERR) return ERR
     const is_optional = at(t.Question)
     if (is_optional) advance()
@@ -1511,6 +1674,7 @@ function parser_impl(
         {
           span: pattern.span,
           pattern,
+          is_optional: false,
           type_annotation: null,
           initializer: null,
         },
@@ -1563,6 +1727,7 @@ function parser_impl(
         {
           span: pattern.span,
           pattern,
+          is_optional: false,
           type_annotation: null,
           initializer: null,
         },
@@ -1576,7 +1741,7 @@ function parser_impl(
         ;[params, params_span] = params_result
       }
     }
-    const return_type = parse_optional_type_annotation()
+    const return_type = parse_optional_return_type()
     if (return_type === ERR) return ERR
     if (expect(t.FatArrow) === ERR) return ERR
 
@@ -1726,6 +1891,12 @@ function parser_impl(
         span: key.span,
         text: key.ident.text,
       })
+      if (at(t.Eq)) {
+        advance()
+        const init = parse_assignment_expr()
+        if (init === ERR) return ERR
+        value = Pattern.Assignment(Span.between(key.span, init.span), value, init)
+      }
     } else {
       if (expect(t.Colon) === ERR) return ERR
       const p = parse_pattern()
@@ -1939,7 +2110,21 @@ function parser_impl(
           flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
           self.current_token.text === "type"
         ) {
+          if (export_token && next_is(t.LBrace)) {
+            advance()
+            return parse_export_named_stmt(export_token, true)
+          }
           return parse_type_decl(export_token)
+        } else if (
+          flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+          self.current_token.text === "declare" &&
+          next_matches(Token.is_valid_property_name) &&
+          self.current_token.line === next_token().line
+        ) {
+          const start = advance()
+          const stmt = parse_stmt()
+          if (stmt === ERR) return ERR
+          return Stmt.Declare(Span.between(start, stmt), stmt)
         } else if (
           flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
           self.current_token.text === "interface" &&
@@ -2160,6 +2345,8 @@ function parser_impl(
     assert.equal(start.text, "type")
     const ident = parse_ident()
     if (ident === ERR) return ERR
+    const type_params = parse_optional_type_params()
+    if (type_params === ERR) return ERR
     if (expect(t.Eq) === ERR) return ERR
     const type_annotation = parse_type_annotation()
     if (type_annotation === ERR) return ERR
@@ -2168,6 +2355,7 @@ function parser_impl(
       Span.between(export_token?.span ?? ident.span, type_annotation),
       export_token !== null,
       ident,
+      type_params,
       type_annotation,
     )
   }
@@ -2196,8 +2384,10 @@ function parser_impl(
     )
   }
 
-  function parse_export_named_stmt(): Stmt | Err {
-    const start = advance()
+  function parse_export_named_stmt(
+    start: Token = advance(),
+    is_type_only = false,
+  ): Stmt | Err {
     assert(start.kind === t.Export)
     if (expect(t.LBrace) === ERR) return ERR
     const specifiers = parse_comma_separated_list(
@@ -2220,6 +2410,7 @@ function parser_impl(
       Span.between(start.span, end.span),
       specifiers,
       module_specifier,
+      is_type_only,
     )
   }
 
@@ -2650,7 +2841,7 @@ function parser_impl(
     const params_result = parse_params_with_parens()
     if (params_result === ERR) return ERR
     const params = params_result[0]
-    const return_type = parse_optional_type_annotation()
+    const return_type = parse_optional_return_type()
     if (return_type === ERR) return ERR
     const body = parse_block()
     if (body === ERR) return ERR
@@ -2675,13 +2866,22 @@ function parser_impl(
   function parse_type_params(): readonly TypeParam[] | Err {
     const start = advance()
     assert(start.kind === t.LessThan)
-    const params = parse_comma_separated_list(
-      t.GreaterThan,
-      parse_binding_ident,
-    )
+    const params = parse_comma_separated_list(t.GreaterThan, parse_type_param)
     if (params === ERR) return ERR
     if (expect(t.GreaterThan) === ERR) return ERR
-    return params.map((ident) => ({ ident }))
+    return params
+  }
+  function parse_type_param(): TypeParam | Err {
+    const ident = parse_binding_ident()
+    if (ident === ERR) return ERR
+    let constraint: TypeAnnotation | null = null
+    if (at(t.Extends)) {
+      advance()
+      const annotation = parse_type_annotation()
+      if (annotation === ERR) return ERR
+      constraint = annotation
+    }
+    return { ident, constraint }
   }
   function parse_var_decl(export_token: Token | null): VarDecl | Err {
     let span = export_token?.span ?? self.current_token.span
@@ -3145,6 +3345,12 @@ function assign_op(kind: TokenKind): AssignOp | null {
       return AssignOp.UnsignedRightShiftEq
     case t.StarStarEq:
       return AssignOp.ExponentEq
+    case t.AmpAmpEq:
+      return AssignOp.AndEq
+    case t.BarBarEq:
+      return AssignOp.OrEq
+    case t.QuestionQuestionEq:
+      return AssignOp.NullishEq
     default:
       return null
   }

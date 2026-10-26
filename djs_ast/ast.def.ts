@@ -67,6 +67,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   ExportNamed: {
     specifiers: List(() => ExportSpecifier),
     module_specifier: Option(Text),
+    is_type_only: "boolean",
   },
   Labeled: {
     label: () => Label,
@@ -75,6 +76,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
   TypeAlias: {
     is_exported: "boolean",
     name: Ident,
+    type_params: List(() => TypeParam),
     type_annotation: () => TypeAnnotation,
   },
   Interface: {
@@ -83,6 +85,8 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     supertypes: List(() => TypeAnnotation),
     members: List(() => TypeMember),
   },
+  /** `declare const x: T`: a binding the program doesn't define. */
+  Declare: { stmt: () => Stmt },
   Empty: {},
 })
 
@@ -173,6 +177,10 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     left: () => TypeAnnotation,
     right: () => TypeAnnotation,
   },
+  Intersection: {
+    left: () => TypeAnnotation,
+    right: () => TypeAnnotation,
+  },
   Array: { item: () => TypeAnnotation },
   ReadonlyArray: { item: () => TypeAnnotation },
   Application: {
@@ -180,6 +188,8 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     args: List(() => TypeAnnotation),
   },
   String: { text: Text },
+  Number: { text: Text },
+  Tuple: { items: List(() => TypeAnnotation) },
   Func: {
     type_params: List(() => TypeParam),
     params: List(() => FuncTypeParam),
@@ -190,6 +200,18 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     tail: List(Ident),
   },
   Object: { members: List(() => TypeMember) },
+  /** `import("module").A.B` */
+  Import: { module_specifier: Text, members: List(Ident) },
+  TemplateLiteral: { fragments: List(() => TemplateLiteralTypeFragment) },
+  UniqueSymbol: {},
+  /** The `const` in `x as const` */
+  Const: {},
+  /** `param is T`, `asserts param is T` or `asserts param` */
+  Predicate: {
+    asserts: "boolean",
+    param: Ident,
+    type_annotation: Option(() => TypeAnnotation),
+  },
   TypeOf: { head: Ident, tail: List(Ident) },
   KeyOf: { operand: () => TypeAnnotation },
   IndexedAccess: {
@@ -218,7 +240,7 @@ const FuncTypeParam = Struct("FuncTypeParam", [], {
 })
 /** A property or method signature; a method's type is a Func annotation. */
 const TypeMember = Struct("TypeMember", ["span"], {
-  name: Ident,
+  name: () => ObjectKey,
   is_readonly: "boolean",
   is_optional: "boolean",
   type_annotation: () => TypeAnnotation,
@@ -243,6 +265,9 @@ const FieldDef = Struct("FieldDef", ["span"], {
   name: () => ObjectKey,
   is_static: "boolean",
   is_override: "boolean",
+  is_readonly: "boolean",
+  is_optional: "boolean",
+  type_annotation: Option(() => TypeAnnotation),
   initializer: Option(() => Expr),
 })
 const MethodDef = Struct("MethodDef", ["span"], {
@@ -271,6 +296,7 @@ const ObjectLiteralEntry = Enum("ObjectLiteralEntry", ["span"], {
 
 const Param = Struct("Param", ["span"], {
   pattern: Pattern,
+  is_optional: "boolean",
   type_annotation: Option(() => TypeAnnotation),
   initializer: Option(() => Expr),
 })
@@ -292,6 +318,7 @@ export const Func = Struct("Func", ["span", "visit"], {
 })
 const TypeParam = Struct("TypeParam", [], {
   ident: Ident,
+  constraint: Option(() => TypeAnnotation),
 })
 const Block = Struct("Block", ["span", "visit"], {
   stmts: List(() => Stmt),
@@ -340,6 +367,14 @@ const TemplateLiteralFragment = Enum("TemplateLiteralFragment", ["span"], {
   Text: { text: Text },
   Expr: { expr: () => Expr },
 })
+const TemplateLiteralTypeFragment = Enum(
+  "TemplateLiteralTypeFragment",
+  ["span"],
+  {
+    Text: { text: Text },
+    Type: { type_annotation: () => TypeAnnotation },
+  },
+)
 const ObjectPatternProperty = Struct("ObjectPatternProperty", ["span"], {
   key: ObjectKey,
   value: Pattern,
@@ -408,6 +443,9 @@ const AssignOp = StringUnion(
   "BitXorEq",
   "BitOrEq",
   "ExponentEq",
+  "AndEq",
+  "OrEq",
+  "NullishEq",
 )
 const DeclType = StringUnion("DeclType", "Let", "Const", "Var")
 const AccessorType = StringUnion("AccessorType", "Get", "Set")
@@ -441,6 +479,7 @@ const ast_items = [
   ArrayLiteralMember,
   ArrowFnBody,
   TemplateLiteralFragment,
+  TemplateLiteralTypeFragment,
   ObjectPatternProperty,
   ModuleExportName,
   ImportSpecifier,

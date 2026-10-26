@@ -665,6 +665,7 @@ function prepare_statements(
       case "ExportNamed": {
         if (fn.id !== 0 || scope !== fn.scope)
           unsupported(stmt, "nested export")
+        if (stmt.is_type_only) break
         if (stmt.module_specifier === null) {
           // Local exports may name bindings declared later in the module.
           local_exports.push(stmt)
@@ -980,6 +981,7 @@ function compile_stmt_kind(
   switch (stmt.kind) {
     case "Empty":
     case "Interface":
+    case "Declare":
       return
     case "Func":
       unsupported(stmt, "function declarations outside blocks")

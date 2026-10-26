@@ -155,6 +155,9 @@ export class ASTVisitorBase implements ASTVisitor {
       }
       case "TypeAlias": {
         this.visit_ident(stmt.name)
+        for (const type_param of stmt.type_params) {
+          this.visit_type_param(type_param)
+        }
         this.visit_type_annotation(stmt.type_annotation)
         break
       }
@@ -166,6 +169,10 @@ export class ASTVisitorBase implements ASTVisitor {
         for (const member of stmt.members) {
           this.visit_type_member(member)
         }
+        break
+      }
+      case "Declare": {
+        this.visit_stmt(stmt.stmt)
         break
       }
       case "Empty": {
@@ -386,6 +393,7 @@ export class ASTVisitorBase implements ASTVisitor {
   visit_ident(node: ast.Ident): void {}
   visit_param(node: ast.Param): void {
     this.visit_pattern(node.pattern)
+
     if (node.type_annotation !== null) {
       this.visit_type_annotation(node.type_annotation)
     }
@@ -467,6 +475,11 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(type_annotation.right)
         break
       }
+      case "Intersection": {
+        this.visit_type_annotation(type_annotation.left)
+        this.visit_type_annotation(type_annotation.right)
+        break
+      }
       case "Array": {
         this.visit_type_annotation(type_annotation.item)
         break
@@ -483,6 +496,15 @@ export class ASTVisitorBase implements ASTVisitor {
         break
       }
       case "String": {
+        break
+      }
+      case "Number": {
+        break
+      }
+      case "Tuple": {
+        for (const item of type_annotation.items) {
+          this.visit_type_annotation(item)
+        }
         break
       }
       case "Func": {
@@ -508,6 +530,31 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
+      case "Import": {
+        for (const member of type_annotation.members) {
+          this.visit_ident(member)
+        }
+        break
+      }
+      case "TemplateLiteral": {
+        for (const fragment of type_annotation.fragments) {
+          this.visit_template_literal_type_fragment(fragment)
+        }
+        break
+      }
+      case "UniqueSymbol": {
+        break
+      }
+      case "Const": {
+        break
+      }
+      case "Predicate": {
+        this.visit_ident(type_annotation.param)
+        if (type_annotation.type_annotation !== null) {
+          this.visit_type_annotation(type_annotation.type_annotation)
+        }
+        break
+      }
       case "TypeOf": {
         this.visit_ident(type_annotation.head)
         for (const tail of type_annotation.tail) {
@@ -528,6 +575,9 @@ export class ASTVisitorBase implements ASTVisitor {
   }
   visit_type_param(node: ast.TypeParam): void {
     this.visit_ident(node.ident)
+    if (node.constraint !== null) {
+      this.visit_type_annotation(node.constraint)
+    }
   }
   visit_func_type_param(node: ast.FuncTypeParam): void {
     this.visit_ident(node.label)
@@ -535,9 +585,24 @@ export class ASTVisitorBase implements ASTVisitor {
     this.visit_type_annotation(node.type_annotation)
   }
   visit_type_member(node: ast.TypeMember): void {
-    this.visit_ident(node.name)
+    this.visit_object_key(node.name)
 
     this.visit_type_annotation(node.type_annotation)
+  }
+  visit_template_literal_type_fragment(
+    template_literal_type_fragment: ast.TemplateLiteralTypeFragment,
+  ): void {
+    switch (template_literal_type_fragment.kind) {
+      case "Text": {
+        break
+      }
+      case "Type": {
+        this.visit_type_annotation(
+          template_literal_type_fragment.type_annotation,
+        )
+        break
+      }
+    }
   }
   visit_arrow_fn_body(arrow_fn_body: ast.ArrowFnBody): void {
     switch (arrow_fn_body.kind) {
@@ -659,6 +724,9 @@ export class ASTVisitorBase implements ASTVisitor {
     }
     this.visit_object_key(node.name)
 
+    if (node.type_annotation !== null) {
+      this.visit_type_annotation(node.type_annotation)
+    }
     if (node.initializer !== null) {
       this.visit_expr(node.initializer)
     }

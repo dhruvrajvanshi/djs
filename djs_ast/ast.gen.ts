@@ -51,6 +51,7 @@ export type Stmt =
   | LabeledStmt
   | TypeAliasStmt
   | InterfaceStmt
+  | DeclareStmt
   | EmptyStmt
 export class ExprStmt {
   constructor(
@@ -377,6 +378,7 @@ export class ExportNamedStmt {
 
     readonly specifiers: readonly ExportSpecifier[],
     readonly module_specifier: Text | null,
+    readonly is_type_only: boolean,
   ) {}
 
   get kind(): "ExportNamed" {
@@ -409,6 +411,7 @@ export class TypeAliasStmt {
 
     readonly is_exported: boolean,
     readonly name: Ident,
+    readonly type_params: readonly TypeParam[],
     readonly type_annotation: TypeAnnotation,
   ) {}
 
@@ -432,6 +435,21 @@ export class InterfaceStmt {
 
   get kind(): "Interface" {
     return "Interface"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
+export class DeclareStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly stmt: Stmt,
+  ) {}
+
+  get kind(): "Declare" {
+    return "Declare"
   }
 
   toString(): string {
@@ -555,7 +573,9 @@ export const Stmt = {
     span: Span,
     specifiers: readonly ExportSpecifier[],
     module_specifier: Text | null,
-  ): ExportNamedStmt => new ExportNamedStmt(span, specifiers, module_specifier),
+    is_type_only: boolean,
+  ): ExportNamedStmt =>
+    new ExportNamedStmt(span, specifiers, module_specifier, is_type_only),
 
   Labeled: (span: Span, label: Label, stmt: Stmt): LabeledStmt =>
     new LabeledStmt(span, label, stmt),
@@ -564,9 +584,10 @@ export const Stmt = {
     span: Span,
     is_exported: boolean,
     name: Ident,
+    type_params: readonly TypeParam[],
     type_annotation: TypeAnnotation,
   ): TypeAliasStmt =>
-    new TypeAliasStmt(span, is_exported, name, type_annotation),
+    new TypeAliasStmt(span, is_exported, name, type_params, type_annotation),
 
   Interface: (
     span: Span,
@@ -576,6 +597,8 @@ export const Stmt = {
     members: readonly TypeMember[],
   ): InterfaceStmt =>
     new InterfaceStmt(span, is_exported, name, supertypes, members),
+
+  Declare: (span: Span, stmt: Stmt): DeclareStmt => new DeclareStmt(span, stmt),
 
   Empty: (span: Span): EmptyStmt => new EmptyStmt(span),
 } as const
@@ -639,6 +662,9 @@ export interface FieldDef {
   readonly name: ObjectKey
   readonly is_static: boolean
   readonly is_override: boolean
+  readonly is_readonly: boolean
+  readonly is_optional: boolean
+  readonly type_annotation: TypeAnnotation | null
   readonly initializer: Expr | null
 }
 
@@ -1715,13 +1741,21 @@ export const Expr = {
 export type TypeAnnotation =
   | IdentTypeAnnotation
   | UnionTypeAnnotation
+  | IntersectionTypeAnnotation
   | ArrayTypeAnnotation
   | ReadonlyArrayTypeAnnotation
   | ApplicationTypeAnnotation
   | StringTypeAnnotation
+  | NumberTypeAnnotation
+  | TupleTypeAnnotation
   | FuncTypeAnnotation
   | QualifiedTypeAnnotation
   | ObjectTypeAnnotation
+  | ImportTypeAnnotation
+  | TemplateLiteralTypeAnnotation
+  | UniqueSymbolTypeAnnotation
+  | ConstTypeAnnotation
+  | PredicateTypeAnnotation
   | TypeOfTypeAnnotation
   | KeyOfTypeAnnotation
   | IndexedAccessTypeAnnotation
@@ -1751,6 +1785,22 @@ export class UnionTypeAnnotation {
 
   get kind(): "Union" {
     return "Union"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class IntersectionTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly left: TypeAnnotation,
+    readonly right: TypeAnnotation,
+  ) {}
+
+  get kind(): "Intersection" {
+    return "Intersection"
   }
 
   toString(): string {
@@ -1818,6 +1868,36 @@ export class StringTypeAnnotation {
     return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
+export class NumberTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly text: Text,
+  ) {}
+
+  get kind(): "Number" {
+    return "Number"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class TupleTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly items: readonly TypeAnnotation[],
+  ) {}
+
+  get kind(): "Tuple" {
+    return "Tuple"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
 export class FuncTypeAnnotation {
   constructor(
     readonly span: Span,
@@ -1860,6 +1940,76 @@ export class ObjectTypeAnnotation {
 
   get kind(): "Object" {
     return "Object"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class ImportTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly module_specifier: Text,
+    readonly members: readonly Ident[],
+  ) {}
+
+  get kind(): "Import" {
+    return "Import"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class TemplateLiteralTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly fragments: readonly TemplateLiteralTypeFragment[],
+  ) {}
+
+  get kind(): "TemplateLiteral" {
+    return "TemplateLiteral"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class UniqueSymbolTypeAnnotation {
+  constructor(readonly span: Span) {}
+
+  get kind(): "UniqueSymbol" {
+    return "UniqueSymbol"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class ConstTypeAnnotation {
+  constructor(readonly span: Span) {}
+
+  get kind(): "Const" {
+    return "Const"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
+export class PredicateTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly asserts: boolean,
+    readonly param: Ident,
+    readonly type_annotation: TypeAnnotation | null,
+  ) {}
+
+  get kind(): "Predicate" {
+    return "Predicate"
   }
 
   toString(): string {
@@ -1928,6 +2078,13 @@ export const TypeAnnotation = {
     right: TypeAnnotation,
   ): UnionTypeAnnotation => new UnionTypeAnnotation(span, left, right),
 
+  Intersection: (
+    span: Span,
+    left: TypeAnnotation,
+    right: TypeAnnotation,
+  ): IntersectionTypeAnnotation =>
+    new IntersectionTypeAnnotation(span, left, right),
+
   Array: (span: Span, item: TypeAnnotation): ArrayTypeAnnotation =>
     new ArrayTypeAnnotation(span, item),
 
@@ -1946,6 +2103,12 @@ export const TypeAnnotation = {
   String: (span: Span, text: Text): StringTypeAnnotation =>
     new StringTypeAnnotation(span, text),
 
+  Number: (span: Span, text: Text): NumberTypeAnnotation =>
+    new NumberTypeAnnotation(span, text),
+
+  Tuple: (span: Span, items: readonly TypeAnnotation[]): TupleTypeAnnotation =>
+    new TupleTypeAnnotation(span, items),
+
   Func: (
     span: Span,
     type_params: readonly TypeParam[],
@@ -1962,6 +2125,32 @@ export const TypeAnnotation = {
 
   Object: (span: Span, members: readonly TypeMember[]): ObjectTypeAnnotation =>
     new ObjectTypeAnnotation(span, members),
+
+  Import: (
+    span: Span,
+    module_specifier: Text,
+    members: readonly Ident[],
+  ): ImportTypeAnnotation =>
+    new ImportTypeAnnotation(span, module_specifier, members),
+
+  TemplateLiteral: (
+    span: Span,
+    fragments: readonly TemplateLiteralTypeFragment[],
+  ): TemplateLiteralTypeAnnotation =>
+    new TemplateLiteralTypeAnnotation(span, fragments),
+
+  UniqueSymbol: (span: Span): UniqueSymbolTypeAnnotation =>
+    new UniqueSymbolTypeAnnotation(span),
+
+  Const: (span: Span): ConstTypeAnnotation => new ConstTypeAnnotation(span),
+
+  Predicate: (
+    span: Span,
+    asserts: boolean,
+    param: Ident,
+    type_annotation: TypeAnnotation | null,
+  ): PredicateTypeAnnotation =>
+    new PredicateTypeAnnotation(span, asserts, param, type_annotation),
 
   TypeOf: (
     span: Span,
@@ -1988,7 +2177,7 @@ export interface FuncTypeParam {
 
 export interface TypeMember {
   readonly span: Span
-  readonly name: Ident
+  readonly name: ObjectKey
   readonly is_readonly: boolean
   readonly is_optional: boolean
   readonly type_annotation: TypeAnnotation
@@ -2126,6 +2315,7 @@ export const ObjectKey = {
 export interface Param {
   readonly span: Span
   readonly pattern: Pattern
+  readonly is_optional: boolean
   readonly type_annotation: TypeAnnotation | null
   readonly initializer: Expr | null
 }
@@ -2143,6 +2333,7 @@ export interface Func {
 
 export interface TypeParam {
   readonly ident: Ident
+  readonly constraint: TypeAnnotation | null
 }
 
 export type ArrayLiteralMember =
@@ -2256,6 +2447,43 @@ export const TemplateLiteralFragment = {
     new ExprTemplateLiteralFragment(span, expr),
 } as const
 
+export type TemplateLiteralTypeFragment =
+  | TextTemplateLiteralTypeFragment
+  | TypeTemplateLiteralTypeFragment
+export class TextTemplateLiteralTypeFragment {
+  constructor(
+    readonly span: Span,
+
+    readonly text: Text,
+  ) {}
+
+  get kind(): "Text" {
+    return "Text"
+  }
+}
+export class TypeTemplateLiteralTypeFragment {
+  constructor(
+    readonly span: Span,
+
+    readonly type_annotation: TypeAnnotation,
+  ) {}
+
+  get kind(): "Type" {
+    return "Type"
+  }
+}
+
+export const TemplateLiteralTypeFragment = {
+  Text: (span: Span, text: Text): TextTemplateLiteralTypeFragment =>
+    new TextTemplateLiteralTypeFragment(span, text),
+
+  Type: (
+    span: Span,
+    type_annotation: TypeAnnotation,
+  ): TypeTemplateLiteralTypeFragment =>
+    new TypeTemplateLiteralTypeFragment(span, type_annotation),
+} as const
+
 export interface ObjectPatternProperty {
   readonly span: Span
   readonly key: ObjectKey
@@ -2366,6 +2594,9 @@ export type AssignOp =
   | "BitXorEq"
   | "BitOrEq"
   | "ExponentEq"
+  | "AndEq"
+  | "OrEq"
+  | "NullishEq"
 export const AssignOp = {
   Eq: "Eq",
   MulEq: "MulEq",
@@ -2380,6 +2611,9 @@ export const AssignOp = {
   BitXorEq: "BitXorEq",
   BitOrEq: "BitOrEq",
   ExponentEq: "ExponentEq",
+  AndEq: "AndEq",
+  OrEq: "OrEq",
+  NullishEq: "NullishEq",
 } as const
 export type DeclType = "Let" | "Const" | "Var"
 export const DeclType = {
