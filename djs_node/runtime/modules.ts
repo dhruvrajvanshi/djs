@@ -11,7 +11,8 @@ import {
 } from "../vm/storage/value.ts"
 import type { ExportBinding, CompiledModule } from "../compiler/compile.ts"
 import type { Runtime } from "./runtime.ts"
-import { resolve, isAbsolute } from "node:path"
+import { resolve, isAbsolute, dirname, join } from "node:path"
+import { existsSync, readFileSync, realpathSync } from "node:fs"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import { compile_module, located_message } from "../compiler/compile.ts"
 import { read_string, write_string } from "../vm/records/string.ts"
@@ -181,7 +182,130 @@ export function resolve_specifier(specifier: string, importer: string) {
       throw new SyntaxError("Relative imports require a file module")
     return new URL(specifier, importer).href
   }
-  throw new SyntaxError(`Package imports are not implemented: ${specifier}`)
+  if (!importer.startsWith("file:"))
+    throw new SyntaxError("Package imports require a file module")
+  return resolve_package(specifier, fileURLToPath(importer))
+}
+
+const CONDITIONS = ["node", "import", "default"]
+
+function module_not_found(specifier: string, importer: string) {
+  return Object.assign(
+    new Error(`Cannot find package '${specifier}' imported from ${importer}`),
+    { code: "ERR_MODULE_NOT_FOUND" },
+  )
+}
+
+// Node's ESM resolution: walk up node_modules directories, then map the
+// subpath through package.json "exports", falling back to "main".
+function resolve_package(specifier: string, importer: string) {
+  const parts = specifier.split("/")
+  const name_length = specifier.startsWith("@") ? 2 : 1
+  const name = parts.slice(0, name_length).join("/")
+  if (parts.length < name_length || parts.slice(0, name_length).includes(""))
+    throw new TypeError(`Invalid module specifier: ${specifier}`)
+  const subpath = [".", ...parts.slice(name_length)].join("/")
+  let directory = dirname(importer)
+  while (true) {
+    const root = join(directory, "node_modules", name)
+    if (existsSync(join(root, "package.json")))
+      return resolve_in_package(root, subpath, specifier, importer)
+    const parent = dirname(directory)
+    if (parent === directory) throw module_not_found(specifier, importer)
+    directory = parent
+  }
+}
+
+function resolve_in_package(
+  root: string,
+  subpath: string,
+  specifier: string,
+  importer: string,
+) {
+  const manifest = JSON.parse(readFileSync(join(root, "package.json"), "utf8"))
+  let target: string
+  if (manifest.exports !== undefined && manifest.exports !== null) {
+    const exported = resolve_exports(manifest.exports, subpath)
+    if (exported === null)
+      throw Object.assign(
+        new Error(
+          `Package subpath '${subpath}' is not exported from ${root}/package.json`,
+        ),
+        { code: "ERR_PACKAGE_PATH_NOT_EXPORTED" },
+      )
+    target = exported
+  } else if (subpath === ".") {
+    target = typeof manifest.main === "string" ? manifest.main : "index.js"
+  } else {
+    target = subpath
+  }
+  const path = resolve(root, target)
+  if (!existsSync(path)) throw module_not_found(specifier, importer)
+  return pathToFileURL(realpathSync(path)).href
+}
+
+function resolve_exports(exports: unknown, subpath: string): string | null {
+  const is_subpath_map =
+    typeof exports === "object" &&
+    !Array.isArray(exports) &&
+    Object.keys(exports!).some((key) => key.startsWith("."))
+  if (!is_subpath_map)
+    return subpath === "." ? resolve_export_target(exports, null) : null
+  const map = exports as Record<string, unknown>
+  if (Object.hasOwn(map, subpath) && !subpath.includes("*"))
+    return resolve_export_target(map[subpath], null)
+  let best: string | null = null
+  for (const key of Object.keys(map)) {
+    const star = key.indexOf("*")
+    if (star === -1 || key.indexOf("*", star + 1) !== -1) continue
+    const prefix = key.slice(0, star)
+    const suffix = key.slice(star + 1)
+    if (
+      subpath.startsWith(prefix) &&
+      subpath.length >= key.length &&
+      subpath.endsWith(suffix) &&
+      (best === null || pattern_key_compare(best, key) > 0)
+    )
+      best = key
+  }
+  if (best === null) return null
+  const star = best.indexOf("*")
+  const match = subpath.slice(star, subpath.length - (best.length - star - 1))
+  return resolve_export_target(map[best], match)
+}
+
+// Orders pattern keys so the most specific one comes first.
+function pattern_key_compare(a: string, b: string) {
+  const a_base = a.indexOf("*") + 1
+  const b_base = b.indexOf("*") + 1
+  if (a_base !== b_base) return b_base - a_base
+  return b.length - a.length
+}
+
+function resolve_export_target(
+  target: unknown,
+  match: string | null,
+): string | null {
+  if (typeof target === "string") {
+    if (!target.startsWith("./"))
+      throw new Error(`Invalid package target: ${target}`)
+    return match === null ? target : target.replaceAll("*", match)
+  }
+  if (Array.isArray(target)) {
+    for (const item of target) {
+      const resolved = resolve_export_target(item, match)
+      if (resolved !== null) return resolved
+    }
+    return null
+  }
+  if (target !== null && typeof target === "object") {
+    for (const [condition, value] of Object.entries(target)) {
+      if (condition !== "default" && !CONDITIONS.includes(condition)) continue
+      const resolved = resolve_export_target(value, match)
+      if (resolved !== null) return resolved
+    }
+  }
+  return null
 }
 
 function instantiate_module(
