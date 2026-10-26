@@ -50,14 +50,14 @@ gathers the declarations from all the loaded modules and:
   is created with no code yet; its code is attached in step 3. The new object
   is stored in the module's `const` variable with `initialize_binding`, and
   handed to the VM with `set_realm_intrinsic`
-  ([vm/intrinsics.ts](../vm/intrinsics.ts)). `%Object.prototype%` and
+  ([runtime/realm.ts](../runtime/realm.ts)). `%Object.prototype%` and
   `%Function.prototype%` come first, so every object and function created
   after them gets the right prototype.
 - **Marks the functions the VM calls.** The functions named in
   `abstract_operation` and `internal_method` statements don't exist yet; they
   are created when their module runs. So `create_realm` marks their variables
   instead (`intrinsic_bindings` in [runtime/modules.ts](../runtime/modules.ts)).
-  When `initialize_binding` ([vm/objects.ts](../vm/objects.ts)) later sets a
+  When `initialize_binding` ([vm/semantics/bindings.ts](../vm/semantics/bindings.ts)) later sets a
   marked variable, it hands the function to `set_realm_intrinsic`.
 
 **3. Fill.** `define_globals(runtime, REALM)` runs the stdlib. Each
@@ -68,27 +68,26 @@ Then the exports of `realm.js` become the globals.
 **4. Node globals.** `define_globals(runtime, NODE_GLOBALS)` does the same for
 [`stdlib/node/index.js`](../stdlib/node/index.js).
 
-`set_realm_intrinsic` stores each value in `runtime.intrinsics` under its
-name. The object-creation code in [vm/objects.ts](../vm/objects.ts) only
-receives `memory`, not the whole runtime, so the prototypes it needs are also
-copied into fields of `memory` (`PROTOTYPE_FIELDS`).
+`set_realm_intrinsic` stores each value in `runtime.realm.intrinsics` under its
+name. The prototypes that object creation needs are also kept in fields of
+the `Realm` (`PROTOTYPE_FIELDS`).
 
 ## What the VM uses
 
 This is the complete list of what the VM takes from the stdlib. Every name
 here is in `REQUIRED`, so the stdlib can't load without declaring it. The VM
 calls these functions synchronously (`invoke_sync` in
-[vm/interpreter.ts](../vm/interpreter.ts)), so they must not use `await`.
+[vm/execution/calls.ts](../vm/execution/calls.ts)), so they must not use `await`.
 
 ### Well-known objects
 
 | Object | Used for | Where |
 | --- | --- | --- |
-| [`%Object.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object) | The prototype of object literals, class prototypes and other new objects | `memory.object_prototype`, read by `create_object` ([vm/objects.ts](../vm/objects.ts)) |
-| [`%Function.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object) | The prototype of every function, method and class | `memory.function_prototype`, read by `create_function` |
-| [`%Array.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object) | The prototype of array literals and rest parameters | `memory.array_prototype`, read by `create_array` |
+| [`%Object.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-object-prototype-object) | The prototype of object literals, class prototypes and other new objects | `realm.object_prototype`, read by `create_object` ([vm/semantics/objects.ts](../vm/semantics/objects.ts)) |
+| [`%Function.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-function-prototype-object) | The prototype of every function, method and class | `realm.function_prototype`, read by `create_function` |
+| [`%Array.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-array-prototype-object) | The prototype of array literals and rest parameters | `realm.array_prototype`, read by `create_array` |
 | [`%String.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-string-prototype-object), [`%Symbol.prototype%`](https://tc39.es/ecma262/#sec-properties-of-the-symbol-prototype-object) | Property lookups on string and symbol primitives, such as `"abc".at(0)` | `prototype_reference` |
-| [`%Error%`](https://tc39.es/ecma262/#sec-error-objects), [`%TypeError%`, `%RangeError%`, `%ReferenceError%`, `%SyntaxError%`](https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard) | Errors the VM throws, such as calling a non-function | `create_error` and `throw_error` ([vm/completion.ts](../vm/completion.ts)) |
+| [`%Error%`](https://tc39.es/ecma262/#sec-error-objects), [`%TypeError%`, `%RangeError%`, `%ReferenceError%`, `%SyntaxError%`](https://tc39.es/ecma262/#sec-native-error-types-used-in-this-standard) | Errors the VM throws, such as calling a non-function | `create_error` and `throw_error` ([vm/semantics/errors.ts](../vm/semantics/errors.ts)) |
 
 To throw an error, the VM calls the constructor with the message, as in
 `TypeError("Value is not callable")`, and throws the result. If that call
@@ -99,11 +98,11 @@ are therefore the same kind of object as `new TypeError()` in a program.
 
 | Operation | When the VM calls it | Called as | Where |
 | --- | --- | --- | --- |
-| [`ToPrimitive`](https://tc39.es/ecma262/#sec-toprimitive) | An operator such as `+` or `<` meets an object | `(value, hint)`; returns a primitive | `coerce_value` ([vm/interpreter.ts](../vm/interpreter.ts)) |
+| [`ToPrimitive`](https://tc39.es/ecma262/#sec-toprimitive) | An operator such as `+` or `<` meets an object | `(value, hint)`; returns a primitive | `coerce_value` ([vm/execution/calls.ts](../vm/execution/calls.ts)) |
 | [`ToString`](https://tc39.es/ecma262/#sec-tostring) | An object is used as a property key, including on the left of `in` | `(value)`; returns a string | `coerce_value` |
 | [`ToNumber`](https://tc39.es/ecma262/#sec-tonumber) | Unary `+`, `-` or `~` meets an object | `(value)`; returns a number | `coerce_value` |
 | [`NewPromiseCapability`](https://tc39.es/ecma262/#sec-newpromisecapability) | An async function is called | `()`; returns `{ promise, resolve, reject }` | `call_async_function` |
-| [`Await`](https://tc39.es/ecma262/#await) | `await value` | `(value, on_fulfilled, on_rejected)`; arranges for exactly one callback to run | `await_value` ([runtime/jobs.ts](../runtime/jobs.ts)) |
+| [`Await`](https://tc39.es/ecma262/#await) | `await value` | `(value, on_fulfilled, on_rejected)`; arranges for exactly one callback to run | `await_value` ([vm/execution/calls.ts](../vm/execution/calls.ts)) |
 
 ### Internal methods
 
@@ -111,7 +110,7 @@ are therefore the same kind of object as `new TypeError()` in a program.
 | --- | --- | --- | --- |
 | [`[[Call]]`](https://tc39.es/ecma262/#sec-built-in-function-objects-call-thisargument-argumentslist) of a built-in function | It is called | `this` is the receiver; `new.target` is undefined | `call_function`, then `enter_builtin` |
 | [`[[Construct]]`](https://tc39.es/ecma262/#sec-built-in-function-objects-construct-argumentslist-newtarget) of a built-in constructor | It is called with `new` | `this` is undefined; `new.target` is the constructor; returns the new object | `construct_function`, then `enter_builtin` |
-| [`[[DefineOwnProperty]]`](https://tc39.es/ecma262/#sec-array-exotic-objects-defineownproperty-p-desc) of arrays | A property of an array is assigned or defined | `this` is the array; `(key, descriptor)`, with the key already converted to a string or symbol; returns a boolean | `exotic_define_own_property` and `invoke_define` ([vm/properties.ts](../vm/properties.ts)) |
+| [`[[DefineOwnProperty]]`](https://tc39.es/ecma262/#sec-array-exotic-objects-defineownproperty-p-desc) of arrays | A property of an array is assigned or defined | `this` is the array; `(key, descriptor)`, with the key already converted to a string or symbol; returns a boolean | `exotic_define_own_property` and `invoke_define` ([vm/semantics/properties.ts](../vm/semantics/properties.ts)) |
 
 When `[[DefineOwnProperty]]` returns false, the VM throws a `TypeError` if the
 operation is supposed to fail loudly, such as an assignment in strict code.
@@ -137,6 +136,6 @@ error message. That only happens if the stdlib has a bug.
 1. Declare it in the stdlib with the right marker ([stdlib.md](stdlib.md)).
 2. Add its name to `REQUIRED` in [runtime/realm.ts](../runtime/realm.ts), so
    the stdlib can't load without it.
-3. Read it from `runtime.intrinsics` by name. If the object layer needs it,
-   add a `memory` field and an entry in `PROTOTYPE_FIELDS`.
+3. Read it from `runtime.realm.intrinsics` by name. If object creation needs
+   it, add a `Realm` field and an entry in `PROTOTYPE_FIELDS`.
 4. Add it to the tables above.

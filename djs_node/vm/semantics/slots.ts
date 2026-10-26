@@ -1,21 +1,31 @@
-import type { Root } from "./memory.ts"
-import type { Runtime } from "../runtime/modules.ts"
-import { KINDS } from "./memory.ts"
-import { set_ref, write_boolean, write_null } from "./values.ts"
+import type { Root } from "../storage/value.ts"
 import {
   kind_of,
-  create_object,
+  set_ref,
+  write_boolean,
+  write_null,
+} from "../storage/value.ts"
+import { KINDS } from "../storage/layout.ts"
+import type { Runtime } from "../../runtime/runtime.ts"
+import {
   has_property_list,
-  find_property,
-  define_property,
-  try_set_prototype,
   mark_error_object,
+  object_prototype_reference,
+  try_set_prototype,
+} from "../records/object.ts"
+import {
+  find_property,
+  load_property_value,
+  store_property_value,
+} from "../records/property.ts"
+import {
   string_object_set_value,
   string_value,
-  object_prototype_reference,
-} from "./objects.ts"
-import { OK, throw_error } from "./completion.ts"
-import type { Status } from "./completion.ts"
+} from "../records/string_object.ts"
+import { create_object } from "./objects.ts"
+import { define_property } from "./properties.ts"
+import { OK, throw_error } from "./errors.ts"
+import type { Status } from "./errors.ts"
 
 // The VM represents these slots itself; set_slot cannot change them.
 const VM_SLOTS = new Set([
@@ -27,11 +37,11 @@ const VM_SLOTS = new Set([
 
 // Other slots are private properties, keyed by one token object per name.
 function slot_key(runtime: Runtime, name: string): Root {
-  let key = runtime.slot_keys.get(name)
+  let key = runtime.realm.slot_keys.get(name)
   if (key === undefined) {
     key = runtime.memory.alloc_root()
-    create_object(runtime.memory, key)
-    runtime.slot_keys.set(name, key)
+    create_object(runtime, key)
+    runtime.realm.slot_keys.set(name, key)
   }
   return key
 }
@@ -86,7 +96,7 @@ export function get_slot(
     true,
     true,
   )
-  memory.copy_heap_value_to_root(destination, property + 24)
+  load_property_value(memory, destination, property)
   return OK
 }
 
@@ -108,7 +118,7 @@ export function set_slot(
     true,
     true,
   )
-  memory.copy_root_to_heap_value(property + 24, value)
+  store_property_value(memory, property, value)
   return OK
 }
 
@@ -141,6 +151,6 @@ export function init_slot(
   const key = slot_key(runtime, name)
   if (find_property(memory, object, key, true, true) !== 0)
     return throw_error(runtime, "TypeError", `Duplicate ${name} slot`)
-  define_property(memory, object, key, value, 9)
+  define_property(runtime, object, key, value, 9)
   return OK
 }

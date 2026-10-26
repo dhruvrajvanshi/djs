@@ -1,11 +1,17 @@
-import type { Brand } from "../utils.ts"
-import type { Root } from "../vm/memory.ts"
+import type { Root } from "../vm/storage/value.ts"
+import { kind_of, write_number } from "../vm/storage/value.ts"
+import { KINDS } from "../vm/storage/layout.ts"
+import type { Runtime } from "./runtime.ts"
 import type { HostError } from "../host/node.ts"
-import { read_root, read_optional_root } from "../vm/memory.ts"
-
-type SchedulerControl = Brand<Uint8Array, "SchedulerControl">
-type JobQueue = Brand<Uint8Array, "JobQueue">
-type OperationTable = Brand<Uint8Array, "OperationTable">
+import { write_string } from "../vm/records/string.ts"
+import { byte_buffer_view } from "../vm/records/byte_buffer.ts"
+import { create_error } from "../vm/semantics/errors.ts"
+import { define_property } from "../vm/semantics/properties.ts"
+import { to_string, write_primitive } from "../vm/semantics/operations.ts"
+import { CONTEXT_STATE } from "../vm/execution/context.ts"
+import { create_call_context, dispose_context } from "../vm/execution/calls.ts"
+import { run_task } from "../vm/execution/interpreter.ts"
+import { panic } from "../utils.ts"
 
 export interface Completion {
   id: number
@@ -16,21 +22,14 @@ export interface Completion {
   path?: string
 }
 
-export interface Scheduler {
-  control: SchedulerControl
-  jobs: JobQueue
-  operations: OperationTable
-  completions: Completion[]
-  wake: (() => void) | null
-}
-
-interface Job {
+/** Callers own allocation and disposal of every stored root. */
+export interface Job {
   callee: Root
   value: Root
   has_argument: boolean
 }
 
-interface Operation {
+export interface Operation {
   resolve: Root
   reject: Root
   buffer: Root | null
@@ -38,171 +37,235 @@ interface Operation {
   length: number
 }
 
-const NONE = 0xffffffff
-const C = Object.freeze({
-  JOB_HEAD: 0,
-  JOB_TAIL: 4,
-  OPERATION_COUNT: 8,
-  PENDING: 12,
-  TASK_STEPS: 16,
-  FREE_OPERATION: 20,
-})
-const JOB_BYTES = 16
-const J = Object.freeze({ CALLEE: 0, VALUE: 4, HAS_ARGUMENT: 8 })
-const OPERATION_BYTES = 24
-const O = Object.freeze({
-  NEXT_FREE: 0,
-  RESOLVE: 4,
-  REJECT: 8,
-  BUFFER: 12,
-  OFFSET: 16,
-  LENGTH: 20,
-})
+/** The job queue and pending host operations of one runtime. */
+export class Scheduler {
+  jobs: Job[] = []
+  job_head = 0
+  /** Indexed by operation id; released slots are reused. */
+  operations: (Operation | null)[] = []
+  free_operations: number[] = []
+  pending_operations = 0
+  // Host completions contain host values and operation IDs, never heap pointers.
+  completions: Completion[] = []
+  wake: (() => void) | null = null
+  /** Instructions run by the current task, across all of its contexts. */
+  task_steps = 0
 
-/** Storage only; callers own allocation and disposal of all stored roots. */
-export function create_scheduler(): Scheduler {
-  return {
-    control: new Uint8Array(32) as SchedulerControl,
-    jobs: new Uint8Array(JOB_BYTES * 16) as JobQueue,
-    operations: new Uint8Array(OPERATION_BYTES * 16) as OperationTable,
-    // Host completions contain host values and operation IDs, never heap pointers.
-    completions: [],
-    wake: null,
+  has_jobs() {
+    return this.job_head < this.jobs.length
+  }
+
+  enqueue_job(job: Job) {
+    this.jobs.push(job)
+  }
+
+  /** Remove before executing: jobs may enqueue more jobs. */
+  take_job(): Job | null {
+    if (!this.has_jobs()) return null
+    const job = this.jobs[this.job_head++]
+    if (this.job_head === this.jobs.length) {
+      this.jobs = []
+      this.job_head = 0
+    }
+    return job
+  }
+
+  allocate_operation(operation: Operation): number {
+    const id = this.free_operations.pop() ?? this.operations.length
+    this.operations[id] = operation
+    this.pending_operations++
+    return id
+  }
+
+  operation(id: number): Operation {
+    const operation = this.operations[id]
+    if (!operation) panic(`Invalid operation ID: ${id}`)
+    return operation
+  }
+
+  /** Caller must release the operation's roots first. */
+  release_operation(id: number) {
+    this.operation(id)
+    this.operations[id] = null
+    this.free_operations.push(id)
+    this.pending_operations--
   }
 }
 
-function data_view(bytes: Uint8Array) {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+function notify(runtime: Runtime) {
+  const wake = runtime.scheduler.wake
+  runtime.scheduler.wake = null
+  if (wake) wake()
 }
 
-function grow(
-  scheduler: Scheduler,
-  field: "jobs" | "operations",
-  required: number,
+export function enqueue_job(runtime: Runtime, callee: Root, argument?: Root) {
+  const { memory, scheduler } = runtime
+  if (callee === undefined || kind_of(memory, callee) !== KINDS.FUNCTION)
+    panic("Job is not callable")
+  const fn = memory.alloc_root(),
+    value = memory.alloc_root()
+  memory.copy_value(fn, callee)
+  if (argument !== undefined) memory.copy_value(value, argument)
+  scheduler.enqueue_job({
+    callee: fn,
+    value,
+    has_argument: argument !== undefined,
+  })
+  notify(runtime)
+}
+
+export interface OperationOptions {
+  buffer?: Root
+  offset?: number
+  length?: number
+  syscall?: string
+  path?: string
+}
+
+export function start_operation(
+  runtime: Runtime,
+  resolve: Root,
+  reject: Root,
+  begin: () => unknown | PromiseLike<unknown>,
+  { buffer, offset = 0, length = 0, syscall, path }: OperationOptions = {},
 ) {
-  if (required <= scheduler[field].length) return
-  const bytes = new Uint8Array(Math.max(required, scheduler[field].length * 2))
-  bytes.set(scheduler[field])
-  if (field === "jobs") scheduler.jobs = bytes as JobQueue
-  else scheduler.operations = bytes as OperationTable
-}
-
-export function scheduler_has_jobs(scheduler: Scheduler): boolean {
-  const view = data_view(scheduler.control)
-  return view.getUint32(C.JOB_HEAD, true) < view.getUint32(C.JOB_TAIL, true)
-}
-
-export function scheduler_enqueue_job(scheduler: Scheduler, job: Job) {
-  const control = data_view(scheduler.control)
-  const index = control.getUint32(C.JOB_TAIL, true)
-  grow(scheduler, "jobs", (index + 1) * JOB_BYTES)
-  const view = data_view(scheduler.jobs),
-    offset = index * JOB_BYTES
-  view.setUint32(offset + J.CALLEE, job.callee, true)
-  view.setUint32(offset + J.VALUE, job.value, true)
-  view.setUint32(offset + J.HAS_ARGUMENT, job.has_argument ? 1 : 0, true)
-  control.setUint32(C.JOB_TAIL, index + 1, true)
-}
-
-/** Remove before executing: jobs may enqueue, grow, or restart an empty queue. */
-export function scheduler_take_job(scheduler: Scheduler): Job | null {
-  if (!scheduler_has_jobs(scheduler)) return null
-  const control = data_view(scheduler.control)
-  const index = control.getUint32(C.JOB_HEAD, true)
-  const view = data_view(scheduler.jobs),
-    offset = index * JOB_BYTES
-  const job = {
-    callee: read_root(view, offset + J.CALLEE),
-    value: read_root(view, offset + J.VALUE),
-    has_argument: view.getUint32(offset + J.HAS_ARGUMENT, true) !== 0,
-  }
-  const next = index + 1
-  if (next === control.getUint32(C.JOB_TAIL, true)) {
-    control.setUint32(C.JOB_HEAD, 0, true)
-    control.setUint32(C.JOB_TAIL, 0, true)
-  } else control.setUint32(C.JOB_HEAD, next, true)
-  return job
-}
-
-export function scheduler_pending_operations(scheduler: Scheduler): number {
-  return data_view(scheduler.control).getUint32(C.PENDING, true)
-}
-
-export function scheduler_allocate_operation(
-  scheduler: Scheduler,
-  operation: Operation,
-): number {
-  const control = data_view(scheduler.control)
-  // Free-list links encode id + 1 so zero denotes an empty list.
-  const available = control.getUint32(C.FREE_OPERATION, true)
-  const id = available
-    ? available - 1
-    : control.getUint32(C.OPERATION_COUNT, true)
-  if (available)
-    control.setUint32(
-      C.FREE_OPERATION,
-      data_view(scheduler.operations).getUint32(
-        id * OPERATION_BYTES + O.NEXT_FREE,
-        true,
-      ),
-      true,
+  const { memory, scheduler } = runtime
+  if (
+    resolve === undefined ||
+    reject === undefined ||
+    kind_of(memory, resolve) !== KINDS.FUNCTION ||
+    kind_of(memory, reject) !== KINDS.FUNCTION
+  )
+    panic("I/O operation requires resolve and reject callbacks")
+  const resolve_root = memory.alloc_root(),
+    reject_root = memory.alloc_root(),
+    buffer_root = buffer === undefined ? null : memory.alloc_root()
+  memory.copy_value(resolve_root, resolve)
+  memory.copy_value(reject_root, reject)
+  if (buffer !== undefined && buffer_root !== null)
+    memory.copy_value(buffer_root, buffer)
+  const id = scheduler.allocate_operation({
+    resolve: resolve_root,
+    reject: reject_root,
+    buffer: buffer_root,
+    offset,
+    length,
+  })
+  Promise.resolve()
+    .then(begin)
+    .then(
+      (result) => {
+        scheduler.completions.push({ id, result, syscall, path })
+        notify(runtime)
+      },
+      (error) => {
+        scheduler.completions.push({ id, error, rejected: true, syscall, path })
+        notify(runtime)
+      },
     )
-  else control.setUint32(C.OPERATION_COUNT, id + 1, true)
-  grow(scheduler, "operations", (id + 1) * OPERATION_BYTES)
-  const view = data_view(scheduler.operations),
-    offset = id * OPERATION_BYTES
-  view.setUint32(offset + O.NEXT_FREE, NONE, true)
-  view.setUint32(offset + O.RESOLVE, operation.resolve, true)
-  view.setUint32(offset + O.REJECT, operation.reject, true)
-  view.setUint32(offset + O.BUFFER, operation.buffer ?? NONE, true)
-  view.setUint32(offset + O.OFFSET, operation.offset, true)
-  view.setUint32(offset + O.LENGTH, operation.length, true)
-  control.setUint32(
-    C.PENDING,
-    scheduler_pending_operations(scheduler) + 1,
-    true,
-  )
-  return id
 }
 
-export function scheduler_operation(
-  scheduler: Scheduler,
-  id: number,
-): Operation {
-  const view = data_view(scheduler.operations),
-    offset = id * OPERATION_BYTES
-  return {
-    resolve: read_root(view, offset + O.RESOLVE),
-    reject: read_root(view, offset + O.REJECT),
-    buffer: read_optional_root(view, offset + O.BUFFER),
-    offset: view.getUint32(offset + O.OFFSET, true),
-    length: view.getUint32(offset + O.LENGTH, true),
+function operation_error(
+  runtime: Runtime,
+  destination: Root,
+  error: HostError,
+  syscall?: string,
+  path?: string,
+) {
+  const { memory } = runtime
+  create_error(runtime, destination, "Error", String(error?.message ?? error))
+  const key = memory.alloc_root(),
+    value = memory.alloc_root()
+  try {
+    for (const [name, item] of Object.entries({
+      code: error?.code,
+      syscall,
+      path,
+    })) {
+      if (item === undefined) continue
+      write_string(memory, key, name)
+      write_primitive(runtime, value, item)
+      define_property(runtime, destination, key, value)
+    }
+  } finally {
+    memory.free_root(key)
+    memory.free_root(value)
   }
 }
 
-/** Caller must release the operation's roots first. */
-export function scheduler_release_operation(scheduler: Scheduler, id: number) {
-  const control = data_view(scheduler.control)
-  data_view(scheduler.operations).setUint32(
-    id * OPERATION_BYTES + O.NEXT_FREE,
-    control.getUint32(C.FREE_OPERATION, true),
-    true,
-  )
-  control.setUint32(C.FREE_OPERATION, id + 1, true)
-  control.setUint32(
-    C.PENDING,
-    scheduler_pending_operations(scheduler) - 1,
-    true,
-  )
+export function drain_completions(runtime: Runtime) {
+  const { memory, scheduler } = runtime
+  while (scheduler.completions.length) {
+    const completion = scheduler.completions.shift()!
+    const { resolve, reject, buffer, offset, length } = scheduler.operation(
+      completion.id,
+    )
+    const value = memory.alloc_root()
+    try {
+      let rejected = completion.rejected
+      try {
+        if (rejected) throw completion.error
+        if (buffer !== null) {
+          const bytes = completion.result
+          if (!(bytes instanceof Uint8Array) || bytes.length > length)
+            throw new TypeError("Host read returned invalid bytes")
+          // Resolve the rooted buffer again here; it may have moved while waiting.
+          byte_buffer_view(memory, buffer).set(bytes, offset)
+          write_number(memory, value, bytes.length)
+        } else write_primitive(runtime, value, completion.result)
+      } catch (error) {
+        rejected = true
+        operation_error(
+          runtime,
+          value,
+          error,
+          completion.syscall,
+          completion.path,
+        )
+      }
+      enqueue_job(runtime, rejected ? reject : resolve, value)
+    } finally {
+      memory.free_root(value)
+      memory.free_root(resolve)
+      memory.free_root(reject)
+      if (buffer !== null) memory.free_root(buffer)
+      scheduler.release_operation(completion.id)
+    }
+  }
 }
 
-export function scheduler_reset_task_steps(scheduler: Scheduler) {
-  data_view(scheduler.control).setUint32(C.TASK_STEPS, 0, true)
+export function drain_jobs(runtime: Runtime) {
+  const { memory, scheduler } = runtime
+  while (scheduler.has_jobs()) {
+    const { callee, value, has_argument } = scheduler.take_job()!
+    let job
+    try {
+      job = create_call_context(
+        runtime,
+        callee,
+        undefined,
+        has_argument ? [value] : [],
+      )
+      run_task(runtime, job)
+      if (job.status === CONTEXT_STATE.FAILED)
+        throw new Error(to_string(runtime, job.error))
+      // Await reactions resume their context as part of the current microtask.
+      for (const active of runtime.contexts)
+        if (active.status === CONTEXT_STATE.READY) run_task(runtime, active)
+    } finally {
+      if (job) dispose_context(runtime, job)
+      memory.free_root(callee)
+      memory.free_root(value)
+    }
+  }
 }
-
-export function scheduler_increment_task_steps(scheduler: Scheduler): number {
-  const view = data_view(scheduler.control)
-  const steps = view.getUint32(C.TASK_STEPS, true) + 1
-  view.setUint32(C.TASK_STEPS, steps, true)
-  return steps
+export async function wait_for_completion(runtime: Runtime) {
+  if (
+    runtime.scheduler.completions.length !== 0 ||
+    runtime.scheduler.has_jobs()
+  )
+    return
+  await new Promise<void>((resolve) => {
+    runtime.scheduler.wake = resolve
+  })
 }

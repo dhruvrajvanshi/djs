@@ -1,20 +1,22 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { KINDS, NAN_HIGH, TAGS, Memory } from "../vm/memory.ts"
-import { allocate, collect, heap_stats } from "../vm/heap.ts"
+import { FUNCTION, KINDS } from "../vm/storage/layout.ts"
+import { Memory } from "../vm/storage/memory.ts"
 import {
+  NAN_HIGH,
+  TAGS,
   get_ref,
   read_number,
-  read_string,
   set_ref,
   tag_of,
   write_number,
-  write_string,
   write_undefined,
-  create_symbol,
-  load_symbol_description,
-} from "../vm/values.ts"
-import { create_object, define_property, get_property } from "../vm/objects.ts"
+} from "../vm/storage/value.ts"
+import { read_string, write_string } from "../vm/records/string.ts"
+import { create_symbol, load_symbol_description } from "../vm/records/symbol.ts"
+import { create_object } from "../vm/semantics/objects.ts"
+import { define_property, get_property } from "../vm/semantics/properties.ts"
+import { Runtime } from "../runtime/runtime.ts"
 
 test("number slots canonicalize NaN and preserve binary64 values", () => {
   const memory = new Memory()
@@ -42,40 +44,41 @@ test("strings retain UTF-16 code units through repeated moving collections", () 
   const before = get_ref(memory, root)
   write_string(memory, garbage, "dead")
   memory.free_root(garbage)
-  collect(memory)
+  memory.collect()
   assert.notEqual(get_ref(memory, root), before)
   assert.equal(read_string(memory, root), text)
-  assert.equal(heap_stats(memory).used_bytes, 24)
-  collect(memory)
+  assert.equal(memory.stats().used_bytes, 24)
+  memory.collect()
   assert.equal(read_string(memory, root), text)
   assert.equal(get_ref(memory, root), before)
 })
 
 test("symbols keep identity and descriptions as property keys through moving collections", () => {
-  const memory = new Memory({ semispace_bytes: 1024 })
+  const runtime = new Runtime({ semispace_bytes: 1024 })
+  const { memory } = runtime
   const symbol = memory.alloc_root()
   const object = memory.alloc_root()
   const value = memory.alloc_root()
   write_string(memory, value, "description")
   create_symbol(memory, symbol, value)
-  create_object(memory, object)
+  create_object(runtime, object)
   write_number(memory, value, 7)
-  define_property(memory, object, symbol, value)
+  define_property(runtime, object, symbol, value)
   const before = get_ref(memory, symbol)
-  collect(memory)
+  memory.collect()
   assert.notEqual(get_ref(memory, symbol), before)
   load_symbol_description(memory, value, symbol)
   assert.equal(read_string(memory, value), "description")
-  get_property(memory, value, object, symbol)
+  get_property(runtime, value, object, symbol)
   assert.equal(read_number(memory, value), 7)
   write_string(memory, value, "description")
-  get_property(memory, value, object, value)
+  get_property(runtime, value, object, value)
   assert.equal(tag_of(memory, value), TAGS.UNDEFINED)
 })
 
 function record(memory, kind, payload_bytes) {
   const root = memory.alloc_root()
-  set_ref(memory, root, allocate(memory, kind, payload_bytes))
+  set_ref(memory, root, memory.allocate(kind, payload_bytes))
   return root
 }
 
@@ -93,9 +96,12 @@ test("Cheney tracing updates nested raw pointers, tagged fields, aliases and cyc
   memory.write_u32(get_ref(memory, environment) + 16, 2)
   memory.copy_root_to_heap_value(get_ref(memory, environment) + 8, parent)
   const fn = record(memory, KINDS.FUNCTION, 48)
-  memory.write_u32(get_ref(memory, fn) + 8, 123)
-  memory.write_u32(get_ref(memory, fn) + 12, 456)
-  memory.copy_root_to_heap_value(get_ref(memory, fn) + 16, environment)
+  memory.write_u32(get_ref(memory, fn) + FUNCTION.CODE, 123)
+  memory.write_u32(get_ref(memory, fn) + FUNCTION.ID, 456)
+  memory.copy_root_to_heap_value(
+    get_ref(memory, fn) + FUNCTION.ENVIRONMENT,
+    environment,
+  )
   const property = record(memory, KINDS.PROPERTY, 24)
   memory.copy_root_to_heap_value(get_ref(memory, property) + 16, key)
   memory.copy_root_to_heap_value(get_ref(memory, property) + 24, fn)
@@ -127,7 +133,7 @@ test("Cheney tracing updates nested raw pointers, tagged fields, aliases and cyc
   for (let pass = 0; pass < 3; pass++) {
     write_undefined(memory, scratch)
     const previous_array = get_ref(memory, array)
-    collect(memory)
+    memory.collect()
     assert.notEqual(get_ref(memory, array), previous_array)
     memory.copy_heap_value_to_root(scratch, get_ref(memory, array) + 16)
     const moved_object = get_ref(memory, scratch)
@@ -137,9 +143,9 @@ test("Cheney tracing updates nested raw pointers, tagged fields, aliases and cyc
     assert.equal(read_string(memory, scratch), "key")
     memory.copy_heap_value_to_root(scratch, moved_property + 24)
     const moved_fn = get_ref(memory, scratch)
-    assert.equal(memory.read_u32(moved_fn + 8), 123)
-    assert.equal(memory.read_u32(moved_fn + 12), 456)
-    memory.copy_heap_value_to_root(scratch, moved_fn + 16)
+    assert.equal(memory.read_u32(moved_fn + FUNCTION.CODE), 123)
+    assert.equal(memory.read_u32(moved_fn + FUNCTION.ID), 456)
+    memory.copy_heap_value_to_root(scratch, moved_fn + FUNCTION.ENVIRONMENT)
     const moved_environment = get_ref(memory, scratch)
     memory.copy_heap_value_to_root(scratch, moved_environment + 8)
     assert.equal(memory.read_u32(get_ref(memory, scratch)), KINDS.ENVIRONMENT)

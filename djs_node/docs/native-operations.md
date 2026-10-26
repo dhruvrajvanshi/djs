@@ -11,7 +11,7 @@ functions in two modules:
 | `djs:host` | File and console I/O, supplied by the program embedding djs_node |
 
 Both are implemented in the `INTRINSICS` table in
-[vm/intrinsics.ts](../vm/intrinsics.ts), and `NATIVE_MODULES` lists which
+[vm/execution/intrinsics.ts](../vm/execution/intrinsics.ts), and `NATIVE_MODULES` lists which
 names each module exports. Calls run synchronously, through `call_intrinsic`.
 Bad arguments throw a `TypeError` or `RangeError`.
 
@@ -59,7 +59,7 @@ itself again. Elsewhere, avoid them on exotic objects; for example,
 | `get_slot(o, "[[Name]]")` | The slot's value; throws if `o` does not have it |
 | `set_slot(o, "[[Name]]", value)` | `undefined`; throws if `o` does not have it |
 
-These are implemented in [vm/slots.ts](../vm/slots.ts). Rules:
+These are implemented in [vm/semantics/slots.ts](../vm/semantics/slots.ts). Rules:
 
 - **Write the slot name as a string literal.** The compiler requires it, and
   doesn't let you pass these three functions around as values
@@ -95,7 +95,7 @@ These are implemented in [vm/slots.ts](../vm/slots.ts). Rules:
 | Operation | Spec | Effect |
 | --- | --- | --- |
 | `call(f, thisValue, ...args)` | [Call](https://tc39.es/ecma262/#sec-call) | Calls `f` with `thisValue` as `this`. A program can overwrite `f.call`, but not this |
-| `host_enqueue_promise_job(job)` | [HostEnqueuePromiseJob](https://tc39.es/ecma262/#sec-hostenqueuepromisejob) | Adds `job` to the queue that runs after the current code finishes, as promise callbacks do ([runtime/jobs.ts](../runtime/jobs.ts)) |
+| `host_enqueue_promise_job(job)` | [HostEnqueuePromiseJob](https://tc39.es/ecma262/#sec-hostenqueuepromisejob) | Adds `job` to the queue that runs after the current code finishes, as promise callbacks do ([runtime/scheduler.ts](../runtime/scheduler.ts)) |
 
 ## `djs:host`
 

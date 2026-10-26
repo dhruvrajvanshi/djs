@@ -20,8 +20,8 @@ operations the VM provides.
 | Directory | Contents | Start with |
 | --- | --- | --- |
 | [`compiler/`](../compiler/) | Parses source (through `djs_parser`) and emits bytecode | `compile_module` in [compile.ts](../compiler/compile.ts) |
-| [`vm/`](../vm/) | Values, heap, objects, the interpreter, native operations | `run_interpreter` in [interpreter.ts](../vm/interpreter.ts) |
-| [`runtime/`](../runtime/) | Module loading and linking, the job queue, bootstrap | `bootstrap` in [bootstrap.ts](../runtime/bootstrap.ts) |
+| [`vm/`](../vm/) | `storage/`: the heap and boxed values. `records/`: one module per heap kind. `semantics/`: JavaScript operations on them. `execution/`: the interpreter, calls and native operations | `run_interpreter` in [interpreter.ts](../vm/execution/interpreter.ts) |
+| [`runtime/`](../runtime/) | The `Runtime`, the realm, module loading and linking, the job queue, bootstrap | `bootstrap` in [bootstrap.ts](../runtime/bootstrap.ts) |
 | [`stdlib/js/`](../stdlib/js/) | The ECMAScript builtins | [realm.js](../stdlib/js/realm.js), which lists the globals |
 | [`stdlib/node/`](../stdlib/node/) | The `node:*` modules | [index.js](../stdlib/node/index.js) |
 | [`host/`](../host/) | File system and stdout access, provided by Node | [node.ts](../host/node.ts) |
@@ -38,7 +38,7 @@ operations the VM provides.
 3. `run_module` ([runtime/modules.ts](../runtime/modules.ts)) loads the
    program. `load_module` reads each file, compiles it with `compile_module`,
    and loads its imports; `evaluate_module` runs the bytecode.
-4. `run_interpreter` ([vm/interpreter.ts](../vm/interpreter.ts)) executes one
+4. `run_interpreter` ([vm/execution/interpreter.ts](../vm/execution/interpreter.ts)) executes one
    instruction at a time. Some instructions need a builtin: throwing a
    `TypeError`, giving an array literal its prototype, or converting an object
    with `ToPrimitive`. The interpreter gets those from the realm.
@@ -65,7 +65,7 @@ The stdlib follows the [ECMAScript specification](https://tc39.es/ecma262/)
 | Builtins | `stdlib/js/*.js` | One declaration per well-known intrinsic |
 | Support | [`stdlib/js/support.js`](../stdlib/js/support.js) | Helpers shared by builtins that are not spec operations |
 | Abstract operations | `djs:abstract` ([`stdlib/js/abstract.js`](../stdlib/js/abstract.js)) | Spec abstract operations, named after the spec |
-| Native modules | `djs:native`, `djs:host` | Operations JavaScript cannot express, in [`vm/intrinsics.ts`](../vm/intrinsics.ts) |
+| Native modules | `djs:native`, `djs:host` | Operations JavaScript cannot express, in [`vm/execution/intrinsics.ts`](../vm/execution/intrinsics.ts) |
 | VM | `vm/` | Runs bytecode; reaches builtins through the realm |
 
 Each layer imports only from the layers below it. The module loader rejects

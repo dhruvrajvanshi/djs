@@ -3,17 +3,16 @@ import test from "node:test"
 import { readFile } from "node:fs/promises"
 import { fileURLToPath } from "node:url"
 import { bootstrap } from "../runtime/bootstrap.ts"
-import { Runtime, load_module, evaluate_module } from "../runtime/modules.ts"
+import { Runtime } from "../runtime/runtime.ts"
+import { load_module, evaluate_module } from "../runtime/modules.ts"
 import { create_node_host } from "../host/node.ts"
-import { collect, heap_stats } from "../vm/heap.ts"
-import { create_function } from "../vm/objects.ts"
-import { NATIVE_CODE, intrinsic_id } from "../vm/intrinsics.ts"
+import { create_function } from "../vm/semantics/objects.ts"
+import { NATIVE_CODE, intrinsic_id } from "../vm/execution/intrinsics.ts"
 import {
   start_operation,
   drain_completions,
   drain_jobs,
-  pending_operations,
-} from "../runtime/jobs.ts"
+} from "../runtime/scheduler.ts"
 
 async function prepare(source, host = {}, options = {}) {
   let output = ""
@@ -31,7 +30,7 @@ async function prepare(source, host = {}, options = {}) {
   })
   await bootstrap(runtime)
   const module = await load_module(runtime, "file:///io-test.js")
-  const roots = heap_stats(runtime.memory).roots
+  const roots = runtime.memory.stats().roots
   return {
     runtime,
     get output() {
@@ -39,8 +38,8 @@ async function prepare(source, host = {}, options = {}) {
     },
     async run() {
       await evaluate_module(runtime, module)
-      assert.equal(pending_operations(runtime), 0)
-      assert.equal(heap_stats(runtime.memory).roots, roots)
+      assert.equal(runtime.scheduler.pending_operations, 0)
+      assert.equal(runtime.memory.stats().roots, roots)
     },
   }
 }
@@ -147,8 +146,8 @@ test(
     )
     const evaluation = app.run()
     await began
-    collect(app.runtime.memory)
-    collect(app.runtime.memory)
+    app.runtime.memory.collect()
+    app.runtime.memory.collect()
     assert.equal(app.output, "")
     finish(Uint8Array.of(1, 2, 3))
     await evaluation
@@ -168,13 +167,8 @@ test("completion slots are reused and concurrent results retain callbacks across
     },
   })
   const callback = runtime.memory.alloc_root()
-  create_function(
-    runtime.memory,
-    callback,
-    NATIVE_CODE,
-    intrinsic_id("write_stdout"),
-  )
-  const baseline = heap_stats(runtime.memory).roots
+  create_function(runtime, callback, NATIVE_CODE, intrinsic_id("write_stdout"))
+  const baseline = runtime.memory.stats().roots
   let capacity
   for (let pass = 0; pass < 3; pass++) {
     const finish = []
@@ -190,8 +184,8 @@ test("completion slots are reused and concurrent results retain callbacks across
       )
     }
     await new Promise(setImmediate)
-    assert.equal(pending_operations(runtime), 40)
-    collect(runtime.memory)
+    assert.equal(runtime.scheduler.pending_operations, 40)
+    runtime.memory.collect()
     for (let index = 39; index >= 0; index--) finish[index](String(index) + ",")
     await new Promise(setImmediate)
     assert.equal(
@@ -200,11 +194,11 @@ test("completion slots are reused and concurrent results retain callbacks across
         .map((n) => n + ",")
         .join(""),
     )
-    collect(runtime.memory)
+    runtime.memory.collect()
     drain_completions(runtime)
     drain_jobs(runtime)
-    assert.equal(pending_operations(runtime), 0)
-    assert.equal(heap_stats(runtime.memory).roots, baseline)
+    assert.equal(runtime.scheduler.pending_operations, 0)
+    assert.equal(runtime.memory.stats().roots, baseline)
     if (capacity === undefined) capacity = runtime.scheduler.operations.length
     assert.equal(runtime.scheduler.operations.length, capacity)
   }
@@ -215,8 +209,8 @@ test("completion slots are reused and concurrent results retain callbacks across
       .join(""),
   )
   runtime.memory.free_root(callback)
-  collect(runtime.memory)
-  assert.equal(heap_stats(runtime.memory).used_bytes, 0)
+  runtime.memory.collect()
+  assert.equal(runtime.memory.stats().used_bytes, 0)
 })
 
 test("the Node host advances file positions and rejects closed or unknown handles", async () => {
@@ -277,7 +271,7 @@ test("readFile handles multiple chunks and UTF-8 sequences split at the read bou
   assert.equal(app.output, bytes.toString("utf8"))
   assert.equal(reads, 3)
   assert.equal(closed, true)
-  assert.ok(heap_stats(app.runtime.memory).collections > 0)
+  assert.ok(app.runtime.memory.stats().collections > 0)
 })
 
 test("userland UTF-8 decoding matches replacement semantics across one-byte short reads", async () => {

@@ -1,9 +1,8 @@
-import type { Root } from "./memory.ts"
-import { panic } from "../utils.ts"
-import type { BytecodeOffset, RegisterIndex } from "../compiler/bytecode.ts"
-import type { FunctionId } from "../compiler/compile.ts"
-import type { CodeId } from "../runtime/modules.ts"
-import type { ModuleStateBytes } from "../runtime/module-state.ts"
+import type { Root } from "../storage/value.ts"
+import { panic } from "../../utils.ts"
+import type { BytecodeOffset, RegisterIndex } from "../../compiler/bytecode.ts"
+import type { FunctionId } from "../../compiler/compile.ts"
+import type { CodeId, ModuleRecord } from "../../runtime/modules.ts"
 
 export const CONTEXT_STATE = Object.freeze({
   READY: 0,
@@ -37,8 +36,8 @@ export class Context {
   handlers: Handler[] = []
   steps = 0
   await_rejected = false
-  /** Shared with the module; not owned by this context. */
-  module_state?: ModuleStateBytes
+  /** The module this context evaluates, if any; not owned by the context. */
+  module?: ModuleRecord
   settle?: { resolve: Root; reject: Root }
 
   constructor(id: number, result: Root, error: Root) {

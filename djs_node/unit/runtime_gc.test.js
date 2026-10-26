@@ -4,85 +4,82 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { pathToFileURL } from "node:url"
-import { Memory } from "../vm/memory.ts"
-import { CONTEXT_STATE } from "../vm/context.ts"
-import { collect, heap_stats } from "../vm/heap.ts"
-import { read_number, read_string, write_string } from "../vm/values.ts"
+import { CONTEXT_STATE } from "../vm/execution/context.ts"
+import { read_number } from "../vm/storage/value.ts"
+import { read_string, write_string } from "../vm/records/string.ts"
 import {
   create_arguments_object,
+  create_function,
   create_object,
-  get_property,
-  set_property,
-} from "../vm/objects.ts"
+} from "../vm/semantics/objects.ts"
+import { get_property, set_property } from "../vm/semantics/properties.ts"
 import { bootstrap } from "../runtime/bootstrap.ts"
-import { Runtime, evaluate_module, load_module } from "../runtime/modules.ts"
-import {
-  create_scheduler,
-  enqueue_job,
-  drain_jobs,
-  pending_operations,
-} from "../runtime/jobs.ts"
-import { create_function } from "../vm/objects.ts"
-import { NATIVE_CODE, intrinsic_id } from "../vm/intrinsics.ts"
+import { Runtime } from "../runtime/runtime.ts"
+import { evaluate_module, load_module } from "../runtime/modules.ts"
+import { enqueue_job, drain_jobs } from "../runtime/scheduler.ts"
+import { NATIVE_CODE, intrinsic_id } from "../vm/execution/intrinsics.ts"
 
 test("property creation re-reads object and value roots after allocation collects", () => {
-  const memory = new Memory({ semispace_bytes: 128 })
+  const runtime = new Runtime({ semispace_bytes: 128 })
+  const { memory } = runtime
   const object = memory.alloc_root()
   const key = memory.alloc_root()
   const value = memory.alloc_root()
   const garbage = memory.alloc_root()
   const setter = memory.alloc_root()
-  create_object(memory, object)
+  create_object(runtime, object)
   write_string(memory, key, "key")
   write_string(memory, value, "value")
   write_string(memory, garbage, "abcdefghijklmnopqrst")
   memory.free_root(garbage)
-  assert.equal(heap_stats(memory).collections, 0)
-  set_property({ memory }, setter, object, key, value)
-  assert.equal(heap_stats(memory).collections, 1)
-  get_property(memory, value, object, key)
+  assert.equal(memory.stats().collections, 0)
+  set_property(runtime, setter, object, key, value)
+  assert.equal(memory.stats().collections, 1)
+  get_property(runtime, value, object, key)
   assert.equal(read_string(memory, value), "value")
-  collect(memory)
-  get_property(memory, value, object, key)
+  memory.collect()
+  get_property(runtime, value, object, key)
   assert.equal(read_string(memory, value), "value")
 })
 
 test("queued callbacks retain functions and arguments across collection and queue growth", () => {
   let output = ""
-  const runtime = {
-    memory: new Memory({ semispace_bytes: 16384, root_capacity: 2 }),
-    scheduler: create_scheduler(),
-    contexts: [],
+  const runtime = new Runtime({
+    semispace_bytes: 16384,
+    root_capacity: 2,
     host: {
       write_stdout: (text) => {
         output += text
       },
     },
-  }
+  })
   const { memory } = runtime
+  const baseline = memory.stats().roots
   const fn = memory.alloc_root(),
     argument = memory.alloc_root()
-  create_function(memory, fn, NATIVE_CODE, intrinsic_id("write_stdout"))
+  create_function(runtime, fn, NATIVE_CODE, intrinsic_id("write_stdout"))
   for (let index = 0; index < 40; index++) {
     write_string(memory, argument, `job ${index}\n`)
     enqueue_job(runtime, fn, argument)
-    collect(memory)
+    memory.collect()
   }
   memory.free_root(fn)
   memory.free_root(argument)
-  collect(memory)
+  memory.collect()
   drain_jobs(runtime)
   assert.equal(
     output,
     Array.from({ length: 40 }, (_, i) => `job ${i}\n`).join(""),
   )
-  collect(memory)
-  assert.equal(heap_stats(memory).roots, 0)
-  assert.equal(heap_stats(memory).used_bytes, 0)
+  memory.collect()
+  assert.equal(memory.stats().roots, baseline)
+  assert.equal(memory.stats().used_bytes, 0)
 })
 
 test("arguments objects retain indexed values through allocation-triggered collection", () => {
-  const memory = new Memory({ semispace_bytes: 1024, root_capacity: 2 })
+  const runtime = new Runtime({ semispace_bytes: 1024, root_capacity: 2 })
+  const { memory } = runtime
+  const baseline = memory.stats().roots
   const args = memory.alloc_root(),
     key = memory.alloc_root(),
     value = memory.alloc_root(),
@@ -92,24 +89,24 @@ test("arguments objects retain indexed values through allocation-triggered colle
     write_string(memory, first, "first")
     write_string(memory, second, "second")
     for (let index = 0; index < 40; index++) {
-      create_arguments_object(memory, args, [first, second])
+      create_arguments_object(runtime, args, [first, second])
       write_string(memory, key, "length")
-      get_property(memory, value, args, key)
+      get_property(runtime, value, args, key)
       assert.equal(read_number(memory, value), 2)
       write_string(memory, key, "0")
-      get_property(memory, value, args, key)
+      get_property(runtime, value, args, key)
       assert.equal(read_string(memory, value), "first")
       write_string(memory, key, "1")
-      get_property(memory, value, args, key)
+      get_property(runtime, value, args, key)
       assert.equal(read_string(memory, value), "second")
     }
-    assert.ok(heap_stats(memory).collections > 2)
+    assert.ok(memory.stats().collections > 2)
   } finally {
     for (const root of [args, key, value, first, second]) memory.free_root(root)
   }
-  collect(memory)
-  assert.equal(heap_stats(memory).roots, 0)
-  assert.equal(heap_stats(memory).used_bytes, 0)
+  memory.collect()
+  assert.equal(memory.stats().roots, baseline)
+  assert.equal(memory.stats().used_bytes, 0)
 })
 
 test("guest closures survive repeated calls and allocation-triggered collection", async () => {
@@ -150,15 +147,15 @@ test("guest closures survive repeated calls and allocation-triggered collection"
     })
     await bootstrap(runtime)
     const module = await load_module(runtime, pathToFileURL(path).href)
-    const roots_before = heap_stats(runtime.memory).roots
-    collect(runtime.memory)
-    const bytes_before = heap_stats(runtime.memory).used_bytes
+    const roots_before = runtime.memory.stats().roots
+    runtime.memory.collect()
+    const bytes_before = runtime.memory.stats().used_bytes
     await evaluate_module(runtime, module)
     assert.equal(output, "item3010 3011\n")
-    assert.ok(heap_stats(runtime.memory).collections > 10)
-    assert.equal(heap_stats(runtime.memory).roots, roots_before)
-    collect(runtime.memory)
-    assert.ok(heap_stats(runtime.memory).used_bytes < bytes_before + 4096)
+    assert.ok(runtime.memory.stats().collections > 10)
+    assert.equal(runtime.memory.stats().roots, roots_before)
+    runtime.memory.collect()
+    assert.ok(runtime.memory.stats().used_bytes < bytes_before + 4096)
   } finally {
     await rm(directory, { recursive: true, force: true })
   }
@@ -217,9 +214,9 @@ test(
       })
       await bootstrap(runtime)
       const module = await load_module(runtime, pathToFileURL(path).href)
-      const roots_before = heap_stats(runtime.memory).roots
-      collect(runtime.memory)
-      const bytes_before = heap_stats(runtime.memory).used_bytes
+      const roots_before = runtime.memory.stats().roots
+      runtime.memory.collect()
+      const bytes_before = runtime.memory.stats().used_bytes
       const evaluation = evaluate_module(runtime, module)
       await Promise.race([
         read_started,
@@ -227,23 +224,23 @@ test(
           throw new Error("Guest did not start file read")
         }),
       ])
-      assert.equal(pending_operations(runtime), 1)
+      assert.equal(runtime.scheduler.pending_operations, 1)
       assert.ok(
         runtime.contexts.some(
           (context) => context && context.status === CONTEXT_STATE.WAITING,
         ),
       )
-      collect(runtime.memory)
-      collect(runtime.memory)
+      runtime.memory.collect()
+      runtime.memory.collect()
       assert.equal(output, "")
       finish(new TextEncoder().encode("contents"))
       await evaluation
       assert.equal(output, "read: contents\n")
-      assert.equal(pending_operations(runtime), 0)
+      assert.equal(runtime.scheduler.pending_operations, 0)
       assert.equal(closed, true)
-      assert.equal(heap_stats(runtime.memory).roots, roots_before)
-      collect(runtime.memory)
-      assert.ok(heap_stats(runtime.memory).used_bytes < bytes_before + 4096)
+      assert.equal(runtime.memory.stats().roots, roots_before)
+      runtime.memory.collect()
+      assert.ok(runtime.memory.stats().used_bytes < bytes_before + 4096)
     } finally {
       await rm(directory, { recursive: true, force: true })
     }
@@ -294,12 +291,12 @@ for (const rejected of [false, true]) {
     })
     await bootstrap(runtime)
     const module = await load_module(runtime, "file:///entry")
-    const roots = heap_stats(runtime.memory).roots
+    const roots = runtime.memory.stats().roots
     const evaluation = evaluate_module(runtime, module)
     await began
-    assert.equal(pending_operations(runtime), 1)
-    collect(runtime.memory)
-    collect(runtime.memory)
+    assert.equal(runtime.scheduler.pending_operations, 1)
+    runtime.memory.collect()
+    runtime.memory.collect()
     finish(
       rejected
         ? new Error("read failed")
@@ -310,8 +307,8 @@ for (const rejected of [false, true]) {
       output,
       rejected ? "Error read failed true\nfinished\n" : "contents\nfinished\n",
     )
-    assert.equal(pending_operations(runtime), 0)
+    assert.equal(runtime.scheduler.pending_operations, 0)
     assert.equal(closed, true)
-    assert.equal(heap_stats(runtime.memory).roots, roots)
+    assert.equal(runtime.memory.stats().roots, roots)
   })
 }

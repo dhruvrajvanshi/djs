@@ -5,12 +5,8 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { bootstrap } from "../runtime/bootstrap.ts"
 import { create_node_host } from "../host/node.ts"
-import {
-  Runtime,
-  module_status,
-  MODULE_STATE,
-  run_module,
-} from "../runtime/modules.ts"
+import { Runtime } from "../runtime/runtime.ts"
+import { MODULE_STATE, run_module } from "../runtime/modules.ts"
 
 async function fixture(t, files) {
   const directory = await mkdtemp(join(tmpdir(), "djs-integration-"))
@@ -91,7 +87,7 @@ test("module evaluation caches evaluated dependencies and entry modules", async 
   })
   const module = await app.run()
   assert.equal(app.output, "dependency\nside-effect\ndep 2\n3\n")
-  assert.equal(module_status(module), MODULE_STATE.EVALUATED)
+  assert.equal(module.status, MODULE_STATE.EVALUATED)
   await app.run()
   assert.equal(app.output, "dependency\nside-effect\ndep 2\n3\n")
 })
@@ -121,9 +117,6 @@ for (const [name, source, diagnostic] of [
     })
     await assert.rejects(app.run(), diagnostic)
     assert.equal(app.output, "")
-    assert.equal(
-      module_status(app.runtime.modules.at(-1)),
-      MODULE_STATE.ERRORED,
-    )
+    assert.equal(app.runtime.loader.modules.at(-1).status, MODULE_STATE.ERRORED)
   })
 }

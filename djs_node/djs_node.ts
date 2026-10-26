@@ -5,7 +5,8 @@ import { readFile } from "node:fs/promises"
 import { pathToFileURL } from "node:url"
 import { compile_module } from "./compiler/compile.ts"
 import { disassemble_module } from "./compiler/disassemble.ts"
-import { Runtime, run_module } from "./runtime/modules.ts"
+import { Runtime } from "./runtime/runtime.ts"
+import { run_module } from "./runtime/modules.ts"
 import { bootstrap } from "./runtime/bootstrap.ts"
 
 export { Runtime, run_module, bootstrap }

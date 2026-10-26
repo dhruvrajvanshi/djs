@@ -1,8 +1,9 @@
-import type { Root } from "./memory.ts"
-import type { Runtime } from "../runtime/modules.ts"
-import { write_string, write_undefined } from "./values.ts"
-import { invoke_sync } from "./interpreter.ts"
-import { panic } from "../utils.ts"
+import type { Root } from "../storage/value.ts"
+import { write_undefined } from "../storage/value.ts"
+import type { Runtime } from "../../runtime/runtime.ts"
+import { write_string } from "../records/string.ts"
+import { invoke_sync } from "../execution/calls.ts"
+import { panic } from "../../utils.ts"
 
 /**
  * Operations that guest code can observe failing return a Status. On THROW,
@@ -33,7 +34,7 @@ export function create_error(
   name: string,
   message: string,
 ) {
-  const constructor = runtime.intrinsics.get(`%${name}%`)
+  const constructor = runtime.realm.intrinsics.get(`%${name}%`)
   // Errors can only reach guest code once the stdlib has registered them.
   if (constructor === undefined) panic(`${name}: ${message}`)
   const text = runtime.memory.alloc_root()

@@ -1,74 +1,62 @@
-import type { Root, Memory } from "./memory.ts"
-import type { Runtime } from "../runtime/modules.ts"
+import { panic } from "../../utils.ts"
+import type { Memory } from "../storage/memory.ts"
+import type { Root } from "../storage/value.ts"
 import {
+  TAGS,
+  kind_of,
   read_number,
-  read_string,
-  write_string,
-  write_undefined,
-  write_number,
+  set_ref,
+  tag_of,
   write_boolean,
   write_null,
-  set_ref,
-  get_ref,
-  tag_of,
-  string_code_unit_at,
+  write_number,
+  write_undefined,
+} from "../storage/value.ts"
+import { KINDS } from "../storage/layout.ts"
+import { NATIVE_MARKERS } from "../../compiler/bytecode.ts"
+import type { Runtime } from "../../runtime/runtime.ts"
+import { enqueue_job, start_operation } from "../../runtime/scheduler.ts"
+import {
+  read_string,
   slice_string,
+  string_code_unit_at,
   string_length,
-  create_symbol,
-  load_symbol_description,
-} from "./values.ts"
-import { byte_buffer_view, create_byte_buffer } from "./bytes.ts"
+  write_string,
+} from "../records/string.ts"
+import { create_symbol, load_symbol_description } from "../records/symbol.ts"
+import { byte_buffer_view, create_byte_buffer } from "../records/byte_buffer.ts"
 import {
-  kind_of,
-  create_array,
-  create_string_object,
-  create_object,
-  set_prototype,
-  has_property,
-  delete_property,
-  is_object,
-  has_properties,
   has_property_list,
+  is_object,
+  object_prototype_reference,
+  set_prototype,
   try_set_prototype,
-  ordinary_own_property_keys,
-  get_property,
-  BUILTIN_CONSTRUCTOR,
-  create_function,
-  define_property,
-  function_code_id,
-  set_builtin_steps,
-} from "./objects.ts"
+} from "../records/object.ts"
 import {
-  get_own_property_descriptor,
+  BUILTIN_CONSTRUCTOR,
+  function_code_id,
+  function_flags,
+  set_builtin_steps,
+} from "../records/function.ts"
+import {
+  create_array,
+  create_function,
+  create_object,
+  create_string_object,
+} from "../semantics/objects.ts"
+import {
   define_own_property,
-} from "./properties.ts"
-import { KINDS, TAGS } from "./memory.ts"
-import { has_slot, get_slot, set_slot, init_slot } from "./slots.ts"
-import { NATIVE_MARKERS } from "../compiler/bytecode.ts"
-import { enqueue_job, start_operation } from "../runtime/jobs.ts"
-import { panic } from "../utils.ts"
-import { OK, THROW, throw_error, clear_exception } from "./completion.ts"
-import type { Status } from "./completion.ts"
-
-const PROTOTYPE_FIELDS = Object.freeze({
-  "%Object.prototype%": "object_prototype",
-  "%Function.prototype%": "function_prototype",
-  "%Array.prototype%": "array_prototype",
-  "%String.prototype%": "string_prototype",
-  "%Symbol.prototype%": "symbol_prototype",
-} as const)
-
-export function set_realm_intrinsic(
-  runtime: Runtime,
-  name: string,
-  value: Root,
-) {
-  const root = runtime.memory.alloc_root()
-  runtime.memory.copy_value(root, value)
-  runtime.intrinsics.set(name, root)
-  const field = PROTOTYPE_FIELDS[name as keyof typeof PROTOTYPE_FIELDS]
-  if (field) runtime.memory[field] = root
-}
+  define_property,
+  delete_property,
+  get_own_property_descriptor,
+  get_property,
+  has_properties,
+  has_property,
+  ordinary_own_property_keys,
+} from "../semantics/properties.ts"
+import { has_slot, get_slot, set_slot, init_slot } from "../semantics/slots.ts"
+import { OK, THROW, throw_error, clear_exception } from "../semantics/errors.ts"
+import type { Status } from "../semantics/errors.ts"
 
 export const NATIVE_CODE = 0xffffffff
 /** Built-in function objects run the steps stored by set_builtin_steps. */
@@ -155,19 +143,19 @@ const INTRINSICS: Record<string, Intrinsic> = {
     write_boolean(runtime.memory, destination, status === OK)
     return OK
   },
-  ordinary_delete({ memory }, destination, arguments_) {
+  ordinary_delete(runtime, destination, arguments_) {
     write_boolean(
-      memory,
+      runtime.memory,
       destination,
-      has_properties(memory, arguments_[0]) &&
-        delete_property(memory, arguments_[0], arguments_[1]),
+      has_properties(runtime, arguments_[0]) &&
+        delete_property(runtime, arguments_[0], arguments_[1]),
     )
     return OK
   },
   ordinary_own_property_keys(runtime, destination, arguments_) {
     if (!has_property_list(runtime.memory, arguments_[0]))
       return throw_error(runtime, "TypeError", "Expected an object")
-    ordinary_own_property_keys(runtime.memory, destination, arguments_[0])
+    ordinary_own_property_keys(runtime, destination, arguments_[0])
     return OK
   },
   symbol_create(runtime, destination, arguments_) {
@@ -199,7 +187,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
   well_known_symbol(runtime, destination, arguments_) {
     const name = string(runtime, arguments_[0], "Symbol name")
     if (name === undefined) return THROW
-    const symbol = runtime.well_known_symbols?.get(name)
+    const symbol = runtime.realm.well_known_symbols.get(name)
     if (symbol === undefined)
       return throw_error(runtime, "TypeError", "Unknown well-known symbol")
     runtime.memory.copy_value(destination, symbol)
@@ -239,7 +227,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
       return throw_error(runtime, "TypeError", "Expected a string")
     if (!is_prototype(memory, arguments_[1]))
       return throw_error(runtime, "TypeError", "Expected an object")
-    create_string_object(memory, destination, arguments_[0], arguments_[1])
+    create_string_object(runtime, destination, arguments_[0], arguments_[1])
     return OK
   },
   array_create(runtime, destination, arguments_) {
@@ -247,7 +235,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
     if (length < 0) return THROW
     if (!is_prototype(runtime.memory, arguments_[1]))
       return throw_error(runtime, "TypeError", "Expected an object")
-    create_array(runtime.memory, destination, length, arguments_[1])
+    create_array(runtime, destination, length, arguments_[1])
     return OK
   },
   is_constructor({ memory }, destination, arguments_) {
@@ -256,9 +244,8 @@ const INTRINSICS: Record<string, Intrinsic> = {
       arguments_[0] !== undefined &&
       kind_of(memory, arguments_[0]) === KINDS.FUNCTION
     ) {
-      const reference = get_ref(memory, arguments_[0])
-      const code = memory.read_u32(reference + 8)
-      const flags = memory.read_u32(reference + 32)
+      const code = function_code_id(memory, arguments_[0])
+      const flags = function_flags(memory, arguments_[0])
       result =
         code === BUILTIN_CODE
           ? Boolean(flags & BUILTIN_CONSTRUCTOR)
@@ -283,7 +270,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
     write_boolean(
       memory,
       destination,
-      has_property(memory, arguments_[0], arguments_[1]),
+      has_property(runtime, arguments_[0], arguments_[1]),
     )
     return OK
   },
@@ -291,7 +278,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
     const { memory } = runtime
     if (!is_object(memory, arguments_[0]))
       return throw_error(runtime, "TypeError", "Expected an object")
-    if (!delete_property(memory, arguments_[0], arguments_[1]))
+    if (!delete_property(runtime, arguments_[0], arguments_[1]))
       return throw_error(
         runtime,
         "TypeError",
@@ -305,7 +292,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
     if (!is_object(memory, arguments_[0]))
       return throw_error(runtime, "TypeError", "Expected an object")
     get_own_property_descriptor(
-      memory,
+      runtime,
       destination,
       arguments_[0],
       arguments_[1],
@@ -344,14 +331,14 @@ const INTRINSICS: Record<string, Intrinsic> = {
       key = memory.alloc_root(),
       value = memory.alloc_root()
     try {
-      create_function(memory, result, BUILTIN_CODE, 0)
+      create_function(runtime, result, BUILTIN_CODE, 0)
       set_builtin_steps(memory, result, behaviour, false)
       write_string(memory, key, "length")
       write_number(memory, value, length)
-      define_property(memory, result, key, value, 4)
+      define_property(runtime, result, key, value, 4)
       write_string(memory, key, "name")
       write_string(memory, value, name)
-      define_property(memory, result, key, value, 4)
+      define_property(runtime, result, key, value, 4)
       memory.copy_value(destination, result)
       return OK
     } finally {
@@ -367,18 +354,18 @@ const INTRINSICS: Record<string, Intrinsic> = {
       name = memory.alloc_root(),
       empty = memory.alloc_root()
     try {
-      create_object(memory, object)
+      create_object(runtime, object)
       set_prototype(memory, object, arguments_[0])
       const names = arguments_[1]
       if (names !== undefined && tag_of(memory, names) !== TAGS.UNDEFINED) {
         if (kind_of(memory, names) !== KINDS.ARRAY)
           return throw_error(runtime, "TypeError", "Expected slot names")
         write_string(memory, key, "length")
-        get_property(memory, name, names, key)
+        get_property(runtime, name, names, key)
         const count = read_number(memory, name)
         for (let index = 0; index < count; index++) {
           write_string(memory, key, String(index))
-          get_property(memory, name, names, key)
+          get_property(runtime, name, names, key)
           if (!is_string(memory, name))
             return throw_error(runtime, "TypeError", "Expected a slot name")
           if (
@@ -440,10 +427,7 @@ const INTRINSICS: Record<string, Intrinsic> = {
     const { memory } = runtime
     if (!has_property_list(memory, arguments_[0]))
       return throw_error(runtime, "TypeError", "Expected an ordinary object")
-    const reference = get_ref(memory, arguments_[0])
-    const prototype = memory.read_u32(
-      reference + (kind_of(memory, arguments_[0]) === KINDS.FUNCTION ? 28 : 12),
-    )
+    const prototype = object_prototype_reference(memory, arguments_[0])
     if (prototype) set_ref(memory, destination, prototype)
     else write_null(memory, destination)
     return OK
