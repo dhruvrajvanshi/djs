@@ -26,6 +26,7 @@ import type { OperationOptions } from "../../runtime/scheduler.ts"
 import {
   read_string,
   slice_string,
+  string_from_utf16,
   string_code_unit_at,
   string_length,
   write_string,
@@ -265,6 +266,20 @@ const INTRINSICS: Record<string, Intrinsic> = {
     if (end < start || end > string_length(memory, arguments_[0]))
       return throw_error(runtime, "RangeError", "Invalid string range")
     slice_string(memory, destination, arguments_[0], start, end)
+    return OK
+  },
+  string_from_utf16(runtime, destination, arguments_) {
+    const { memory } = runtime
+    const buffer = arguments_[0]
+    if (buffer === undefined || kind_of(memory, buffer) !== KINDS.BYTE_BUFFER)
+      return throw_error(runtime, "TypeError", "Expected a byte buffer")
+    const start = integer(runtime, arguments_[1], "start")
+    if (start < 0) return THROW
+    const end = integer(runtime, arguments_[2], "end")
+    if (end < 0) return THROW
+    if (end < start || end * 2 > byte_buffer_view(memory, buffer).length)
+      return throw_error(runtime, "RangeError", "Invalid code unit range")
+    string_from_utf16(memory, destination, buffer, start, end)
     return OK
   },
   string_create(runtime, destination, arguments_) {

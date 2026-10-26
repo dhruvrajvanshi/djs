@@ -2,7 +2,7 @@ import { panic } from "../../utils.ts"
 import type { Memory } from "../storage/memory.ts"
 import type { HeapRef, Root } from "../storage/value.ts"
 import { get_ref, set_ref } from "../storage/value.ts"
-import { HEADER, KINDS, STRING } from "../storage/layout.ts"
+import { BYTE_BUFFER, HEADER, KINDS, STRING } from "../storage/layout.ts"
 
 export function write_string(memory: Memory, root: Root, text: string) {
   memory.assert_root(root)
@@ -81,6 +81,26 @@ export function slice_string(
   // Allocation may move the source; read its root afterwards, before replacing
   // an aliased destination. copyWithin also handles overlapping storage safely.
   const source = get_ref(memory, value) + STRING.UNITS + start * 2
+  memory.heap.copyWithin(
+    reference + STRING.UNITS,
+    source,
+    source + (end - start) * 2,
+  )
+  memory.write_u32(reference + STRING.LENGTH, end - start)
+  set_ref(memory, destination, reference)
+}
+
+/** Copies code units `start` to `end` of a byte buffer holding little-endian UTF-16. */
+export function string_from_utf16(
+  memory: Memory,
+  destination: Root,
+  buffer: Root,
+  start: number,
+  end: number,
+) {
+  const reference = memory.allocate(KINDS.STRING, 4 + (end - start) * 2)
+  // Allocation may move the buffer; read its root afterwards.
+  const source = get_ref(memory, buffer) + BYTE_BUFFER.BYTES + start * 2
   memory.heap.copyWithin(
     reference + STRING.UNITS,
     source,

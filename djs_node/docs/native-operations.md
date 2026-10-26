@@ -89,6 +89,7 @@ These are implemented in [vm/semantics/slots.ts](../vm/semantics/slots.ts). Rule
 | `string_slice(s, start, end)` | — | The code units from `start` to `end` |
 | `string_from_code_unit(unit)` | — | A one-code-unit string |
 | `byte_buffer(length)` | — | A byte buffer for I/O |
+| `string_from_utf16(buffer, start, end)` | — | A string of code units `start` to `end` of a byte buffer holding little-endian UTF-16. Lets JS decoders build a string in one step instead of appending character by character |
 
 ## Calls and jobs
 

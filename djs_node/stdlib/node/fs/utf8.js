@@ -1,7 +1,9 @@
-import { string_from_code_unit as character } from "djs:native"
+import { byte_buffer, string_from_utf16 } from "djs:native"
 
 export default class Utf8Decoder {
-  #text = ""
+  // Decoded little-endian UTF-16, turned into a string once in finish().
+  #units = byte_buffer(4096)
+  #count = 0
   #point = 0
   #needed = 0
   #seen = 0
@@ -14,7 +16,7 @@ export default class Utf8Decoder {
     while (index < length) {
       byte = bytes[index]
       if (this.#needed === 0) {
-        if (byte < 0x80) this.#text = this.#text + character(byte)
+        if (byte < 0x80) this.#push(byte)
         else if (byte >= 0xc2 && byte <= 0xdf) {
           this.#point = byte & 0x1f
           this.#needed = 1
@@ -28,7 +30,7 @@ export default class Utf8Decoder {
           this.#needed = 3
           if (byte === 0xf0) this.#lower = 0x90
           if (byte === 0xf4) this.#upper = 0x8f
-        } else this.#text = this.#text + "\ufffd"
+        } else this.#push(0xfffd)
         index = index + 1
       } else if (byte < this.#lower || byte > this.#upper) {
         // Reprocess this byte as a possible new sequence starter.
@@ -36,7 +38,7 @@ export default class Utf8Decoder {
         this.#seen = 0
         this.#lower = 0x80
         this.#upper = 0xbf
-        this.#text = this.#text + "\ufffd"
+        this.#push(0xfffd)
       } else {
         this.#lower = 0x80
         this.#upper = 0xbf
@@ -44,14 +46,11 @@ export default class Utf8Decoder {
         this.#seen = this.#seen + 1
         index = index + 1
         if (this.#seen === this.#needed) {
-          if (this.#point <= 0xffff)
-            this.#text = this.#text + character(this.#point)
+          if (this.#point <= 0xffff) this.#push(this.#point)
           else {
             point = this.#point - 0x10000
-            this.#text =
-              this.#text +
-              character(0xd800 + (point - (point % 1024)) / 1024) +
-              character(0xdc00 + (point & 0x3ff))
+            this.#push(0xd800 + (point - (point % 1024)) / 1024)
+            this.#push(0xdc00 + (point & 0x3ff))
           }
           this.#needed = 0
           this.#seen = 0
@@ -61,11 +60,24 @@ export default class Utf8Decoder {
   }
 
   finish() {
-    if (this.#needed !== 0) this.#text = this.#text + "\ufffd"
+    if (this.#needed !== 0) this.#push(0xfffd)
     this.#needed = 0
     this.#seen = 0
     this.#lower = 0x80
     this.#upper = 0xbf
-    return this.#text
+    return string_from_utf16(this.#units, 0, this.#count)
+  }
+
+  #push(unit) {
+    const index = this.#count * 2
+    if (index === this.#units.length) {
+      const grown = byte_buffer(index * 2)
+      for (let offset = 0; offset < index; offset = offset + 1)
+        grown[offset] = this.#units[offset]
+      this.#units = grown
+    }
+    this.#units[index] = unit & 0xff
+    this.#units[index + 1] = unit >>> 8
+    this.#count = this.#count + 1
   }
 }
