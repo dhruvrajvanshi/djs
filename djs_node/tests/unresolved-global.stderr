@@ -1,1 +1,2 @@
-Error: ReferenceError: missing is not defined
+ReferenceError: missing is not defined
+    at unresolved-global.js:1:13

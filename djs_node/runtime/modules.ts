@@ -1,6 +1,9 @@
 import type { Brand } from "../utils.ts"
 import type { Root } from "../vm/storage/value.ts"
 import {
+  TAGS,
+  kind_of,
+  tag_of,
   write_boolean,
   write_null,
   write_number,
@@ -10,9 +13,12 @@ import type { ExportBinding, CompiledModule } from "../compiler/compile.ts"
 import type { Runtime } from "./runtime.ts"
 import { resolve, isAbsolute } from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
-import { compile_module } from "../compiler/compile.ts"
+import { compile_module, located_message } from "../compiler/compile.ts"
 import { read_string, write_string } from "../vm/records/string.ts"
 import { create_environment } from "../vm/records/environment.ts"
+import { is_object } from "../vm/records/object.ts"
+import { get_property } from "../vm/semantics/properties.ts"
+import { KINDS } from "../vm/storage/layout.ts"
 import { create_function } from "../vm/semantics/objects.ts"
 import { load_binding, initialize_binding } from "../vm/semantics/bindings.ts"
 import { declare_slot, get_slot } from "../vm/semantics/slots.ts"
@@ -22,7 +28,10 @@ import {
   take_exception,
 } from "../vm/semantics/errors.ts"
 import { to_string } from "../vm/semantics/operations.ts"
-import { NATIVE_MODULES, NATIVE_CODE } from "../vm/execution/native_operations.ts"
+import {
+  NATIVE_MODULES,
+  NATIVE_CODE,
+} from "../vm/execution/native_operations.ts"
 import { panic } from "../utils.ts"
 import type { HostError } from "../host/node.ts"
 import { FIBER_STATE } from "../vm/execution/fiber.ts"
@@ -159,7 +168,9 @@ function link_code(runtime: Runtime, unit: CompiledModule) {
 export function resolve_specifier(specifier: string, importer: string) {
   if (specifier.startsWith("node:") || specifier.startsWith("djs:")) {
     if (!NATIVE_MODULES.has(specifier) && !BUILTINS.has(specifier))
-      throw new SyntaxError(`Unsupported builtin module: ${specifier}`)
+      throw Object.assign(new Error(`No such built-in module: ${specifier}`), {
+        code: "ERR_UNKNOWN_BUILTIN_MODULE",
+      })
     return specifier
   }
   if (specifier.startsWith("file:")) return new URL(specifier).href
@@ -264,13 +275,19 @@ export async function load_module(
   const imports = runtime.loader.scopes[scope_id].import_bindings
   try {
     for (const declaration of unit.imports) {
-      const target = await load_module(
-        runtime,
-        resolve_specifier(
+      let specifier
+      try {
+        specifier = resolve_specifier(
           declaration.specifier,
           builtin ? builtin.href : identity,
-        ),
-      )
+        )
+      } catch (error) {
+        error.message = located_message(path, source, [
+          { message: error.message, span: declaration.span },
+        ])
+        throw error
+      }
+      const target = await load_module(runtime, specifier)
       module.dependencies.push(target.id)
       for (const binding of declaration.bindings) {
         const slot = target.exports.get(binding.imported)
@@ -358,14 +375,14 @@ export async function evaluate_module(
     if (settle_with_promise(runtime, fiber, promise) === THROW) {
       take_exception(runtime, module.error)
       guest_error = true
-      throw new Error(to_string(runtime, module.error))
+      throw new UncaughtException(error_report(runtime, module.error))
     }
     run_task(runtime, fiber)
     await run_event_loop(runtime, promise)
     if (promise_state(runtime, promise) === "rejected") {
       get_slot(runtime, module.error, promise, "[[PromiseResult]]")
       guest_error = true
-      throw new Error(to_string(runtime, module.error))
+      throw new UncaughtException(error_report(runtime, module.error))
     }
     module.status = MODULE_STATE.EVALUATED
     // Module evaluation fulfills with undefined; exports live in its environment.
@@ -378,6 +395,31 @@ export async function evaluate_module(
   } finally {
     if (fiber) dispose_fiber(runtime, fiber)
     memory.free_root(promise)
+  }
+}
+
+/** A guest exception that escaped module evaluation. */
+export class UncaughtException extends Error {}
+
+// The value's stack if it has one, since that already starts with its message.
+function error_report(runtime: Runtime, value: Root) {
+  const { memory } = runtime
+  if (!is_object(memory, value)) return to_string(runtime, value)
+  const key = memory.alloc_root(),
+    stack = memory.alloc_root()
+  try {
+    write_string(memory, key, "stack")
+    const accessor = get_property(runtime, stack, value, key)
+    if (
+      !accessor &&
+      tag_of(memory, stack) === TAGS.REF &&
+      kind_of(memory, stack) === KINDS.STRING
+    )
+      return read_string(memory, stack)
+    return to_string(runtime, value)
+  } finally {
+    memory.free_root(key)
+    memory.free_root(stack)
   }
 }
 

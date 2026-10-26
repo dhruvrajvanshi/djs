@@ -15,6 +15,8 @@ export class Runtime {
   readonly scheduler = new Scheduler()
   readonly host: NodeHost = create_node_host()
   fibers: Fiber[] = []
+  /** Fibers being run, innermost last. A fiber runs others for nested calls. */
+  running: Fiber[] = []
   /** The value of the THROW status most recently returned. */
   readonly pending_exception: Root
 

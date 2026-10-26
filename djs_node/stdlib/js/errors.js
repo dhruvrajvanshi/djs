@@ -6,6 +6,7 @@ import {
   attributes,
   ordinary_object_create,
   create_builtin_function,
+  capture_stack,
 } from "djs:native"
 import {
   to_string,
@@ -43,15 +44,19 @@ const ErrorPrototype = well_known("%Error.prototype%", ordinary_object_create, {
   toString() {
     if (!is_object(this))
       throw new TypeError("Error.prototype.toString requires an object")
-    const name_value = this.name
-    const name = name_value === undefined ? "Error" : to_string(name_value)
-    const message_value = this.message
-    const message = message_value === undefined ? "" : to_string(message_value)
-    if (name === "") return message
-    if (message === "") return name
-    return name + ": " + message
+    return error_to_string(this)
   },
 })
+
+function error_to_string(error) {
+  const name_value = error.name
+  const name = name_value === undefined ? "Error" : to_string(name_value)
+  const message_value = error.message
+  const message = message_value === undefined ? "" : to_string(message_value)
+  if (name === "") return message
+  if (message === "") return name
+  return name + ": " + message
+}
 
 // 20.5.5.5 TypeError, structured as in 20.5.6.1 The NativeError Constructors
 export const TypeError = well_known("%TypeError%", create_builtin_function, {
@@ -211,5 +216,10 @@ function create_error(new_target, default_prototype, message, options) {
   // 20.5.9.1 InstallErrorCause
   if (is_object(options) && "cause" in options)
     create_non_enumerable_data_property_or_throw(error, "cause", options.cause)
+  create_non_enumerable_data_property_or_throw(
+    error,
+    "stack",
+    error_to_string(error) + capture_stack(),
+  )
   return error
 }

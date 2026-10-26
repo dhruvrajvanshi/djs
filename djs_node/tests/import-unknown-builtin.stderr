@@ -1,1 +1,5 @@
-SyntaxError: Unsupported builtin module: node:unknown
+Error: import-unknown-builtin.js:1:1: No such built-in module: node:unknown
+1|  import value from "node:unknown";
+    ^~~
+2|  console.log("unreachable");
+3|  

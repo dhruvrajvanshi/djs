@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url"
 import { compile_module } from "./compiler/compile.ts"
 import { disassemble_module } from "./compiler/disassemble.ts"
 import { Runtime } from "./runtime/runtime.ts"
-import { run_module } from "./runtime/modules.ts"
+import { run_module, UncaughtException } from "./runtime/modules.ts"
 import { bootstrap } from "./runtime/bootstrap.ts"
 
 export { Runtime, run_module, bootstrap }
@@ -58,7 +58,11 @@ if (
   try {
     await main()
   } catch (error) {
-    process.stderr.write(`${error.name}: ${error.message}\n`)
+    process.stderr.write(
+      error instanceof UncaughtException
+        ? `${error.message}\n`
+        : `${error.name}: ${error.message}\n`,
+    )
     process.exitCode = error.exit_code ?? 1
   }
 }

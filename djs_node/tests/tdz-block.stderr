@@ -1,1 +1,2 @@
-Error: ReferenceError: Cannot access binding before initialization
+ReferenceError: Cannot access binding before initialization
+    at tdz-block.js:1:30

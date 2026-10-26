@@ -1,1 +1,3 @@
-Error: TypeError: handler
+TypeError: handler
+    at uncaught-handler-error.js:1:44
+    at djs:stdlib/js/promise.js:260:23

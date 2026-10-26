@@ -1,1 +1,2 @@
-Error: TypeError: Cannot assign to an imported binding
+TypeError: Cannot assign to an imported binding
+    at import-assignment.js:1:60

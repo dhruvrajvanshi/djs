@@ -1,1 +1,2 @@
-Error: TypeError: Assignment to constant binding
+TypeError: Assignment to constant binding
+    at const-assignment.js:1:18

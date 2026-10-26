@@ -138,6 +138,8 @@ export interface FunctionDescriptor {
   block_binding_flags: boolean[][]
   slot_count: number
   handlers: ExceptionHandler[]
+  /** The source offset each instruction was compiled from. */
+  source_offsets: number[]
   bytecode: Uint8Array
 }
 
@@ -187,7 +189,7 @@ export interface CompiledModule {
   path: string
   functions: FunctionDescriptor[]
   literals: Literal[]
-  imports: { specifier: string; bindings: ImportBinding[] }[]
+  imports: { specifier: string; bindings: ImportBinding[]; span: Span }[]
   exports: ExportBinding[]
   realm: RealmDeclaration[]
   object_templates: ObjectTemplate[]
@@ -196,6 +198,8 @@ export interface CompiledModule {
   classes: ClassDescriptor[]
   /** Slot names passed to has_slot, get_slot and set_slot. */
   slot_names: string[]
+  /** The source offset of each line's first character. */
+  line_starts: number[]
   entry: FunctionId
 }
 
@@ -232,6 +236,7 @@ export function compile_module(
     array_holes: [],
     classes: [],
     slot_names: [],
+    line_starts: line_starts(source),
     entry: 0 as FunctionId,
   }
   const state: CompilerState = {
@@ -263,6 +268,7 @@ export function compile_module(
     if (fn.rest) Object.freeze(fn.rest)
     fn.handlers.forEach(Object.freeze)
     Object.freeze(fn.handlers)
+    Object.freeze(fn.source_offsets)
     // A typed array cannot be frozen. Expose a fresh copy so compilation output
     // remains immutable even if a consumer modifies its instruction view.
     const bytecode = fn.bytecode
@@ -299,6 +305,7 @@ export function compile_module(
     "object_templates",
     "array_holes",
     "classes",
+    "line_starts",
   ])
     Object.freeze(unit[key as keyof CompiledModule])
   return Object.freeze(unit)
@@ -336,19 +343,33 @@ function init_import_meta(
   init_binding(fn, declare_binding(scope, IMPORT_META, true), meta)
 }
 
+function line_starts(source: string) {
+  const starts = [0]
+  for (let i = 0; i < source.length; i++)
+    if (source[i] === "\n") starts.push(i + 1)
+  return starts
+}
+
 function located_error(
   path: string,
   source: string,
   errors: readonly SourceDiagnostic[],
 ): SyntaxError {
-  const message = [...errors]
+  return new SyntaxError(located_message(path, source, errors))
+}
+
+export function located_message(
+  path: string,
+  source: string,
+  errors: readonly SourceDiagnostic[],
+) {
+  return [...errors]
     .sort((a, b) => a.span!.start - b.span!.start)
     .map((error) => {
       const [line, col] = offset_to_line_and_col(source, error.span!.start)
       return `${path}:${line}:${col}: ${error.message}\n${preview_lines(source, error.span!, false)}`
     })
     .join("\n\n")
-  return new SyntaxError(message)
 }
 
 function unsupported(
@@ -380,6 +401,7 @@ function allocate(fn: FunctionBuilder, count: number = 1) {
 function emit(fn: FunctionBuilder, opcode: number, ...operands: number[]) {
   const index = fn.instructions.length
   fn.instructions.push([opcode, ...operands])
+  fn.source_offsets.push(fn.source_offset)
   return index
 }
 
@@ -631,6 +653,7 @@ function prepare_statements(
         state.unit.imports.push({
           specifier: decode_string(stmt.module_specifier, stmt),
           bindings,
+          span: stmt.span,
         })
         break
       }
@@ -653,6 +676,7 @@ function prepare_statements(
         state.unit.imports.push({
           specifier: decode_string(stmt.module_specifier, stmt),
           bindings,
+          span: stmt.span,
         })
         break
       }
@@ -689,6 +713,9 @@ export interface FunctionBuilder {
   slot_count: number
   instructions: Instruction[]
   handlers: ExceptionHandler[]
+  /** Where the code being compiled starts in the source. */
+  source_offset: number
+  source_offsets: number[]
   parent: FunctionBuilder | null
   scope: Scope | null
   flags: number
@@ -756,6 +783,8 @@ function compile_function(
     slot_count: 0,
     instructions: [],
     handlers: [],
+    source_offset: parent?.source_offset ?? 0,
+    source_offsets: [],
     parent,
     scope: null,
     flags: options.flags ?? 0,
@@ -827,6 +856,7 @@ function compile_function(
     arguments_slot: fn.arguments_slot,
     slot_count: fn.slot_count,
     handlers: fn.handlers,
+    source_offsets: fn.source_offsets,
     bytecode: encode_instructions(fn.instructions),
   }
   state.unit.functions[fn.id] = descriptor
@@ -902,6 +932,31 @@ function compile_statements(
 }
 
 function compile_stmt(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  stmt: Stmt | { kind: "Block"; block: import("djs_ast").Block },
+): void {
+  if (!("span" in stmt)) return compile_stmt_kind(state, fn, scope, stmt)
+  compile_at(fn, stmt, () => compile_stmt_kind(state, fn, scope, stmt))
+}
+
+/** Attributes the instructions `compile` emits to `node`. */
+function compile_at<T>(
+  fn: FunctionBuilder,
+  node: { span: Span },
+  compile: () => T,
+) {
+  const outer = fn.source_offset
+  fn.source_offset = node.span.start
+  try {
+    return compile()
+  } finally {
+    fn.source_offset = outer
+  }
+}
+
+function compile_stmt_kind(
   state: CompilerState,
   fn: FunctionBuilder,
   scope: Scope,
@@ -1601,17 +1656,19 @@ function chain_member(
   expr: PropExpr | IndexExpr | CallExpr,
   chain: Chain,
 ): number {
-  if (expr.kind === "Call") return compile_call(state, fn, scope, expr, chain)
-  const reference = property_reference(state, fn, scope, expr, chain)
-  const dst = allocate(fn)
-  emit(
-    fn,
-    reference.private ? OP.GET_PRIVATE : OP.GET_PROP,
-    dst,
-    reference.object,
-    reference.key,
-  )
-  return dst
+  return compile_at(fn, expr, () => {
+    if (expr.kind === "Call") return compile_call(state, fn, scope, expr, chain)
+    const reference = property_reference(state, fn, scope, expr, chain)
+    const dst = allocate(fn)
+    emit(
+      fn,
+      reference.private ? OP.GET_PRIVATE : OP.GET_PROP,
+      dst,
+      reference.object,
+      reference.key,
+    )
+    return dst
+  })
 }
 
 function compile_call(
@@ -1718,6 +1775,15 @@ function property_reference(
 }
 
 function compile_expr(
+  state: CompilerState,
+  fn: FunctionBuilder,
+  scope: Scope,
+  expr: Expr,
+): number {
+  return compile_at(fn, expr, () => compile_expr_kind(state, fn, scope, expr))
+}
+
+function compile_expr_kind(
   state: CompilerState,
   fn: FunctionBuilder,
   scope: Scope,

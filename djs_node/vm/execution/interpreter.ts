@@ -1277,11 +1277,16 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
 }
 
 export function run_task(runtime: Runtime, fiber: Fiber) {
-  while (
-    fiber.status === FIBER_STATE.READY ||
-    fiber.status === FIBER_STATE.RUNNING
-  )
-    run_interpreter(runtime, fiber)
+  runtime.running.push(fiber)
+  try {
+    while (
+      fiber.status === FIBER_STATE.READY ||
+      fiber.status === FIBER_STATE.RUNNING
+    )
+      run_interpreter(runtime, fiber)
+  } finally {
+    runtime.running.pop()
+  }
   if (
     fiber.settle &&
     (fiber.status === FIBER_STATE.DONE || fiber.status === FIBER_STATE.FAILED)

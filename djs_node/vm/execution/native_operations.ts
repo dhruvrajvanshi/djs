@@ -13,7 +13,10 @@ import {
   write_undefined,
 } from "../storage/value.ts"
 import { KINDS } from "../storage/layout.ts"
-import { NATIVE_MARKERS } from "../../compiler/bytecode.ts"
+import { INSTRUCTION_BYTES, NATIVE_MARKERS } from "../../compiler/bytecode.ts"
+import type { CompiledModule } from "../../compiler/compile.ts"
+import type { Frame } from "./fiber.ts"
+import { fileURLToPath } from "node:url"
 import type { Runtime } from "../../runtime/runtime.ts"
 import type { HostError } from "../../host/node.ts"
 import {
@@ -534,6 +537,23 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     else write_null(memory, destination)
     return OK
   },
+  /**
+   * The `    at ...` lines of the stack trace for the code that's running,
+   * starting at the innermost frame outside the stdlib.
+   */
+  capture_stack(runtime, destination) {
+    const lines = []
+    for (let i = runtime.running.length - 1; i >= 0; i--) {
+      for (let frame = runtime.running[i].frame; frame; frame = frame.caller) {
+        const { unit } = runtime.loader.code[frame.code_id]
+        if (lines.length === 0 && unit.path.startsWith(STDLIB_DIRECTORY))
+          continue
+        lines.push(`\n    at ${frame_location(unit, frame)}`)
+      }
+    }
+    write_string(runtime.memory, destination, lines.join(""))
+    return OK
+  },
   write_stdout(runtime, destination, [text]) {
     const { memory } = runtime
     if (!is_string(memory, text))
@@ -705,6 +725,25 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
         ),
     ]),
   ),
+}
+
+const STDLIB_DIRECTORY = fileURLToPath(
+  new URL("../../stdlib/", import.meta.url),
+)
+
+function frame_location(unit: CompiledModule, frame: Frame) {
+  const fn = unit.functions[frame.function_id]
+  // A caller's pc is past its call instruction, so step back into it.
+  const instruction = Math.max(frame.pc / INSTRUCTION_BYTES - 1, 0)
+  const offset = fn.source_offsets[instruction]
+  let line = 0
+  while (unit.line_starts[line + 1] <= offset) line++
+  const path = unit.path.startsWith(STDLIB_DIRECTORY)
+    ? `djs:stdlib/${unit.path.slice(STDLIB_DIRECTORY.length)}`
+    : unit.path
+  const location = `${path}:${line + 1}:${offset - unit.line_starts[line] + 1}`
+  if (frame.function_id === unit.entry || fn.name === "") return location
+  return `${fn.name} (${location})`
 }
 
 const NATIVE_OPERATION_HANDLERS = Object.freeze(
