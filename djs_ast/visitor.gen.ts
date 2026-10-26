@@ -158,6 +158,16 @@ export class ASTVisitorBase implements ASTVisitor {
         this.visit_type_annotation(stmt.type_annotation)
         break
       }
+      case "Interface": {
+        this.visit_ident(stmt.name)
+        for (const supertype of stmt.supertypes) {
+          this.visit_type_annotation(supertype)
+        }
+        for (const member of stmt.members) {
+          this.visit_type_member(member)
+        }
+        break
+      }
       case "Empty": {
         break
       }
@@ -488,6 +498,12 @@ export class ASTVisitorBase implements ASTVisitor {
         }
         break
       }
+      case "Object": {
+        for (const member of type_annotation.members) {
+          this.visit_type_member(member)
+        }
+        break
+      }
     }
   }
   visit_type_param(node: ast.TypeParam): void {
@@ -495,6 +511,12 @@ export class ASTVisitorBase implements ASTVisitor {
   }
   visit_func_type_param(node: ast.FuncTypeParam): void {
     this.visit_ident(node.label)
+
+    this.visit_type_annotation(node.type_annotation)
+  }
+  visit_type_member(node: ast.TypeMember): void {
+    this.visit_ident(node.name)
+
     this.visit_type_annotation(node.type_annotation)
   }
   visit_arrow_fn_body(arrow_fn_body: ast.ArrowFnBody): void {

@@ -11,6 +11,7 @@ import {
   Expr,
   ForInit,
   type FuncTypeParam,
+  type TypeMember,
   type Ident,
   type ImportSpecifier,
   type ExportSpecifier,
@@ -1205,6 +1206,13 @@ function parser_impl(
           text: "null",
         })
       }
+      case t.Undefined: {
+        const tok = advance()
+        return TypeAnnotation.Ident(tok.span, tok.leading_trivia, {
+          span: tok.span,
+          text: "undefined",
+        })
+      }
       case t.String: {
         const tok = advance()
         return TypeAnnotation.String(tok.span, tok.text)
@@ -1213,6 +1221,15 @@ function parser_impl(
         return parse_parenthesized_or_func_type_annotation()
       case t.LessThan:
         return parse_generic_func_type_annotation()
+      case t.LBrace: {
+        const start = self.current_token
+        const members = parse_type_members()
+        if (members === ERR) return ERR
+        return TypeAnnotation.Object(
+          Span.between(start, self.last_token ?? start),
+          members,
+        )
+      }
       default:
         emit_error("Expected a type annotation")
         return ERR
@@ -1284,10 +1301,73 @@ function parser_impl(
   function parse_func_type_param(): FuncTypeParam | Err {
     const label = parse_binding_ident()
     if (label === ERR) return ERR
+    const is_optional = at(t.Question)
+    if (is_optional) advance()
     if (expect(t.Colon) === ERR) return ERR
     const type_annotation = parse_type_annotation()
     if (type_annotation === ERR) return ERR
-    return { label, type_annotation }
+    return { label, is_optional, type_annotation }
+  }
+
+  function parse_type_members(): TypeMember[] | Err {
+    if (expect(t.LBrace) === ERR) return ERR
+    const members: TypeMember[] = []
+    while (!at(t.RBrace) && !at(t.EndOfFile)) {
+      const member = parse_type_member()
+      if (member === ERR) return ERR
+      members.push(member)
+      if (at(t.Semi) || at(t.Comma)) {
+        advance()
+      } else if (
+        !at(t.RBrace) &&
+        self.current_token.line === self.last_token?.line
+      ) {
+        emit_error("Expected ';' or '}'")
+        return ERR
+      }
+    }
+    if (expect(t.RBrace) === ERR) return ERR
+    return members
+  }
+
+  function parse_type_member(): TypeMember | Err {
+    const start = self.current_token
+    const is_readonly =
+      at_soft_keyword("readonly") &&
+      Token.is_valid_property_name(next_token())
+    if (is_readonly) advance()
+    const name = parse_member_ident_name()
+    if (name === ERR) return ERR
+    const is_optional = at(t.Question)
+    if (is_optional) advance()
+    let type_annotation: TypeAnnotation
+    if (at(t.LParen)) {
+      const params_start = advance()
+      const params = parse_comma_separated_list(t.RParen, parse_func_type_param)
+      if (params === ERR) return ERR
+      if (expect(t.RParen) === ERR) return ERR
+      if (expect(t.Colon) === ERR) return ERR
+      const returns = parse_type_annotation()
+      if (returns === ERR) return ERR
+      type_annotation = TypeAnnotation.Func(
+        Span.between(params_start, returns),
+        /* type_params */ [],
+        params,
+        returns,
+      )
+    } else {
+      if (expect(t.Colon) === ERR) return ERR
+      const annotation = parse_type_annotation()
+      if (annotation === ERR) return ERR
+      type_annotation = annotation
+    }
+    return {
+      span: Span.between(start, type_annotation),
+      name,
+      is_readonly,
+      is_optional,
+      type_annotation,
+    }
   }
 
   function parse_comma_separated_list<T>(
@@ -1771,7 +1851,8 @@ function parser_impl(
         next_is(t.Let) ||
         next_is(t.Const) ||
         (flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
-          next_is_soft_keyword("type")))
+          (next_is_soft_keyword("type") ||
+            next_is_soft_keyword("interface"))))
     ) {
       const export_token = advance()
       return parse_stmt(export_token)
@@ -1801,6 +1882,12 @@ function parser_impl(
           self.current_token.text === "type"
         ) {
           return parse_type_decl(export_token)
+        } else if (
+          flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+          self.current_token.text === "interface" &&
+          next_is(t.Ident)
+        ) {
+          return parse_interface_decl(export_token)
         } else {
           return parse_expr_stmt()
         }
@@ -2011,6 +2098,30 @@ function parser_impl(
       export_token !== null,
       ident,
       type_annotation,
+    )
+  }
+
+  function parse_interface_decl(export_token: Token | null): Stmt | Err {
+    const start = advance()
+    assert.equal(t.Ident, start.kind)
+    assert.equal(start.text, "interface")
+    const name = parse_ident()
+    if (name === ERR) return ERR
+    let supertypes: TypeAnnotation[] = []
+    if (at(t.Extends)) {
+      advance()
+      const list = parse_comma_separated_list(t.LBrace, parse_type_annotation)
+      if (list === ERR) return ERR
+      supertypes = list
+    }
+    const members = parse_type_members()
+    if (members === ERR) return ERR
+    return Stmt.Interface(
+      Span.between(export_token ?? start, self.last_token ?? start),
+      export_token !== null,
+      name,
+      supertypes,
+      members,
     )
   }
 

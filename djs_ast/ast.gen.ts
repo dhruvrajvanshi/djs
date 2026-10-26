@@ -50,6 +50,7 @@ export type Stmt =
   | ExportNamedStmt
   | LabeledStmt
   | TypeAliasStmt
+  | InterfaceStmt
   | EmptyStmt
 export class ExprStmt {
   constructor(
@@ -418,6 +419,24 @@ export class TypeAliasStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class InterfaceStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly is_exported: boolean,
+    readonly name: Ident,
+    readonly supertypes: readonly TypeAnnotation[],
+    readonly members: readonly TypeMember[],
+  ) {}
+
+  get kind(): "Interface" {
+    return "Interface"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class EmptyStmt {
   constructor(readonly span: Span) {}
 
@@ -540,6 +559,15 @@ export const Stmt = {
     type_annotation: TypeAnnotation,
   ): TypeAliasStmt =>
     new TypeAliasStmt(span, is_exported, name, type_annotation),
+
+  Interface: (
+    span: Span,
+    is_exported: boolean,
+    name: Ident,
+    supertypes: readonly TypeAnnotation[],
+    members: readonly TypeMember[],
+  ): InterfaceStmt =>
+    new InterfaceStmt(span, is_exported, name, supertypes, members),
 
   Empty: (span: Span): EmptyStmt => new EmptyStmt(span),
 } as const
@@ -1665,6 +1693,7 @@ export type TypeAnnotation =
   | StringTypeAnnotation
   | FuncTypeAnnotation
   | QualifiedTypeAnnotation
+  | ObjectTypeAnnotation
 export class IdentTypeAnnotation {
   constructor(
     readonly span: Span,
@@ -1791,6 +1820,21 @@ export class QualifiedTypeAnnotation {
     return sexpr_to_string(type_annotation_to_sexpr(this))
   }
 }
+export class ObjectTypeAnnotation {
+  constructor(
+    readonly span: Span,
+
+    readonly members: readonly TypeMember[],
+  ) {}
+
+  get kind(): "Object" {
+    return "Object"
+  }
+
+  toString(): string {
+    return sexpr_to_string(type_annotation_to_sexpr(this))
+  }
+}
 
 export const TypeAnnotation = {
   Ident: (
@@ -1837,10 +1881,22 @@ export const TypeAnnotation = {
     head: Ident,
     tail: readonly Ident[],
   ): QualifiedTypeAnnotation => new QualifiedTypeAnnotation(span, head, tail),
+
+  Object: (span: Span, members: readonly TypeMember[]): ObjectTypeAnnotation =>
+    new ObjectTypeAnnotation(span, members),
 } as const
 
 export interface FuncTypeParam {
   readonly label: Ident
+  readonly is_optional: boolean
+  readonly type_annotation: TypeAnnotation
+}
+
+export interface TypeMember {
+  readonly span: Span
+  readonly name: Ident
+  readonly is_readonly: boolean
+  readonly is_optional: boolean
   readonly type_annotation: TypeAnnotation
 }
 

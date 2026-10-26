@@ -76,6 +76,12 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     name: Ident,
     type_annotation: () => TypeAnnotation,
   },
+  Interface: {
+    is_exported: "boolean",
+    name: Ident,
+    supertypes: List(() => TypeAnnotation),
+    members: List(() => TypeMember),
+  },
   Empty: {},
 })
 
@@ -181,6 +187,7 @@ export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
     head: Ident,
     tail: List(Ident),
   },
+  Object: { members: List(() => TypeMember) },
 })
 
 export const Pattern = Enum("Pattern", ["span", "visit"], {
@@ -198,6 +205,14 @@ export const Pattern = Enum("Pattern", ["span", "visit"], {
 
 const FuncTypeParam = Struct("FuncTypeParam", [], {
   label: Ident,
+  is_optional: "boolean",
+  type_annotation: () => TypeAnnotation,
+})
+/** A property or method signature; a method's type is a Func annotation. */
+const TypeMember = Struct("TypeMember", ["span"], {
+  name: Ident,
+  is_readonly: "boolean",
+  is_optional: "boolean",
   type_annotation: () => TypeAnnotation,
 })
 const Class = Struct("Class", ["span"], {
@@ -407,6 +422,7 @@ const ast_items = [
   Expr,
   TypeAnnotation,
   FuncTypeParam,
+  TypeMember,
   ObjectLiteralEntry,
   ObjectKey,
   Param,

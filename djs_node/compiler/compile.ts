@@ -978,6 +978,7 @@ function compile_stmt_kind(
   }
   switch (stmt.kind) {
     case "Empty":
+    case "Interface":
       return
     case "Func":
       unsupported(stmt, "function declarations outside blocks")
