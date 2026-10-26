@@ -14,7 +14,7 @@ operations the VM provides.
 | [stdlib.md](stdlib.md) | You are changing or adding a builtin, such as `Array.prototype.map` |
 | [realm.md](realm.md) | You want to know how the stdlib is loaded, or you are changing something the VM relies on |
 | [object-model.md](object-model.md) | You want to know how the VM represents objects: arrays and `String` objects, internal slots, built-in functions |
-| [native-operations.md](native-operations.md) | You want to know exactly what a `djs:native` or `djs:host` function does |
+| [native-operations.md](native-operations.md) | You are using a `djs:native` or `djs:host` function |
 
 ## Where things are
 
@@ -67,7 +67,7 @@ The stdlib follows the [ECMAScript specification](https://tc39.es/ecma262/)
 | Builtins | `stdlib/js/*.js` | One declaration per well-known intrinsic |
 | Support | [`stdlib/js/support.js`](../stdlib/js/support.js) | Helpers shared by builtins that are not spec operations |
 | Abstract operations | `djs:abstract` ([`stdlib/js/abstract.js`](../stdlib/js/abstract.js)) | Spec abstract operations, named after the spec |
-| Native modules | `djs:native`, `djs:host` | Operations JavaScript cannot express, in [`vm/execution/intrinsics.ts`](../vm/execution/intrinsics.ts) |
+| Native modules | `djs:native`, `djs:host` | Operations JavaScript cannot express, in [`vm/execution/native_operations.ts`](../vm/execution/native_operations.ts) |
 | VM | `vm/` | Runs bytecode; reaches builtins through the realm |
 
 Each layer imports only from the layers below it. The module loader rejects

@@ -153,7 +153,7 @@ test("method calls preserve receiver and reserve consecutive argument slots", ()
   assert.equal(outer.c, property.b)
 })
 
-test("intrinsic values compile as ordinary named imports", () => {
+test("native operation values compile as ordinary named imports", () => {
   const code = compile_module(
     'import { write_stdout as write } from "djs:native"; export default { log: function(value) { write(value); } };',
     "console.js",

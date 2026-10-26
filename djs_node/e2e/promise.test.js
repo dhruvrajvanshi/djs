@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { execute, fixture } from "./helpers.js"
 
-test("imported call and enqueue_job intrinsics preserve receivers, errors and job order", async (t) => {
+test("imported call and enqueue_job native operations preserve receivers, errors and job order", async (t) => {
   const source = `
     import { call, host_enqueue_promise_job as enqueue } from "djs:native";
     import { write_stdout as write } from "djs:host";

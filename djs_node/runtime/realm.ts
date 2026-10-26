@@ -13,7 +13,7 @@ import {
   create_string_object,
 } from "../vm/semantics/objects.ts"
 import { initialize_binding } from "../vm/semantics/bindings.ts"
-import { BUILTIN_CODE } from "../vm/execution/intrinsics.ts"
+import { BUILTIN_CODE } from "../vm/execution/native_operations.ts"
 
 export const WELL_KNOWN_SYMBOLS = Object.freeze([
   "asyncIterator",

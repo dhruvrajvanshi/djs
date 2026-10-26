@@ -153,7 +153,7 @@ what a call does, based on the callee:
 | --- | --- |
 | Bytecode function | Pushes a frame |
 | Built-in function | Pushes a frame for its steps, the JavaScript function that implements it ([object-model.md](object-model.md#built-in-functions)) |
-| `djs:native` operation | Runs TypeScript directly through `call_intrinsic` |
+| `djs:native` operation | Runs TypeScript directly through `call_native_operation` |
 | Async function | Runs in a new fiber (see [`await`](#await)) |
 
 New fibers are created in these cases:

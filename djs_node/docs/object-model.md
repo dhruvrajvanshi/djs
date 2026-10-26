@@ -157,7 +157,7 @@ roots don't grow while code runs.
 
 A [built-in function](https://tc39.es/ecma262/#sec-built-in-function-objects)
 is a `KINDS.FUNCTION` object whose code ID is `BUILTIN_CODE`
-([vm/execution/intrinsics.ts](../vm/execution/intrinsics.ts)). Instead of bytecode of its own, it
+([vm/execution/native_operations.ts](../vm/execution/native_operations.ts)). Instead of bytecode of its own, it
 holds a reference to another function, its **steps**: the function expression
 written in its `well_known` declaration, or the `behaviour` passed to
 `create_builtin_function`. `set_builtin_steps` and `load_builtin_steps` in

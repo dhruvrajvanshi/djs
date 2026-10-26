@@ -2,7 +2,7 @@ import assert from "node:assert/strict"
 import test from "node:test"
 import { execute } from "./helpers.js"
 
-// Compare observable operations against Node, mapping the guest intrinsics to
+// Compare observable operations against Node, mapping the guest native operations to
 // their standard host counterparts without requiring spread syntax in DJS.
 async function equivalent(t, source) {
   let expected = ""

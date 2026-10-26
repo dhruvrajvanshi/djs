@@ -22,7 +22,7 @@ import {
   take_exception,
 } from "../vm/semantics/errors.ts"
 import { to_string } from "../vm/semantics/operations.ts"
-import { NATIVE_MODULES, NATIVE_CODE } from "../vm/execution/intrinsics.ts"
+import { NATIVE_MODULES, NATIVE_CODE } from "../vm/execution/native_operations.ts"
 import { panic } from "../utils.ts"
 import type { HostError } from "../host/node.ts"
 import { FIBER_STATE } from "../vm/execution/fiber.ts"

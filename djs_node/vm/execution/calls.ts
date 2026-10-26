@@ -51,8 +51,8 @@ import {
   CALL_ID,
   NATIVE_CODE,
   RESUME_CODE,
-  call_intrinsic,
-} from "./intrinsics.ts"
+  call_native_operation,
+} from "./native_operations.ts"
 import { run_task } from "./interpreter.ts"
 
 export function create_fiber(
@@ -233,7 +233,7 @@ export function call_function(
       arguments_.slice(2),
     )
   if (code_id === NATIVE_CODE)
-    return call_intrinsic(runtime, function_id, destination, arguments_)
+    return call_native_operation(runtime, function_id, destination, arguments_)
   if (runtime.loader.code[code_id].unit.functions[function_id].flags & 8)
     return call_async_function(
       runtime,

@@ -243,7 +243,7 @@ test("imported bindings are readonly aliases", async (t) => {
   assert.equal(result.stdout, "")
 })
 
-test("guest modules share intrinsic function values through ordinary imports", async (t) => {
+test("guest modules share native operation values through ordinary imports", async (t) => {
   const app = await fixture(t, {
     "dependency.js": `
       import { write_stdout } from "djs:host";
@@ -347,13 +347,13 @@ for (const [name, source, diagnostic] of [
     /Expected Class/,
   ],
   [
-    "unknown intrinsic export",
+    "unknown native operation export",
     'import { unknown } from "djs:native";',
     /djs:native does not export unknown/,
   ],
   [
-    "missing intrinsic default export",
-    'import intrinsics from "djs:native";',
+    "missing native module default export",
+    'import operations from "djs:native";',
     /djs:native does not export default/,
   ],
   [

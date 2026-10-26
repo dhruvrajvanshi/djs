@@ -16,7 +16,7 @@ import { bootstrap } from "../runtime/bootstrap.ts"
 import { Runtime } from "../runtime/runtime.ts"
 import { evaluate_module, load_module } from "../runtime/modules.ts"
 import { enqueue_job, drain_jobs } from "../runtime/scheduler.ts"
-import { NATIVE_CODE, intrinsic_id } from "../vm/execution/intrinsics.ts"
+import { NATIVE_CODE, native_operation_id } from "../vm/execution/native_operations.ts"
 
 test("property creation re-reads object and value roots after allocation collects", () => {
   const runtime = new Runtime({ semispace_bytes: 128 })
@@ -56,7 +56,7 @@ test("queued callbacks retain functions and arguments across collection and queu
   const baseline = memory.stats().roots
   const fn = memory.alloc_root(),
     argument = memory.alloc_root()
-  create_function(runtime, fn, NATIVE_CODE, intrinsic_id("write_stdout"))
+  create_function(runtime, fn, NATIVE_CODE, native_operation_id("write_stdout"))
   for (let index = 0; index < 40; index++) {
     write_string(memory, argument, `job ${index}\n`)
     enqueue_job(runtime, fn, argument)

@@ -605,8 +605,9 @@ export function get_own_property_descriptor(
   }
 }
 
-// Intrinsic descriptors are trusted records of data fields. Public Object APIs
-// can perform observable descriptor conversion in the stdlib before calling us.
+// Descriptors from native operations are trusted records of data fields.
+// Public Object APIs can perform observable descriptor conversion in the stdlib
+// before calling us.
 export function define_own_property(
   runtime: Runtime,
   object: Root,
@@ -650,7 +651,7 @@ export function define_own_property(
         return throw_error(
           runtime,
           "TypeError",
-          "Intrinsic descriptor fields must be data properties",
+          "Native operation descriptor fields must be data properties",
         )
       return true
     }

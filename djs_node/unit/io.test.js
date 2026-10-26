@@ -7,7 +7,7 @@ import { Runtime } from "../runtime/runtime.ts"
 import { load_module, evaluate_module } from "../runtime/modules.ts"
 import { create_node_host } from "../host/node.ts"
 import { create_function } from "../vm/semantics/objects.ts"
-import { NATIVE_CODE, intrinsic_id } from "../vm/execution/intrinsics.ts"
+import { NATIVE_CODE, native_operation_id } from "../vm/execution/native_operations.ts"
 import {
   start_operation,
   drain_completions,
@@ -167,7 +167,7 @@ test("completion slots are reused and concurrent results retain callbacks across
     },
   })
   const callback = runtime.memory.alloc_root()
-  create_function(runtime, callback, NATIVE_CODE, intrinsic_id("write_stdout"))
+  create_function(runtime, callback, NATIVE_CODE, native_operation_id("write_stdout"))
   const baseline = runtime.memory.stats().roots
   let capacity
   for (let pass = 0; pass < 3; pass++) {
