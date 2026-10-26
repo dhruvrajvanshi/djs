@@ -375,6 +375,16 @@ function parser_impl(
             return lhs
           }
         }
+        case t.Bang: {
+          if (
+            !(flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS) ||
+            self.current_token.line !== self.last_token?.line
+          )
+            return lhs
+          const end = advance()
+          lhs = Expr.NonNull(Span.between(lhs.span, end.span), lhs)
+          break
+        }
         case t.QuestionDot: {
           in_optional_chain = true
           advance()
@@ -795,6 +805,14 @@ function parser_impl(
     ) {
       static_token = advance()
     }
+    let override_token: Token | null = null
+    if (
+      flags & PARSER_FLAGS.ALLOW_TYPE_ANNOTATIONS &&
+      at_soft_keyword("override") &&
+      (next_matches(Token.can_start_object_property_name) || next_is(t.Star))
+    ) {
+      override_token = advance()
+    }
 
     let accessor_type: AccessorType | null = null
     if (
@@ -829,7 +847,7 @@ function parser_impl(
       if (key === ERR) return ERR
       name = key
     }
-    const start = static_token ? static_token.span : name.span
+    const start = (static_token ?? override_token)?.span ?? name.span
     if (!at(t.LParen) && !at(t.LessThan)) {
       if (accessor_type || is_async || is_generator) {
         emit_error("Expected a method")
@@ -848,6 +866,7 @@ function parser_impl(
         span: Span.between(start, initializer?.span ?? name.span),
         name,
         is_static: static_token !== null,
+        is_override: override_token !== null,
         initializer,
       })
     }
@@ -870,6 +889,7 @@ function parser_impl(
       span,
       name,
       is_static: static_token !== null,
+      is_override: override_token !== null,
       accessor_type,
       return_type,
       body: {
@@ -937,6 +957,7 @@ function parser_impl(
             span,
             name,
             is_static: false,
+            is_override: false,
             accessor_type: null,
             return_type,
             body: {
@@ -1018,6 +1039,7 @@ function parser_impl(
       span,
       name,
       is_static: false,
+      is_override: false,
       accessor_type,
       return_type,
       body: {

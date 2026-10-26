@@ -603,6 +603,7 @@ export interface MethodDef {
   readonly decorators: readonly Expr[]
   readonly name: ObjectKey
   readonly is_static: boolean
+  readonly is_override: boolean
   readonly body: Func
   readonly return_type: TypeAnnotation | null
   readonly accessor_type: AccessorType | null
@@ -637,6 +638,7 @@ export interface FieldDef {
   readonly decorators: readonly Expr[]
   readonly name: ObjectKey
   readonly is_static: boolean
+  readonly is_override: boolean
   readonly initializer: Expr | null
 }
 
@@ -882,6 +884,7 @@ export type Expr =
   | TaggedTemplateLiteralExpr
   | TypeApplicationExpr
   | AsExpr
+  | NonNullExpr
 export class VarExpr {
   constructor(
     readonly span: Span,
@@ -1541,6 +1544,21 @@ export class AsExpr {
     return sexpr_to_string(expr_to_sexpr(this))
   }
 }
+export class NonNullExpr {
+  constructor(
+    readonly span: Span,
+
+    readonly expr: Expr,
+  ) {}
+
+  get kind(): "NonNull" {
+    return "NonNull"
+  }
+
+  toString(): string {
+    return sexpr_to_string(expr_to_sexpr(this))
+  }
+}
 
 export const Expr = {
   Var: (span: Span, leading_trivia: Text, ident: Ident): VarExpr =>
@@ -1690,6 +1708,8 @@ export const Expr = {
 
   As: (span: Span, expr: Expr, type_annotation: TypeAnnotation): AsExpr =>
     new AsExpr(span, expr, type_annotation),
+
+  NonNull: (span: Span, expr: Expr): NonNullExpr => new NonNullExpr(span, expr),
 } as const
 
 export type TypeAnnotation =

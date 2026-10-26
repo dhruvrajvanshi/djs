@@ -1654,6 +1654,7 @@ function chain_operand(
   expr: Expr,
   chain: Chain,
 ) {
+  while (expr.kind === "NonNull") expr = expr.expr
   return expr.kind === "Prop" || expr.kind === "Index" || expr.kind === "Call"
     ? chain_member(state, fn, scope, expr, chain)
     : compile_expr(state, fn, scope, expr)
@@ -1690,7 +1691,11 @@ function compile_call(
 ) {
   let callee, receiver
   let target = expr.callee
-  while (target.kind === "Paren") target = target.expr
+  let parenthesized = false
+  while (target.kind === "Paren" || target.kind === "NonNull") {
+    if (target.kind === "Paren") parenthesized = true
+    target = target.expr
+  }
   const construct = target.kind === "New"
   if (construct) {
     callee = compile_expr(
@@ -1702,7 +1707,6 @@ function compile_call(
     receiver = constant(state, fn, undefined)
   } else if (target.kind === "Prop" || target.kind === "Index") {
     // `(a?.b)()` keeps `a` as the receiver but ends the chain at the parens.
-    const parenthesized = target !== expr.callee
     const callee_chain = parenthesized ? { exits: [] } : chain
     const reference = property_reference(state, fn, scope, target, callee_chain)
     receiver = reference.object
@@ -1861,6 +1865,7 @@ function compile_expr_kind(
         )
       return load_name(state, fn, scope, expr.ident.text)
     case "Paren":
+    case "NonNull":
       return compile_expr(state, fn, scope, expr.expr)
     case "Prop":
     case "Index":

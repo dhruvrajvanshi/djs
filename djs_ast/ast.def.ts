@@ -165,6 +165,7 @@ export const Expr = Enum("Expr", ["span", "visit"], {
     expr: () => Expr,
     type_annotation: () => TypeAnnotation,
   },
+  NonNull: { expr: () => Expr },
 })
 export const TypeAnnotation = Enum("TypeAnnotation", ["span"], {
   Ident: { leading_trivia: Text, ident: Ident },
@@ -241,12 +242,14 @@ const FieldDef = Struct("FieldDef", ["span"], {
   decorators: List(() => Expr),
   name: () => ObjectKey,
   is_static: "boolean",
+  is_override: "boolean",
   initializer: Option(() => Expr),
 })
 const MethodDef = Struct("MethodDef", ["span"], {
   decorators: List(() => Expr),
   name: () => ObjectKey,
   is_static: "boolean",
+  is_override: "boolean",
   body: () => Func,
   return_type: Option(() => TypeAnnotation),
   accessor_type: Option(() => AccessorType),
