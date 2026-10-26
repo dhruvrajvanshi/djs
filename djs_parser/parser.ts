@@ -353,12 +353,12 @@ function parser_impl(
           break
         }
         case t.LSquare: {
-          const start = advance()
+          advance()
           const prop = parse_expr()
           if (prop === ERR) return prop
           const end = expect(t.RSquare)
           if (end === ERR) return end
-          const span = Span.between(start.span, end.span)
+          const span = Span.between(lhs.span, end.span)
           lhs = Expr.Index(span, lhs, prop, /* is_optional */ false)
           break
         }
@@ -386,12 +386,12 @@ function parser_impl(
               break
             }
             case t.LSquare: {
-              const start = advance()
+              advance()
               const prop = parse_expr()
               if (prop === ERR) return prop
               const end = expect(t.RSquare)
               if (end === ERR) return end
-              const span = Span.between(start.span, end.span)
+              const span = Span.between(lhs.span, end.span)
               lhs = Expr.Index(span, lhs, prop, /* is_optional */ true)
               break
             }
