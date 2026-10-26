@@ -69,6 +69,7 @@ export const Stmt = Enum("Stmt", ["span", "visit"], {
     module_specifier: Option(Text),
     is_type_only: "boolean",
   },
+  ExportStar: { module_specifier: Text },
   Labeled: {
     label: () => Label,
     stmt: () => Stmt,

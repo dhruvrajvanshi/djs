@@ -1,0 +1,5 @@
+SyntaxError: export-star-ambiguous.js:1:10: The requested module './export-star-ambiguous/index.js' contains conflicting star exports for name 'value'
+1|  import { value } from "./export-star-ambiguous/index.js";
+             ^~~
+2|  console.log("unreachable");
+3|  

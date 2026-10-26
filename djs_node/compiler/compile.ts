@@ -192,7 +192,13 @@ export interface CompiledModule {
   path: string
   functions: FunctionDescriptor[]
   literals: Literal[]
-  imports: { specifier: string; bindings: ImportBinding[]; span: Span }[]
+  /** Module requests in source order. `star_export` marks `export * from`. */
+  imports: {
+    specifier: string
+    bindings: ImportBinding[]
+    span: Span
+    star_export?: boolean
+  }[]
   exports: ExportBinding[]
   realm: RealmDeclaration[]
   object_templates: ObjectTemplate[]
@@ -838,6 +844,16 @@ function prepare_statements(
         })
         break
       }
+      case "ExportStar":
+        if (fn.id !== 0 || scope !== fn.scope)
+          unsupported(stmt, "nested export")
+        state.unit.imports.push({
+          specifier: decode_string(stmt.module_specifier, stmt),
+          bindings: [],
+          span: stmt.span,
+          star_export: true,
+        })
+        break
     }
   }
   for (const stmt of local_exports) {
@@ -1104,7 +1120,8 @@ function compile_statements(
     if (
       stmt.kind !== "Func" &&
       stmt.kind !== "Import" &&
-      stmt.kind !== "ExportNamed"
+      stmt.kind !== "ExportNamed" &&
+      stmt.kind !== "ExportStar"
     )
       compile_stmt(state, fn, scope, stmt)
   }

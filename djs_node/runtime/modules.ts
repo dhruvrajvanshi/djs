@@ -79,9 +79,15 @@ export interface LinkedCode {
   bytecodes: Uint8Array[]
 }
 
+/** A slot in a module's environment. */
+export interface ModuleBinding {
+  module_id: number
+  slot: number
+}
+
 export interface RuntimeScope {
   binding_flags: boolean[]
-  import_bindings: Map<number, { module_id: number; slot: number }>
+  import_bindings: Map<number, ModuleBinding>
   /** Slots whose value the VM receives as a realm intrinsic once initialized. */
   intrinsic_bindings?: Map<number, string>
 }
@@ -94,7 +100,10 @@ export class ModuleRecord {
   readonly scope_id: number
   status: ModuleStatus = MODULE_STATE.LINKING
   dependencies: number[] = []
-  readonly exports: Map<string, number>
+  /** Export names, mapped to the bindings they resolve to once linked. */
+  readonly exports: Map<string, ModuleBinding>
+  /** Names that `export *` gets from more than one binding. */
+  readonly ambiguous_exports = new Set<string>()
   /** Owned roots. `error` holds the evaluation error, or undefined. */
   readonly environment: Root
   readonly error: Root
@@ -105,7 +114,7 @@ export class ModuleRecord {
     unit: CompiledModule | null
     code_id: CodeId | null
     scope_id: number
-    exports: Map<string, number>
+    exports: Map<string, ModuleBinding>
     environment: Root
     error: Root
   }) {
@@ -323,13 +332,16 @@ function instantiate_module(
     exports: ExportBinding[]
   },
 ): ModuleRecord {
+  const id = runtime.loader.modules.length
   const module = new ModuleRecord({
-    id: runtime.loader.modules.length,
+    id,
     identity,
     unit,
     code_id,
     scope_id,
-    exports: new Map(exports.map((item) => [item.name, item.slot])),
+    exports: new Map(
+      exports.map((item) => [item.name, { module_id: id, slot: item.slot }]),
+    ),
     environment: runtime.memory.alloc_root(),
     error: runtime.memory.alloc_root(),
   })
@@ -398,6 +410,7 @@ export async function load_module(
     exports: unit.exports,
   })
   const imports = runtime.loader.scopes[scope_id].import_bindings
+  const local_exports = new Set(module.exports.keys())
   try {
     for (const declaration of unit.imports) {
       let specifier
@@ -414,26 +427,80 @@ export async function load_module(
       }
       const target = await load_module(runtime, specifier)
       module.dependencies.push(target.id)
-      for (const binding of declaration.bindings) {
-        const slot = target.exports.get(binding.imported)
-        if (slot === undefined)
+      if (declaration.star_export) {
+        if (target.status === MODULE_STATE.LINKING)
           throw new SyntaxError(
             located_message(path, source, [
               {
-                message: `The requested module '${declaration.specifier}' does not provide an export named '${binding.imported}'`,
+                message: "Cyclic export * is not implemented yet",
+                span: declaration.span,
+              },
+            ]),
+          )
+        star_export(module, local_exports, target)
+      }
+      for (const binding of declaration.bindings) {
+        const resolved = target.exports.get(binding.imported)
+        if (resolved === undefined)
+          throw new SyntaxError(
+            located_message(path, source, [
+              {
+                message: target.ambiguous_exports.has(binding.imported)
+                  ? `The requested module '${declaration.specifier}' contains conflicting star exports for name '${binding.imported}'`
+                  : `The requested module '${declaration.specifier}' does not provide an export named '${binding.imported}'`,
                 span: binding.span,
               },
             ]),
           )
-        imports.set(binding.slot, Object.freeze({ module_id: target.id, slot }))
+        imports.set(binding.slot, resolved)
       }
     }
+    for (const [name, binding] of module.exports)
+      module.exports.set(name, resolve_binding(runtime, binding))
     module.status = MODULE_STATE.LINKED
     return module
   } catch (error) {
     module.status = MODULE_STATE.ERRORED
     write_string(runtime.memory, module.error, error.message)
     throw error
+  }
+}
+
+// Follows re-exports to the binding that holds the value, so that bindings
+// can be compared and loads don't go through intermediate modules.
+function resolve_binding(runtime: Runtime, binding: ModuleBinding) {
+  while (true) {
+    const { scope_id } = runtime.loader.modules[binding.module_id]
+    const next = runtime.loader.scopes[scope_id].import_bindings.get(
+      binding.slot,
+    )
+    if (!next) return Object.freeze(binding)
+    binding = next
+  }
+}
+
+// Adds the target's exports, except `default` and names the module exports
+// itself. A name two star exports give different bindings becomes ambiguous.
+function star_export(
+  module: ModuleRecord,
+  local_exports: Set<string>,
+  target: ModuleRecord,
+) {
+  const names = [...target.exports.keys(), ...target.ambiguous_exports]
+  for (const name of names) {
+    if (name === "default" || local_exports.has(name)) continue
+    if (module.ambiguous_exports.has(name)) continue
+    const binding = target.exports.get(name)
+    const existing = module.exports.get(name)
+    if (
+      binding === undefined ||
+      (existing &&
+        (existing.module_id !== binding.module_id ||
+          existing.slot !== binding.slot))
+    ) {
+      module.exports.delete(name)
+      module.ambiguous_exports.add(name)
+    } else module.exports.set(name, binding)
   }
 }
 
@@ -588,9 +655,10 @@ export function read_export(
   name: string,
   destination: Root,
 ) {
-  const slot = module.exports.get(name)
-  if (slot === undefined) throw new SyntaxError(`Missing export: ${name}`)
-  if (load_binding(runtime, destination, module.environment, slot) === THROW) {
+  const binding = module.exports.get(name)
+  if (binding === undefined) throw new SyntaxError(`Missing export: ${name}`)
+  const { environment } = runtime.loader.modules[binding.module_id]
+  if (load_binding(runtime, destination, environment, binding.slot) === THROW) {
     clear_exception(runtime)
     throw new ReferenceError("Cannot access binding before initialization")
   }

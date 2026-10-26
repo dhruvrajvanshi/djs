@@ -48,6 +48,7 @@ export type Stmt =
   | ImportStmt
   | ImportStarAsStmt
   | ExportNamedStmt
+  | ExportStarStmt
   | LabeledStmt
   | TypeAliasStmt
   | InterfaceStmt
@@ -389,6 +390,21 @@ export class ExportNamedStmt {
     return sexpr_to_string(stmt_to_sexpr(this))
   }
 }
+export class ExportStarStmt {
+  constructor(
+    readonly span: Span,
+
+    readonly module_specifier: Text,
+  ) {}
+
+  get kind(): "ExportStar" {
+    return "ExportStar"
+  }
+
+  toString(): string {
+    return sexpr_to_string(stmt_to_sexpr(this))
+  }
+}
 export class LabeledStmt {
   constructor(
     readonly span: Span,
@@ -576,6 +592,9 @@ export const Stmt = {
     is_type_only: boolean,
   ): ExportNamedStmt =>
     new ExportNamedStmt(span, specifiers, module_specifier, is_type_only),
+
+  ExportStar: (span: Span, module_specifier: Text): ExportStarStmt =>
+    new ExportStarStmt(span, module_specifier),
 
   Labeled: (span: Span, label: Label, stmt: Stmt): LabeledStmt =>
     new LabeledStmt(span, label, stmt),

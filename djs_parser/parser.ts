@@ -2069,6 +2069,8 @@ function parser_impl(
     }
     if (!export_token && at(t.Export) && next_is(t.LBrace))
       return parse_export_named_stmt()
+    if (!export_token && at(t.Export) && next_is(t.Star))
+      return parse_export_star_stmt()
     if (
       !export_token &&
       at(t.Export) &&
@@ -2411,6 +2413,20 @@ function parser_impl(
       specifiers,
       module_specifier,
       is_type_only,
+    )
+  }
+
+  function parse_export_star_stmt(): Stmt | Err {
+    const start = advance()
+    assert(start.kind === t.Export)
+    assert(advance().kind === t.Star)
+    if (expect_soft_keyword("from") === ERR) return ERR
+    const from_clause = expect(t.String)
+    if (from_clause === ERR) return ERR
+    if (expect_semi() === ERR) return ERR
+    return Stmt.ExportStar(
+      Span.between(start.span, from_clause.span),
+      from_clause.text,
     )
   }
 
