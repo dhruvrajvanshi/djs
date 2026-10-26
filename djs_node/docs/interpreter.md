@@ -240,10 +240,3 @@ does.
 
 The stdlib is not evaluated this way: it runs synchronously while the realm
 is set up ([realm.md](realm.md#step-by-step)).
-
-## Instruction limit
-
-Each fiber, and each task across all of its fibers, can run at most
-`max_steps` instructions (default 1,000,000, set in the `Runtime`
-constructor). Going over the limit panics with "VM instruction limit
-exceeded".

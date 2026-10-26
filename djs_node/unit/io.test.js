@@ -265,7 +265,7 @@ test("readFile handles multiple chunks and UTF-8 sequences split at the read bou
         closed = true
       },
     },
-    { max_steps: 5000000, semispace_bytes: 131072 },
+    { semispace_bytes: 131072 },
   )
   await app.run()
   assert.equal(app.output, bytes.toString("utf8"))

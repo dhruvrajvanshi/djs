@@ -25,7 +25,6 @@ export class Fiber {
   readonly error: Root
   status: FiberStatus = FIBER_STATE.READY
   frame: Frame | null = null
-  steps = 0
   await_rejected = false
   /** Resolving functions of the promise this fiber settles when it finishes. */
   settle?: { resolve: Root; reject: Root }

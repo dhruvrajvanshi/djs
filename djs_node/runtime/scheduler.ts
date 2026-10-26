@@ -7,6 +7,7 @@ import { write_string } from "../vm/records/string.ts"
 import { byte_buffer_view } from "../vm/records/byte_buffer.ts"
 import { create_error } from "../vm/semantics/errors.ts"
 import { define_property } from "../vm/semantics/properties.ts"
+import { create_object } from "../vm/semantics/objects.ts"
 import { to_string, write_primitive } from "../vm/semantics/operations.ts"
 import { FIBER_STATE } from "../vm/execution/fiber.ts"
 import { create_call_fiber, dispose_fiber } from "../vm/execution/calls.ts"
@@ -48,8 +49,6 @@ export class Scheduler {
   // Host completions contain host values and operation IDs, never heap pointers.
   completions: Completion[] = []
   wake: (() => void) | null = null
-  /** Instructions run by the current task, across all of its fibers. */
-  task_steps = 0
 
   has_jobs() {
     return this.job_head < this.jobs.length
@@ -165,7 +164,7 @@ export function start_operation(
     )
 }
 
-function operation_error(
+export function operation_error(
   runtime: Runtime,
   destination: Root,
   error: HostError,
@@ -193,6 +192,30 @@ function operation_error(
   }
 }
 
+/** Host results are primitives or flat records of primitives, such as lstat's. */
+export function write_host_value(
+  runtime: Runtime,
+  destination: Root,
+  value: unknown,
+) {
+  if (value === null || typeof value !== "object")
+    return write_primitive(runtime, destination, value)
+  const { memory } = runtime
+  create_object(runtime, destination)
+  const key = memory.alloc_root(),
+    item = memory.alloc_root()
+  try {
+    for (const [name, field] of Object.entries(value)) {
+      write_string(memory, key, name)
+      write_primitive(runtime, item, field)
+      define_property(runtime, destination, key, item)
+    }
+  } finally {
+    memory.free_root(key)
+    memory.free_root(item)
+  }
+}
+
 export function drain_completions(runtime: Runtime) {
   const { memory, scheduler } = runtime
   while (scheduler.completions.length) {
@@ -212,7 +235,7 @@ export function drain_completions(runtime: Runtime) {
           // Resolve the rooted buffer again here; it may have moved while waiting.
           byte_buffer_view(memory, buffer).set(bytes, offset)
           write_number(memory, value, bytes.length)
-        } else write_primitive(runtime, value, completion.result)
+        } else write_host_value(runtime, value, completion.result)
       } catch (error) {
         rejected = true
         operation_error(

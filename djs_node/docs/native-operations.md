@@ -104,6 +104,7 @@ These are implemented in [vm/semantics/slots.ts](../vm/semantics/slots.ts). Rule
 | `write_stdout(text)` | Writes `text` to standard output |
 | `process_cwd()` | Returns the current working directory |
 | `io_open(path, flags, mode, resolve, reject)`, `io_read(…)`, `io_close(…)` | Asynchronous file I/O. The result is passed to `resolve` or `reject` later. Used by [stdlib/node/fs/promises.js](../stdlib/node/fs/promises.js) |
+| `io_lstat(path, resolve?, reject?)`, `io_readlink(…)` | File metadata (a record of numbers, like Node's `Stats` fields) and symlink targets. Synchronous when both callbacks are omitted: returns the result or throws. Used by [stdlib/node/fs.js](../stdlib/node/fs.js) |
 
 The VM forwards these to the host object passed to `new Runtime`. By
 default that's [host/node.ts](../host/node.ts), which uses Node's APIs.

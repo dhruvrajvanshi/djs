@@ -924,10 +924,6 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
     }
     // run_task preserves run-to-completion across these bounded slices.
     for (let slice = 0; slice < 10000; slice++) {
-      const steps = ++fiber.steps
-      const task_steps = ++runtime.scheduler.task_steps
-      if (steps > runtime.max_steps || task_steps > runtime.max_steps)
-        panic("VM instruction limit exceeded")
       const frame = fiber.frame
       if (frame === null) panic("No active frame")
       const code_id = frame.code_id

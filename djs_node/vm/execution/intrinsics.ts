@@ -15,7 +15,14 @@ import {
 import { KINDS } from "../storage/layout.ts"
 import { NATIVE_MARKERS } from "../../compiler/bytecode.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
-import { enqueue_job, start_operation } from "../../runtime/scheduler.ts"
+import type { HostError } from "../../host/node.ts"
+import {
+  enqueue_job,
+  operation_error,
+  start_operation,
+  write_host_value,
+} from "../../runtime/scheduler.ts"
+import type { OperationOptions } from "../../runtime/scheduler.ts"
 import {
   read_string,
   slice_string,
@@ -55,7 +62,13 @@ import {
   ordinary_own_property_keys,
 } from "../semantics/properties.ts"
 import { has_slot, get_slot, set_slot, init_slot } from "../semantics/slots.ts"
-import { OK, THROW, throw_error, clear_exception } from "../semantics/errors.ts"
+import {
+  OK,
+  THROW,
+  throw_error,
+  throw_value,
+  clear_exception,
+} from "../semantics/errors.ts"
 import type { Status } from "../semantics/errors.ts"
 
 export const NATIVE_CODE = 0xffffffff
@@ -97,6 +110,39 @@ function string(runtime: Runtime, value: Root, name: string) {
 
 function is_string(memory: Memory, value: Root) {
   return value !== undefined && kind_of(memory, value) === KINDS.STRING
+}
+
+/** Runs synchronously when both callbacks are omitted, otherwise settles them later. */
+function host_operation(
+  runtime: Runtime,
+  destination: Root,
+  resolve: Root,
+  reject: Root,
+  run_sync: () => unknown,
+  run_async: () => Promise<unknown>,
+  options: OperationOptions,
+): Status {
+  if (resolve === undefined && reject === undefined) {
+    let result
+    try {
+      result = run_sync()
+    } catch (error) {
+      operation_error(
+        runtime,
+        destination,
+        error as HostError,
+        options.syscall,
+        options.path,
+      )
+      return throw_value(runtime, destination)
+    }
+    write_host_value(runtime, destination, result)
+    return OK
+  }
+  if (check_callbacks(runtime, resolve, reject) === THROW) return THROW
+  start_operation(runtime, resolve, reject, run_async, options)
+  write_undefined(runtime.memory, destination)
+  return OK
 }
 
 // An omitted prototype argument selects the default.
@@ -532,6 +578,32 @@ const INTRINSICS: Record<string, Intrinsic> = {
     write_undefined(runtime.memory, destination)
     return OK
   },
+  io_lstat(runtime, destination, arguments_) {
+    const path = string(runtime, arguments_[0], "path")
+    if (path === undefined) return THROW
+    return host_operation(
+      runtime,
+      destination,
+      arguments_[1],
+      arguments_[2],
+      () => runtime.host.lstat_sync(path),
+      () => runtime.host.lstat(path),
+      { syscall: "lstat", path },
+    )
+  },
+  io_readlink(runtime, destination, arguments_) {
+    const path = string(runtime, arguments_[0], "path")
+    if (path === undefined) return THROW
+    return host_operation(
+      runtime,
+      destination,
+      arguments_[1],
+      arguments_[2],
+      () => runtime.host.readlink_sync(path),
+      () => runtime.host.readlink(path),
+      { syscall: "readlink", path },
+    )
+  },
   call() {
     panic("call is handled by the interpreter")
   },
@@ -556,6 +628,8 @@ const HOST_NAMES = Object.freeze([
   "io_open",
   "io_read",
   "io_close",
+  "io_lstat",
+  "io_readlink",
 ])
 
 function native_module(names: readonly string[]) {

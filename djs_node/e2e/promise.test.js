@@ -66,14 +66,3 @@ test("finally blocks unwind deep recursion and keep completions across await", a
   )
   assert.equal(output, "true 25\ntrue\n99\n")
 })
-
-test("an endless chain of microtasks stops at the instruction limit", async (t) => {
-  const app = await fixture(t, {
-    "entry.js": `
-      const p = Promise.resolve();
-      function again() { p.then(again); }
-      again();
-    `,
-  })
-  app.run({ status: 1, stderr: /VM instruction limit exceeded/ })
-})

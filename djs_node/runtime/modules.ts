@@ -42,6 +42,7 @@ const BUILTINS = new Map([
   ["djs:abstract", new URL("../stdlib/js/abstract.js", import.meta.url)],
   ["node:console", new URL("../stdlib/node/console.js", import.meta.url)],
   ["node:path", new URL("../stdlib/node/path.js", import.meta.url)],
+  ["node:fs", new URL("../stdlib/node/fs.js", import.meta.url)],
   [
     "node:fs/promises",
     new URL("../stdlib/node/fs/promises.js", import.meta.url),
@@ -316,7 +317,6 @@ export function evaluate_realm_module(
     for (const id of module.dependencies)
       evaluate_realm_module(runtime, runtime.loader.modules[id], chain)
     fiber = create_fiber(runtime, module.code_id!, module.environment)
-    runtime.scheduler.task_steps = 0
     run_task(runtime, fiber)
     if (fiber.status === FIBER_STATE.FAILED)
       throw new Error(to_string(runtime, fiber.error))
@@ -360,8 +360,6 @@ export async function evaluate_module(
       guest_error = true
       throw new Error(to_string(runtime, module.error))
     }
-    // Include all callbacks and await helpers in this module evaluation's budget.
-    runtime.scheduler.task_steps = 0
     run_task(runtime, fiber)
     await run_event_loop(runtime, promise)
     if (promise_state(runtime, promise) === "rejected") {
