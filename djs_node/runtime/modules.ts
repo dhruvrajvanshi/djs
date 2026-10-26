@@ -25,10 +25,10 @@ import { to_string } from "../vm/semantics/operations.ts"
 import { NATIVE_MODULES, NATIVE_CODE } from "../vm/execution/intrinsics.ts"
 import { panic } from "../utils.ts"
 import type { HostError } from "../host/node.ts"
-import { CONTEXT_STATE } from "../vm/execution/context.ts"
+import { FIBER_STATE } from "../vm/execution/fiber.ts"
 import {
-  create_context,
-  dispose_context,
+  create_fiber,
+  dispose_fiber,
   settle_with_promise,
 } from "../vm/execution/calls.ts"
 import { run_task } from "../vm/execution/interpreter.ts"
@@ -311,32 +311,32 @@ export function evaluate_realm_module(
 ) {
   if (!start_evaluation(module, ancestors)) return
   const chain = new Set(ancestors).add(module.id)
-  let context
+  let fiber
   try {
     for (const id of module.dependencies)
       evaluate_realm_module(runtime, runtime.loader.modules[id], chain)
-    context = create_context(runtime, module.code_id!, module.environment)
+    fiber = create_fiber(runtime, module.code_id!, module.environment)
     runtime.scheduler.task_steps = 0
-    run_task(runtime, context)
-    if (context.status === CONTEXT_STATE.FAILED)
-      throw new Error(to_string(runtime, context.error))
-    if (context.status !== CONTEXT_STATE.DONE)
+    run_task(runtime, fiber)
+    if (fiber.status === FIBER_STATE.FAILED)
+      throw new Error(to_string(runtime, fiber.error))
+    if (fiber.status !== FIBER_STATE.DONE)
       panic("Stdlib modules must evaluate synchronously")
     module.status = MODULE_STATE.EVALUATED
     write_undefined(runtime.memory, module.error)
   } catch (error) {
     module.status = MODULE_STATE.ERRORED
-    if (context) runtime.memory.copy_value(module.error, context.error)
+    if (fiber) runtime.memory.copy_value(module.error, fiber.error)
     else write_string(runtime.memory, module.error, error.message)
     throw error
   } finally {
-    if (context) dispose_context(runtime, context)
+    if (fiber) dispose_fiber(runtime, fiber)
   }
 }
 
 /**
  * Evaluates a program module and its dependencies. Like an async function
- * call, the module's context settles a promise when it finishes. This runs
+ * call, the module's fiber settles a promise when it finishes. This runs
  * jobs and host operations until that promise rejects, or until it is
  * fulfilled and nothing is left to run.
  */
@@ -349,20 +349,20 @@ export async function evaluate_module(
   const chain = new Set(ancestors).add(module.id)
   const { memory } = runtime
   const promise = memory.alloc_root()
-  let context
+  let fiber
   let guest_error = false
   try {
     for (const id of module.dependencies)
       await evaluate_module(runtime, runtime.loader.modules[id], chain)
-    context = create_context(runtime, module.code_id!, module.environment)
-    if (settle_with_promise(runtime, context, promise) === THROW) {
+    fiber = create_fiber(runtime, module.code_id!, module.environment)
+    if (settle_with_promise(runtime, fiber, promise) === THROW) {
       take_exception(runtime, module.error)
       guest_error = true
       throw new Error(to_string(runtime, module.error))
     }
     // Include all callbacks and await helpers in this module evaluation's budget.
     runtime.scheduler.task_steps = 0
-    run_task(runtime, context)
+    run_task(runtime, fiber)
     await run_event_loop(runtime, promise)
     if (promise_state(runtime, promise) === "rejected") {
       get_slot(runtime, module.error, promise, "[[PromiseResult]]")
@@ -378,7 +378,7 @@ export async function evaluate_module(
     if (!guest_error) write_string(memory, module.error, error.message)
     throw error
   } finally {
-    if (context) dispose_context(runtime, context)
+    if (fiber) dispose_fiber(runtime, fiber)
     memory.free_root(promise)
   }
 }

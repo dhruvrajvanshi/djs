@@ -45,7 +45,7 @@ import {
   take_exception,
 } from "../semantics/errors.ts"
 import type { Status } from "../semantics/errors.ts"
-import { CONTEXT_STATE, Context, Frame } from "./context.ts"
+import { FIBER_STATE, Fiber, Frame } from "./fiber.ts"
 import {
   BUILTIN_CODE,
   CALL_ID,
@@ -55,19 +55,19 @@ import {
 } from "./intrinsics.ts"
 import { run_task } from "./interpreter.ts"
 
-export function create_context(
+export function create_fiber(
   runtime: Runtime,
   code_id: CodeId,
   environment: Root,
-): Context {
-  const context = new Context(
-    runtime.contexts.length,
+): Fiber {
+  const fiber = new Fiber(
+    runtime.fibers.length,
     runtime.memory.alloc_root(),
     runtime.memory.alloc_root(),
   )
   push_frame(
     runtime,
-    context,
+    fiber,
     code_id,
     runtime.loader.code[code_id].unit.entry,
     environment,
@@ -75,13 +75,13 @@ export function create_context(
     [],
     null,
   )
-  runtime.contexts.push(context)
-  return context
+  runtime.fibers.push(fiber)
+  return fiber
 }
 
 function push_frame(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   code_id: CodeId,
   function_id: FunctionId,
   environment: Root,
@@ -103,7 +103,7 @@ function push_frame(
   for (let index = 0; index < fn.slot_count; index++)
     registers.push(memory.alloc_root())
   const frame = new Frame({
-    caller: context.frame,
+    caller: fiber.frame,
     code_id,
     function_id,
     return_root: destination,
@@ -154,34 +154,34 @@ function push_frame(
       memory.free_root(key)
     }
   }
-  context.frame = frame
+  fiber.frame = frame
 }
 
-export function pop_frame(runtime: Runtime, context: Context) {
-  const frame = context.frame!
+export function pop_frame(runtime: Runtime, fiber: Fiber) {
+  const frame = fiber.frame!
   for (const register of frame.registers) runtime.memory.free_root(register)
   runtime.memory.free_root(frame.environment_root)
   runtime.memory.free_root(frame.this_root)
   runtime.memory.free_root(frame.new_target_root)
-  context.frame = frame.caller
+  fiber.frame = frame.caller
 }
 
-export function dispose_context(runtime: Runtime, context: Context) {
-  if (context.status === CONTEXT_STATE.DISPOSED) return
-  while (context.frame !== null) pop_frame(runtime, context)
-  runtime.memory.free_root(context.result)
-  runtime.memory.free_root(context.error)
-  if (context.settle) {
-    runtime.memory.free_root(context.settle.resolve)
-    runtime.memory.free_root(context.settle.reject)
-    context.settle = undefined
+export function dispose_fiber(runtime: Runtime, fiber: Fiber) {
+  if (fiber.status === FIBER_STATE.DISPOSED) return
+  while (fiber.frame !== null) pop_frame(runtime, fiber)
+  runtime.memory.free_root(fiber.result)
+  runtime.memory.free_root(fiber.error)
+  if (fiber.settle) {
+    runtime.memory.free_root(fiber.settle.resolve)
+    runtime.memory.free_root(fiber.settle.reject)
+    fiber.settle = undefined
   }
-  context.status = CONTEXT_STATE.DISPOSED
+  fiber.status = FIBER_STATE.DISPOSED
 }
 
 export function call_function(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   destination: Root,
   callee: Root,
   receiver: Root | undefined,
@@ -200,9 +200,9 @@ export function call_function(
       load_value_array_element(memory, value, captured, 0)
       const target = read_number(memory, value) as Root
       load_value_array_element(memory, value, captured, 1)
-      resume_context(
+      resume_fiber(
         runtime,
-        runtime.contexts[function_id],
+        runtime.fibers[function_id],
         target,
         arguments_[0],
         read_boolean(memory, value),
@@ -217,7 +217,7 @@ export function call_function(
   if (code_id === BUILTIN_CODE)
     return enter_builtin(
       runtime,
-      context,
+      fiber,
       destination,
       callee,
       receiver,
@@ -226,7 +226,7 @@ export function call_function(
   if (code_id === NATIVE_CODE && function_id === CALL_ID)
     return call_function(
       runtime,
-      context,
+      fiber,
       destination,
       arguments_[0],
       arguments_[1],
@@ -244,7 +244,7 @@ export function call_function(
     )
   return enter_function(
     runtime,
-    context,
+    fiber,
     destination,
     callee,
     receiver,
@@ -254,7 +254,7 @@ export function call_function(
 
 function enter_function(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   destination: Root,
   callee: Root,
   receiver: Root | undefined,
@@ -289,7 +289,7 @@ function enter_function(
     )
     push_frame(
       runtime,
-      context,
+      fiber,
       code_id,
       function_id,
       environment,
@@ -332,7 +332,7 @@ export function coerce_value(
 }
 
 // A synchronous language operation may execute user code (valueOf/toString).
-// Keep that execution in a rooted VM context and preserve thrown guest values.
+// Keep that execution in a rooted VM fiber and preserve thrown guest values.
 export function invoke_sync(
   runtime: Runtime,
   destination: Root,
@@ -340,27 +340,27 @@ export function invoke_sync(
   receiver: Root | undefined,
   args: Root[],
 ): Status {
-  const context = create_call_context(runtime, callee, receiver, args)
+  const fiber = create_call_fiber(runtime, callee, receiver, args)
   try {
-    run_task(runtime, context)
-    if (context.status === CONTEXT_STATE.FAILED)
-      return throw_value(runtime, context.error)
-    if (context.status !== CONTEXT_STATE.DONE)
+    run_task(runtime, fiber)
+    if (fiber.status === FIBER_STATE.FAILED)
+      return throw_value(runtime, fiber.error)
+    if (fiber.status !== FIBER_STATE.DONE)
       panic("Internal operations must complete synchronously")
-    runtime.memory.copy_value(destination, context.result)
+    runtime.memory.copy_value(destination, fiber.result)
     return OK
   } finally {
-    dispose_context(runtime, context)
+    dispose_fiber(runtime, fiber)
   }
 }
 
 /**
- * Makes `context` settle a new %Promise%, written to `promise`, when it
+ * Makes `fiber` settle a new %Promise%, written to `promise`, when it
  * finishes. Async function calls and module evaluations both work this way.
  */
 export function settle_with_promise(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   promise: Root,
 ): Status {
   const new_capability = runtime.realm.intrinsics.get("NewPromiseCapability")
@@ -369,10 +369,10 @@ export function settle_with_promise(
   const key = memory.alloc_root(),
     resolve = memory.alloc_root(),
     reject = memory.alloc_root()
-  const capability = create_call_context(runtime, new_capability, undefined, [])
+  const capability = create_call_fiber(runtime, new_capability, undefined, [])
   try {
     run_task(runtime, capability)
-    if (capability.status === CONTEXT_STATE.FAILED) {
+    if (capability.status === FIBER_STATE.FAILED) {
       memory.free_root(resolve)
       memory.free_root(reject)
       return throw_value(runtime, capability.error)
@@ -386,14 +386,14 @@ export function settle_with_promise(
       get_property(runtime, target, capability.result, key)
     }
   } finally {
-    dispose_context(runtime, capability)
+    dispose_fiber(runtime, capability)
     memory.free_root(key)
   }
-  context.settle = { resolve, reject }
+  fiber.settle = { resolve, reject }
   return OK
 }
 
-// Each async call runs in its own context, so AWAIT suspends only that call.
+// Each async call runs in its own fiber, so AWAIT suspends only that call.
 function call_async_function(
   runtime: Runtime,
   destination: Root,
@@ -401,92 +401,92 @@ function call_async_function(
   receiver: Root | undefined,
   arguments_: Root[],
 ): Status {
-  const context = create_empty_context(runtime)
-  if (settle_with_promise(runtime, context, destination) === THROW) {
-    dispose_context(runtime, context)
+  const fiber = create_empty_fiber(runtime)
+  if (settle_with_promise(runtime, fiber, destination) === THROW) {
+    dispose_fiber(runtime, fiber)
     return THROW
   }
   if (
     enter_function(
       runtime,
-      context,
-      context.result,
+      fiber,
+      fiber.result,
       callee,
       receiver,
       arguments_,
     ) === THROW
   ) {
-    take_exception(runtime, context.error)
-    context.status = CONTEXT_STATE.FAILED
+    take_exception(runtime, fiber.error)
+    fiber.status = FIBER_STATE.FAILED
   }
-  run_task(runtime, context)
+  run_task(runtime, fiber)
   return OK
 }
 
-export function settle_context(runtime: Runtime, context: Context) {
-  const { resolve, reject } = context.settle!
-  const fulfilled = context.status === CONTEXT_STATE.DONE
+export function settle_fiber(runtime: Runtime, fiber: Fiber) {
+  const { resolve, reject } = fiber.settle!
+  const fulfilled = fiber.status === FIBER_STATE.DONE
   let settlement
   try {
-    settlement = create_call_context(
+    settlement = create_call_fiber(
       runtime,
       fulfilled ? resolve : reject,
       undefined,
-      [fulfilled ? context.result : context.error],
+      [fulfilled ? fiber.result : fiber.error],
     )
     run_task(runtime, settlement)
   } finally {
-    if (settlement) dispose_context(runtime, settlement)
-    dispose_context(runtime, context)
+    if (settlement) dispose_fiber(runtime, settlement)
+    dispose_fiber(runtime, fiber)
   }
 }
 
-function create_empty_context(runtime: Runtime): Context {
-  const context = new Context(
-    runtime.contexts.length,
+function create_empty_fiber(runtime: Runtime): Fiber {
+  const fiber = new Fiber(
+    runtime.fibers.length,
     runtime.memory.alloc_root(),
     runtime.memory.alloc_root(),
   )
-  runtime.contexts.push(context)
-  return context
+  runtime.fibers.push(fiber)
+  return fiber
 }
 
-export function create_call_context(
+export function create_call_fiber(
   runtime: Runtime,
   callee: Root,
   receiver: Root | undefined,
   arguments_: Root[],
-): Context {
-  const context = create_empty_context(runtime)
+): Fiber {
+  const fiber = create_empty_fiber(runtime)
   if (
     call_function(
       runtime,
-      context,
-      context.result,
+      fiber,
+      fiber.result,
       callee,
       receiver,
       arguments_,
     ) === THROW
   ) {
-    take_exception(runtime, context.error)
-    context.status = CONTEXT_STATE.FAILED
-  } else if (context.frame === null) context.status = CONTEXT_STATE.DONE
-  return context
+    take_exception(runtime, fiber.error)
+    fiber.status = FIBER_STATE.FAILED
+  } else if (fiber.frame === null) fiber.status = FIBER_STATE.DONE
+  return fiber
 }
 
-export function resume_context(
+export function resume_fiber(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   destination: Root,
   argument: Root | undefined,
   rejected: boolean,
 ) {
-  if (context.status !== CONTEXT_STATE.WAITING) return
+  if (fiber.status !== FIBER_STATE.WAITING) return
   if (argument !== undefined)
-    runtime.memory.copy_value(rejected ? context.error : destination, argument)
-  else write_undefined(runtime.memory, rejected ? context.error : destination)
-  context.await_rejected = rejected
-  context.status = CONTEXT_STATE.READY
+    runtime.memory.copy_value(rejected ? fiber.error : destination, argument)
+  else write_undefined(runtime.memory, rejected ? fiber.error : destination)
+  fiber.await_rejected = rejected
+  fiber.status = FIBER_STATE.READY
 }
 
 // [[Call]] and [[Construct]] of built-in function objects (ECMA-262 10.3.1,
@@ -494,7 +494,7 @@ export function resume_context(
 // no receiver, and the steps return the new object.
 function enter_builtin(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   destination: Root,
   callee: Root,
   receiver: Root | undefined,
@@ -507,7 +507,7 @@ function enter_builtin(
       panic("Built-in function has no steps")
     return enter_function(
       runtime,
-      context,
+      fiber,
       destination,
       steps,
       receiver,
@@ -521,7 +521,7 @@ function enter_builtin(
 
 export function construct_function(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   destination: Root,
   callee: Root,
   arguments_: Root[],
@@ -536,7 +536,7 @@ export function construct_function(
       return throw_error(runtime, "TypeError", "Value is not a constructor")
     return enter_builtin(
       runtime,
-      context,
+      fiber,
       destination,
       callee,
       undefined,
@@ -574,7 +574,7 @@ export function construct_function(
     )
     push_frame(
       runtime,
-      context,
+      fiber,
       code,
       id,
       environment,
@@ -583,7 +583,7 @@ export function construct_function(
       destination,
       callee,
     )
-    context.frame!.is_construct_call = true
+    fiber.frame!.is_construct_call = true
     return OK
   } finally {
     for (const root of [receiver, key, prototype, parent, environment])
@@ -594,7 +594,7 @@ export function construct_function(
 function resume_function(
   runtime: Runtime,
   destination: Root,
-  context: Context,
+  fiber: Fiber,
   destination_root: Root,
   rejected: boolean,
 ) {
@@ -606,7 +606,7 @@ function resume_function(
     write_number(memory, target, destination_root)
     write_boolean(memory, flag, rejected)
     create_value_array(memory, captured, [target, flag])
-    create_function(runtime, destination, RESUME_CODE, context.id, captured, 2)
+    create_function(runtime, destination, RESUME_CODE, fiber.id, captured, 2)
   } finally {
     for (const root of [target, flag, captured]) memory.free_root(root)
   }
@@ -614,7 +614,7 @@ function resume_function(
 
 export function await_value(
   runtime: Runtime,
-  context: Context,
+  fiber: Fiber,
   destination: Root,
   source: Root,
 ) {
@@ -623,21 +623,21 @@ export function await_value(
   const { memory } = runtime
   const fulfilled = memory.alloc_root(),
     rejected = memory.alloc_root()
-  context.status = CONTEXT_STATE.WAITING
+  fiber.status = FIBER_STATE.WAITING
   let registration
   try {
-    resume_function(runtime, fulfilled, context, destination, false)
-    resume_function(runtime, rejected, context, destination, true)
-    registration = create_call_context(runtime, await_promise, undefined, [
+    resume_function(runtime, fulfilled, fiber, destination, false)
+    resume_function(runtime, rejected, fiber, destination, true)
+    registration = create_call_fiber(runtime, await_promise, undefined, [
       source,
       fulfilled,
       rejected,
     ])
     run_task(runtime, registration)
-    if (registration.status === CONTEXT_STATE.FAILED)
-      resume_context(runtime, context, destination, registration.error, true)
+    if (registration.status === FIBER_STATE.FAILED)
+      resume_fiber(runtime, fiber, destination, registration.error, true)
   } finally {
-    if (registration) dispose_context(runtime, registration)
+    if (registration) dispose_fiber(runtime, registration)
     memory.free_root(fulfilled)
     memory.free_root(rejected)
   }

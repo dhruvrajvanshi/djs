@@ -4,7 +4,7 @@ import type { BytecodeOffset, RegisterIndex } from "../../compiler/bytecode.ts"
 import type { FunctionId } from "../../compiler/compile.ts"
 import type { CodeId } from "../../runtime/modules.ts"
 
-export const CONTEXT_STATE = Object.freeze({
+export const FIBER_STATE = Object.freeze({
   READY: 0,
   RUNNING: 1,
   WAITING: 2,
@@ -12,22 +12,22 @@ export const CONTEXT_STATE = Object.freeze({
   FAILED: 4,
   DISPOSED: 5,
 })
-export type ContextStatus = (typeof CONTEXT_STATE)[keyof typeof CONTEXT_STATE]
+export type FiberStatus = (typeof FIBER_STATE)[keyof typeof FIBER_STATE]
 
 /**
  * A stack of frames that runs, suspends at `await` and resumes as a unit. Each
  * module evaluation, async function call, job and JavaScript call made from VM
  * code gets its own. The caller owns allocation/disposal of all roots.
  */
-export class Context {
+export class Fiber {
   readonly id: number
   readonly result: Root
   readonly error: Root
-  status: ContextStatus = CONTEXT_STATE.READY
+  status: FiberStatus = FIBER_STATE.READY
   frame: Frame | null = null
   steps = 0
   await_rejected = false
-  /** Resolving functions of the promise this context settles when it finishes. */
+  /** Resolving functions of the promise this fiber settles when it finishes. */
   settle?: { resolve: Root; reject: Root }
 
   constructor(id: number, result: Root, error: Root) {

@@ -8,8 +8,8 @@ import { byte_buffer_view } from "../vm/records/byte_buffer.ts"
 import { create_error } from "../vm/semantics/errors.ts"
 import { define_property } from "../vm/semantics/properties.ts"
 import { to_string, write_primitive } from "../vm/semantics/operations.ts"
-import { CONTEXT_STATE } from "../vm/execution/context.ts"
-import { create_call_context, dispose_context } from "../vm/execution/calls.ts"
+import { FIBER_STATE } from "../vm/execution/fiber.ts"
+import { create_call_fiber, dispose_fiber } from "../vm/execution/calls.ts"
 import { run_task } from "../vm/execution/interpreter.ts"
 import { panic } from "../utils.ts"
 
@@ -48,7 +48,7 @@ export class Scheduler {
   // Host completions contain host values and operation IDs, never heap pointers.
   completions: Completion[] = []
   wake: (() => void) | null = null
-  /** Instructions run by the current task, across all of its contexts. */
+  /** Instructions run by the current task, across all of its fibers. */
   task_steps = 0
 
   has_jobs() {
@@ -240,20 +240,20 @@ export function drain_jobs(runtime: Runtime) {
     const { callee, value, has_argument } = scheduler.take_job()!
     let job
     try {
-      job = create_call_context(
+      job = create_call_fiber(
         runtime,
         callee,
         undefined,
         has_argument ? [value] : [],
       )
       run_task(runtime, job)
-      if (job.status === CONTEXT_STATE.FAILED)
+      if (job.status === FIBER_STATE.FAILED)
         throw new Error(to_string(runtime, job.error))
-      // Await reactions resume their context as part of the current microtask.
-      for (const active of runtime.contexts)
-        if (active.status === CONTEXT_STATE.READY) run_task(runtime, active)
+      // Await reactions resume their fiber as part of the current microtask.
+      for (const active of runtime.fibers)
+        if (active.status === FIBER_STATE.READY) run_task(runtime, active)
     } finally {
-      if (job) dispose_context(runtime, job)
+      if (job) dispose_fiber(runtime, job)
       memory.free_root(callee)
       memory.free_root(value)
     }

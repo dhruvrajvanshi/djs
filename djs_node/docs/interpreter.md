@@ -124,27 +124,27 @@ A binding in an environment starts out uninitialized. Reading it before
 reads can only happen before the declaration, and compiles them to
 `THROW_ERROR`.
 
-## Contexts and frames
+## Fibers and frames
 
 The VM's call stack is made of two types, both in
-[vm/execution/context.ts](../vm/execution/context.ts):
+[vm/execution/fiber.ts](../vm/execution/fiber.ts):
 
 - A **`Frame`** is one active call of a bytecode function. It holds the
   function, the `pc`, the registers, the current environment, `this`,
   `new.target`, and the caller's register that receives the return value.
   Each frame links to its caller's frame.
-- A **`Context`** is a stack of frames that can run, suspend and finish on its
+- A **`Fiber`** is a stack of frames that can run, suspend and finish on its
   own. It has a status (`READY`, `RUNNING`, `WAITING`, `DONE`, `FAILED`) and a
   slot for its result or error.
 
 `run_interpreter` ([vm/execution/interpreter.ts](../vm/execution/interpreter.ts))
-executes the top frame of one context. It decodes the instruction at `pc`,
+executes the top frame of one fiber. It decodes the instruction at `pc`,
 advances `pc`, and dispatches on the opcode.
 
-`CALL` to a bytecode function pushes a frame onto the current context and
+`CALL` to a bytecode function pushes a frame onto the current fiber and
 returns. The loop then continues with the callee's first instruction. `RETURN` pops the frame and
 writes the value into the caller's destination register. When the last frame
-returns, the context is `DONE`.
+returns, the fiber is `DONE`.
 
 `call_function` ([vm/execution/calls.ts](../vm/execution/calls.ts)) decides
 what a call does, based on the callee:
@@ -154,15 +154,15 @@ what a call does, based on the callee:
 | Bytecode function | Pushes a frame |
 | Built-in function | Pushes a frame for its steps, the JavaScript function that implements it ([object-model.md](object-model.md#built-in-functions)) |
 | `djs:native` operation | Runs TypeScript directly through `call_intrinsic` |
-| Async function | Runs in a new context (see [`await`](#await)) |
+| Async function | Runs in a new fiber (see [`await`](#await)) |
 
-New contexts are created in these cases:
+New fibers are created in these cases:
 
 | When | Why |
 | --- | --- |
-| A module is evaluated | Each module body runs in its own context |
+| A module is evaluated | Each module body runs in its own fiber |
 | An async function is called | So that `AWAIT` suspends only that call |
-| VM code needs a JavaScript result right away (`invoke_sync`) | Examples: `ToPrimitive` calling `valueOf`, `ITERATOR_NEXT` calling `next`, any abstract operation the VM gets from the realm. The context runs to completion before the instruction continues, and must not await |
+| VM code needs a JavaScript result right away (`invoke_sync`) | Examples: `ToPrimitive` calling `valueOf`, `ITERATOR_NEXT` calling `next`, any abstract operation the VM gets from the realm. The fiber runs to completion before the instruction continues, and must not await |
 | A job runs | Each promise reaction is a fresh call |
 
 ## Exceptions
@@ -178,7 +178,7 @@ thrown value waits in `runtime.pending_exception`. The interpreter then
 2. If an entry matches, the interpreter restores that environment, stores the
    exception, and jumps to the target.
 3. If no entry matches, it pops the frame and repeats from step 1 in the
-   caller. If no frames are left, the context is `FAILED`, with the exception
+   caller. If no frames are left, the fiber is `FAILED`, with the exception
    as its error.
 
 `try` compiles to an entry in the handler table. In `--dump-ir` output, an entry looks like
@@ -198,35 +198,35 @@ with `JUMP_INDIRECT` back to that address.
 
 ## `await`
 
-An async function runs in its own context, which `AWAIT` suspends:
+An async function runs in its own fiber, which `AWAIT` suspends:
 
-1. `AWAIT` sets the context to `WAITING` and stops running it. The frame's
+1. `AWAIT` sets the fiber to `WAITING` and stops running it. The frame's
    `pc` already points past the `AWAIT`.
 2. It creates two **resume functions**: internal function objects that each
-   remember the context, the `AWAIT`'s destination register, and whether they
+   remember the fiber, the `AWAIT`'s destination register, and whether they
    report fulfillment or rejection. It passes them, along with the awaited
    value, to the stdlib's `Await` abstract operation, which subscribes them to
    the promise.
 3. When the promise settles, a job calls one of the two functions. The
    function writes the value into the destination register, or into the
-   context's error if the promise rejected, and sets the context to `READY`.
-4. After every job, the scheduler runs each `READY` context. If the promise
-   rejected, the context throws as if from the `AWAIT` instruction, so a
+   fiber's error if the promise rejected, and sets the fiber to `READY`.
+4. After every job, the scheduler runs each `READY` fiber. If the promise
+   rejected, the fiber throws as if from the `AWAIT` instruction, so a
    surrounding `try` catches it.
 
 An async function call and a program module's evaluation each get a promise,
 created by `settle_with_promise` ([vm/execution/calls.ts](../vm/execution/calls.ts))
-with the stdlib's `NewPromiseCapability`. When the context finishes,
+with the stdlib's `NewPromiseCapability`. When the fiber finishes,
 `run_task` settles that promise with the result or the error.
 
 ## The event loop
 
 `evaluate_module` ([runtime/modules.ts](../runtime/modules.ts)) runs a program
-module's context, then `run_event_loop` repeats these steps:
+module's fiber, then `run_event_loop` repeats these steps:
 
 1. Turn finished host operations, such as file reads, into jobs
    (`drain_completions` in [runtime/scheduler.ts](../runtime/scheduler.ts)).
-   Running a job also runs every context it made `READY`.
+   Running a job also runs every fiber it made `READY`.
 2. Run every queued job (`drain_jobs`).
 3. If the module's promise rejected, stop and report the error.
 4. If no jobs are queued but host operations are still pending, wait for the
@@ -243,7 +243,7 @@ is set up ([realm.md](realm.md#step-by-step)).
 
 ## Instruction limit
 
-Each context, and each task across all of its contexts, can run at most
+Each fiber, and each task across all of its fibers, can run at most
 `max_steps` instructions (default 1,000,000, set in the `Runtime`
 constructor). Going over the limit panics with "VM instruction limit
 exceeded".

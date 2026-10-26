@@ -69,13 +69,13 @@ import {
 import { init_slot } from "../semantics/slots.ts"
 import { OK, THROW, throw_error, clear_exception } from "../semantics/errors.ts"
 import type { Status } from "../semantics/errors.ts"
-import { CONTEXT_STATE } from "./context.ts"
-import type { Context, ContextStatus, Frame } from "./context.ts"
+import { FIBER_STATE } from "./fiber.ts"
+import type { Fiber, FiberStatus, Frame } from "./fiber.ts"
 import {
   await_value,
   call_function,
   pop_frame,
-  settle_context,
+  settle_fiber,
   coerce_value,
   construct_function,
   invoke_sync,
@@ -352,7 +352,7 @@ const op = {
   },
   ITERATOR_NEXT(
     runtime: Runtime,
-    context: Context,
+    fiber: Fiber,
     frame: Frame,
     destination: Root,
     iterator: Root,
@@ -412,7 +412,7 @@ const op = {
   LOAD_NEW_TARGET(
     memory: Memory,
     destination: Root,
-    context: Context,
+    fiber: Fiber,
     frame: Frame,
   ) {
     memory.copy_value(destination, frame.new_target_root)
@@ -469,7 +469,7 @@ const op = {
   },
   GET_PROP(
     runtime: Runtime,
-    context: Context,
+    fiber: Fiber,
     destination: Root,
     object: Root,
     key: Root,
@@ -482,19 +482,12 @@ const op = {
       get_property(runtime, destination, object, property_key) &&
       tag_of(memory, destination) !== TAGS.UNDEFINED
     )
-      return call_function(
-        runtime,
-        context,
-        destination,
-        destination,
-        object,
-        [],
-      )
+      return call_function(runtime, fiber, destination, destination, object, [])
     return OK
   },
   SET_PROP(
     runtime: Runtime,
-    context: Context,
+    fiber: Fiber,
     object: Root,
     key: Root,
     value: Root,
@@ -518,7 +511,7 @@ const op = {
     )
       return THROW
     if (tag_of(memory, temporary) === TAGS.UNDEFINED) return OK
-    return call_function(runtime, context, context.result, temporary, object, [
+    return call_function(runtime, fiber, fiber.result, temporary, object, [
       value,
     ])
   },
@@ -682,7 +675,7 @@ const op = {
   },
   CALL(
     runtime: Runtime,
-    context: Context,
+    fiber: Fiber,
     destination: Root,
     callee: Root,
     receiver: Root,
@@ -690,7 +683,7 @@ const op = {
   ): Status {
     return call_function(
       runtime,
-      context,
+      fiber,
       destination,
       callee,
       receiver,
@@ -699,12 +692,12 @@ const op = {
   },
   CONSTRUCT(
     runtime: Runtime,
-    context: Context,
+    fiber: Fiber,
     destination: Root,
     callee: Root,
     arguments_: Root[],
   ): Status {
-    return construct_function(runtime, context, destination, callee, arguments_)
+    return construct_function(runtime, fiber, destination, callee, arguments_)
   },
   PUSH_ENV(
     memory: Memory,
@@ -745,17 +738,17 @@ const op = {
     memory.copy_value(env, temporary)
   },
   // The handlers below return true when run_interpreter must stop.
-  RETURN(runtime: Runtime, context: Context, value: Root): boolean {
-    return_value(runtime, context, value)
-    return context.status === CONTEXT_STATE.DONE
+  RETURN(runtime: Runtime, fiber: Fiber, value: Root): boolean {
+    return_value(runtime, fiber, value)
+    return fiber.status === FIBER_STATE.DONE
   },
-  AWAIT(runtime: Runtime, context: Context, destination: Root, value: Root) {
-    await_value(runtime, context, destination, value)
+  AWAIT(runtime: Runtime, fiber: Fiber, destination: Root, value: Root) {
+    await_value(runtime, fiber, destination, value)
     return true
   },
-  THROW(runtime: Runtime, context: Context, value: Root): boolean {
-    throw_value(runtime, context, value)
-    return context.status === CONTEXT_STATE.FAILED
+  THROW(runtime: Runtime, fiber: Fiber, value: Root): boolean {
+    throw_value(runtime, fiber, value)
+    return fiber.status === FIBER_STATE.FAILED
   },
   THROW_ERROR(runtime: Runtime, type: string, message: string): Status {
     return throw_error(runtime, type, message)
@@ -872,30 +865,30 @@ const op = {
     write_string(memory, destination, to_string(runtime, source))
     return OK
   },
-  LOAD_THIS(memory: Memory, destination: Root, context: Context, frame: Frame) {
+  LOAD_THIS(memory: Memory, destination: Root, fiber: Fiber, frame: Frame) {
     memory.copy_value(destination, frame.this_root)
   },
 }
 
-export function run_interpreter(runtime: Runtime, context: Context) {
+export function run_interpreter(runtime: Runtime, fiber: Fiber) {
   const { memory } = runtime
   // Widened so TS doesn't keep the narrowed status across calls that change it.
-  context.status = CONTEXT_STATE.RUNNING as ContextStatus
+  fiber.status = FIBER_STATE.RUNNING as FiberStatus
   const temporary = memory.alloc_root(),
     operand = memory.alloc_root(),
     property_key = memory.alloc_root()
   try {
-    if (context.take_await_rejection()) {
-      throw_value(runtime, context, context.error)
-      if (context.status === CONTEXT_STATE.FAILED) return
+    if (fiber.take_await_rejection()) {
+      throw_value(runtime, fiber, fiber.error)
+      if (fiber.status === FIBER_STATE.FAILED) return
     }
     // run_task preserves run-to-completion across these bounded slices.
     for (let slice = 0; slice < 10000; slice++) {
-      const steps = ++context.steps
+      const steps = ++fiber.steps
       const task_steps = ++runtime.scheduler.task_steps
       if (steps > runtime.max_steps || task_steps > runtime.max_steps)
         panic("VM instruction limit exceeded")
-      const frame = context.frame
+      const frame = fiber.frame
       if (frame === null) panic("No active frame")
       const code_id = frame.code_id
       const function_id = frame.function_id
@@ -917,10 +910,10 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           op.MOVE(memory, reg(a), reg(b))
           break
         case OP.LOAD_THIS:
-          op.LOAD_THIS(memory, reg(a), context, frame)
+          op.LOAD_THIS(memory, reg(a), fiber, frame)
           break
         case OP.LOAD_NEW_TARGET:
-          op.LOAD_NEW_TARGET(memory, reg(a), context, frame)
+          op.LOAD_NEW_TARGET(memory, reg(a), fiber, frame)
           break
         case OP.LOAD_GLOBAL:
           status = op.LOAD_GLOBAL(
@@ -997,7 +990,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
         case OP.GET_PROP:
           status = op.GET_PROP(
             runtime,
-            context,
+            fiber,
             reg(a),
             reg(b),
             reg(c),
@@ -1007,7 +1000,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
         case OP.SET_PROP:
           status = op.SET_PROP(
             runtime,
-            context,
+            fiber,
             reg(a),
             reg(b),
             reg(c),
@@ -1073,7 +1066,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
         case OP.CALL:
           status = op.CALL(
             runtime,
-            context,
+            fiber,
             reg(a),
             reg(b),
             reg(c),
@@ -1083,20 +1076,20 @@ export function run_interpreter(runtime: Runtime, context: Context) {
         case OP.CONSTRUCT:
           status = op.CONSTRUCT(
             runtime,
-            context,
+            fiber,
             reg(a),
             reg(b),
             Array.from({ length: e }, (_, index) => reg(d + index)),
           )
           break
         case OP.RETURN:
-          if (op.RETURN(runtime, context, reg(a))) return
+          if (op.RETURN(runtime, fiber, reg(a))) return
           break
         case OP.AWAIT:
-          if (op.AWAIT(runtime, context, reg(a), reg(b))) return
+          if (op.AWAIT(runtime, fiber, reg(a), reg(b))) return
           break
         case OP.THROW:
-          if (op.THROW(runtime, context, reg(a))) return
+          if (op.THROW(runtime, fiber, reg(a))) return
           break
         case OP.THROW_ERROR:
           status = op.THROW_ERROR(
@@ -1135,7 +1128,7 @@ export function run_interpreter(runtime: Runtime, context: Context) {
         case OP.ITERATOR_NEXT:
           status = op.ITERATOR_NEXT(
             runtime,
-            context,
+            fiber,
             frame,
             reg(a),
             reg(b),
@@ -1212,16 +1205,16 @@ export function run_interpreter(runtime: Runtime, context: Context) {
           panic(`Unknown opcode: ${opcode}`)
       }
       if (status === THROW) {
-        throw_value(runtime, context, runtime.pending_exception)
+        throw_value(runtime, fiber, runtime.pending_exception)
         clear_exception(runtime)
-        if (context.status === CONTEXT_STATE.FAILED) return
+        if (fiber.status === FIBER_STATE.FAILED) return
       }
       // The helper root must not retain environments after the instruction.
       write_undefined(memory, temporary)
       write_undefined(memory, operand)
       write_undefined(memory, property_key)
     }
-    context.status = CONTEXT_STATE.READY
+    fiber.status = FIBER_STATE.READY
   } finally {
     memory.free_root(temporary)
     memory.free_root(operand)
@@ -1229,18 +1222,17 @@ export function run_interpreter(runtime: Runtime, context: Context) {
   }
 }
 
-export function run_task(runtime: Runtime, context: Context) {
+export function run_task(runtime: Runtime, fiber: Fiber) {
   while (
-    context.status === CONTEXT_STATE.READY ||
-    context.status === CONTEXT_STATE.RUNNING
+    fiber.status === FIBER_STATE.READY ||
+    fiber.status === FIBER_STATE.RUNNING
   )
-    run_interpreter(runtime, context)
+    run_interpreter(runtime, fiber)
   if (
-    context.settle &&
-    (context.status === CONTEXT_STATE.DONE ||
-      context.status === CONTEXT_STATE.FAILED)
+    fiber.settle &&
+    (fiber.status === FIBER_STATE.DONE || fiber.status === FIBER_STATE.FAILED)
   )
-    settle_context(runtime, context)
+    settle_fiber(runtime, fiber)
 }
 
 // Restores the environment of the frame's code at the handler, which is the
@@ -1262,16 +1254,16 @@ function restore_environment(
 
 // Unwinds frames to the innermost exception handler covering the throwing
 // instruction, which is the one before each frame's pc.
-function throw_value(runtime: Runtime, context: Context, source: Root) {
+function throw_value(runtime: Runtime, fiber: Fiber, source: Root) {
   const { memory } = runtime
   const value = memory.alloc_root()
   memory.copy_value(value, source)
   try {
     while (true) {
-      const frame = context.frame
+      const frame = fiber.frame
       if (frame === null) {
-        memory.copy_value(context.error, value)
-        context.status = CONTEXT_STATE.FAILED
+        memory.copy_value(fiber.error, value)
+        fiber.status = FIBER_STATE.FAILED
         return
       }
       const pc = frame.pc - INSTRUCTION_BYTES
@@ -1287,16 +1279,16 @@ function throw_value(runtime: Runtime, context: Context, source: Root) {
         frame.pc = bytecode_offset(handler.target)
         return
       }
-      pop_frame(runtime, context)
+      pop_frame(runtime, fiber)
     }
   } finally {
     memory.free_root(value)
   }
 }
 
-function return_value(runtime: Runtime, context: Context, source: Root) {
+function return_value(runtime: Runtime, fiber: Fiber, source: Root) {
   const { memory } = runtime
-  const frame = context.frame!
+  const frame = fiber.frame!
   const caller = frame.caller
   const value = memory.alloc_root()
   try {
@@ -1304,11 +1296,11 @@ function return_value(runtime: Runtime, context: Context, source: Root) {
     if (frame.is_construct_call && !is_object(memory, value))
       memory.copy_value(value, frame.this_root)
     memory.copy_value(
-      caller === null ? context.result : frame.return_root!,
+      caller === null ? fiber.result : frame.return_root!,
       value,
     )
-    pop_frame(runtime, context)
-    if (caller === null) context.status = CONTEXT_STATE.DONE
+    pop_frame(runtime, fiber)
+    if (caller === null) fiber.status = FIBER_STATE.DONE
   } finally {
     memory.free_root(value)
   }

@@ -1,7 +1,7 @@
 import type { Root } from "../vm/storage/value.ts"
 import type { MemoryOptions } from "../vm/storage/memory.ts"
 import { Memory } from "../vm/storage/memory.ts"
-import type { Context } from "../vm/execution/context.ts"
+import type { Fiber } from "../vm/execution/fiber.ts"
 import type { NodeHost } from "../host/node.ts"
 import { create_node_host } from "../host/node.ts"
 import { Realm } from "./realm.ts"
@@ -21,7 +21,7 @@ export class Runtime {
   readonly scheduler = new Scheduler()
   readonly host: NodeHost
   readonly max_steps: number
-  contexts: Context[] = []
+  fibers: Fiber[] = []
   /** The value of the THROW status most recently returned. */
   readonly pending_exception: Root
 
