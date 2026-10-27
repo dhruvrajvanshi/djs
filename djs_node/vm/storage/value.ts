@@ -15,6 +15,23 @@ export const VALUE_TAGS = Object.freeze({
   NULL: 2,
   BOOLEAN: 3,
   REF: 4,
+  /**
+   * Used to track variables which are lexically visible to a closure,
+   * but haven't been initialized because the closure was called before the
+   * variable's declaration.
+   *
+   * @example
+   * ```js
+   * foo(); // foo visible because of hoisting
+   * let x; // declared after foo is called.
+   * function foo() { console.log(x) }
+   * ```
+   *
+   * Every variable that a closure captures starts with this tag.
+   *
+   * Another place where this happens is referring to `this` before calling super
+   * in a derived class.
+   */
   UNINITIALIZED: 5,
 })
 
