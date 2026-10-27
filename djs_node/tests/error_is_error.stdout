@@ -1,0 +1,4 @@
+Error.isError(new Error()) === true
+Error.isError(new TypeError()) === true
+Error.isError({}) === false
+Error.isError(null) === false

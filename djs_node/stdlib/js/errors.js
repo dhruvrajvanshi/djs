@@ -7,6 +7,7 @@ import {
   ordinary_object_create,
   create_builtin_function,
   capture_stack,
+  has_slot,
 } from "djs:native"
 import {
   to_string,
@@ -31,6 +32,10 @@ export const Error = well_known("%Error%", create_builtin_function, {
     { writable: false, configurable: false },
     ErrorPrototype,
   ),
+
+  isError(obj) {
+    return has_slot(obj, "[[ErrorData]]")
+  },
 })
 
 // 20.5.3 Properties of the Error Prototype Object
