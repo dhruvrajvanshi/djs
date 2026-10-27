@@ -45,10 +45,13 @@ import {
   define_property,
   define_value_property,
   delete_property,
+  get_private,
   get_property_value,
+  has_private,
   has_properties,
   has_property,
-  private_property,
+  init_private,
+  set_private,
   property_key,
   set_property_value,
   to_property_key,
@@ -511,43 +514,6 @@ const op = {
   },
   SET_PROTO(heap: Heap, object: Handle, prototype: Handle) {
     set_prototype(heap, object, prototype)
-  },
-  SET_PRIVATE(
-    runtime: Runtime,
-    object: Handle,
-    key: Handle,
-    value: Handle,
-    initialize: boolean,
-    readonly: boolean,
-    temporary: Handle,
-  ): Status {
-    return private_property(
-      runtime,
-      temporary,
-      object,
-      key,
-      value,
-      initialize,
-      false,
-      readonly,
-    )
-  },
-  GET_PRIVATE(
-    runtime: Runtime,
-    destination: Handle,
-    object: Handle,
-    key: Handle,
-    has: boolean,
-  ): Status {
-    return private_property(
-      runtime,
-      destination,
-      object,
-      key,
-      undefined,
-      false,
-      has,
-    )
   },
   INIT_SLOT(
     runtime: Runtime,
@@ -1023,26 +989,16 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           status = op.TO_PROPERTY_KEY(runtime, reg(a), reg(b))
           break
         case OP.INIT_PRIVATE:
+          status = init_private(runtime, reg(a), reg(b), reg(c), d === 1)
+          break
         case OP.SET_PRIVATE:
-          status = op.SET_PRIVATE(
-            runtime,
-            reg(a),
-            reg(b),
-            reg(c),
-            opcode === OP.INIT_PRIVATE,
-            d === 1,
-            temporary,
-          )
+          status = set_private(runtime, reg(a), reg(b), reg(c))
           break
         case OP.GET_PRIVATE:
+          status = get_private(runtime, reg(a), reg(b), reg(c))
+          break
         case OP.HAS_PRIVATE:
-          status = op.GET_PRIVATE(
-            runtime,
-            reg(a),
-            reg(b),
-            reg(c),
-            opcode === OP.HAS_PRIVATE,
-          )
+          status = has_private(runtime, reg(a), reg(b), reg(c))
           break
         case OP.INIT_SLOT:
           status = op.INIT_SLOT(

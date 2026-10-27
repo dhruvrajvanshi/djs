@@ -476,18 +476,80 @@ export function set_property_value(
   })
 }
 
-export function private_property(
+function find_private(runtime: Runtime, object: Handle, key: Handle) {
+  if (!has_property_list(runtime.heap, object)) {
+    throw_error(runtime, "TypeError", "Expected an object")
+    return undefined
+  }
+  const property = find_property(runtime.heap, object, key, true, true)
+  if (property === 0) {
+    throw_error(runtime, "TypeError", "Invalid private field receiver")
+    return undefined
+  }
+  return property
+}
+
+export function get_private(
   runtime: Runtime,
   destination: Handle,
   object: Handle,
   key: Handle,
-  value: Handle | undefined,
-  initialize: boolean = false,
-  has: boolean = false,
-  readonly: boolean = false,
+): Status {
+  const property = find_private(runtime, object, key)
+  if (property === undefined) return THROW
+  load_property_value(runtime.heap, destination, property)
+  return OK
+}
+
+export function set_private(
+  runtime: Runtime,
+  object: Handle,
+  key: Handle,
+  value: Handle,
+): Status {
+  const property = find_private(runtime, object, key)
+  if (property === undefined) return THROW
+  if (!(property_flags(runtime.heap, property) & WRITABLE))
+    return throw_error(runtime, "TypeError", "Private method is readonly")
+  store_property_value(runtime.heap, property, value)
+  return OK
+}
+
+export function init_private(
+  runtime: Runtime,
+  object: Handle,
+  key: Handle,
+  value: Handle,
+  is_method: boolean,
 ): Status {
   const { heap } = runtime
-  if (has && heap_type_of(heap, object) === HEAP_TYPES.BYTE_BUFFER) {
+  if (!has_property_list(heap, object))
+    return throw_error(runtime, "TypeError", "Expected an object")
+  if (find_property(heap, object, key, true, true) !== 0)
+    return throw_error(
+      runtime,
+      "TypeError",
+      "Private field is already initialized",
+    )
+  define_property(
+    runtime,
+    object,
+    key,
+    value,
+    is_method ? PRIVATE : PRIVATE | WRITABLE,
+  )
+  return OK
+}
+
+/** `#key in object` */
+export function has_private(
+  runtime: Runtime,
+  destination: Handle,
+  object: Handle,
+  key: Handle,
+): Status {
+  const { heap } = runtime
+  if (heap_type_of(heap, object) === HEAP_TYPES.BYTE_BUFFER) {
     write_boolean(heap, destination, false)
     return OK
   }
@@ -495,37 +557,13 @@ export function private_property(
     return throw_error(
       runtime,
       "TypeError",
-      has ? "Private brand check requires an object" : "Expected an object",
+      "Private brand check requires an object",
     )
-  const property = find_property(heap, object, key, true, true)
-  if (has) {
-    write_boolean(heap, destination, property !== 0)
-    return OK
-  }
-  if (initialize) {
-    if (property !== 0)
-      return throw_error(
-        runtime,
-        "TypeError",
-        "Private field is already initialized",
-      )
-    define_property(
-      runtime,
-      object,
-      key,
-      value!,
-      readonly ? PRIVATE : PRIVATE | WRITABLE,
-    )
-  } else {
-    if (property === 0)
-      return throw_error(runtime, "TypeError", "Invalid private field receiver")
-    if (value === undefined) load_property_value(heap, destination, property)
-    else {
-      if (!(property_flags(heap, property) & WRITABLE))
-        return throw_error(runtime, "TypeError", "Private method is readonly")
-      store_property_value(heap, property, value)
-    }
-  }
+  write_boolean(
+    heap,
+    destination,
+    find_property(heap, object, key, true, true) !== 0,
+  )
   return OK
 }
 
