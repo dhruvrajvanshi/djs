@@ -16,7 +16,6 @@ export const VALUE_TAGS = Object.freeze({
   BOOLEAN: 3,
   REF: 4,
   UNINITIALIZED: 5,
-  HOLE: 6,
 })
 
 function write_tag(
@@ -34,7 +33,7 @@ export function tag_of(heap: Heap, handle: Handle) {
   heap.handles.assert_handle(handle)
   const high = heap.handles.view.getUint32(handle * VALUE_BYTES + 4, true)
   const tag = high - NAN_HIGH
-  return tag > 0 && tag <= VALUE_TAGS.HOLE ? tag : VALUE_TAGS.NUMBER
+  return tag > 0 && tag <= VALUE_TAGS.UNINITIALIZED ? tag : VALUE_TAGS.NUMBER
 }
 
 /** The heap type of a reference value, or 0 for any other value. */
@@ -81,10 +80,6 @@ export function read_boolean(heap: Heap, handle: Handle) {
 
 export function write_uninitialized(heap: Heap, dest: Handle) {
   write_tag(heap, dest, VALUE_TAGS.UNINITIALIZED)
-}
-
-export function write_hole(heap: Heap, handle: Handle) {
-  write_tag(heap, handle, VALUE_TAGS.HOLE)
 }
 
 export function set_ref(heap: Heap, handle: Handle, reference: Address) {
