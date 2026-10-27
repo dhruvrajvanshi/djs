@@ -16,7 +16,6 @@ import { HEAP_TYPES, is_object_type } from "../storage/layout.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import { read_string, write_string } from "../heap_types/string.ts"
 import {
-  has_error_prototype,
   has_property_list,
   prototype_of_reference,
 } from "../heap_types/object.ts"
@@ -45,20 +44,6 @@ export function to_string(runtime: Runtime, value: Handle): string {
           panic("Cannot convert a Symbol value to a string")
         case HEAP_TYPES.FUNCTION:
           return "[Function]"
-        case HEAP_TYPES.OBJECT:
-          if (!has_error_prototype(heap, value)) return "[object Object]"
-        case HEAP_TYPES.ERROR: {
-          return heap.handles.scope(() => {
-            const key = heap.handles.local(),
-              text = heap.handles.local()
-            write_string(heap, key, "name")
-            load_property(runtime, text, value, key)
-            const name = to_string(runtime, text)
-            write_string(heap, key, "message")
-            load_property(runtime, text, value, key)
-            return name + ": " + to_string(runtime, text)
-          })
-        }
         default:
           return "[object Object]"
       }

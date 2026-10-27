@@ -96,12 +96,3 @@ export function try_set_prototype(
 export function mark_error_object(heap: Heap, object: Handle) {
   heap.write_u32(object_reference(heap, object) + HEADER.TYPE, HEAP_TYPES.ERROR)
 }
-
-export function has_error_prototype(heap: Heap, value: Handle) {
-  let reference = object_reference(heap, value)
-  while (reference !== 0) {
-    if (heap.read_u32(reference + HEADER.TYPE) === HEAP_TYPES.ERROR) return true
-    reference = prototype_of_reference(heap, reference)
-  }
-  return false
-}

@@ -1,8 +1,5 @@
 import type { Brand } from "../utils.ts"
 import {
-  VALUE_TAGS,
-  heap_type_of,
-  tag_of,
   write_boolean,
   write_null,
   write_number,
@@ -16,9 +13,6 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { compile_module, located_message } from "../compiler/compile.ts"
 import { read_string, write_string } from "../vm/heap_types/string.ts"
 import { create_environment } from "../vm/heap_types/environment.ts"
-import { is_object } from "../vm/heap_types/object.ts"
-import { load_property } from "../vm/semantics/properties.ts"
-import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import { create_function } from "../vm/semantics/objects.ts"
 import { load_binding, initialize_binding } from "../vm/semantics/bindings.ts"
 import { declare_slot, get_slot } from "../vm/semantics/internal_slots.ts"
@@ -27,7 +21,7 @@ import {
   clear_exception,
   take_exception,
 } from "../vm/semantics/errors.ts"
-import { to_string } from "../vm/semantics/operations.ts"
+import { error_report } from "./error_report.ts"
 import {
   NATIVE_MODULES,
   NATIVE_CODE,
@@ -539,7 +533,7 @@ export function evaluate_realm_module(
     fiber = create_fiber(runtime, module.code_id!, module.environment)
     run_task(runtime, fiber)
     if (fiber.status === FIBER_STATE.FAILED)
-      throw new Error(to_string(runtime, fiber.error))
+      throw new Error(error_report(runtime, fiber.error))
     if (fiber.status !== FIBER_STATE.DONE)
       panic("Stdlib modules must evaluate synchronously")
     module.status = MODULE_STATE.EVALUATED
@@ -604,25 +598,6 @@ export async function evaluate_module(
 
 /** A guest exception that escaped module evaluation. */
 export class UncaughtException extends Error {}
-
-// The value's stack if it has one, since that already starts with its message.
-function error_report(runtime: Runtime, value: Handle) {
-  const { heap } = runtime
-  if (!is_object(heap, value)) return to_string(runtime, value)
-  return heap.handles.scope(() => {
-    const key = heap.handles.local(),
-      stack = heap.handles.local()
-    write_string(heap, key, "stack")
-    const accessor = load_property(runtime, stack, value, key)
-    if (
-      !accessor &&
-      tag_of(heap, stack) === VALUE_TAGS.REF &&
-      heap_type_of(heap, stack) === HEAP_TYPES.STRING
-    )
-      return read_string(heap, stack)
-    return to_string(runtime, value)
-  })
-}
 
 function promise_state(runtime: Runtime, promise: Handle) {
   return runtime.heap.handles.scope(() => {

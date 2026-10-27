@@ -7,7 +7,8 @@ import { byte_buffer_view } from "../vm/heap_types/byte_buffer.ts"
 import { create_error } from "../vm/semantics/errors.ts"
 import { define_property } from "../vm/semantics/properties.ts"
 import { create_object } from "../vm/semantics/objects.ts"
-import { to_string, write_primitive } from "../vm/semantics/operations.ts"
+import { write_primitive } from "../vm/semantics/operations.ts"
+import { error_report } from "./error_report.ts"
 import { FIBER_STATE } from "../vm/execution/fiber.ts"
 import { create_call_fiber, dispose_fiber } from "../vm/execution/calls.ts"
 import { run_task } from "../vm/execution/interpreter.ts"
@@ -271,7 +272,7 @@ export function drain_jobs(runtime: Runtime) {
       )
       run_task(runtime, job)
       if (job.status === FIBER_STATE.FAILED)
-        throw new Error(to_string(runtime, job.error))
+        throw new Error(error_report(runtime, job.error))
       // Await reactions resume their fiber as part of the current microtask.
       for (const active of runtime.fibers)
         if (active.status === FIBER_STATE.READY) run_task(runtime, active)
