@@ -1,4 +1,4 @@
-import { byte_buffer, string_from_utf16 } from "djs:native"
+import { byte_buffer, string_from_utf16 } from "djs:vm"
 
 export default class Utf8Decoder {
   // Decoded little-endian UTF-16, turned into a string once in finish().

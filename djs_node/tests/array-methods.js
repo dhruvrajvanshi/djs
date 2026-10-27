@@ -1,6 +1,3 @@
-import { call, define_property_or_throw as define,
-  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
-  ordinary_object_create as create } from "djs:native";
 const a = [1,,3];
 console.log(a.push(4,5),a.pop(),a.shift(),a.unshift(7,8),a.join("|"));
 console.log(a.splice(1,2,"a","b","c").join("|"),a.join("|"));

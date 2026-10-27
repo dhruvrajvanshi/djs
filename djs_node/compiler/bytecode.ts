@@ -113,10 +113,6 @@ export const OP = Object.freeze({
   SET_PRIVATE: 25,
   /** `dst, object, key`: `#x in object`. */
   HAS_PRIVATE: 26,
-  /** `object, #name, src`: stdlib only. See docs/stdlib.md. */
-  INIT_SLOT: 27,
-  /** `object, steps, =constructor`: stdlib only. See docs/stdlib.md. */
-  SET_BEHAVIOR: 28,
 
   /** `dst, callee, receiver, first, =count` */
   CALL: 29,
@@ -227,18 +223,6 @@ export const FUNCTION_DERIVED = 16
 
 /** ExceptionHandler.environment for the function's own environment. */
 export const FUNCTION_ENVIRONMENT = 0xffffffff
-
-/**
- * Declaration markers, recognized at compile time through imports of
- * djs:native.
- */
-export const NATIVE_MARKERS: readonly string[] = Object.freeze([
-  "well_known",
-  "slot",
-  "internal_method",
-  "attributes",
-  "abstract_operation",
-])
 
 export type Instruction = number[]
 

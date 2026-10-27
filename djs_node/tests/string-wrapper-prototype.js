@@ -1,6 +1,7 @@
-import { call, define_property_or_throw as define,
-  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
-  ordinary_object_create as create } from "djs:native";
+const call = (f, receiver, ...args) => f.call(receiver, ...args);
+const descriptor = Object.getOwnPropertyDescriptor;
+const setPrototype = Object.setPrototypeOf;
+const create = Object.create;
 const unbox = String.prototype.valueOf;
 const text = new String("a😀z");
 setPrototype(text, null);

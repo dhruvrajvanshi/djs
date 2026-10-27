@@ -1,6 +1,4 @@
-import { call, define_property_or_throw as define,
-  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
-  ordinary_object_create as create } from "djs:native";
+const call = (f, receiver, ...args) => f.call(receiver, ...args);
 const s = "abcabc";
 console.log(s.slice(-4,-1),s.substring(5,1),s.substring(-3,2));
 console.log(s.indexOf("bc",2),s.lastIndexOf("bc"),s.lastIndexOf("",NaN));

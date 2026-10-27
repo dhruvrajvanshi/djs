@@ -8,7 +8,6 @@ import {
   load_environment_slot,
   store_environment_slot,
 } from "../heap_types/environment.ts"
-import { set_realm_intrinsic } from "../../runtime/realm.ts"
 import { OK, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 
@@ -54,8 +53,6 @@ export function initialize_binding(
   if (!environment_slot_uninitialized(heap, environment, slot))
     panic("Binding is already initialized")
   store_environment_slot(heap, environment, slot, source)
-  const intrinsic = scope.intrinsic_bindings?.get(slot)
-  if (intrinsic !== undefined) set_realm_intrinsic(runtime, intrinsic, source)
 }
 
 export function store_binding(

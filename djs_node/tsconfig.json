@@ -6,5 +6,5 @@
     "useUnknownInCatchVariables": false,
     "types": ["node"]
   },
-  "include": ["*.ts", "compiler/**/*.ts", "vm/**/*.ts", "runtime/**/*.ts", "host/**/*.ts"]
+  "include": ["*.ts", "compiler/**/*.ts", "vm/**/*.ts", "runtime/**/*.ts", "host/**/*.ts", "builtin_modules/**/*.ts"]
 }

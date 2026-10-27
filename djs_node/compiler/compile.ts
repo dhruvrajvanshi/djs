@@ -12,7 +12,6 @@ import type {
   CallExpr,
   Ident,
   ObjectLiteralEntry,
-  VarExpr,
   ArrayLiteralMember,
 } from "djs_ast"
 import {
@@ -30,7 +29,6 @@ import {
   OP,
   FUNCTION_ENVIRONMENT,
   INSTRUCTION_BYTES,
-  NATIVE_MARKERS,
   NO_HOLES,
   FUNCTION_DERIVED,
   encode_instructions,
@@ -180,17 +178,6 @@ export interface ImportBinding {
   span: Span
 }
 
-/** A module-scope binding the realm gives to the VM; see docs/realm.md. */
-export type RealmDeclaration =
-  | {
-      kind: "well_known"
-      name: string
-      slot: number
-      object: "ordinary" | "function" | "array" | "string"
-    }
-  | { kind: "abstract_operation"; name: string; slot: number }
-  | { kind: "internal_method"; object: string; method: string; slot: number }
-
 export interface CompiledModule {
   path: string
   functions: FunctionDescriptor[]
@@ -203,7 +190,6 @@ export interface CompiledModule {
     star_export?: boolean
   }[]
   exports: ExportBinding[]
-  realm: RealmDeclaration[]
   object_templates: ObjectTemplate[]
   /** Element indices absent from array literals, for CREATE_ARRAY. */
   array_holes: number[][]
@@ -218,14 +204,8 @@ export interface CompiledModule {
 export interface CompilerState {
   unit: CompiledModule
   prepared: WeakSet<object>
-  /** Local names of djs:native imports, mapped to the imported names. */
+  /** Local names of djs:vm imports, mapped to the imported names. */
   native_imports: Map<string, string>
-  /** Well-known declarations, mapped to the object literal that fills them. */
-  well_known: Map<Stmt, Extract<Expr, { kind: "Object" }>>
-  /** Module-level marker statements, which compile to nothing. */
-  registrations: Set<Stmt>
-  /** Names of module-level function declarations. */
-  functions: Set<string>
   /** Indices of object templates and hole lists, by their JSON. */
   template_ids: Map<string, number>
 }
@@ -244,7 +224,6 @@ export function compile_module(
     literals: [],
     imports: [],
     exports: [],
-    realm: [],
     object_templates: [],
     array_holes: [],
     classes: [],
@@ -256,9 +235,6 @@ export function compile_module(
     unit,
     prepared: new WeakSet(),
     native_imports: new Map(),
-    well_known: new Map(),
-    registrations: new Set(),
-    functions: new Set(),
     template_ids: new Map(),
   }
   try {
@@ -297,7 +273,6 @@ export function compile_module(
     Object.freeze(item)
   }
   unit.exports.forEach(Object.freeze)
-  unit.realm.forEach(Object.freeze)
   for (const template of unit.object_templates) {
     template.entries.forEach(Object.freeze)
     Object.freeze(template.entries)
@@ -314,7 +289,6 @@ export function compile_module(
     "literals",
     "imports",
     "exports",
-    "realm",
     "object_templates",
     "array_holes",
     "classes",
@@ -579,7 +553,7 @@ function destructure(
 }
 
 // Variables that no closure uses live in registers, except module-level ones,
-// which imports, exports and the realm address by slot.
+// which imports and exports address by slot.
 function declare_local(scope: Scope, name: string, readonly: boolean = false) {
   const fn = scope.owner
   const in_register =
@@ -736,16 +710,6 @@ function prepare_statements(
               export_binding(state, stmt, binding.name, binding.slot)
           }
         }
-        if (
-          fn.id === 0 &&
-          marker_call(
-            state,
-            scope,
-            stmt.decl.declarators[0]?.init,
-            "well_known",
-          )
-        )
-          declare_well_known(state, stmt, scope)
         break
       case "ClassDecl": {
         const name = stmt.class_def.name?.text
@@ -762,7 +726,6 @@ function prepare_statements(
         if (!stmt.func.name)
           throw syntax_error(stmt, "A function declaration needs a name")
         const binding = declare_local(scope, stmt.func.name!.text)
-        if (fn.id === 0 && scope === fn.scope) state.functions.add(binding.name)
         if (stmt.is_exported) {
           if (fn.id !== 0 || scope !== fn.scope)
             unsupported(stmt, "nested export")
@@ -770,14 +733,6 @@ function prepare_statements(
         }
         break
       }
-      case "Expr":
-        if (
-          fn.id === 0 &&
-          (marker_call(state, scope, stmt.expr, "abstract_operation") ||
-            marker_call(state, scope, stmt.expr, "internal_method"))
-        )
-          state.registrations.add(stmt)
-        break
       case "ExportDefault": {
         if (fn.id !== 0 || scope !== fn.scope)
           unsupported(stmt, "nested export")
@@ -804,7 +759,7 @@ function prepare_statements(
               ? item.imported_name.ident.text
               : decode_string(item.imported_name.text, item)
           const local = item.as_name?.text ?? imported
-          if (decode_string(stmt.module_specifier, stmt) === "djs:native")
+          if (decode_string(stmt.module_specifier, stmt) === "djs:vm")
             state.native_imports.set(local, imported)
           bindings.push({
             imported,
@@ -1180,17 +1135,9 @@ function compile_stmt_kind(
       unsupported(stmt, "nested import")
       break
     case "Expr":
-      if (state.registrations.has(stmt)) {
-        declare_registration(state, scope, stmt.expr)
-        return
-      }
       compile_expr(state, fn, scope, stmt.expr)
       return
     case "VarDecl":
-      if (state.well_known.has(stmt)) {
-        fill_well_known(state, fn, scope, stmt)
-        return
-      }
       for (const item of stmt.decl.declarators) {
         const value = item.init
           ? compile_expr(state, fn, scope, item.init)
@@ -2187,13 +2134,6 @@ function compile_expr_kind(
       return constant(state, fn, undefined)
     case "Var":
       if (
-        NATIVE_MARKERS.includes(native_import(state, scope, expr.ident.text)!)
-      )
-        throw syntax_error(
-          expr,
-          `${expr.ident.text} declares the realm and is never evaluated`,
-        )
-      if (
         SLOT_OPERATIONS.includes(native_import(state, scope, expr.ident.text)!)
       )
         throw syntax_error(
@@ -2864,246 +2804,9 @@ const SLOT_OPERATIONS = ["has_slot", "get_slot", "set_slot"]
 const SUPER_CONSTRUCTOR = "*super*"
 const SUPER_PROTOTYPE = "*super prototype*"
 
-/** The djs:native export a module-level name imports, if any. */
+/** The djs:vm export a module-level name imports, if any. */
 function native_import(state: CompilerState, scope: Scope, name: string) {
   const binding = resolve_binding(scope, name)
   if (!binding || binding.owner.id !== 0) return undefined
   return state.native_imports.get(name)
-}
-
-/** The arguments of `name(...)` when `expr` calls that djs:native marker. */
-function marker_call(
-  state: CompilerState,
-  scope: Scope,
-  expr: Expr | null | undefined,
-  name: string,
-) {
-  if (expr?.kind !== "Call" || expr.callee.kind !== "Var") return null
-  if (native_import(state, scope, expr.callee.ident.text) !== name) return null
-  if (expr.spread || expr.is_optional)
-    throw syntax_error(expr, `Invalid ${name}(...) marker`)
-  return expr.args
-}
-
-function string_args(node: Expr, args: readonly Expr[], count: number) {
-  if (args.length !== count)
-    throw syntax_error(node, "Wrong number of marker arguments")
-  return args.map((arg) => {
-    if (arg.kind !== "String")
-      throw syntax_error(arg, "Marker arguments must be string literals")
-    return decode_string(arg.text, arg)
-  })
-}
-
-function steps_entry(
-  state: CompilerState,
-  scope: Scope,
-  entry: ObjectLiteralEntry,
-) {
-  return (
-    entry.kind === "Prop" &&
-    entry.key.kind === "Computed" &&
-    marker_call(state, scope, entry.key.expr, "internal_method") !== null
-  )
-}
-
-// The native operation a well-known object is allocated with, named after the
-// spec's creation algorithm, and the kind of object it creates.
-const CREATION_OPERATIONS = Object.freeze({
-  ordinary_object_create: "ordinary",
-  array_create: "array",
-  string_create: "string",
-  create_builtin_function: "function",
-} as const)
-
-// const X = well_known("%X%", creation_operation, { … })
-function declare_well_known(
-  state: CompilerState,
-  stmt: VarDeclStmt,
-  scope: Scope,
-) {
-  const [item] = stmt.decl.declarators
-  const init = item.init!
-  if (
-    stmt.decl.decl_type !== "Const" ||
-    stmt.decl.declarators.length !== 1 ||
-    item.pattern.kind !== "Var"
-  )
-    throw syntax_error(stmt, "Expected const name = well_known(...)")
-  const args = marker_call(state, scope, init, "well_known")!
-  if (args.length !== 3)
-    throw syntax_error(init, 'Expected well_known("%X%", create, { … })')
-  const [name] = string_args(init, args.slice(0, 1), 1)
-  const [, create, literal] = args
-  const operation =
-    create.kind === "Var"
-      ? native_import(state, scope, create.ident.text)
-      : undefined
-  if (!operation || !Object.hasOwn(CREATION_OPERATIONS, operation))
-    throw syntax_error(
-      create,
-      `Expected one of ${Object.keys(CREATION_OPERATIONS).join(", ")} from djs:native`,
-    )
-  const object =
-    CREATION_OPERATIONS[operation as keyof typeof CREATION_OPERATIONS]
-  if (literal.kind !== "Object")
-    throw syntax_error(literal, "Expected an object literal")
-  const has_steps = literal.entries.some((entry) =>
-    steps_entry(state, scope, entry),
-  )
-  if (has_steps !== (object === "function"))
-    throw syntax_error(
-      literal,
-      has_steps
-        ? "Only create_builtin_function objects have [[Call]] steps"
-        : "create_builtin_function requires an internal_method member",
-    )
-  state.unit.realm.push({
-    kind: "well_known",
-    name,
-    slot: scope.bindings.get(item.pattern.ident.text)!.slot,
-    object,
-  })
-  state.well_known.set(stmt, literal)
-}
-
-// abstract_operation("Name", fn) and internal_method(kind, "[[X]]", fn)
-function declare_registration(state: CompilerState, scope: Scope, expr: Expr) {
-  const call = expr as Extract<Expr, { kind: "Call" }>
-  const kind = native_import(state, scope, (call.callee as VarExpr).ident.text)
-  const target = call.args.at(-1)
-  const binding =
-    target?.kind === "Var" ? scope.bindings.get(target.ident.text) : undefined
-  if (!binding || !state.functions.has(binding.name))
-    throw syntax_error(expr, "Expected a function declared in this module")
-  if (kind === "abstract_operation") {
-    const [name] = string_args(expr, call.args.slice(0, -1), 1)
-    state.unit.realm.push({ kind, name, slot: binding.slot })
-  } else {
-    const [object, method] = string_args(expr, call.args.slice(0, -1), 2)
-    if (object !== "array" || method !== "[[DefineOwnProperty]]")
-      throw syntax_error(
-        expr,
-        `Unsupported internal method: ${object} ${method}`,
-      )
-    state.unit.realm.push({
-      kind: "internal_method",
-      object,
-      method,
-      slot: binding.slot,
-    })
-  }
-}
-
-function fill_well_known(
-  state: CompilerState,
-  fn: FunctionBuilder,
-  scope: Scope,
-  stmt: VarDeclStmt,
-) {
-  const pattern = stmt.decl.declarators[0].pattern as Extract<
-    Pattern,
-    { kind: "Var" }
-  >
-  // The VM allocated the object before evaluation; this fills it.
-  const object = load_name(state, fn, scope, pattern.ident.text)
-  for (const entry of state.well_known.get(stmt)!.entries)
-    fill_entry(state, fn, scope, object, entry)
-}
-
-function fill_entry(
-  state: CompilerState,
-  fn: FunctionBuilder,
-  scope: Scope,
-  object: number,
-  entry: ObjectLiteralEntry,
-): void {
-  if (entry.kind === "Spread")
-    unsupported(entry, "spread in a well-known object")
-  if (entry.kind === "Prop" && entry.key.kind === "Computed") {
-    const slot = marker_call(state, scope, entry.key.expr, "slot")
-    if (slot) {
-      const [name] = string_args(entry.key.expr, slot, 1)
-      const value = compile_expr(state, fn, scope, entry.value)
-      emit(fn, OP.INIT_SLOT, object, literal(state, name), value)
-      return
-    }
-    const steps = marker_call(state, scope, entry.key.expr, "internal_method")
-    if (steps) {
-      const marker = entry.key.expr
-      const names = steps.map(
-        (_, index) => string_args(marker, steps.slice(index, index + 1), 1)[0],
-      )
-      if (
-        names[0] !== "[[Call]]" ||
-        names.length > 2 ||
-        (names.length === 2 && names[1] !== "[[Construct]]")
-      )
-        throw syntax_error(
-          marker,
-          'Expected internal_method("[[Call]]"[, "[[Construct]]"])',
-        )
-      if (entry.value.kind !== "Func")
-        throw syntax_error(entry.value, "Expected a function expression")
-      const name = entry.value.func.name?.text ?? ""
-      const id = function_id(state, fn, scope, entry.value.func, name, 2)
-      const value = allocate(fn)
-      emit(fn, OP.CREATE_CLOSURE, value, id)
-      emit(fn, OP.SET_BEHAVIOR, object, value, names.length === 2 ? 1 : 0)
-      for (const [property, initial] of [
-        ["length", state.unit.functions[id].length],
-        ["name", name],
-      ] as const)
-        emit(
-          fn,
-          OP.DEFINE_PROP,
-          object,
-          constant(state, fn, property),
-          constant(state, fn, initial),
-          4,
-        )
-      return
-    }
-  }
-  const accessor = entry.kind === "Method" ? entry.method.accessor_type : null
-  let flags = accessor ? 4 : 5
-  let key, value
-  if (entry.kind === "Ident") {
-    key = constant(state, fn, entry.ident.text)
-    value = load_name(state, fn, scope, entry.ident.text)
-  } else if (entry.kind === "Prop") {
-    key = property_key(state, fn, scope, entry.key)
-    let initializer = entry.value
-    const attributes = marker_call(state, scope, initializer, "attributes")
-    if (attributes) {
-      if (attributes.length !== 2)
-        throw syntax_error(initializer, "Expected attributes({ … }, value)")
-      flags = attribute_flags(attributes[0], flags)
-      initializer = attributes[1]
-    }
-    value = compile_expr(state, fn, scope, initializer)
-  } else {
-    key = property_key(state, fn, scope, entry.method.name)
-    value = method_value(state, fn, scope, entry.method, key)
-  }
-  emit(fn, OP.DEFINE_PROP, object, key, value, flags, property_kind(accessor))
-}
-
-// Built-in properties default to non-enumerable (ECMA-262 clause 18).
-function attribute_flags(node: Expr, flags: number) {
-  if (node.kind !== "Object")
-    throw syntax_error(node, "Expected an object literal of attributes")
-  const masks = { writable: 1, enumerable: 2, configurable: 4 }
-  for (const entry of node.entries) {
-    if (
-      entry.kind !== "Prop" ||
-      entry.key.kind !== "Ident" ||
-      !Object.hasOwn(masks, entry.key.ident.text) ||
-      entry.value.kind !== "Boolean"
-    )
-      throw syntax_error(entry, "Expected writable, enumerable or configurable")
-    const mask = masks[entry.key.ident.text as keyof typeof masks]
-    flags = entry.value.value ? flags | mask : flags & ~mask
-  }
-  return flags
 }

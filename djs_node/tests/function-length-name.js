@@ -1,6 +1,4 @@
-import { call, define_property_or_throw as define,
-  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
-  ordinary_object_create as create } from "djs:native";
+const descriptor = Object.getOwnPropertyDescriptor;
 function plain(a, b) {return arguments.length}
 function optional(a, b = 2, c) {return [a, b, c, arguments.length].join("|")}
 function collect(first, ...rest) {

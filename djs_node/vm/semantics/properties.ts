@@ -25,6 +25,7 @@ import {
 import { byte_buffer_view } from "../heap_types/byte_buffer.ts"
 import { string_reference } from "../heap_types/string_object.ts"
 import {
+  allocate_object,
   has_property_list,
   is_object,
   object_properties,
@@ -46,7 +47,7 @@ import {
 } from "../heap_types/property.ts"
 import { create_array, create_object } from "./objects.ts"
 import { same_value, to_string, truthy, write_primitive } from "./operations.ts"
-import { call, coerce_value } from "../execution/calls.ts"
+import { call, to_primitive } from "../execution/calls.ts"
 import { panic } from "../../utils.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
@@ -112,7 +113,7 @@ export function to_property_key(
   if (!is_object(heap, key)) return property_key(runtime, key)
   return heap.handles.scope(() => {
     const converted = heap.handles.local()
-    if (coerce_value(runtime, converted, key, "ToString") === THROW)
+    if (to_primitive(runtime, converted, key, "string") === THROW)
       return undefined
     return property_key(runtime, converted)
   })
@@ -687,7 +688,7 @@ export function has_private(
  * Own string keys in property order, followed by symbol keys. The symbols are
  * local handles in the caller's scope, since creating the result moves them.
  */
-function own_property_keys(runtime: Runtime, object: Handle) {
+export function own_property_keys(runtime: Runtime, object: Handle) {
   const { heap } = runtime
   const names = []
   const symbols: Handle[] = []
@@ -759,6 +760,9 @@ export function from_property_descriptor(
   runtime: Runtime,
   destination: Handle,
   descriptor: PropertyDescriptor | undefined,
+  // null for a descriptor only the stdlib sees, so that reading its absent
+  // fields can't reach %Object.prototype%.
+  prototype?: null,
 ) {
   const { heap } = runtime
   if (!descriptor) {
@@ -766,7 +770,8 @@ export function from_property_descriptor(
     return
   }
   heap.handles.scope(() => {
-    create_object(runtime, destination)
+    if (prototype === null) allocate_object(heap, destination, undefined)
+    else create_object(runtime, destination)
     for (const field of [
       "value",
       "writable",
@@ -793,9 +798,9 @@ export function from_property_descriptor(
 }
 
 /**
- * Reads a descriptor object whose fields must be data properties: public
- * Object APIs perform the observable conversion in the stdlib before calling
- * the VM. Returns undefined after raising.
+ * Reads a descriptor object's own fields, which must be data properties:
+ * public Object APIs perform the observable conversion in the stdlib before
+ * calling the VM. Returns undefined after raising.
  * @see https://tc39.es/ecma262/#sec-topropertydescriptor
  */
 export function to_property_descriptor(
@@ -816,7 +821,7 @@ export function to_property_descriptor(
     "get",
     "set",
   ] as const) {
-    const found = get_property_descriptor(runtime, object, field)
+    const found = get_own_property_descriptor(runtime, object, field)
     if (!found) continue
     if (is_accessor_descriptor(found)) {
       throw_error(
@@ -865,7 +870,7 @@ function invoke_define(
       descriptor_object = heap.handles.local()
     if (typeof key === "string") write_string(heap, key_value, key)
     else heap.copy_value(key_value, key)
-    from_property_descriptor(runtime, descriptor_object, descriptor)
+    from_property_descriptor(runtime, descriptor_object, descriptor, null)
     if (
       call(runtime, result, method, object, [key_value, descriptor_object]) ===
       THROW
@@ -883,9 +888,9 @@ function invoke_define(
   })
 }
 
-// Array exotic objects define properties through the stdlib's
-// @internal_method("array", "[[DefineOwnProperty]]"); other objects are ordinary.
+// Array exotic objects define properties through the [[DefineOwnProperty]]
+// the stdlib registers for "array"; other objects are ordinary.
 function exotic_define_own_property(runtime: Runtime, object: Handle) {
   if (heap_type_of(runtime.heap, object) !== HEAP_TYPES.ARRAY) return undefined
-  return runtime.realm.intrinsics.get("array [[DefineOwnProperty]]")
+  return runtime.realm.internal_method("array [[DefineOwnProperty]]")
 }

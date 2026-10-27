@@ -29,7 +29,6 @@ import type { CodeId, LinkedCode } from "../../runtime/modules.ts"
 import { write_string } from "../heap_types/string.ts"
 import { load_symbol_description } from "../heap_types/symbol.ts"
 import { is_object, set_prototype } from "../heap_types/object.ts"
-import { set_builtin_steps } from "../heap_types/function.ts"
 import {
   copy_environment_bindings,
   create_environment,
@@ -76,7 +75,6 @@ import {
   load_binding,
   store_binding,
 } from "../semantics/bindings.ts"
-import { init_slot } from "../semantics/internal_slots.ts"
 import { OK, THROW, throw_error, clear_exception } from "../semantics/errors.ts"
 import type { Status } from "../semantics/errors.ts"
 import { FIBER_STATE } from "./fiber.ts"
@@ -87,7 +85,7 @@ import {
   call_function,
   pop_frame,
   settle_fiber,
-  coerce_value,
+  to_primitive,
   construct_function,
 } from "./calls.ts"
 
@@ -186,7 +184,7 @@ function to_primitives(
   right_destination: Handle,
   left: Handle,
   right: Handle,
-  hint?: string,
+  hint?: "string" | "number",
 ): Status {
   const { heap } = runtime
   heap.copy_value(left_destination, left)
@@ -194,7 +192,7 @@ function to_primitives(
   for (const value of [left_destination, right_destination])
     if (
       is_object(heap, value) &&
-      coerce_value(runtime, value, value, "ToPrimitive", hint) === THROW
+      to_primitive(runtime, value, value, hint) === THROW
     )
       return THROW
   return OK
@@ -424,8 +422,7 @@ const op = {
     pattern: Handle,
     flags: Handle,
   ): Status {
-    const create = runtime.realm.intrinsics.get("RegExpCreate")
-    if (create === undefined) panic("RegExp is not initialized")
+    const create = runtime.realm.abstract_operation("RegExpCreate")
     return call(runtime, destination, create, undefined, [pattern, flags])
   },
   COPY_DATA_PROPERTIES(
@@ -434,8 +431,7 @@ const op = {
     source: Handle,
     temporary: Handle,
   ): Status {
-    const copy = runtime.realm.intrinsics.get("CopyDataProperties")
-    if (copy === undefined) panic("CopyDataProperties is not initialized")
+    const copy = runtime.realm.abstract_operation("CopyDataProperties")
     return call(runtime, temporary, copy, undefined, [object, source])
   },
   GET_FOR_IN_ITERATOR(
@@ -444,8 +440,9 @@ const op = {
     next: Handle,
     source: Handle,
   ): Status {
-    const enumerate = runtime.realm.intrinsics.get("EnumerateObjectProperties")
-    if (enumerate === undefined) panic("for-in is not initialized")
+    const enumerate = runtime.realm.abstract_operation(
+      "EnumerateObjectProperties",
+    )
     if (call(runtime, iterator, enumerate, undefined, [source]) === THROW)
       return THROW
     return get_v(runtime, next, iterator, "next")
@@ -544,22 +541,6 @@ const op = {
   },
   SET_PROTO(heap: Heap, object: Handle, prototype: Handle) {
     set_prototype(heap, object, prototype)
-  },
-  INIT_SLOT(
-    runtime: Runtime,
-    object: Handle,
-    name: string,
-    value: Handle,
-  ): Status {
-    return init_slot(runtime, object, name, value)
-  },
-  SET_BEHAVIOR(
-    heap: Heap,
-    object: Handle,
-    steps: Handle,
-    constructor: boolean,
-  ) {
-    set_builtin_steps(heap, object, steps, constructor)
   },
   CREATE_OBJECT(
     runtime: Runtime,
@@ -847,22 +828,26 @@ const op = {
     runtime.heap.copy_value(operand, source)
     if (
       is_object(runtime.heap, operand) &&
-      coerce_value(runtime, operand, operand, "ToNumber") === THROW
+      to_primitive(runtime, operand, operand, "number") === THROW
     )
       return THROW
     return numeric_unary_operation(runtime, destination, operand, opcode)
   },
   TO_STRING(runtime: Runtime, destination: Handle, source: Handle): Status {
     const { heap } = runtime
-    if (heap_type_of(heap, source) === HEAP_TYPES.SYMBOL)
+    heap.copy_value(destination, source)
+    if (
+      is_object(heap, destination) &&
+      to_primitive(runtime, destination, destination, "string") === THROW
+    )
+      return THROW
+    if (heap_type_of(heap, destination) === HEAP_TYPES.SYMBOL)
       return throw_error(
         runtime,
         "TypeError",
         "Cannot convert a Symbol value to a string",
       )
-    if (is_object(heap, source))
-      return coerce_value(runtime, destination, source, "ToString")
-    write_string(heap, destination, to_string(runtime, source))
+    write_string(heap, destination, to_string(runtime, destination))
     return OK
   },
   LOAD_THIS(runtime: Runtime, destination: Handle, frame: Frame): Status {
@@ -1030,17 +1015,6 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           break
         case OP.HAS_PRIVATE:
           status = has_private(runtime, reg(a), reg(b), reg(c))
-          break
-        case OP.INIT_SLOT:
-          status = op.INIT_SLOT(
-            runtime,
-            reg(a),
-            code.unit.literals[b] as string,
-            reg(c),
-          )
-          break
-        case OP.SET_BEHAVIOR:
-          op.SET_BEHAVIOR(heap, reg(a), reg(b), c === 1)
           break
         case OP.CALL:
           status = op.CALL(

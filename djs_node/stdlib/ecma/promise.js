@@ -1,128 +1,130 @@
-// 27.2 Promise Objects
 import {
-  well_known,
-  slot,
-  internal_method,
-  attributes,
-  abstract_operation,
-  host_enqueue_promise_job,
   call,
+  create_builtin_function,
+  define_own_property,
   has_slot,
   get_slot,
+  object_create,
   set_slot,
-  ordinary_object_create,
-  create_builtin_function,
-} from "djs:native"
-import { get_prototype_from_constructor } from "djs:abstract"
-import { is_object } from "./support.js"
-import { ObjectPrototype, FunctionPrototype } from "./fundamental.js"
+  set_abstract_operation,
+  well_known_intrinsic_objects,
+} from "djs:vm"
+import { enqueue_job } from "djs:runtime"
+import { define_builtin_properties } from "./define_builtin_properties.js"
+import { get_prototype_from_constructor } from "./abstract-operations.js"
 
-// 27.2.3 The Promise Constructor
-const Promise = well_known("%Promise%", create_builtin_function, {
-  [slot("[[Prototype]]")]: FunctionPrototype,
+const { "%Object.prototype%": object_prototype } = well_known_intrinsic_objects
 
-  // 27.2.3.1 Promise ( executor )
-  [internal_method("[[Call]]", "[[Construct]]")]: function Promise(executor) {
+function is_object(value) {
+  return (
+    value !== null && (typeof value === "object" || typeof value === "function")
+  )
+}
+
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise-constructor
+ */
+const Promise = create_builtin_function(
+  function (executor) {
     if (new.target === undefined)
       throw new TypeError("Promise constructor requires new")
     if (typeof executor !== "function")
       throw new TypeError("Promise executor is not callable")
-    const promise = ordinary_object_create(
+    const promise = object_create(
       get_prototype_from_constructor(new.target, PromisePrototype),
-      [
-        "[[PromiseState]]",
-        "[[PromiseResult]]",
-        "[[PromiseFulfillReactions]]",
-        "[[PromiseRejectReactions]]",
-        "[[PromiseIsHandled]]",
-      ],
+      "ordinary",
+      {
+        "[[PromiseState]]": "pending",
+        "[[PromiseResult]]": undefined,
+        "[[PromiseFulfillReactions]]": undefined,
+        "[[PromiseRejectReactions]]": undefined,
+        "[[PromiseIsHandled]]": false,
+      },
     )
-    set_slot(promise, "[[PromiseState]]", "pending")
-    set_slot(promise, "[[PromiseIsHandled]]", false)
     const functions = create_resolving_functions(promise)
     try {
-      call(executor, undefined, functions.resolve, functions.reject)
+      call(executor, undefined, [functions.resolve, functions.reject])
     } catch (error) {
-      call(functions.reject, undefined, error)
+      call(functions.reject, undefined, [error])
     }
     return promise
   },
+  { name: "Promise", constructor: true },
+)
 
-  // 27.2.4 Properties of the Promise Constructor
-  prototype: attributes(
-    { writable: false, configurable: false },
-    PromisePrototype,
-  ),
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-properties-of-the-promise-prototype-object
+ */
+const PromisePrototype = object_create(object_prototype, "ordinary")
 
-  // 27.2.4.6 Promise.reject ( r )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-properties-of-the-promise-constructor
+ */
+define_own_property(Promise, "prototype", {
+  value: PromisePrototype,
+  writable: false,
+  enumerable: false,
+  configurable: false,
+})
+define_builtin_properties(Promise, {
   reject(reason) {
     const result = new_promise_capability(this)
-    call(result.reject, undefined, reason)
+    call(result.reject, undefined, [reason])
     return result.promise
   },
 
-  // 27.2.4.8 Promise.resolve ( x )
   resolve(value) {
     if (!is_object(this))
       throw new TypeError("Promise.resolve requires an object receiver")
     return promise_resolve(this, value)
   },
 
-  // 27.2.4.9 Promise.withResolvers ( )
   withResolvers() {
     return new_promise_capability(this)
   },
 })
 
-// 27.2.5 Properties of the Promise Prototype Object
-const PromisePrototype = well_known(
-  "%Promise.prototype%",
-  ordinary_object_create,
-  {
-    [slot("[[Prototype]]")]: ObjectPrototype,
-    constructor: Promise,
+define_builtin_properties(PromisePrototype, {
+  constructor: Promise,
 
-    // 27.2.5.1 Promise.prototype.catch ( onRejected )
-    catch(rejected) {
-      return this.then(undefined, rejected)
-    },
-
-    // 27.2.5.3 Promise.prototype.finally ( onFinally )
-    finally(onFinally) {
-      if (typeof onFinally !== "function")
-        return this.then(onFinally, onFinally)
-      return this.then(
-        function (value) {
-          const result = call(onFinally, undefined)
-          return promise_resolve(Promise, result).then(function () {
-            return value
-          })
-        },
-        function (reason) {
-          const result = call(onFinally, undefined)
-          return promise_resolve(Promise, result).then(function () {
-            throw reason
-          })
-        },
-      )
-    },
-
-    // 27.2.5.4 Promise.prototype.then ( onFulfilled, onRejected )
-    then(fulfilled, rejected) {
-      if (!is_promise(this))
-        throw new TypeError("Promise.prototype.then requires a promise")
-      const result = new_promise_capability(Promise)
-      perform_promise_then(this, fulfilled, rejected, result)
-      return result.promise
-    },
+  catch(rejected) {
+    return this.then(undefined, rejected)
   },
-)
 
-// 27.2.1.3 CreateResolvingFunctions ( promise )
+  finally(onFinally) {
+    if (typeof onFinally !== "function") return this.then(onFinally, onFinally)
+    return this.then(
+      function (value) {
+        const result = call(onFinally, undefined, [])
+        return promise_resolve(Promise, result).then(function () {
+          return value
+        })
+      },
+      function (reason) {
+        const result = call(onFinally, undefined, [])
+        return promise_resolve(Promise, result).then(function () {
+          throw reason
+        })
+      },
+    )
+  },
+
+  then(fulfilled, rejected) {
+    if (!is_promise(this))
+      throw new TypeError("Promise.prototype.then requires a promise")
+    const result = new_promise_capability(Promise)
+    perform_promise_then(this, fulfilled, rejected, result)
+    return result.promise
+  },
+})
+
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-createresolvingfunctions
+ */
 function create_resolving_functions(promise) {
-  // Shared [[AlreadyResolved]]; it also locks both functions during adoption.
+  // The spec's [[AlreadyResolved]], shared by both functions: once either one
+  // runs, later calls to either do nothing.
   let already_resolved = false
-  // 27.2.1.3.2 Promise Resolve Functions
   const resolve = function (resolution) {
     if (already_resolved) return
     already_resolved = true
@@ -145,17 +147,16 @@ function create_resolving_functions(promise) {
       fulfill_promise(promise, resolution)
       return
     }
-    // 27.2.2.2 NewPromiseResolveThenableJob ( promiseToResolve, thenable, then )
-    host_enqueue_promise_job(function () {
+    // https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-newpromiseresolvethenablejob
+    enqueue_job(function () {
       const functions = create_resolving_functions(promise)
       try {
-        call(then, resolution, functions.resolve, functions.reject)
+        call(then, resolution, [functions.resolve, functions.reject])
       } catch (error) {
-        call(functions.reject, undefined, error)
+        call(functions.reject, undefined, [error])
       }
     })
   }
-  // 27.2.1.3.1 Promise Reject Functions
   const reject = function (reason) {
     if (already_resolved) return
     already_resolved = true
@@ -164,14 +165,18 @@ function create_resolving_functions(promise) {
   return { resolve, reject }
 }
 
-// 27.2.1.4 FulfillPromise ( promise, value )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-fulfillpromise
+ */
 function fulfill_promise(promise, value) {
   const reactions = get_slot(promise, "[[PromiseFulfillReactions]]")
   settle_promise(promise, "fulfilled", value)
   trigger_promise_reactions(reactions, value)
 }
 
-// 27.2.1.7 RejectPromise ( promise, reason )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-rejectpromise
+ */
 function reject_promise(promise, reason) {
   const reactions = get_slot(promise, "[[PromiseRejectReactions]]")
   settle_promise(promise, "rejected", reason)
@@ -185,7 +190,9 @@ function settle_promise(promise, state, value) {
   set_slot(promise, "[[PromiseState]]", state)
 }
 
-// 27.2.1.8 TriggerPromiseReactions ( reactions, argument )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-triggerpromisereactions
+ */
 function trigger_promise_reactions(last, argument) {
   if (last === undefined) return
   let reaction = last
@@ -196,7 +203,9 @@ function trigger_promise_reactions(last, argument) {
   }
 }
 
-// 27.2.1.2 PromiseReaction Records
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promisereaction-records
+ */
 function promise_reaction(capability, type, handler) {
   return {
     capability,
@@ -206,9 +215,9 @@ function promise_reaction(capability, type, handler) {
   }
 }
 
-// A reaction list is a circular list through each reaction's `next`, held by
-// its last reaction. Appending is O(1) and doesn't go through Array.prototype,
-// which a program can change.
+// A promise keeps its reactions in a circular linked list. The slot holds the
+// last reaction, and each reaction's `next` points to the one after it,
+// wrapping around to the first, so appending takes constant time.
 function append_reaction(last, reaction) {
   if (last === undefined) reaction.next = reaction
   else {
@@ -218,12 +227,16 @@ function append_reaction(last, reaction) {
   return reaction
 }
 
-// 27.2.1.6 IsPromise ( x )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-ispromise
+ */
 function is_promise(value) {
   return is_object(value) && has_slot(value, "[[PromiseState]]")
 }
 
-// 27.2.1.5 NewPromiseCapability ( C )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-newpromisecapability
+ */
 function new_promise_capability(Constructor) {
   let resolve
   let reject
@@ -242,40 +255,53 @@ function new_promise_capability(Constructor) {
   return { promise, resolve, reject }
 }
 
-// The VM only creates %Promise% capabilities, for async function calls.
 function new_intrinsic_promise_capability() {
   return new_promise_capability(Promise)
 }
-abstract_operation("NewPromiseCapability", new_intrinsic_promise_capability)
 
-// 27.2.2.1 NewPromiseReactionJob ( reaction, argument )
+// The VM calls this when it implicitly creates a promise.
+// @example
+// ```js
+//   async function f() {}
+//   f() // returns NewPromiseCapability().promise
+// ```
+// Module imports call this.
+set_abstract_operation("NewPromiseCapability", new_intrinsic_promise_capability)
+
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-newpromisereactionjob
+ */
 function new_promise_reaction_job(reaction, argument) {
-  host_enqueue_promise_job(function () {
+  enqueue_job(function () {
     const capability = reaction.capability
     let result
     try {
       if (reaction.handler === undefined) {
         if (reaction.type === "reject") throw argument
         result = argument
-      } else result = call(reaction.handler, undefined, argument)
+      } else result = call(reaction.handler, undefined, [argument])
     } catch (error) {
       if (capability === undefined) throw error
-      call(capability.reject, undefined, error)
+      call(capability.reject, undefined, [error])
       return
     }
-    if (capability !== undefined) call(capability.resolve, undefined, result)
+    if (capability !== undefined) call(capability.resolve, undefined, [result])
   })
 }
 
-// 27.2.4.7.1 PromiseResolve ( C, x )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-promise-resolve
+ */
 function promise_resolve(Constructor, value) {
   if (is_promise(value) && value.constructor === Constructor) return value
   const result = new_promise_capability(Constructor)
-  call(result.resolve, undefined, value)
+  call(result.resolve, undefined, [value])
   return result.promise
 }
 
-// 27.2.5.4.1 PerformPromiseThen ( promise, onFulfilled, onRejected [ , resultCapability ] )
+/**
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#sec-performpromisethen
+ */
 function perform_promise_then(promise, fulfilled, rejected, capability) {
   const state = get_slot(promise, "[[PromiseState]]")
   if (state === "pending") {
@@ -305,7 +331,10 @@ function perform_promise_then(promise, fulfilled, rejected, capability) {
   set_slot(promise, "[[PromiseIsHandled]]", true)
 }
 
-// 27.7.5.3 Await ( value ), resuming through the VM's callbacks
+/**
+ * The VM passes the callbacks that resume the awaiting code.
+ * https://tc39.es/ecma262/multipage/control-abstraction-objects.html#await
+ */
 function await_value(value, on_fulfilled, on_rejected) {
   perform_promise_then(
     promise_resolve(Promise, value),
@@ -314,6 +343,10 @@ function await_value(value, on_fulfilled, on_rejected) {
     undefined,
   )
 }
-abstract_operation("Await", await_value)
+// The VM calls this for each `await`, including top-level await:
+//
+//   const result = await value
+//   // await_value(value, resume with result, resume by throwing the reason)
+set_abstract_operation("Await", await_value)
 
 export default Promise

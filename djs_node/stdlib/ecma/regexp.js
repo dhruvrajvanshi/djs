@@ -1,40 +1,34 @@
-// 22.2 RegExp (Regular Expression) Objects
 import {
-  well_known,
-  slot,
-  internal_method,
-  attributes,
-  abstract_operation,
-  string_code_unit_at as unit,
-  string_slice,
-  has_slot,
-  get_slot,
-  set_slot,
-  array_create,
-  ordinary_object_create,
-  define_property_or_throw,
   call,
   create_builtin_function,
-} from "djs:native"
+  define_own_property,
+  get_slot,
+  has_slot,
+  object_create,
+  string_code_unit_at as unit,
+  string_slice,
+  set_abstract_operation,
+  well_known_symbols,
+  well_known_intrinsic_objects,
+} from "djs:vm"
+import { define_builtin_properties } from "./define_builtin_properties.js"
 import {
   to_string,
   to_length,
   create_data_property_or_throw,
+  define_property_or_throw,
   get_prototype_from_constructor,
-} from "djs:abstract"
-import { ObjectPrototype, FunctionPrototype } from "./fundamental.js"
-import Symbol from "./symbol.js"
+} from "./abstract-operations.js"
+import { raw_array, raw_array_push, raw_array_sort } from "../raw/array.js"
 import { substitution } from "./string.js"
 
-// 22.2.4 The RegExp Constructor
-const RegExp = well_known("%RegExp%", create_builtin_function, {
-  [slot("[[Prototype]]")]: FunctionPrototype,
+const { "%Object.prototype%": object_prototype } = well_known_intrinsic_objects
 
-  // 22.2.4.1 RegExp ( pattern, flags )
-  [internal_method("[[Call]]", "[[Construct]]")]: function RegExp(
-    pattern,
-    flags,
-  ) {
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-regexp-constructor
+ */
+const RegExp = create_builtin_function(
+  function (pattern, flags) {
     let source = pattern
     if (is_regexp(pattern)) {
       if (new.target === undefined && flags === undefined) return pattern
@@ -47,135 +41,136 @@ const RegExp = well_known("%RegExp%", create_builtin_function, {
       get_prototype_from_constructor(new.target ?? RegExp, RegExpPrototype),
     )
   },
-
-  // 22.2.5 Properties of the RegExp Constructor
-  prototype: attributes(
-    { writable: false, configurable: false },
-    RegExpPrototype,
-  ),
-})
-
-// 22.2.6 Properties of the RegExp Prototype Object
-const RegExpPrototype = well_known(
-  "%RegExp.prototype%",
-  ordinary_object_create,
-  {
-    [slot("[[Prototype]]")]: ObjectPrototype,
-    constructor: RegExp,
-
-    // 22.2.6.2 RegExp.prototype.exec ( string )
-    exec(string) {
-      return regexp_builtin_exec(this_regexp(this), to_string(string))
-    },
-
-    // 22.2.6.4 get RegExp.prototype.flags
-    get flags() {
-      return get_slot(this_regexp(this), "[[OriginalFlags]]")
-    },
-
-    // 22.2.6.5 get RegExp.prototype.global
-    get global() {
-      return get_slot(this_regexp(this), "[[RegExpMatcher]]").global
-    },
-
-    // 22.2.6.6 get RegExp.prototype.ignoreCase
-    get ignoreCase() {
-      return get_slot(this_regexp(this), "[[RegExpMatcher]]").ignore_case
-    },
-
-    // 22.2.6.9 get RegExp.prototype.multiline
-    get multiline() {
-      return get_slot(this_regexp(this), "[[RegExpMatcher]]").multiline
-    },
-
-    // 22.2.6.3 get RegExp.prototype.dotAll
-    get dotAll() {
-      return get_slot(this_regexp(this), "[[RegExpMatcher]]").dot_all
-    },
-
-    // 22.2.6.13 get RegExp.prototype.source
-    get source() {
-      const source = get_slot(this_regexp(this), "[[OriginalSource]]")
-      return source.length === 0 ? "(?:)" : source
-    },
-
-    // 22.2.6.14 get RegExp.prototype.sticky
-    get sticky() {
-      return get_slot(this_regexp(this), "[[RegExpMatcher]]").sticky
-    },
-
-    // 22.2.6.16 RegExp.prototype.test ( S )
-    test(S) {
-      return regexp_builtin_exec(this_regexp(this), to_string(S)) !== null
-    },
-
-    // 22.2.6.17 RegExp.prototype.toString ( )
-    toString() {
-      return "/" + this.source + "/" + this.flags
-    },
-
-    // 22.2.6.18 get RegExp.prototype.unicode
-    get unicode() {
-      return get_slot(this_regexp(this), "[[RegExpMatcher]]").unicode
-    },
-
-    // 22.2.6.11 RegExp.prototype [ %Symbol.replace% ] ( string, replaceValue )
-    [Symbol.replace](string, replaceValue) {
-      const rx = this_regexp(this)
-      const S = to_string(string)
-      const functional = typeof replaceValue === "function"
-      const template = functional ? undefined : to_string(replaceValue)
-      const global = get_slot(rx, "[[RegExpMatcher]]").global
-      if (global) rx.lastIndex = 0
-      const results = []
-      let result = regexp_builtin_exec(rx, S)
-      while (result !== null) {
-        results.push(result)
-        if (!global) break
-        if (result[0].length === 0) rx.lastIndex = to_length(rx.lastIndex) + 1
-        result = regexp_builtin_exec(rx, S)
-      }
-      let accumulated = ""
-      let next_position = 0
-      let index = 0
-      while (index < results.length) {
-        result = results[index]
-        const matched = result[0]
-        const position = result.index
-        const captures = []
-        let n = 1
-        while (n < result.length) {
-          captures.push(result[n])
-          n = n + 1
-        }
-        let replacement
-        if (functional) {
-          const args = [matched]
-          append(args, captures)
-          args.push(position, S)
-          replacement = to_string(call(replaceValue, undefined, ...args))
-        } else {
-          replacement = substitution(template, matched, position, S, captures)
-        }
-        if (position >= next_position) {
-          accumulated =
-            accumulated + string_slice(S, next_position, position) + replacement
-          next_position = position + matched.length
-        }
-        index = index + 1
-      }
-      return accumulated + string_slice(S, next_position, S.length)
-    },
-  },
+  { name: "RegExp", constructor: true },
 )
 
-// 22.2.3.1 RegExpCreate ( P, F )
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-properties-of-the-regexp-prototype-object
+ */
+const RegExpPrototype = object_create(object_prototype, "ordinary")
+
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-properties-of-the-regexp-constructor
+ */
+define_own_property(RegExp, "prototype", {
+  value: RegExpPrototype,
+  writable: false,
+  enumerable: false,
+  configurable: false,
+})
+
+define_builtin_properties(RegExpPrototype, {
+  constructor: RegExp,
+
+  exec(string) {
+    return regexp_builtin_exec(this_regexp(this), to_string(string))
+  },
+
+  get flags() {
+    return get_slot(this_regexp(this), "[[OriginalFlags]]")
+  },
+
+  get global() {
+    return get_slot(this_regexp(this), "[[RegExpMatcher]]").global
+  },
+
+  get ignoreCase() {
+    return get_slot(this_regexp(this), "[[RegExpMatcher]]").ignore_case
+  },
+
+  get multiline() {
+    return get_slot(this_regexp(this), "[[RegExpMatcher]]").multiline
+  },
+
+  get dotAll() {
+    return get_slot(this_regexp(this), "[[RegExpMatcher]]").dot_all
+  },
+
+  get source() {
+    const source = get_slot(this_regexp(this), "[[OriginalSource]]")
+    return source.length === 0 ? "(?:)" : source
+  },
+
+  get sticky() {
+    return get_slot(this_regexp(this), "[[RegExpMatcher]]").sticky
+  },
+
+  test(S) {
+    return regexp_builtin_exec(this_regexp(this), to_string(S)) !== null
+  },
+
+  toString() {
+    return "/" + this.source + "/" + this.flags
+  },
+
+  get unicode() {
+    return get_slot(this_regexp(this), "[[RegExpMatcher]]").unicode
+  },
+
+  [well_known_symbols.replace](string, replaceValue) {
+    const rx = this_regexp(this)
+    const S = to_string(string)
+    const functional = typeof replaceValue === "function"
+    const template = functional ? undefined : to_string(replaceValue)
+    const global = get_slot(rx, "[[RegExpMatcher]]").global
+    if (global) rx.lastIndex = 0
+    const results = raw_array()
+    let result = regexp_builtin_exec(rx, S)
+    while (result !== null) {
+      raw_array_push(results, result)
+      if (!global) break
+      if (result[0].length === 0) rx.lastIndex = to_length(rx.lastIndex) + 1
+      result = regexp_builtin_exec(rx, S)
+    }
+    let accumulated = ""
+    let next_position = 0
+    let index = 0
+    while (index < results.length) {
+      result = results[index]
+      const matched = result[0]
+      const position = result.index
+      const captures = raw_array()
+      let n = 1
+      while (n < result.length) {
+        raw_array_push(captures, result[n])
+        n = n + 1
+      }
+      let replacement
+      if (functional) {
+        const args = raw_array()
+        raw_array_push(args, matched)
+        append(args, captures)
+        raw_array_push(args, position)
+        raw_array_push(args, S)
+        replacement = to_string(call(replaceValue, undefined, args))
+      } else {
+        replacement = substitution(template, matched, position, S, captures)
+      }
+      if (position >= next_position) {
+        accumulated =
+          accumulated + string_slice(S, next_position, position) + replacement
+        next_position = position + matched.length
+      }
+      index = index + 1
+    }
+    return accumulated + string_slice(S, next_position, S.length)
+  },
+})
+
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-regexpcreate
+ */
 function regexp_create(P, F) {
   return regexp_create_with_prototype(P, F, RegExpPrototype)
 }
-abstract_operation("RegExpCreate", regexp_create)
+// The VM calls this for each evaluation of a regular expression literal:
+//
+//   /ab+c/g  // regexp_create("ab+c", "g")
+set_abstract_operation("RegExpCreate", regexp_create)
 
-// 22.2.3.3 RegExpInitialize ( obj, pattern, flags )
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-regexpinitialize
+ */
 function regexp_create_with_prototype(pattern, flags, prototype) {
   const P = pattern === undefined ? "" : to_string(pattern)
   const F = flags === undefined ? "" : to_string(flags)
@@ -216,14 +211,11 @@ function regexp_create_with_prototype(pattern, flags, prototype) {
   matcher.node = parse_disjunction(parser)
   if (parser.index < P.length) throw pattern_error(parser, "Unmatched ')'")
   matcher.group_count = parser.group_count
-  const R = ordinary_object_create(prototype, [
-    "[[OriginalSource]]",
-    "[[OriginalFlags]]",
-    "[[RegExpMatcher]]",
-  ])
-  set_slot(R, "[[OriginalSource]]", P)
-  set_slot(R, "[[OriginalFlags]]", F)
-  set_slot(R, "[[RegExpMatcher]]", matcher)
+  const R = object_create(prototype, "ordinary", {
+    "[[OriginalSource]]": P,
+    "[[OriginalFlags]]": F,
+    "[[RegExpMatcher]]": matcher,
+  })
   define_property_or_throw(R, "lastIndex", { value: 0, writable: true })
   return R
 }
@@ -241,12 +233,14 @@ function this_regexp(value) {
   return value
 }
 
-// 22.2.7.2 RegExpBuiltinExec ( R, S )
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-regexpbuiltinexec
+ */
 function regexp_builtin_exec(R, S) {
   const matcher = get_slot(R, "[[RegExpMatcher]]")
   const global_or_sticky = matcher.global || matcher.sticky
   let last_index = global_or_sticky ? to_length(R.lastIndex) : 0
-  const captures = []
+  const captures = raw_array()
   let end = -1
   while (end < 0) {
     if (last_index > S.length) {
@@ -255,7 +249,8 @@ function regexp_builtin_exec(R, S) {
     }
     let index = 0
     while (index < matcher.group_count * 2) {
-      captures[index] = -1
+      if (index < captures.length) captures[index] = -1
+      else raw_array_push(captures, -1)
       index = index + 1
     }
     const context = { input: S, matcher, captures }
@@ -272,7 +267,7 @@ function regexp_builtin_exec(R, S) {
     }
   }
   if (global_or_sticky) R.lastIndex = end
-  const A = array_create(0)
+  const A = []
   create_data_property_or_throw(A, "index", last_index)
   create_data_property_or_throw(A, "input", S)
   create_data_property_or_throw(A, 0, string_slice(S, last_index, end))
@@ -290,19 +285,19 @@ function regexp_builtin_exec(R, S) {
   return A
 }
 
-// The pattern compiles to a tree of these nodes, matched by backtracking:
-// `match_node` calls `next` with each position the node can end at, most
-// preferred first, until `next` accepts one.
+// A pattern compiles to a tree of nodes, which match_node matches by
+// backtracking. It calls `next` with each position where the node can end,
+// preferred one first, until `next` accepts one. For example, /ab*/ compiles
+// to:
 //
-//   { type: "char", code }               { type: "class", ranges, negated }
-//   { type: "any" }                      { type: "sequence", items }
-//   { type: "alternation", options }     { type: "group", index, body }
-//   { type: "repeat", body, min, max, greedy }
-//   { type: "look", body, negated }      { type: "backreference", index }
-//   { type: "start" }  { type: "end" }   { type: "boundary", negated }
+//   { type: "sequence", items: [
+//     { type: "char", code: 97 },
+//     { type: "repeat", body: { type: "char", code: 98 }, min: 0, max: Infinity, greedy: true },
+//   ] }
 //
-// `ranges` are inclusive [low, high] code unit pairs. A group's `index` is
-// -1 when it doesn't capture.
+// The other node types are "class" (with `ranges`, inclusive [low, high] code
+// unit pairs), "any", "alternation", "group" (whose `index` is -1 when it
+// doesn't capture), "look", "backreference", "start", "end" and "boundary".
 
 function match_node(node, context, position, next) {
   const input = context.input
@@ -417,8 +412,12 @@ function match_node(node, context, position, next) {
   return (before !== after) !== node.negated ? next(position) : false
 }
 
+const UPPER_A = unit("A", 0)
+const UPPER_Z = unit("Z", 0)
+const LOWER_A = unit("a", 0)
+
 function fold(code) {
-  return code >= 65 && code <= 90 ? code + 32 : code
+  return code >= UPPER_A && code <= UPPER_Z ? code - UPPER_A + LOWER_A : code
 }
 
 // Case folding with the i flag only covers ASCII letters.
@@ -473,21 +472,25 @@ const SPACE_RANGES = [
 ]
 
 function complement(ranges) {
-  const sorted = ranges.slice()
-  sorted.sort((a, b) => a[0] - b[0])
-  const result = []
+  const sorted = raw_array()
+  append(sorted, ranges)
+  raw_array_sort(sorted, (a, b) => a[0] - b[0])
+  const result = raw_array()
   let low = 0
   let index = 0
   while (index < sorted.length) {
-    if (sorted[index][0] > low) result.push([low, sorted[index][0] - 1])
+    if (sorted[index][0] > low)
+      raw_array_push(result, [low, sorted[index][0] - 1])
     if (sorted[index][1] + 1 > low) low = sorted[index][1] + 1
     index = index + 1
   }
-  if (low <= 65535) result.push([low, 65535])
+  if (low <= 0xffff) raw_array_push(result, [low, 0xffff])
   return result
 }
 
-// 22.2.1 Patterns
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-patterns
+ */
 
 function pattern_error(parser, message) {
   return new SyntaxError(
@@ -501,22 +504,23 @@ function peek(parser, offset = 0) {
 }
 
 function parse_disjunction(parser) {
-  const options = [parse_alternative(parser)]
+  const options = raw_array()
+  raw_array_push(options, parse_alternative(parser))
   while (peek(parser) === 124) {
     parser.index = parser.index + 1
-    options.push(parse_alternative(parser))
+    raw_array_push(options, parse_alternative(parser))
   }
   return options.length === 1 ? options[0] : { type: "alternation", options }
 }
 
 function parse_alternative(parser) {
-  const items = []
+  const items = raw_array()
   while (
     parser.index < parser.source.length &&
     peek(parser) !== 124 &&
     peek(parser) !== 41
   )
-    items.push(parse_term(parser))
+    raw_array_push(items, parse_term(parser))
   return { type: "sequence", items }
 }
 
@@ -650,7 +654,8 @@ function parse_atom_escape(parser) {
   return { type: "char", code: character_escape(parser) }
 }
 
-// \d \D \w \W \s \S, or undefined for any other escape.
+// Returns the ranges for \d, \D, \w, \W, \s or \S, or undefined for any
+// other escape.
 function class_escape(parser) {
   const code = peek(parser)
   let ranges
@@ -727,7 +732,7 @@ function parse_class(parser) {
     negated = true
     parser.index = parser.index + 1
   }
-  const ranges = []
+  const ranges = raw_array()
   while (peek(parser) !== 93) {
     if (peek(parser) < 0)
       throw pattern_error(parser, "Unterminated character class")
@@ -741,15 +746,16 @@ function parse_class(parser) {
       const high = parse_class_atom(parser)
       if (typeof high !== "number") {
         // Annex B: [a-\d] is a, -, and the digits.
-        ranges.push([low, low], [45, 45])
+        raw_array_push(ranges, [low, low])
+        raw_array_push(ranges, [45, 45])
         append(ranges, high)
         continue
       }
       if (high < low)
         throw pattern_error(parser, "Range out of order in character class")
-      ranges.push([low, high])
+      raw_array_push(ranges, [low, high])
     } else {
-      ranges.push([low, low])
+      raw_array_push(ranges, [low, low])
     }
   }
   parser.index = parser.index + 1
@@ -759,12 +765,12 @@ function parse_class(parser) {
 function append(list, more) {
   let index = 0
   while (index < more.length) {
-    list.push(more[index])
+    raw_array_push(list, more[index])
     index = index + 1
   }
 }
 
-// A code unit, or the ranges of a class escape such as \d.
+// Returns a code unit, or the ranges of a class escape such as \d.
 function parse_class_atom(parser) {
   const code = peek(parser)
   parser.index = parser.index + 1

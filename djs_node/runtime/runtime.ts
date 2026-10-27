@@ -3,7 +3,7 @@ import { Heap } from "../vm/storage/heap.ts"
 import type { Fiber } from "../vm/execution/fiber.ts"
 import type { NodeHost } from "../host/node.ts"
 import { create_node_host } from "../host/node.ts"
-import { Realm } from "./realm.ts"
+import { Realm } from "../vm/realm.ts"
 import { ModuleLoader } from "./modules.ts"
 import { Scheduler } from "./scheduler.ts"
 

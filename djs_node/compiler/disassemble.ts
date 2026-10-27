@@ -72,8 +72,6 @@ const OPERANDS: Record<string, Operand[] | Formatter> = {
   GET_PRIVATE: ["dst", "reg", "reg"],
   SET_PRIVATE: ["reg", "reg", "reg"],
   HAS_PRIVATE: ["dst", "reg", "reg"],
-  INIT_SLOT: ["reg", "literal", "reg"],
-  SET_BEHAVIOR: ["reg", "reg", "=constructor"],
   CALL: ([dst, callee, receiver, first, count]) => ({
     dsts: [register(dst)],
     args: [

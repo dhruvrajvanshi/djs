@@ -1,6 +1,5 @@
-import { call, define_property_or_throw as define,
-  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
-  ordinary_object_create as create } from "djs:native";
+const define = Object.defineProperty;
+const descriptor = Object.getOwnPropertyDescriptor;
 const a = [0,1,2,3,4];
 define(a, "2", {configurable:false});
 try { define(a,"length",{value:1,writable:false}) } catch(e) { console.log(e.name) }

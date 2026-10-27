@@ -1,6 +1,4 @@
-import { call, define_property_or_throw as define,
-  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
-  ordinary_object_create as create } from "djs:native";
+const define = Object.defineProperty;
 let trace = "";
 const object = {valueOf(){trace=trace+"v";return 7},toString(){trace=trace+"s";return "text"}};
 console.log(String(object),+object,object+1,object==7,trace);

@@ -2,7 +2,9 @@ import type { Handle } from "../storage/heap.ts"
 import { write_undefined } from "../storage/value.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import { write_string } from "../heap_types/string.ts"
-import { call } from "../execution/calls.ts"
+import { allocate_object, mark_error_object } from "../heap_types/object.ts"
+import { define_property } from "./properties.ts"
+import { stack_trace } from "../../builtin_modules/djs_vm.ts"
 import { panic } from "../../utils.ts"
 
 /**
@@ -25,21 +27,36 @@ export function throw_error(
   })
 }
 
-/** Calls the registered %name% constructor. A throwing constructor's exception is the result. */
+/**
+ * Creates an error from the intrinsic %name.prototype%, with the `message` and
+ * `stack` the stdlib's error constructors give it.
+ */
 export function create_error(
   runtime: Runtime,
   destination: Handle,
   name: string,
   message: string,
 ) {
-  const constructor = runtime.realm.intrinsics.get(`%${name}%`)
-  // Errors can only reach guest code once the stdlib has registered them.
-  if (constructor === undefined) panic(`${name}: ${message}`)
-  runtime.heap.handles.scope(() => {
-    const text = runtime.heap.handles.local()
-    write_string(runtime.heap, text, message)
-    if (call(runtime, destination, constructor, undefined, [text]) === THROW)
-      take_exception(runtime, destination)
+  const { heap } = runtime
+  const prototype = runtime.realm.error_prototype(name)
+  if (prototype === undefined) panic(`${name}: ${message}`)
+  allocate_object(heap, destination, prototype)
+  mark_error_object(heap, destination)
+  heap.handles.scope(() => {
+    const value = heap.handles.local()
+    write_string(heap, value, message)
+    define_property(runtime, destination, "message", {
+      value,
+      writable: true,
+      configurable: true,
+    })
+    const summary = message === "" ? name : `${name}: ${message}`
+    write_string(heap, value, summary + stack_trace(runtime))
+    define_property(runtime, destination, "stack", {
+      value,
+      writable: true,
+      configurable: true,
+    })
   })
 }
 

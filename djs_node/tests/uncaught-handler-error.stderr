@@ -1,3 +1,3 @@
 TypeError: handler
     at uncaught-handler-error.js:1:44
-    at djs:stdlib/js/promise.js:260:23
+    at djs:stdlib/ecma/promise.js:282:23

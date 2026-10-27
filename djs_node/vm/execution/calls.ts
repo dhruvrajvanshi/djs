@@ -1,9 +1,11 @@
 import { panic } from "../../utils.ts"
 import type { Handle, Persistent } from "../storage/heap.ts"
 import {
+  VALUE_TAGS,
   heap_type_of,
   read_boolean,
   read_number,
+  tag_of,
   write_boolean,
   write_number,
   write_undefined,
@@ -37,7 +39,11 @@ import {
   create_function,
   create_object,
 } from "../semantics/objects.ts"
-import { define_property, get_property_value } from "../semantics/properties.ts"
+import {
+  define_property,
+  get_own_property_descriptor,
+  get_property_value,
+} from "../semantics/properties.ts"
 import { initialize_binding } from "../semantics/bindings.ts"
 import {
   OK,
@@ -50,9 +56,9 @@ import type { Status } from "../semantics/errors.ts"
 import { FIBER_STATE, Fiber, Frame } from "./fiber.ts"
 import {
   BUILTIN_CODE,
-  CALL_ID,
   NATIVE_CODE,
   RESUME_CODE,
+  call_id,
   call_native_operation,
 } from "./native_operations.ts"
 import { run_task } from "./interpreter.ts"
@@ -216,15 +222,19 @@ export function call_function(
       receiver,
       arguments_,
     )
-  if (code_id === NATIVE_CODE && function_id === CALL_ID)
-    return call_function(
-      runtime,
-      fiber,
-      destination,
-      arguments_[0],
-      arguments_[1],
-      arguments_.slice(2),
-    )
+  if (code_id === NATIVE_CODE && function_id === call_id())
+    return heap.handles.scope(() => {
+      const list = argument_list(runtime, arguments_[2])
+      if (list === undefined) return THROW
+      return call_function(
+        runtime,
+        fiber,
+        destination,
+        arguments_[0],
+        arguments_[1],
+        list,
+      )
+    })
   if (code_id === NATIVE_CODE)
     return call_native_operation(runtime, function_id, destination, arguments_)
   if (runtime.loader.code[code_id].unit.functions[function_id].flags & 8)
@@ -295,22 +305,50 @@ function enter_function(
   })
 }
 
-export function coerce_value(
+// The elements of the array `list` given to `call`, read as own properties so
+// that nothing a program changes on %Array.prototype% is involved.
+function argument_list(runtime: Runtime, list: Handle | undefined) {
+  const { heap } = runtime
+  if (list === undefined || tag_of(heap, list) === VALUE_TAGS.UNDEFINED)
+    return []
+  if (heap_type_of(heap, list) !== HEAP_TYPES.ARRAY) {
+    throw_error(runtime, "TypeError", "call expects an array of arguments")
+    return undefined
+  }
+  const length = read_number(
+    heap,
+    get_own_property_descriptor(runtime, list, "length")!.value!,
+  )
+  const result: Handle[] = []
+  for (let index = 0; index < length; index++) {
+    const value = heap.handles.local()
+    const element = get_own_property_descriptor(runtime, list, String(index))
+    if (element?.value !== undefined) heap.copy_value(value, element.value)
+    else write_undefined(heap, value)
+    result.push(value)
+  }
+  return result
+}
+
+/**
+ * Converts the object `source` with the stdlib's ToPrimitive, which can run
+ * the object's own methods.
+ * @see https://tc39.es/ecma262/#sec-toprimitive
+ */
+export function to_primitive(
   runtime: Runtime,
   destination: Handle,
   source: Handle,
-  operation: string,
-  hint?: string,
+  hint?: "string" | "number",
 ): Status {
-  const helper = runtime.realm.intrinsics.get(operation)
-  if (helper === undefined) {
-    runtime.heap.copy_value(destination, source)
-    return OK
-  }
+  const operation = runtime.realm.abstract_operation("ToPrimitive")
   return runtime.heap.handles.scope(() => {
     const hint_value = runtime.heap.handles.local()
     if (hint !== undefined) write_string(runtime.heap, hint_value, hint)
-    return call(runtime, destination, helper, undefined, [source, hint_value])
+    return call(runtime, destination, operation, undefined, [
+      source,
+      hint_value,
+    ])
   })
 }
 
@@ -349,8 +387,9 @@ export function settle_with_promise(
   fiber: Fiber,
   promise: Handle,
 ): Status {
-  const new_capability = runtime.realm.intrinsics.get("NewPromiseCapability")
-  if (new_capability === undefined) panic("Promise is not initialized")
+  const new_capability = runtime.realm.abstract_operation(
+    "NewPromiseCapability",
+  )
   const { heap } = runtime
   const capability = create_call_fiber(runtime, new_capability, undefined, [])
   try {
@@ -601,8 +640,7 @@ export function await_value(
   destination: Handle,
   source: Handle,
 ) {
-  const await_promise = runtime.realm.intrinsics.get("Await")
-  if (await_promise === undefined) panic("Promise is not initialized")
+  const await_promise = runtime.realm.abstract_operation("Await")
   const { heap } = runtime
   fiber.status = FIBER_STATE.WAITING
   heap.handles.scope(() => {

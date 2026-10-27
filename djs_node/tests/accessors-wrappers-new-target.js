@@ -1,4 +1,4 @@
-import { define_property_or_throw as define } from "djs:native";
+const define = Object.defineProperty;
 const retained = [new String("a😀b"), [1,,3]];
 function Capture() { return () => new.target }
 const target = new Capture();

@@ -1,4 +1,4 @@
-import { write_stdout as write } from "djs:host"
+import { write_stdout as write } from "djs:runtime"
 const ErrorConstructor = Error
 const error_prototype = ErrorConstructor.prototype
 

@@ -1,6 +1,3 @@
-import { call, define_property_or_throw as define,
-  get_own_property as descriptor, ordinary_set_prototype_of as setPrototype,
-  ordinary_object_create as create } from "djs:native";
 const s = "a😀z";
 console.log(s.length,s.charCodeAt(1),s.charCodeAt(2),s.codePointAt(1),s.codePointAt(2));
 console.log(s.at(-1),s.charAt(99),s.charCodeAt(99),s.codePointAt(99));

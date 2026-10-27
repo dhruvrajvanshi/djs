@@ -1,20 +1,18 @@
-// 22.1 String Objects
 import {
-  well_known,
-  slot,
-  internal_method,
-  attributes,
+  call,
+  create_builtin_function,
+  define_own_property,
+  get_slot,
+  has_slot,
+  object_create,
+  ordinary_set_prototype_of,
   string_code_unit_at as unit,
   string_from_code_unit as character,
   string_slice,
-  string_create,
-  has_slot,
-  get_slot,
-  array_create,
-  ordinary_set_prototype_of,
-  call,
-  create_builtin_function,
-} from "djs:native"
+  well_known_symbols,
+  well_known_intrinsic_objects,
+} from "djs:vm"
+import { define_builtin_properties } from "./define_builtin_properties.js"
 import {
   to_string,
   to_number,
@@ -23,18 +21,19 @@ import {
   require_object_coercible,
   create_data_property_or_throw,
   get_prototype_from_constructor,
-} from "djs:abstract"
-import { relative_index } from "./support.js"
-import { ObjectPrototype, FunctionPrototype } from "./fundamental.js"
-import Symbol, { descriptive_string } from "./symbol.js"
+} from "./abstract-operations.js"
+import { descriptive_string } from "./symbol.js"
 import { iterator_prototype } from "./iteration.js"
 
-// 22.1.1 The String Constructor
-const String = well_known("%String%", create_builtin_function, {
-  [slot("[[Prototype]]")]: FunctionPrototype,
+const { "%String.prototype%": string_prototype } = well_known_intrinsic_objects
 
-  // 22.1.1.1 String ( value )
-  [internal_method("[[Call]]", "[[Construct]]")]: function String(value) {
+const MAX_STRING_LENGTH = 2 ** 32 - 1
+
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-string-constructor
+ */
+const String = create_builtin_function(
+  function (value) {
     let text = ""
     if (arguments.length !== 0)
       text =
@@ -42,18 +41,24 @@ const String = well_known("%String%", create_builtin_function, {
           ? descriptive_string(value)
           : to_string(value)
     if (new.target === undefined) return text
-    return string_create(
-      text,
-      get_prototype_from_constructor(new.target, StringPrototype),
+    return object_create(
+      get_prototype_from_constructor(new.target, string_prototype),
+      "string",
+      { "[[StringData]]": text },
     )
   },
+  { name: "String", constructor: true },
+)
 
-  // 22.1.2 Properties of the String Constructor
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-properties-of-the-string-constructor
+ */
+define_builtin_properties(String, {
   fromCharCode(...code_units) {
     let text = ""
     let index = 0
     while (index < code_units.length) {
-      text = text + character(to_number(code_units[index]) & 65535)
+      text = text + character(to_number(code_units[index]) & 0xffff)
       index = index + 1
     }
     return text
@@ -65,7 +70,7 @@ const String = well_known("%String%", create_builtin_function, {
     let point
     while (index < code_points.length) {
       point = to_number(code_points[index])
-      if (point !== point || point < 0 || point > 1114111 || point % 1 !== 0)
+      if (point !== point || point < 0 || point > 0x10ffff || point % 1 !== 0)
         throw new RangeError("Invalid code point")
       text = text + point_string(point)
       index = index + 1
@@ -87,18 +92,18 @@ const String = well_known("%String%", create_builtin_function, {
     }
     return text
   },
-
-  prototype: attributes(
-    { writable: false, configurable: false },
-    StringPrototype,
-  ),
+})
+define_own_property(String, "prototype", {
+  value: string_prototype,
+  writable: false,
+  enumerable: false,
+  configurable: false,
 })
 
-// 22.1.3 Properties of the String Prototype Object
-const StringPrototype = well_known("%String.prototype%", string_create, {
-  [slot("[[Prototype]]")]: ObjectPrototype,
-  [slot("[[StringData]]")]: "",
-
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-properties-of-the-string-prototype-object
+ */
+define_builtin_properties(string_prototype, {
   constructor: String,
 
   toString() {
@@ -137,14 +142,13 @@ const StringPrototype = well_known("%String.prototype%", string_create, {
     const actual = to_integer_or_infinity(index)
     if (actual < 0 || actual >= text.length) return undefined
     const first = unit(text, actual)
-    if (first < 55296 || first > 56319 || actual + 1 === text.length)
-      return first
+    if (!is_lead_surrogate(first) || actual + 1 === text.length) return first
     const second = unit(text, actual + 1)
-    if (second < 56320 || second > 57343) return first
-    return (first - 55296) * 1024 + second - 56320 + 65536
+    if (!is_trail_surrogate(second)) return first
+    return (first - 0xd800) * 0x400 + (second - 0xdc00) + 0x10000
   },
 
-  [Symbol.iterator]() {
+  [well_known_symbols.iterator]() {
     return string_iterator(text_receiver(this))
   },
 
@@ -238,7 +242,11 @@ const StringPrototype = well_known("%String.prototype%", string_create, {
   repeat(count) {
     let text = text_receiver(this)
     let times = to_integer_or_infinity(count)
-    if (times < 0 || times === Infinity || text.length * times > 4294967295)
+    if (
+      times < 0 ||
+      times === Infinity ||
+      text.length * times > MAX_STRING_LENGTH
+    )
       throw new RangeError("Invalid repeat count")
     if (text.length === 0) return ""
     let result = ""
@@ -252,9 +260,9 @@ const StringPrototype = well_known("%String.prototype%", string_create, {
 
   split(separator, limit) {
     const text = text_receiver(this)
-    const maximum = limit === undefined ? 4294967295 : to_number(limit) >>> 0
+    const maximum = limit === undefined ? 2 ** 32 - 1 : to_number(limit) >>> 0
     const needle = separator === undefined ? undefined : to_string(separator)
-    const result = array_create(0)
+    const result = []
     if (maximum === 0) return result
     if (needle === undefined) {
       create_data_property_or_throw(result, 0, text)
@@ -330,11 +338,11 @@ const StringPrototype = well_known("%String.prototype%", string_create, {
     let second
     while (index < text.length) {
       first = unit(text, index)
-      if (first >= 56320 && first <= 57343) return false
-      if (first >= 55296 && first <= 56319) {
+      if (is_trail_surrogate(first)) return false
+      if (is_lead_surrogate(first)) {
         if (index + 1 === text.length) return false
         second = unit(text, index + 1)
-        if (second < 56320 || second > 57343) return false
+        if (!is_trail_surrogate(second)) return false
         index = index + 1
       }
       index = index + 1
@@ -350,10 +358,10 @@ const StringPrototype = well_known("%String.prototype%", string_create, {
     let second
     while (index < text.length) {
       first = unit(text, index)
-      if (first >= 56320 && first <= 57343) result = result + "\ufffd"
-      else if (first >= 55296 && first <= 56319) {
+      if (is_trail_surrogate(first)) result = result + "\ufffd"
+      else if (is_lead_surrogate(first)) {
         second = index + 1 < text.length ? unit(text, index + 1) : 0
-        if (second >= 56320 && second <= 57343) {
+        if (is_trail_surrogate(second)) {
           result = result + character(first) + character(second)
           index = index + 1
         } else result = result + "\ufffd"
@@ -364,7 +372,9 @@ const StringPrototype = well_known("%String.prototype%", string_create, {
   },
 })
 
-// 22.1.3.35.1 ThisStringValue ( value )
+/**
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-thisstringvalue
+ */
 function this_string_value(value) {
   if (typeof value === "string") return value
   if (has_slot(value, "[[StringData]]"))
@@ -383,9 +393,9 @@ function string_iterator(text) {
       }
       const first = unit(text, index)
       let size = 1
-      if (first >= 55296 && first <= 56319 && index + 1 < text.length) {
+      if (is_lead_surrogate(first) && index + 1 < text.length) {
         const second = unit(text, index + 1)
-        if (second >= 56320 && second <= 57343) size = 2
+        if (is_trail_surrogate(second)) size = 2
       }
       const value = string_slice(text, index, index + size)
       index = index + size
@@ -394,6 +404,15 @@ function string_iterator(text) {
   }
   ordinary_set_prototype_of(result, iterator_prototype)
   return result
+}
+
+// Turns an index that counts from the end when negative into one between 0
+// and `length`: relative_index(-1, 5) is 4, relative_index(-10, 5) is 0, and
+// relative_index(9, 5) is 5.
+function relative_index(value, length) {
+  const index = to_integer_or_infinity(value)
+  if (index < 0) return index < -length ? 0 : length + index
+  return index > length ? length : index
 }
 
 function text_receiver(value) {
@@ -419,12 +438,20 @@ function find(text, search, start) {
   return -1
 }
 function point_string(point) {
-  if (point < 65536) return character(point)
-  const offset = point - 65536
+  if (point <= 0xffff) return character(point)
+  const offset = point - 0x10000
   return (
-    character(55296 + (offset - (offset % 1024)) / 1024) +
-    character(56320 + (offset % 1024))
+    character(0xd800 + (offset - (offset % 0x400)) / 0x400) +
+    character(0xdc00 + (offset % 0x400))
   )
+}
+
+function is_lead_surrogate(code) {
+  return code >= 0xd800 && code <= 0xdbff
+}
+
+function is_trail_surrogate(code) {
+  return code >= 0xdc00 && code <= 0xdfff
 }
 
 function whitespace(code) {
@@ -465,7 +492,7 @@ function pad(value, maximum, fill, start) {
   if (length <= text.length) return text
   const filler = fill === undefined ? " " : to_string(fill)
   if (filler.length === 0) return text
-  if (length > 4294967295) throw new RangeError("Invalid string length")
+  if (length > MAX_STRING_LENGTH) throw new RangeError("Invalid string length")
   const needed = length - text.length
   let padding = ""
   let chunk = filler
@@ -479,7 +506,13 @@ function pad(value, maximum, fill, start) {
   return start ? padding + text : text + padding
 }
 
-// 22.1.3.19.1 GetSubstitution ( matched, str, position, captures, namedCaptures, replacementTemplate )
+/**
+ * Expands the `$` patterns in a replacement string:
+ *
+ *   "abc".replace("b", "[$`|$&|$']")  // "a[a|b|c]c"
+ *
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-getsubstitution
+ */
 export function substitution(
   replacement,
   match,
@@ -521,8 +554,10 @@ export function substitution(
   }
   return result
 }
-// The group number of a $n or $nn reference at `index`, or 0. A two-digit
-// reference wins when that group exists.
+// Returns the group number of the $n or $nn reference at `index`, or 0 if
+// there isn't one. A two-digit number is used only if that group exists:
+// with 12 groups, "$12" is group 12, but with 1 group it's group 1 followed
+// by "2".
 function capture_reference(replacement, index, count) {
   const first = unit(replacement, index) - 48
   if (first < 0 || first > 9) return 0
@@ -535,18 +570,21 @@ function capture_reference(replacement, index, count) {
   return first >= 1 && first <= count ? first : 0
 }
 
-// 22.1.3.19 String.prototype.replace ( searchValue, replaceValue )
+/**
+ * Implements both replace and replaceAll; `all` selects replaceAll.
+ * https://tc39.es/ecma262/multipage/text-processing.html#sec-string.prototype.replace
+ */
 function replace(value, search, replacement, all) {
   require_object_coercible(value)
   if (search !== undefined && search !== null) {
-    const replacer = search[Symbol.replace]
+    const replacer = search[well_known_symbols.replace]
     if (replacer !== undefined && replacer !== null) {
       if (all && has_slot(search, "[[RegExpMatcher]]")) {
         const flags = to_string(search.flags)
         if (find(flags, "g", 0) < 0)
           throw new TypeError("replaceAll requires a global RegExp")
       }
-      return call(replacer, search, value, replacement)
+      return call(replacer, search, [value, replacement])
     }
   }
   const text = text_receiver(value)
@@ -560,7 +598,7 @@ function replace(value, search, replacement, all) {
   let inserted
   while (position >= 0) {
     inserted = functional
-      ? to_string(call(replacement, undefined, needle, position, text))
+      ? to_string(call(replacement, undefined, [needle, position, text]))
       : substitution(template, needle, position, text)
     result = result + string_slice(text, end, position) + inserted
     end = position + needle.length

@@ -23,9 +23,10 @@ import {
 } from "../vm/semantics/errors.ts"
 import { error_report } from "./error_report.ts"
 import {
-  NATIVE_MODULES,
+  native_modules,
   NATIVE_CODE,
 } from "../vm/execution/native_operations.ts"
+import type { NativeModule } from "../vm/execution/native_operations.ts"
 import { panic } from "../utils.ts"
 import type { HostError } from "../host/node.ts"
 import { FIBER_STATE } from "../vm/execution/fiber.ts"
@@ -43,7 +44,6 @@ import {
 import type { Handle, Persistent } from "../vm/storage/heap.ts"
 
 const BUILTINS = new Map([
-  ["djs:abstract", new URL("../stdlib/js/abstract.js", import.meta.url)],
   ["node:console", new URL("../stdlib/node/console.js", import.meta.url)],
   ["node:path", new URL("../stdlib/node/path.js", import.meta.url)],
   ["node:fs", new URL("../stdlib/node/fs.js", import.meta.url)],
@@ -87,8 +87,6 @@ export interface ModuleBinding {
 export interface RuntimeScope {
   binding_flags: boolean[]
   import_bindings: Map<number, ModuleBinding>
-  /** Slots whose value the VM receives as a realm intrinsic once initialized. */
-  intrinsic_bindings?: Map<number, string>
 }
 
 export class ModuleRecord {
@@ -176,9 +174,26 @@ function link_code(runtime: Runtime, unit: CompiledModule) {
   return id
 }
 
+const ECMA_LIBRARY = new URL("../stdlib/ecma/", import.meta.url).href
+const NODE_LIBRARY = new URL("../stdlib/node/", import.meta.url).href
+const RAW_COLLECTIONS = new URL("../stdlib/raw/", import.meta.url).href
+
+// Which stdlib directories may import each native module (docs/stdlib.md).
+const NATIVE_IMPORTERS: Readonly<Record<string, readonly string[]>> = {
+  "djs:vm": [ECMA_LIBRARY, NODE_LIBRARY, RAW_COLLECTIONS],
+  "djs:runtime": [ECMA_LIBRARY, NODE_LIBRARY],
+}
+
 export function resolve_specifier(specifier: string, importer: string) {
   if (specifier.startsWith("node:") || specifier.startsWith("djs:")) {
-    if (!NATIVE_MODULES.has(specifier) && !BUILTINS.has(specifier))
+    const native = native_modules().has(specifier)
+    if (
+      (!native && !BUILTINS.has(specifier)) ||
+      (native &&
+        !NATIVE_IMPORTERS[specifier].some((directory) =>
+          importer.startsWith(directory),
+        ))
+    )
       throw Object.assign(new Error(`No such built-in module: ${specifier}`), {
         code: "ERR_UNKNOWN_BUILTIN_MODULE",
       })
@@ -360,9 +375,10 @@ function instantiate_module(
 function load_native_module(
   runtime: Runtime,
   identity: string,
-  ids: Map<string, number>,
+  native: NativeModule,
 ): ModuleRecord {
-  const names = [...ids.keys()]
+  const operations = [...native.operations.keys()]
+  const names = [...operations, ...Object.keys(native.values)]
   const scope_id = runtime.loader.scopes.length
   runtime.loader.scopes.push({
     binding_flags: names.map(() => true),
@@ -376,7 +392,14 @@ function load_native_module(
     const value = runtime.heap.handles.local()
     try {
       for (let slot = 0; slot < names.length; slot++) {
-        create_function(runtime, value, NATIVE_CODE, ids.get(names[slot])!)
+        if (slot < operations.length)
+          create_function(
+            runtime,
+            value,
+            NATIVE_CODE,
+            native.operations.get(names[slot])!,
+          )
+        else native.values[names[slot]](runtime, value)
         initialize_binding(runtime, module.environment, slot, value)
       }
       module.status = MODULE_STATE.EVALUATED
@@ -395,7 +418,7 @@ export async function load_module(
 ): Promise<ModuleRecord> {
   const cached = runtime.loader.identities.get(identity)
   if (cached !== undefined) return runtime.loader.modules[cached]
-  const native = NATIVE_MODULES.get(identity)
+  const native = native_modules().get(identity)
   if (native) return load_native_module(runtime, identity, native)
   const builtin = BUILTINS.get(identity)
   const path = fileURLToPath(builtin ?? new URL(identity))
