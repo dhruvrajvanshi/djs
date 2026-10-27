@@ -82,7 +82,7 @@ the `Realm` (`PROTOTYPE_FIELDS`).
 
 This is the complete list of what the VM takes from the stdlib. Every name
 here is in `REQUIRED`, so the stdlib can't load without declaring it. The VM
-calls these functions synchronously (`invoke_sync` in
+calls these functions synchronously (`call` in
 [vm/execution/calls.ts](../vm/execution/calls.ts)), so they must not use `await`.
 
 ### Well-known objects

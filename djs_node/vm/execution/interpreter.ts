@@ -45,12 +45,15 @@ import {
   define_property,
   define_value_property,
   delete_property,
-  load_property,
+  get_property_value,
   has_properties,
   has_property,
   private_property,
-  set_property,
+  property_key,
+  set_property_value,
+  to_property_key,
 } from "../semantics/properties.ts"
+import type { PropertyKey } from "../semantics/properties.ts"
 import {
   instance_of,
   loose_equals,
@@ -73,12 +76,12 @@ import { FIBER_STATE } from "./fiber.ts"
 import type { Fiber, FiberStatus, Frame } from "./fiber.ts"
 import {
   await_value,
+  call,
   call_function,
   pop_frame,
   settle_fiber,
   coerce_value,
   construct_function,
-  invoke_sync,
 } from "./calls.ts"
 
 const { WRITABLE, ENUMERABLE, CONFIGURABLE, ACCESSOR } = PROPERTY_FLAGS
@@ -89,20 +92,14 @@ function check_properties(runtime: Runtime, value: Handle): Status {
   return OK
 }
 
-// Reads a property, calling a getter synchronously.
 function get_value(
   runtime: Runtime,
   destination: Handle,
   object: Handle,
-  key: Handle,
+  key: PropertyKey,
 ): Status {
   if (check_properties(runtime, object) === THROW) return THROW
-  if (
-    load_property(runtime, destination, object, key) &&
-    tag_of(runtime.heap, destination) !== VALUE_TAGS.UNDEFINED
-  )
-    return invoke_sync(runtime, destination, destination, object, [])
-  return OK
+  return get_property_value(runtime, destination, object, key)
 }
 
 function close_iterator(runtime: Runtime, iterator: Handle): Status {
@@ -110,11 +107,9 @@ function close_iterator(runtime: Runtime, iterator: Handle): Status {
   return heap.handles.scope(() => {
     const method = heap.handles.local(),
       result = heap.handles.local()
-    const key = runtime.realm.property_names.get("return")!
-    if (get_value(runtime, method, iterator, key) === THROW) return THROW
+    if (get_value(runtime, method, iterator, "return") === THROW) return THROW
     if (is_nullish(heap, method)) return OK
-    if (invoke_sync(runtime, result, method, iterator, []) === THROW)
-      return THROW
+    if (call(runtime, result, method, iterator, []) === THROW) return THROW
     if (!is_object(heap, result))
       return throw_error(
         runtime,
@@ -142,35 +137,21 @@ function with_spread_arguments(
     if (op.GET_ITERATOR(runtime, iterator, next, iterable, result) === THROW)
       return THROW
     while (true) {
-      if (invoke_sync(runtime, result, next, iterator, []) === THROW)
-        return THROW
+      if (call(runtime, result, next, iterator, []) === THROW) return THROW
       if (!is_object(heap, result))
         return throw_error(
           runtime,
           "TypeError",
           "Iterator result is not an object",
         )
-      const done_key = runtime.realm.property_names.get("done")!
-      if (get_value(runtime, done, result, done_key) === THROW) return THROW
+      if (get_value(runtime, done, result, "done") === THROW) return THROW
       if (truthy(runtime, done)) break
       const value = heap.handles.local()
       values.push(value)
-      const value_key = runtime.realm.property_names.get("value")!
-      if (get_value(runtime, value, result, value_key) === THROW) return THROW
+      if (get_value(runtime, value, result, "value") === THROW) return THROW
     }
     return body([...fixed, ...values])
   })
-}
-
-function load_property_key(
-  runtime: Runtime,
-  destination: Handle,
-  source: Handle,
-): Status {
-  runtime.heap.copy_value(destination, source)
-  if (is_object(runtime.heap, destination))
-    return coerce_value(runtime, destination, destination, "ToString")
-  return OK
 }
 
 function create_block_environment(
@@ -229,13 +210,14 @@ function define_member(
   kind: number,
   flags: number,
 ) {
+  const name = property_key(runtime, key)
   if (kind === PROPERTY_KIND.VALUE)
-    define_property(runtime, object, key, value, flags)
+    define_property(runtime, object, name, value, flags)
   else
     define_property(
       runtime,
       object,
-      key,
+      name,
       value,
       (flags & (ENUMERABLE | CONFIGURABLE)) | ACCESSOR,
       kind === PROPERTY_KIND.SETTER ? value : undefined,
@@ -262,8 +244,7 @@ function set_function_name(
           : `[${to_string(runtime, description)}]`
     } else text = to_string(runtime, key)
     write_string(heap, name, prefix ? `${prefix} ${text}` : text)
-    write_string(heap, description, "name")
-    define_property(runtime, target, description, name, CONFIGURABLE)
+    define_property(runtime, target, "name", name, CONFIGURABLE)
   })
 }
 
@@ -368,20 +349,14 @@ const op = {
       return THROW
     if (is_nullish(heap, temporary))
       return throw_error(runtime, "TypeError", "Value is not iterable")
-    if (invoke_sync(runtime, iterator, temporary, iterable, []) === THROW)
-      return THROW
+    if (call(runtime, iterator, temporary, iterable, []) === THROW) return THROW
     if (!is_object(heap, iterator))
       return throw_error(
         runtime,
         "TypeError",
         "Result of Symbol.iterator is not an object",
       )
-    return get_value(
-      runtime,
-      next,
-      iterator,
-      runtime.realm.property_names.get("next")!,
-    )
+    return get_value(runtime, next, iterator, "next")
   },
   ITERATOR_NEXT(
     runtime: Runtime,
@@ -395,26 +370,19 @@ const op = {
     operand: Handle,
   ): Status {
     const { heap } = runtime
-    if (invoke_sync(runtime, temporary, next, iterator, []) === THROW)
-      return THROW
+    if (call(runtime, temporary, next, iterator, []) === THROW) return THROW
     if (!is_object(heap, temporary))
       return throw_error(
         runtime,
         "TypeError",
         "Iterator result is not an object",
       )
-    const done = runtime.realm.property_names.get("done")!
-    if (get_value(runtime, operand, temporary, done) === THROW) return THROW
+    if (get_value(runtime, operand, temporary, "done") === THROW) return THROW
     if (truthy(runtime, operand)) {
       frame.pc = bytecode_offset(done_target)
       return OK
     }
-    return get_value(
-      runtime,
-      destination,
-      temporary,
-      runtime.realm.property_names.get("value")!,
-    )
+    return get_value(runtime, destination, temporary, "value")
   },
   ITERATOR_CLOSE(
     runtime: Runtime,
@@ -435,10 +403,7 @@ const op = {
   ): Status {
     const create = runtime.realm.intrinsics.get("RegExpCreate")
     if (create === undefined) panic("RegExp is not initialized")
-    return invoke_sync(runtime, destination, create, undefined, [
-      pattern,
-      flags,
-    ])
+    return call(runtime, destination, create, undefined, [pattern, flags])
   },
   COPY_DATA_PROPERTIES(
     runtime: Runtime,
@@ -448,7 +413,7 @@ const op = {
   ): Status {
     const copy = runtime.realm.intrinsics.get("CopyDataProperties")
     if (copy === undefined) panic("CopyDataProperties is not initialized")
-    return invoke_sync(runtime, temporary, copy, undefined, [object, source])
+    return call(runtime, temporary, copy, undefined, [object, source])
   },
   GET_FOR_IN_ITERATOR(
     runtime: Runtime,
@@ -458,16 +423,9 @@ const op = {
   ): Status {
     const enumerate = runtime.realm.intrinsics.get("EnumerateObjectProperties")
     if (enumerate === undefined) panic("for-in is not initialized")
-    if (
-      invoke_sync(runtime, iterator, enumerate, undefined, [source]) === THROW
-    )
+    if (call(runtime, iterator, enumerate, undefined, [source]) === THROW)
       return THROW
-    return get_value(
-      runtime,
-      next,
-      iterator,
-      runtime.realm.property_names.get("next")!,
-    )
+    return get_value(runtime, next, iterator, "next")
   },
   LOAD_NEW_TARGET(heap: Heap, destination: Handle, fiber: Fiber, frame: Frame) {
     heap.copy_value(destination, frame.new_target)
@@ -476,13 +434,11 @@ const op = {
     runtime: Runtime,
     destination: Handle,
     source: Handle,
-    property_key: Handle,
   ): Status {
-    if (load_property_key(runtime, property_key, source) === THROW) return THROW
-    if (heap_type_of(runtime.heap, property_key) === HEAP_TYPES.SYMBOL)
-      runtime.heap.copy_value(destination, property_key)
-    else
-      write_string(runtime.heap, destination, to_string(runtime, property_key))
+    const key = to_property_key(runtime, source)
+    if (key === undefined) return THROW
+    if (typeof key === "string") write_string(runtime.heap, destination, key)
+    else runtime.heap.copy_value(destination, key)
     return OK
   },
   CREATE_ARRAY(
@@ -491,13 +447,11 @@ const op = {
     elements: (index: number) => Handle,
     length: number,
     holes: readonly number[],
-    key: Handle,
   ) {
     create_array(runtime, destination, length)
     for (let index = 0; index < length; index++) {
       if (holes.includes(index)) continue
-      write_string(runtime.heap, key, String(index))
-      define_property(runtime, destination, key, elements(index))
+      define_property(runtime, destination, String(index), elements(index))
     }
   },
   DELETE_PROP(
@@ -505,11 +459,11 @@ const op = {
     destination: Handle,
     object: Handle,
     key: Handle,
-    property_key: Handle,
   ): Status {
-    if (load_property_key(runtime, property_key, key) === THROW) return THROW
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
     if (check_properties(runtime, object) === THROW) return THROW
-    if (!delete_property(runtime, object, property_key))
+    if (!delete_property(runtime, object, name))
       return throw_error(
         runtime,
         "TypeError",
@@ -520,51 +474,26 @@ const op = {
   },
   GET_PROP(
     runtime: Runtime,
-    fiber: Fiber,
     destination: Handle,
     object: Handle,
     key: Handle,
-    property_key: Handle,
   ): Status {
-    const { heap } = runtime
-    if (load_property_key(runtime, property_key, key) === THROW) return THROW
-    if (check_properties(runtime, object) === THROW) return THROW
-    if (
-      load_property(runtime, destination, object, property_key) &&
-      tag_of(heap, destination) !== VALUE_TAGS.UNDEFINED
-    )
-      return call_function(runtime, fiber, destination, destination, object, [])
-    return OK
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
+    return get_value(runtime, destination, object, name)
   },
   SET_PROP(
     runtime: Runtime,
-    fiber: Fiber,
     object: Handle,
     key: Handle,
     value: Handle,
-    property_key: Handle,
     operand: Handle,
-    temporary: Handle,
   ): Status {
-    const { heap } = runtime
-    if (load_property_key(runtime, property_key, key) === THROW) return THROW
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
     if (check_properties(runtime, object) === THROW) return THROW
-    heap.copy_value(operand, value)
-    if (
-      set_property(
-        runtime,
-        temporary,
-        object,
-        property_key,
-        operand,
-        define_value_property,
-      ) === THROW
-    )
-      return THROW
-    if (tag_of(heap, temporary) === VALUE_TAGS.UNDEFINED) return OK
-    return call_function(runtime, fiber, fiber.result, temporary, object, [
-      value,
-    ])
+    runtime.heap.copy_value(operand, value)
+    return set_property_value(runtime, object, name, operand)
   },
   DEFINE_PROP(
     runtime: Runtime,
@@ -573,19 +502,12 @@ const op = {
     value: Handle,
     flags: number,
     setter: Handle | undefined,
-    property_key: Handle,
     operand: Handle,
   ): Status {
-    if (load_property_key(runtime, property_key, key) === THROW) return THROW
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
     runtime.heap.copy_value(operand, value)
-    return define_value_property(
-      runtime,
-      object,
-      property_key,
-      operand,
-      flags,
-      setter,
-    )
+    return define_value_property(runtime, object, name, operand, flags, setter)
   },
   SET_PROTO(heap: Heap, object: Handle, prototype: Handle) {
     set_prototype(heap, object, prototype)
@@ -689,14 +611,11 @@ const op = {
     )
     create_object(runtime, temporary)
     heap.handles.scope(() => {
-      const key = heap.handles.local()
-      write_string(heap, key, "prototype")
-      define_property(runtime, destination, key, temporary, 0)
-      write_string(heap, key, "constructor")
+      define_property(runtime, destination, "prototype", temporary, 0)
       define_property(
         runtime,
         temporary,
-        key,
+        "constructor",
         destination,
         WRITABLE | CONFIGURABLE,
       )
@@ -911,7 +830,6 @@ const op = {
     destination: Handle,
     left: Handle,
     right: Handle,
-    temporary: Handle,
   ): Status {
     const { heap } = runtime
     if (!is_object(heap, right))
@@ -920,13 +838,9 @@ const op = {
         "TypeError",
         "Right operand of in must be an object",
       )
-    heap.copy_value(temporary, left)
-    if (
-      is_object(heap, temporary) &&
-      coerce_value(runtime, temporary, temporary, "ToString") === THROW
-    )
-      return THROW
-    write_boolean(heap, destination, has_property(runtime, right, temporary))
+    const key = to_property_key(runtime, left)
+    if (key === undefined) return THROW
+    write_boolean(heap, destination, has_property(runtime, right, key))
     return OK
   },
   NUMERIC_UNARY(
@@ -974,8 +888,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
   fiber.status = FIBER_STATE.RUNNING as FiberStatus
   heap.handles.scope(() => {
     const temporary = heap.handles.local(),
-      operand = heap.handles.local(),
-      property_key = heap.handles.local()
+      operand = heap.handles.local()
     if (fiber.take_await_rejection()) {
       throw_value(runtime, fiber, fiber.error)
       if (fiber.status === FIBER_STATE.FAILED) return
@@ -1048,7 +961,6 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             (index) => reg(b + index),
             c,
             d === NO_HOLES ? [] : code.unit.array_holes[d],
-            property_key,
           )
           break
         case OP.CREATE_CLOSURE:
@@ -1085,26 +997,10 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           )
           break
         case OP.GET_PROP:
-          status = op.GET_PROP(
-            runtime,
-            fiber,
-            reg(a),
-            reg(b),
-            reg(c),
-            property_key,
-          )
+          status = op.GET_PROP(runtime, reg(a), reg(b), reg(c))
           break
         case OP.SET_PROP:
-          status = op.SET_PROP(
-            runtime,
-            fiber,
-            reg(a),
-            reg(b),
-            reg(c),
-            property_key,
-            operand,
-            temporary,
-          )
+          status = op.SET_PROP(runtime, reg(a), reg(b), reg(c), operand)
           break
         case OP.DEFINE_PROP:
           status = op.DEFINE_PROP(
@@ -1114,18 +1010,17 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             reg(c),
             d,
             e === 1 ? reg(c) : undefined,
-            property_key,
             operand,
           )
           break
         case OP.DELETE_PROP:
-          status = op.DELETE_PROP(runtime, reg(a), reg(b), reg(c), property_key)
+          status = op.DELETE_PROP(runtime, reg(a), reg(b), reg(c))
           break
         case OP.SET_PROTO:
           op.SET_PROTO(heap, reg(a), reg(b))
           break
         case OP.TO_PROPERTY_KEY:
-          status = op.TO_PROPERTY_KEY(runtime, reg(a), reg(b), property_key)
+          status = op.TO_PROPERTY_KEY(runtime, reg(a), reg(b))
           break
         case OP.INIT_PRIVATE:
         case OP.SET_PRIVATE:
@@ -1316,7 +1211,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           )
           break
         case OP.IN:
-          status = op.IN(runtime, reg(a), reg(b), reg(c), temporary)
+          status = op.IN(runtime, reg(a), reg(b), reg(c))
           break
         case OP.INSTANCEOF:
           status = instance_of(runtime, reg(a), reg(b), reg(c))
@@ -1346,7 +1241,6 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
       // The helper handles must not retain environments after the instruction.
       write_undefined(heap, temporary)
       write_undefined(heap, operand)
-      write_undefined(heap, property_key)
     }
     fiber.status = FIBER_STATE.READY
   })

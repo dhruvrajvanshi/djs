@@ -163,7 +163,7 @@ New fibers are created in these cases:
 | --- | --- |
 | A module is evaluated | Each module body runs in its own fiber |
 | An async function is called | So that `AWAIT` suspends only that call |
-| VM code needs a JavaScript result right away (`invoke_sync`) | Examples: `ToPrimitive` calling `valueOf`, `ITERATOR_NEXT` calling `next`, any abstract operation the VM gets from the realm. The fiber runs to completion before the instruction continues, and must not await |
+| VM code needs a JavaScript result right away (`call`) | Examples: `ToPrimitive` calling `valueOf`, `ITERATOR_NEXT` calling `next`, a getter or setter, any abstract operation the VM gets from the realm. The fiber runs to completion before the instruction continues, and must not await |
 | A job runs | Each promise reaction is a fresh call |
 
 ## Exceptions

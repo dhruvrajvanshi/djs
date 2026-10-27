@@ -62,11 +62,13 @@ import {
   define_own_property,
   define_property,
   delete_property,
+  from_property_descriptor,
   get_own_property_descriptor,
-  load_property,
+  get_property_value,
   has_properties,
   has_property,
   ordinary_own_property_keys,
+  to_property_key,
 } from "../semantics/properties.ts"
 import {
   has_slot,
@@ -205,7 +207,9 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-ordinarydefineownproperty
    */
   ordinary_define_own_property(runtime, destination, [o, key, desc]) {
-    const status = define_own_property(runtime, o, key, desc, true)
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
+    const status = define_own_property(runtime, o, name, desc, true)
     if (status === THROW) clear_exception(runtime)
     write_boolean(runtime.heap, destination, status === OK)
     return OK
@@ -216,10 +220,12 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-ordinarydelete
    */
   ordinary_delete(runtime, destination, [o, key]) {
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
     write_boolean(
       runtime.heap,
       destination,
-      has_properties(runtime, o) && delete_property(runtime, o, key),
+      has_properties(runtime, o) && delete_property(runtime, o, name),
     )
     return OK
   },
@@ -377,14 +383,18 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     const { heap } = runtime
     if (!is_object(heap, o))
       return throw_error(runtime, "TypeError", "Expected an object")
-    write_boolean(heap, destination, has_property(runtime, o, key))
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
+    write_boolean(heap, destination, has_property(runtime, o, name))
     return OK
   },
   delete_property_or_throw(runtime, destination, [o, key]) {
     const { heap } = runtime
     if (!is_object(heap, o))
       return throw_error(runtime, "TypeError", "Expected an object")
-    if (!delete_property(runtime, o, key))
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
+    if (!delete_property(runtime, o, name))
       return throw_error(
         runtime,
         "TypeError",
@@ -402,7 +412,15 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     const { heap } = runtime
     if (!is_object(heap, o))
       return throw_error(runtime, "TypeError", "Expected an object")
-    get_own_property_descriptor(runtime, destination, o, key)
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
+    heap.handles.scope(() =>
+      from_property_descriptor(
+        runtime,
+        destination,
+        get_own_property_descriptor(runtime, o, name),
+      ),
+    )
     return OK
   },
   /**
@@ -413,7 +431,9 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-definepropertyorthrow
    */
   define_property_or_throw(runtime, destination, [o, key, desc]) {
-    if (define_own_property(runtime, o, key, desc) === THROW) return THROW
+    const name = to_property_key(runtime, key)
+    if (name === undefined) return THROW
+    if (define_own_property(runtime, o, name, desc) === THROW) return THROW
     write_undefined(runtime.heap, destination)
     return OK
   },
@@ -438,16 +458,13 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
     if (function_name === undefined) return THROW
     return heap.handles.scope(() => {
       const result = heap.handles.local(),
-        key = heap.handles.local(),
         value = heap.handles.local()
       create_function(runtime, result, BUILTIN_CODE, 0)
       set_builtin_steps(heap, result, behaviour, false)
-      write_string(heap, key, "length")
       write_number(heap, value, function_length)
-      define_property(runtime, result, key, value, CONFIGURABLE)
-      write_string(heap, key, "name")
+      define_property(runtime, result, "length", value, CONFIGURABLE)
       write_string(heap, value, function_name)
-      define_property(runtime, result, key, value, CONFIGURABLE)
+      define_property(runtime, result, "name", value, CONFIGURABLE)
       heap.copy_value(destination, result)
       return OK
     })
@@ -464,7 +481,6 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
       return throw_error(runtime, "TypeError", "Expected an object")
     return heap.handles.scope(() => {
       const object = heap.handles.local(),
-        key = heap.handles.local(),
         name = heap.handles.local(),
         empty = heap.handles.local()
       create_object(runtime, object)
@@ -472,12 +488,12 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
       if (slots !== undefined && tag_of(heap, slots) !== VALUE_TAGS.UNDEFINED) {
         if (heap_type_of(heap, slots) !== HEAP_TYPES.ARRAY)
           return throw_error(runtime, "TypeError", "Expected slot names")
-        write_string(heap, key, "length")
-        load_property(runtime, name, slots, key)
+        if (get_property_value(runtime, name, slots, "length") === THROW)
+          return THROW
         const count = read_number(heap, name)
         for (let index = 0; index < count; index++) {
-          write_string(heap, key, String(index))
-          load_property(runtime, name, slots, key)
+          if (get_property_value(runtime, name, slots, String(index)) === THROW)
+            return THROW
           if (!is_string(heap, name))
             return throw_error(runtime, "TypeError", "Expected a slot name")
           if (

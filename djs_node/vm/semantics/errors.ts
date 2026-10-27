@@ -2,7 +2,7 @@ import type { Handle } from "../storage/heap.ts"
 import { write_undefined } from "../storage/value.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import { write_string } from "../heap_types/string.ts"
-import { invoke_sync } from "../execution/calls.ts"
+import { call } from "../execution/calls.ts"
 import { panic } from "../../utils.ts"
 
 /**
@@ -38,10 +38,7 @@ export function create_error(
   runtime.heap.handles.scope(() => {
     const text = runtime.heap.handles.local()
     write_string(runtime.heap, text, message)
-    if (
-      invoke_sync(runtime, destination, constructor, undefined, [text]) ===
-      THROW
-    )
+    if (call(runtime, destination, constructor, undefined, [text]) === THROW)
       take_exception(runtime, destination)
   })
 }

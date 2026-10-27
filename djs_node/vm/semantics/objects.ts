@@ -44,14 +44,11 @@ export function create_function(
   )
   if (metadata) {
     heap.handles.scope(() => {
-      const key = heap.handles.local(),
-        value = heap.handles.local()
-      write_string(heap, key, "length")
+      const value = heap.handles.local()
       write_number(heap, value, metadata.length)
-      define_property(runtime, destination, key, value, CONFIGURABLE)
-      write_string(heap, key, "name")
+      define_property(runtime, destination, "length", value, CONFIGURABLE)
       write_string(heap, value, metadata.name)
-      define_property(runtime, destination, key, value, CONFIGURABLE)
+      define_property(runtime, destination, "name", value, CONFIGURABLE)
     })
   }
 }
@@ -84,14 +81,16 @@ export function create_arguments_object(
   const { heap } = runtime
   create_object(runtime, destination)
   heap.handles.scope(() => {
-    const key = heap.handles.local(),
-      length = heap.handles.local()
-    write_string(heap, key, "length")
+    const length = heap.handles.local()
     write_number(heap, length, arguments_.length)
-    define_property(runtime, destination, key, length, WRITABLE | CONFIGURABLE)
-    for (let index = 0; index < arguments_.length; index++) {
-      write_string(heap, key, String(index))
-      define_property(runtime, destination, key, arguments_[index])
-    }
+    define_property(
+      runtime,
+      destination,
+      "length",
+      length,
+      WRITABLE | CONFIGURABLE,
+    )
+    for (let index = 0; index < arguments_.length; index++)
+      define_property(runtime, destination, String(index), arguments_[index])
   })
 }

@@ -31,15 +31,6 @@ export const WELL_KNOWN_SYMBOLS = Object.freeze([
   "unscopables",
 ])
 
-/** Property keys the VM reads itself, such as iterator result fields. */
-const PROPERTY_NAMES = Object.freeze([
-  "next",
-  "done",
-  "value",
-  "return",
-  "length",
-])
-
 /** Every handle here is owned by the realm and lives as long as the runtime. */
 export class Realm {
   /** The realm's well-known objects, abstract operations and internal methods by name. */
@@ -48,7 +39,6 @@ export class Realm {
   slot_keys = new Map<string, Persistent>()
   /** Keyed by name without the "Symbol." prefix. */
   well_known_symbols = new Map<string, Persistent>()
-  property_names = new Map<string, Persistent>()
   globals = new Map<string, Persistent>()
   // Undefined until create_realm allocates them; objects created before then
   // have a null prototype.
@@ -104,11 +94,6 @@ export function create_well_known_values(runtime: Runtime) {
       realm.well_known_symbols.set(name, symbol)
     }
   })
-  for (const name of PROPERTY_NAMES) {
-    const key = heap.handles.persistent()
-    write_string(heap, key, name)
-    realm.property_names.set(name, key)
-  }
 }
 
 // What the VM uses from the stdlib; see docs/realm.md.

@@ -37,7 +37,7 @@ import {
   create_function,
   create_object,
 } from "../semantics/objects.ts"
-import { define_property, load_property } from "../semantics/properties.ts"
+import { define_property, get_property_value } from "../semantics/properties.ts"
 import { initialize_binding } from "../semantics/bindings.ts"
 import {
   OK,
@@ -131,15 +131,17 @@ function push_frame(
     for (let index = 0; index < parameters.length; index++)
       bind(parameters[index], arguments_[index] ?? empty)
     if (rest !== null) {
-      const array = heap.handles.local(),
-        key = heap.handles.local()
+      const array = heap.handles.local()
       const start = parameters.length
       const count = Math.max(0, arguments_.length - start)
       create_array(runtime, array, count)
-      for (let index = 0; index < count; index++) {
-        write_string(heap, key, String(index))
-        define_property(runtime, array, key, arguments_[start + index])
-      }
+      for (let index = 0; index < count; index++)
+        define_property(
+          runtime,
+          array,
+          String(index),
+          arguments_[start + index],
+        )
       bind(rest, array)
     }
   })
@@ -308,16 +310,16 @@ export function coerce_value(
   return runtime.heap.handles.scope(() => {
     const hint_value = runtime.heap.handles.local()
     if (hint !== undefined) write_string(runtime.heap, hint_value, hint)
-    return invoke_sync(runtime, destination, helper, undefined, [
-      source,
-      hint_value,
-    ])
+    return call(runtime, destination, helper, undefined, [source, hint_value])
   })
 }
 
-// A synchronous language operation may execute user code (valueOf/toString).
-// Keep that execution in a VM fiber and preserve thrown guest values.
-export function invoke_sync(
+/**
+ * Runs `callee` to completion and writes its result. This is how VM operations
+ * run guest code (getters, setters, coercions); only the interpreter's CALL
+ * continues a call on the current fiber instead.
+ */
+export function call(
   runtime: Runtime,
   destination: Handle,
   callee: Handle,
@@ -359,17 +361,15 @@ export function settle_with_promise(
     const resolve = heap.handles.persistent(),
       reject = heap.handles.persistent()
     fiber.settle = { resolve, reject }
-    heap.handles.scope(() => {
-      const key = heap.handles.local()
-      for (const [name, target] of [
-        ["promise", promise],
-        ["resolve", resolve],
-        ["reject", reject],
-      ] as [string, Handle][]) {
-        write_string(heap, key, name)
-        load_property(runtime, target, capability.result, key)
-      }
-    })
+    for (const [name, target] of [
+      ["promise", promise],
+      ["resolve", resolve],
+      ["reject", reject],
+    ] as [string, Handle][])
+      if (
+        get_property_value(runtime, target, capability.result, name) === THROW
+      )
+        return THROW
     return OK
   } finally {
     dispose_fiber(runtime, capability)
@@ -534,7 +534,6 @@ export function construct_function(
     return throw_error(runtime, "TypeError", "Value is not a constructor")
   return heap.handles.scope(() => {
     const receiver = heap.handles.local(),
-      key = heap.handles.local(),
       prototype = heap.handles.local(),
       parent = heap.handles.local(),
       environment = heap.handles.local()
@@ -546,9 +545,11 @@ export function construct_function(
       write_uninitialized(heap, receiver)
     } else {
       create_object(runtime, receiver)
-      // Constructors in the supported subset have data-valued prototype properties.
-      write_string(heap, key, "prototype")
-      load_property(runtime, prototype, new_target, key)
+      if (
+        get_property_value(runtime, prototype, new_target, "prototype") ===
+        THROW
+      )
+        return THROW
       if (has_property_list(heap, prototype))
         set_prototype(heap, receiver, prototype)
     }

@@ -19,7 +19,7 @@ import {
   has_property_list,
   prototype_of_reference,
 } from "../heap_types/object.ts"
-import { load_property } from "./properties.ts"
+import { get_property_value } from "./properties.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 import { OP } from "../../compiler/bytecode.ts"
@@ -210,10 +210,9 @@ export function instance_of(
   if (heap_type_of(heap, right) !== HEAP_TYPES.FUNCTION)
     return throw_error(runtime, "TypeError", "Expected a constructor")
   return heap.handles.scope(() => {
-    const key = heap.handles.local(),
-      prototype = heap.handles.local()
-    write_string(heap, key, "prototype")
-    load_property(runtime, prototype, right, key)
+    const prototype = heap.handles.local()
+    if (get_property_value(runtime, prototype, right, "prototype") === THROW)
+      return THROW
     if (!has_property_list(heap, prototype))
       return throw_error(runtime, "TypeError", "Expected an object")
     let found = false

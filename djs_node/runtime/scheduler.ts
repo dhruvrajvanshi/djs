@@ -2,7 +2,6 @@ import { heap_type_of, write_number } from "../vm/storage/value.ts"
 import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import type { Runtime } from "./runtime.ts"
 import type { HostError } from "../host/node.ts"
-import { write_string } from "../vm/heap_types/string.ts"
 import { byte_buffer_view } from "../vm/heap_types/byte_buffer.ts"
 import { create_error } from "../vm/semantics/errors.ts"
 import { define_property } from "../vm/semantics/properties.ts"
@@ -180,17 +179,15 @@ export function operation_error(
   const { heap } = runtime
   create_error(runtime, destination, "Error", String(error?.message ?? error))
   heap.handles.scope(() => {
-    const key = heap.handles.local(),
-      value = heap.handles.local()
+    const value = heap.handles.local()
     for (const [name, item] of Object.entries({
       code: error?.code,
       syscall,
       path,
     })) {
       if (item === undefined) continue
-      write_string(heap, key, name)
       write_primitive(runtime, value, item)
-      define_property(runtime, destination, key, value)
+      define_property(runtime, destination, name, value)
     }
   })
 }
@@ -206,12 +203,10 @@ export function write_host_value(
   const { heap } = runtime
   create_object(runtime, destination)
   heap.handles.scope(() => {
-    const key = heap.handles.local(),
-      item = heap.handles.local()
+    const item = heap.handles.local()
     for (const [name, field] of Object.entries(value)) {
-      write_string(heap, key, name)
       write_primitive(runtime, item, field)
-      define_property(runtime, destination, key, item)
+      define_property(runtime, destination, name, item)
     }
   })
 }
