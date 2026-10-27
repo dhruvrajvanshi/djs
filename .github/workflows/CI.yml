@@ -46,7 +46,7 @@ jobs:
       working-directory: djs_parser
 
     - name: Run tests (djs_node)
-      run: pnpm test
+      run: pnpm c8 --reporter=lcov pnpm test
       working-directory: djs_node
 
     - name: Codecov
