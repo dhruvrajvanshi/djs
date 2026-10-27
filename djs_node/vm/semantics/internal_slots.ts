@@ -15,6 +15,7 @@ import {
 } from "../heap_types/object.ts"
 import {
   find_property,
+  insert_property,
   load_property_value,
   store_property_value,
 } from "../heap_types/property.ts"
@@ -23,7 +24,6 @@ import {
   string_value,
 } from "../heap_types/string_object.ts"
 import { create_object } from "./objects.ts"
-import { define_property } from "./properties.ts"
 import { OK, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 
@@ -159,6 +159,6 @@ export function init_slot(
   const key = slot_key(runtime, name)
   if (find_property(heap, object, key, true, true) !== 0)
     return throw_error(runtime, "TypeError", `Duplicate ${name} slot`)
-  define_property(runtime, object, key, value, PRIVATE | WRITABLE)
+  insert_property(heap, object, key, PRIVATE | WRITABLE, value)
   return OK
 }

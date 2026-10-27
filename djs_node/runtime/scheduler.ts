@@ -187,7 +187,12 @@ export function operation_error(
     })) {
       if (item === undefined) continue
       write_primitive(runtime, value, item)
-      define_property(runtime, destination, name, value)
+      define_property(runtime, destination, name, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      })
     }
   })
 }
@@ -206,7 +211,12 @@ export function write_host_value(
     const item = heap.handles.local()
     for (const [name, field] of Object.entries(value)) {
       write_primitive(runtime, item, field)
-      define_property(runtime, destination, name, item)
+      define_property(runtime, destination, name, {
+        value: item,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      })
     }
   })
 }

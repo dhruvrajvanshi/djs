@@ -88,9 +88,9 @@ export const OP = Object.freeze({
   /** `object, key, src` */
   SET_PROP: 18,
   /**
-   * `object, key, src, =flags, =setter`: defines a property without calling
-   * setters, as literals and class fields do. For accessors, `src` is the
-   * getter, or the setter if `setter`.
+   * `object, key, src, =flags, =kind`: defines a property without calling
+   * setters, as literals and class fields do. `kind` is a PROPERTY_KIND; for
+   * a getter or setter, `src` is that function.
    */
   DEFINE_PROP: 19,
   /** `dst, object, key` */

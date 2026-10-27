@@ -12,7 +12,7 @@ import {
   write_number,
   write_undefined,
 } from "../storage/value.ts"
-import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
+import { HEAP_TYPES } from "../storage/layout.ts"
 import { INSTRUCTION_BYTES, NATIVE_MARKERS } from "../../compiler/bytecode.ts"
 import type { CompiledModule } from "../../compiler/compile.ts"
 import type { Frame } from "./fiber.ts"
@@ -59,15 +59,17 @@ import {
   create_string_object,
 } from "../semantics/objects.ts"
 import {
-  define_own_property,
   define_property,
+  define_property_or_throw,
   delete_property,
   from_property_descriptor,
   get_own_property_descriptor,
   get_property_value,
   has_properties,
   has_property,
+  ordinary_define_own_property,
   ordinary_own_property_keys,
+  to_property_descriptor,
   to_property_key,
 } from "../semantics/properties.ts"
 import {
@@ -76,16 +78,8 @@ import {
   set_slot,
   init_slot,
 } from "../semantics/internal_slots.ts"
-import {
-  OK,
-  THROW,
-  throw_error,
-  throw_value,
-  clear_exception,
-} from "../semantics/errors.ts"
+import { OK, THROW, throw_error, throw_value } from "../semantics/errors.ts"
 import type { Status } from "../semantics/errors.ts"
-
-const { CONFIGURABLE } = PROPERTY_FLAGS
 
 export const NATIVE_CODE = 0xffffffff
 /** Built-in function objects run the steps stored by set_builtin_steps. */
@@ -207,12 +201,19 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-ordinarydefineownproperty
    */
   ordinary_define_own_property(runtime, destination, [o, key, desc]) {
+    const { heap } = runtime
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
-    const status = define_own_property(runtime, o, name, desc, true)
-    if (status === THROW) clear_exception(runtime)
-    write_boolean(runtime.heap, destination, status === OK)
-    return OK
+    return heap.handles.scope(() => {
+      const descriptor = to_property_descriptor(runtime, desc)
+      if (descriptor === undefined) return THROW
+      write_boolean(
+        heap,
+        destination,
+        ordinary_define_own_property(runtime, o, name, descriptor),
+      )
+      return OK
+    })
   },
   /**
    * Deletes `key` from `o`, bypassing `o`'s exotic behavior. Returns `false` if
@@ -431,11 +432,17 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
    * @see https://tc39.es/ecma262/#sec-definepropertyorthrow
    */
   define_property_or_throw(runtime, destination, [o, key, desc]) {
+    const { heap } = runtime
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
-    if (define_own_property(runtime, o, name, desc) === THROW) return THROW
-    write_undefined(runtime.heap, destination)
-    return OK
+    return heap.handles.scope(() => {
+      const descriptor = to_property_descriptor(runtime, desc)
+      if (descriptor === undefined) return THROW
+      if (define_property_or_throw(runtime, o, name, descriptor) === THROW)
+        return THROW
+      write_undefined(heap, destination)
+      return OK
+    })
   },
   /**
    * Creates a built-in function with `length` and `name` that runs the JS
@@ -462,9 +469,9 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
       create_function(runtime, result, BUILTIN_CODE, 0)
       set_builtin_steps(heap, result, behaviour, false)
       write_number(heap, value, function_length)
-      define_property(runtime, result, "length", value, CONFIGURABLE)
+      define_property(runtime, result, "length", { value, configurable: true })
       write_string(heap, value, function_name)
-      define_property(runtime, result, "name", value, CONFIGURABLE)
+      define_property(runtime, result, "name", { value, configurable: true })
       heap.copy_value(destination, result)
       return OK
     })

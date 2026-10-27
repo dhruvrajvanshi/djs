@@ -8,7 +8,6 @@ import {
   set_ref,
   tag_of,
   write_boolean,
-  write_number,
   write_undefined,
 } from "../storage/value.ts"
 import {
@@ -57,25 +56,30 @@ const { WRITABLE, ENUMERABLE, CONFIGURABLE, PRIVATE, ACCESSOR } = PROPERTY_FLAGS
 export type { PropertyKey } from "../heap_types/property.ts"
 
 /**
- * A property's attributes and contents, copied into handles in the caller's
- * handle scope.
+ * A property's attributes and contents, as handles in the caller's handle
+ * scope. Any field may be absent: defining leaves an absent field as it is, or
+ * as false or undefined on a new property. Descriptors read from a property
+ * are complete.
  * @see https://tc39.es/ecma262/#sec-property-descriptor-specification-type
  */
-export type PropertyDescriptor =
-  | {
-      kind: "data"
-      value: Handle
-      writable: boolean
-      enumerable: boolean
-      configurable: boolean
-    }
-  | {
-      kind: "accessor"
-      get: Handle
-      set: Handle
-      enumerable: boolean
-      configurable: boolean
-    }
+export interface PropertyDescriptor {
+  value?: Handle
+  writable?: boolean
+  get?: Handle
+  set?: Handle
+  enumerable?: boolean
+  configurable?: boolean
+}
+
+/** @see https://tc39.es/ecma262/#sec-isaccessordescriptor */
+export function is_accessor_descriptor(descriptor: PropertyDescriptor) {
+  return descriptor.get !== undefined || descriptor.set !== undefined
+}
+
+/** @see https://tc39.es/ecma262/#sec-isdatadescriptor */
+export function is_data_descriptor(descriptor: PropertyDescriptor) {
+  return descriptor.value !== undefined || descriptor.writable !== undefined
+}
 
 /** Values whose properties the VM can read without boxing. */
 export function has_properties(runtime: Runtime, value: Handle) {
@@ -237,13 +241,13 @@ function descriptor_of(
       set = heap.handles.local()
     load_property_value(heap, get, found.property!)
     load_property_setter(heap, set, found.property!)
-    return { kind: "accessor", get, set, enumerable, configurable }
+    return { get, set, enumerable, configurable }
   }
   const value = heap.handles.local()
   if (found.property) load_property_value(heap, value, found.property)
   else write_primitive(runtime, value, found.value)
   const writable = Boolean(found.flags & WRITABLE)
-  return { kind: "data", value, writable, enumerable, configurable }
+  return { value, writable, enumerable, configurable }
 }
 
 /** @see https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p */
@@ -275,10 +279,11 @@ export function get_property_value(
   return heap.handles.scope(() => {
     const found = get_property_descriptor(runtime, object, key)
     if (found === undefined) write_undefined(heap, destination)
-    else if (found.kind === "data") heap.copy_value(destination, found.value)
-    else if (tag_of(heap, found.get) === VALUE_TAGS.UNDEFINED)
+    else if (!is_accessor_descriptor(found))
+      heap.copy_value(destination, found.value!)
+    else if (tag_of(heap, found.get!) === VALUE_TAGS.UNDEFINED)
       write_undefined(heap, destination)
-    else return call(runtime, destination, found.get, object, [])
+    else return call(runtime, destination, found.get!, object, [])
     return OK
   })
 }
@@ -302,113 +307,210 @@ export function delete_property(
   return remove_property(runtime.heap, object, key)
 }
 
+/**
+ * Defines a property on an object the VM is setting up, where a refusal is a
+ * VM bug. Skips exotic behavior, such as an array's `length` update.
+ */
 export function define_property(
   runtime: Runtime,
   object: Handle,
   key: PropertyKey,
-  value: Handle,
-  flags: PropertyFlags = WRITABLE | ENUMERABLE | CONFIGURABLE,
-  setter?: Handle,
+  descriptor: PropertyDescriptor,
 ) {
-  if (!try_define_property(runtime, object, key, value, flags, setter))
+  if (!ordinary_define_own_property(runtime, object, key, descriptor))
     panic("Cannot redefine property")
 }
 
-/** Returns false when an existing non-configurable property forbids the change. */
-export function try_define_property(
+/**
+ * Returns undefined after raising.
+ * @see https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-defineownproperty-p-desc
+ */
+export function define_own_property(
   runtime: Runtime,
   object: Handle,
   key: PropertyKey,
-  value: Handle,
-  flags: PropertyFlags = WRITABLE | ENUMERABLE | CONFIGURABLE,
-  setter?: Handle,
-) {
-  const { heap } = runtime
-  const virtual =
-    flags & PRIVATE ? undefined : virtual_property(runtime, object, key)
-  if (virtual) {
-    return heap.handles.scope(() => {
-      const previous = heap.handles.local()
-      write_primitive(runtime, previous, virtual.value)
-      return flags === virtual.flags && same_value(runtime, previous, value)
-    })
-  }
-  return ordinary_define_property(runtime, object, key, value, flags, setter)
+  descriptor: PropertyDescriptor,
+): boolean | undefined {
+  const method = exotic_define_own_property(runtime, object)
+  if (method === undefined)
+    return ordinary_define_own_property(runtime, object, key, descriptor)
+  return invoke_define(runtime, method, object, key, descriptor)
 }
 
-function ordinary_define_property(
+/** @see https://tc39.es/ecma262/#sec-definepropertyorthrow */
+export function define_property_or_throw(
   runtime: Runtime,
   object: Handle,
   key: PropertyKey,
-  value: Handle,
-  flags: PropertyFlags = WRITABLE | ENUMERABLE | CONFIGURABLE,
-  setter?: Handle,
-) {
+  descriptor: PropertyDescriptor,
+): Status {
+  const defined = define_own_property(runtime, object, key, descriptor)
+  if (defined === undefined) return THROW
+  if (!defined)
+    return throw_error(runtime, "TypeError", "Cannot redefine property")
+  return OK
+}
+
+/** @see https://tc39.es/ecma262/#sec-ordinarydefineownproperty */
+export function ordinary_define_own_property(
+  runtime: Runtime,
+  object: Handle,
+  key: PropertyKey,
+  descriptor: PropertyDescriptor,
+): boolean {
   const { heap } = runtime
-  const property = find_property(
-    heap,
-    object,
-    key,
-    true,
-    Boolean(flags & PRIVATE),
-  )
-  if (property !== 0) {
-    const previous_flags = property_flags(heap, property)
-    if (!(previous_flags & CONFIGURABLE)) {
-      if (
-        (flags & (ENUMERABLE | CONFIGURABLE | ACCESSOR)) !==
-          (previous_flags & (ENUMERABLE | ACCESSOR)) ||
-        (!(previous_flags & WRITABLE) && flags & WRITABLE)
+  return heap.handles.scope(() => {
+    const current = get_own_property_descriptor(runtime, object, key)
+    // Computed properties, and objects without a property list, can't change:
+    // a define can only restate them.
+    if (
+      virtual_property(runtime, object, key) ||
+      !has_property_list(heap, object)
+    )
+      return (
+        validate_and_apply_property_descriptor(
+          runtime,
+          undefined,
+          key,
+          false,
+          descriptor,
+          current,
+        ) &&
+        (descriptor.value === undefined ||
+          same_value(runtime, descriptor.value, current!.value!))
       )
-        return false
-      if (previous_flags & ACCESSOR || !(previous_flags & WRITABLE)) {
-        const same = heap.handles.scope(() => {
-          const previous = heap.handles.local()
-          if (flags & ACCESSOR && setter !== undefined)
-            load_property_setter(heap, previous, property)
-          else load_property_value(heap, previous, property)
-          return same_value(runtime, previous, value)
-        })
-        if (!same) return false
-      }
-    }
-    if (flags & ACCESSOR) {
-      if (!(previous_flags & ACCESSOR)) {
-        set_property_flags(heap, property, flags)
-        heap.handles.scope(() => {
-          const empty = heap.handles.local()
-          store_property_value(heap, property, empty)
-          store_property_setter(heap, property, empty)
-        })
-      }
-      if (setter === undefined) store_property_value(heap, property, value)
-      else store_property_setter(heap, property, value)
-      set_property_flags(heap, property, flags)
-      return true
-    }
-    set_property_flags(heap, property, flags)
-    store_property_value(heap, property, value)
-    if (previous_flags & ACCESSOR) {
-      heap.handles.scope(() => {
-        const empty = heap.handles.local()
-        store_property_setter(heap, property, empty)
-      })
-    }
+    return validate_and_apply_property_descriptor(
+      runtime,
+      object,
+      key,
+      true,
+      descriptor,
+      current,
+    )
+  })
+}
+
+/**
+ * Checks `descriptor` against the `current` property, then applies it unless
+ * `object` is undefined.
+ * @see https://tc39.es/ecma262/#sec-validateandapplypropertydescriptor
+ */
+function validate_and_apply_property_descriptor(
+  runtime: Runtime,
+  object: Handle | undefined,
+  key: PropertyKey,
+  extensible: boolean,
+  descriptor: PropertyDescriptor,
+  current: PropertyDescriptor | undefined,
+): boolean {
+  if (current === undefined) {
+    if (!extensible) return false
+    if (object !== undefined)
+      store_own_property(runtime, object, key, descriptor)
     return true
   }
-  return heap.handles.scope(() => {
-    const stored = heap.handles.local()
-    if (typeof key === "string") write_string(heap, stored, key)
-    else heap.copy_value(stored, key)
-    insert_property(
-      heap,
-      object,
-      stored,
-      flags,
-      value,
-      Boolean(flags & ACCESSOR && setter !== undefined),
+  if (!current.configurable) {
+    if (descriptor.configurable) return false
+    if (
+      descriptor.enumerable !== undefined &&
+      descriptor.enumerable !== current.enumerable
     )
-    return true
+      return false
+    const generic =
+      !is_accessor_descriptor(descriptor) && !is_data_descriptor(descriptor)
+    if (
+      !generic &&
+      is_accessor_descriptor(descriptor) !== is_accessor_descriptor(current)
+    )
+      return false
+    if (is_accessor_descriptor(current)) {
+      if (
+        descriptor.get !== undefined &&
+        !same_value(runtime, descriptor.get, current.get!)
+      )
+        return false
+      if (
+        descriptor.set !== undefined &&
+        !same_value(runtime, descriptor.set, current.set!)
+      )
+        return false
+    } else if (!current.writable) {
+      if (descriptor.writable) return false
+      if (
+        descriptor.value !== undefined &&
+        !same_value(runtime, descriptor.value, current.value!)
+      )
+        return false
+    }
+  }
+  if (object === undefined) return true
+  const enumerable = descriptor.enumerable ?? current.enumerable,
+    configurable = descriptor.configurable ?? current.configurable
+  let next: PropertyDescriptor
+  if (is_data_descriptor(current) && is_accessor_descriptor(descriptor))
+    next = {
+      get: descriptor.get,
+      set: descriptor.set,
+      enumerable,
+      configurable,
+    }
+  else if (is_accessor_descriptor(current) && is_data_descriptor(descriptor))
+    next = {
+      value: descriptor.value,
+      writable: descriptor.writable,
+      enumerable,
+      configurable,
+    }
+  else if (is_accessor_descriptor(current))
+    next = {
+      get: descriptor.get ?? current.get,
+      set: descriptor.set ?? current.set,
+      enumerable,
+      configurable,
+    }
+  else
+    next = {
+      value: descriptor.value ?? current.value,
+      writable: descriptor.writable ?? current.writable,
+      enumerable,
+      configurable,
+    }
+  store_own_property(runtime, object, key, next)
+  return true
+}
+
+/**
+ * Writes `descriptor` as `key`'s own property, adding it if missing. Absent
+ * fields are stored as false or undefined.
+ */
+function store_own_property(
+  runtime: Runtime,
+  object: Handle,
+  key: PropertyKey,
+  descriptor: PropertyDescriptor,
+) {
+  const { heap } = runtime
+  heap.handles.scope(() => {
+    const stored_key = heap.handles.local(),
+      empty = heap.handles.local()
+    if (typeof key === "string") write_string(heap, stored_key, key)
+    else heap.copy_value(stored_key, key)
+    const accessor = is_accessor_descriptor(descriptor)
+    const flags =
+      (accessor ? ACCESSOR : descriptor.writable ? WRITABLE : 0) |
+      (descriptor.enumerable ? ENUMERABLE : 0) |
+      (descriptor.configurable ? CONFIGURABLE : 0)
+    let property = find_property(heap, object, key, true)
+    if (property === 0)
+      property = insert_property(heap, object, stored_key, flags, empty)
+    set_property_flags(heap, property, flags)
+    if (accessor) {
+      store_property_value(heap, property, descriptor.get ?? empty)
+      store_property_setter(heap, property, descriptor.set ?? empty)
+    } else {
+      store_property_value(heap, property, descriptor.value ?? empty)
+      store_property_setter(heap, property, empty)
+    }
   })
 }
 
@@ -449,11 +551,11 @@ export function set_property_value(
     )
   return heap.handles.scope(() => {
     const found = get_property_descriptor(runtime, object, key)
-    if (found?.kind === "accessor") {
-      if (tag_of(heap, found.set) === VALUE_TAGS.UNDEFINED)
+    if (found && is_accessor_descriptor(found)) {
+      if (tag_of(heap, found.set!) === VALUE_TAGS.UNDEFINED)
         return throw_error(runtime, "TypeError", "Property has no setter")
       const result = heap.handles.local()
-      return call(runtime, result, found.set, object, [value])
+      return call(runtime, result, found.set!, object, [value])
     }
     if (found && !found.writable)
       return throw_error(
@@ -463,15 +565,13 @@ export function set_property_value(
       )
     if (!has_property_list(heap, object))
       return throw_error(runtime, "TypeError", "Expected an object")
-    const own = own_property(runtime, object, key)
-    return define_value_property(
+    return define_property_or_throw(
       runtime,
       object,
       key,
-      value,
-      own ? own.flags : WRITABLE | ENUMERABLE | CONFIGURABLE,
-      undefined,
-      Boolean(own),
+      own_property(runtime, object, key)
+        ? { value }
+        : { value, writable: true, enumerable: true, configurable: true },
     )
   })
 }
@@ -489,7 +589,8 @@ function find_private(runtime: Runtime, object: Handle, key: Handle) {
   return property
 }
 
-export function get_private(
+/** @see https://tc39.es/ecma262/#sec-privateget */
+export function private_get(
   runtime: Runtime,
   destination: Handle,
   object: Handle,
@@ -501,7 +602,8 @@ export function get_private(
   return OK
 }
 
-export function set_private(
+/** @see https://tc39.es/ecma262/#sec-privateset */
+export function private_set(
   runtime: Runtime,
   object: Handle,
   key: Handle,
@@ -515,12 +617,12 @@ export function set_private(
   return OK
 }
 
-export function init_private(
+function private_element_add(
   runtime: Runtime,
   object: Handle,
   key: Handle,
   value: Handle,
-  is_method: boolean,
+  flags: PropertyFlags,
 ): Status {
   const { heap } = runtime
   if (!has_property_list(heap, object))
@@ -531,14 +633,28 @@ export function init_private(
       "TypeError",
       "Private field is already initialized",
     )
-  define_property(
-    runtime,
-    object,
-    key,
-    value,
-    is_method ? PRIVATE : PRIVATE | WRITABLE,
-  )
+  insert_property(heap, object, key, flags, value)
   return OK
+}
+
+/** @see https://tc39.es/ecma262/#sec-privatefieldadd */
+export function private_field_add(
+  runtime: Runtime,
+  object: Handle,
+  key: Handle,
+  value: Handle,
+): Status {
+  return private_element_add(runtime, object, key, value, PRIVATE | WRITABLE)
+}
+
+/** @see https://tc39.es/ecma262/#sec-privatemethodoraccessoradd */
+export function private_method_or_accessor_add(
+  runtime: Runtime,
+  object: Handle,
+  key: Handle,
+  method: Handle,
+): Status {
+  return private_element_add(runtime, object, key, method, PRIVATE)
 }
 
 /** `#key in object` */
@@ -617,29 +733,26 @@ export function ordinary_own_property_keys(
     create_array(runtime, destination, ordered.length + symbols.length)
     for (let index = 0; index < ordered.length; index++) {
       write_string(heap, value, ordered[index])
-      ordinary_define_property(
-        runtime,
-        destination,
-        String(index),
+      define_property(runtime, destination, String(index), {
         value,
-        WRITABLE | ENUMERABLE | CONFIGURABLE,
-      )
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      })
     }
     for (let index = 0; index < symbols.length; index++) {
-      ordinary_define_property(
-        runtime,
-        destination,
-        String(ordered.length + index),
-        symbols[index],
-        WRITABLE | ENUMERABLE | CONFIGURABLE,
-      )
+      define_property(runtime, destination, String(ordered.length + index), {
+        value: symbols[index],
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      })
     }
   })
 }
 
 /**
- * Writes `descriptor` as an object (`value`, `writable`, `get`, `set`,
- * `enumerable`, `configurable`), or `undefined`.
+ * Writes `descriptor` as an object with its present fields, or `undefined`.
  * @see https://tc39.es/ecma262/#sec-frompropertydescriptor
  */
 export function from_property_descriptor(
@@ -653,187 +766,120 @@ export function from_property_descriptor(
     return
   }
   heap.handles.scope(() => {
-    const flag = heap.handles.local()
     create_object(runtime, destination)
-    if (descriptor.kind === "data") {
-      define_property(runtime, destination, "value", descriptor.value)
-      write_boolean(heap, flag, descriptor.writable)
-      define_property(runtime, destination, "writable", flag)
-    } else {
-      define_property(runtime, destination, "get", descriptor.get)
-      define_property(runtime, destination, "set", descriptor.set)
-    }
-    for (const [field, present] of [
-      ["enumerable", descriptor.enumerable],
-      ["configurable", descriptor.configurable],
-    ] as [string, boolean][]) {
-      write_boolean(heap, flag, present)
-      define_property(runtime, destination, field, flag)
+    for (const field of [
+      "value",
+      "writable",
+      "get",
+      "set",
+      "enumerable",
+      "configurable",
+    ] as const) {
+      const present = descriptor[field]
+      if (present === undefined) continue
+      let value
+      if (typeof present === "boolean") {
+        value = heap.handles.local()
+        write_boolean(heap, value, present)
+      } else value = present
+      define_property(runtime, destination, field, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      })
     }
   })
 }
 
-// Descriptors from native operations are trusted records of data fields.
-// Public Object APIs can perform observable descriptor conversion in the stdlib
-// before calling us.
-export function define_own_property(
+/**
+ * Reads a descriptor object whose fields must be data properties: public
+ * Object APIs perform the observable conversion in the stdlib before calling
+ * the VM. Returns undefined after raising.
+ * @see https://tc39.es/ecma262/#sec-topropertydescriptor
+ */
+export function to_property_descriptor(
   runtime: Runtime,
   object: Handle,
-  key: PropertyKey,
-  descriptor: Handle,
-  ordinary: boolean = false,
-): Status {
+): PropertyDescriptor | undefined {
   const { heap } = runtime
-  if (!ordinary) {
-    const status = dispatch_define(runtime, object, key, descriptor)
-    if (status !== null) return status
+  if (!is_object(heap, object)) {
+    throw_error(runtime, "TypeError", "Expected a property descriptor")
+    return undefined
   }
-  if (!has_property_list(heap, object))
-    return throw_error(runtime, "TypeError", "Expected an object")
-  if (!is_object(heap, descriptor))
-    return throw_error(runtime, "TypeError", "Expected a property descriptor")
-  return heap.handles.scope(() => {
-    const value = heap.handles.local(),
-      getter = heap.handles.local(),
-      setter = heap.handles.local()
-    const previous = own_property(runtime, object, key)
-    let flags = previous?.flags ?? 0
-    if (flags & ACCESSOR) flags &= ~WRITABLE
-    if (previous?.property) {
-      load_property_value(heap, value, previous.property)
-      if (flags & ACCESSOR) {
-        load_property_value(heap, getter, previous.property)
-        load_property_setter(heap, setter, previous.property)
-      }
-    } else if (previous) {
-      if (typeof previous.value === "string")
-        write_string(heap, value, previous.value!)
-      else write_number(heap, value, previous.value!)
-    }
-    // Fields are absent, present, or THROW for accessor fields.
-    function field(field_name: string, target: Handle) {
-      const found = get_property_descriptor(runtime, descriptor, field_name)
-      if (!found) return false
-      if (found.kind === "accessor")
-        return throw_error(
-          runtime,
-          "TypeError",
-          "Native operation descriptor fields must be data properties",
-        )
-      heap.copy_value(target, found.value)
-      return true
-    }
-    const accessor = field("get", getter)
-    if (accessor === THROW) return THROW
-    const has_setter = field("set", setter)
-    if (has_setter === THROW) return THROW
-    const has_value = field("value", value)
-    if (has_value === THROW) return THROW
-    const writable = heap.handles.local()
-    const has_writable = field("writable", writable)
-    if (has_writable === THROW) return THROW
-    if ((accessor || has_setter) && (has_value || has_writable))
-      return throw_error(
+  const descriptor: PropertyDescriptor = {}
+  for (const field of [
+    "enumerable",
+    "configurable",
+    "value",
+    "writable",
+    "get",
+    "set",
+  ] as const) {
+    const found = get_property_descriptor(runtime, object, field)
+    if (!found) continue
+    if (is_accessor_descriptor(found)) {
+      throw_error(
         runtime,
         "TypeError",
-        "Invalid mixed property descriptor",
+        "Native operation descriptor fields must be data properties",
       )
-    if (accessor || has_setter) {
-      if (
-        (accessor &&
-          tag_of(heap, getter) !== VALUE_TAGS.UNDEFINED &&
-          heap_type_of(heap, getter) !== HEAP_TYPES.FUNCTION) ||
-        (has_setter &&
-          tag_of(heap, setter) !== VALUE_TAGS.UNDEFINED &&
-          heap_type_of(heap, setter) !== HEAP_TYPES.FUNCTION)
+      return undefined
+    }
+    if (field === "value" || field === "get" || field === "set")
+      descriptor[field] = found.value
+    else descriptor[field] = truthy(runtime, found.value!)
+  }
+  for (const accessor of [descriptor.get, descriptor.set])
+    if (
+      accessor !== undefined &&
+      tag_of(heap, accessor) !== VALUE_TAGS.UNDEFINED &&
+      heap_type_of(heap, accessor) !== HEAP_TYPES.FUNCTION
+    ) {
+      throw_error(
+        runtime,
+        "TypeError",
+        "Accessor must be callable or undefined",
       )
-        return throw_error(
-          runtime,
-          "TypeError",
-          "Accessor must be callable or undefined",
-        )
-      if (!accessor && flags & ACCESSOR) {
-        const current = own_property(runtime, object, key)
-        load_property_value(heap, getter, current!.property!)
-      }
-      if (!(flags & ACCESSOR) && !has_setter) write_undefined(heap, setter)
-      flags = (flags & ~WRITABLE) | ACCESSOR
-    } else if (has_value || has_writable) {
-      if (flags & ACCESSOR) {
-        flags &= ~ACCESSOR
-        if (!has_value) write_undefined(heap, value)
-      }
-      if (has_writable)
-        flags = truthy(runtime, writable) ? flags | WRITABLE : flags & ~WRITABLE
+      return undefined
     }
-    for (const [field_name, mask] of [
-      ["enumerable", ENUMERABLE],
-      ["configurable", CONFIGURABLE],
-    ] as [string, number][]) {
-      const present = field(field_name, writable)
-      if (present === THROW) return THROW
-      if (present)
-        flags = truthy(runtime, writable) ? flags | mask : flags & ~mask
-    }
-    if (flags & ACCESSOR) {
-      // Validate a non-configurable accessor's two fields before changing either.
-      const current = own_property(runtime, object, key)
-      if (current && !(current.flags & CONFIGURABLE)) {
-        if (flags !== (current.flags & ~WRITABLE))
-          return throw_error(runtime, "TypeError", "Cannot redefine property")
-        load_property_value(heap, value, current!.property!)
-        if (!same_reference(runtime, value, getter))
-          return throw_error(runtime, "TypeError", "Cannot redefine property")
-        load_property_setter(heap, value, current!.property!)
-        if (!same_reference(runtime, value, setter))
-          return throw_error(runtime, "TypeError", "Cannot redefine property")
-        return OK
-      }
-      if (!try_define_property(runtime, object, key, getter, flags))
-        return throw_error(runtime, "TypeError", "Cannot redefine property")
-      const property = own_property(runtime, object, key)!.property!
-      store_property_setter(heap, property, setter)
-    } else if (!try_define_property(runtime, object, key, value, flags))
-      return throw_error(runtime, "TypeError", "Cannot redefine property")
-    return OK
-  })
+  if (is_accessor_descriptor(descriptor) && is_data_descriptor(descriptor)) {
+    throw_error(runtime, "TypeError", "Invalid mixed property descriptor")
+    return undefined
+  }
+  return descriptor
 }
 
-function same_reference(runtime: Runtime, left: Handle, right: Handle) {
-  const { heap } = runtime
-  return (
-    tag_of(heap, left) === tag_of(heap, right) &&
-    (tag_of(heap, left) === VALUE_TAGS.UNDEFINED ||
-      get_ref(heap, left) === get_ref(heap, right))
-  )
-}
-
+// Returns undefined after raising.
 function invoke_define(
   runtime: Runtime,
   method: Handle,
   object: Handle,
   key: PropertyKey,
-  descriptor: Handle,
-): Status {
+  descriptor: PropertyDescriptor,
+): boolean | undefined {
   const { heap } = runtime
   return heap.handles.scope(() => {
     const result = heap.handles.local(),
-      key_value = heap.handles.local()
+      key_value = heap.handles.local(),
+      descriptor_object = heap.handles.local()
     if (typeof key === "string") write_string(heap, key_value, key)
     else heap.copy_value(key_value, key)
+    from_property_descriptor(runtime, descriptor_object, descriptor)
     if (
-      call(runtime, result, method, object, [key_value, descriptor]) === THROW
+      call(runtime, result, method, object, [key_value, descriptor_object]) ===
+      THROW
     )
-      return THROW
-    if (tag_of(heap, result) !== VALUE_TAGS.BOOLEAN)
-      return throw_error(
+      return undefined
+    if (tag_of(heap, result) !== VALUE_TAGS.BOOLEAN) {
+      throw_error(
         runtime,
         "TypeError",
         "DefineOwnProperty must return a boolean",
       )
-    if (!truthy(runtime, result))
-      return throw_error(runtime, "TypeError", "Cannot define property")
-    return OK
+      return undefined
+    }
+    return truthy(runtime, result)
   })
 }
 
@@ -842,57 +888,4 @@ function invoke_define(
 function exotic_define_own_property(runtime: Runtime, object: Handle) {
   if (heap_type_of(runtime.heap, object) !== HEAP_TYPES.ARRAY) return undefined
   return runtime.realm.intrinsics.get("array [[DefineOwnProperty]]")
-}
-
-// Returns null when the object is ordinary.
-function dispatch_define(
-  runtime: Runtime,
-  object: Handle,
-  key: PropertyKey,
-  descriptor: Handle,
-): Status | null {
-  const method = exotic_define_own_property(runtime, object)
-  if (method === undefined) return null
-  return invoke_define(runtime, method, object, key, descriptor)
-}
-
-export function define_value_property(
-  runtime: Runtime,
-  object: Handle,
-  key: PropertyKey,
-  value: Handle,
-  flags: number = WRITABLE | ENUMERABLE | CONFIGURABLE,
-  setter?: Handle,
-  value_only: boolean = false,
-): Status {
-  const { heap } = runtime
-  const method = exotic_define_own_property(runtime, object)
-  if (method === undefined) {
-    if (!try_define_property(runtime, object, key, value, flags, setter))
-      return throw_error(runtime, "TypeError", "Cannot redefine property")
-    return OK
-  }
-  return heap.handles.scope(() => {
-    const descriptor = heap.handles.local(),
-      field = heap.handles.local()
-    create_object(runtime, descriptor)
-    define_property(
-      runtime,
-      descriptor,
-      flags & ACCESSOR ? (setter === undefined ? "get" : "set") : "value",
-      value,
-    )
-    if (!value_only) {
-      for (const [text, mask] of [
-        ["writable", WRITABLE],
-        ["enumerable", ENUMERABLE],
-        ["configurable", CONFIGURABLE],
-      ] as [string, number][]) {
-        if (mask === WRITABLE && flags & ACCESSOR) continue
-        write_boolean(heap, field, Boolean(flags & mask))
-        define_property(runtime, descriptor, text, field)
-      }
-    }
-    return invoke_define(runtime, method, object, key, descriptor)
-  })
 }

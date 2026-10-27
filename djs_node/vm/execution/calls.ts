@@ -136,12 +136,12 @@ function push_frame(
       const count = Math.max(0, arguments_.length - start)
       create_array(runtime, array, count)
       for (let index = 0; index < count; index++)
-        define_property(
-          runtime,
-          array,
-          String(index),
-          arguments_[start + index],
-        )
+        define_property(runtime, array, String(index), {
+          value: arguments_[start + index],
+          writable: true,
+          enumerable: true,
+          configurable: true,
+        })
       bind(rest, array)
     }
   })

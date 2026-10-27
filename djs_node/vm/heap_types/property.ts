@@ -114,7 +114,7 @@ export function store_property_setter(
 
 /**
  * Prepends a property. The key must already be a string, symbol or
- * private key; `value` goes in SETTER when `is_setter` is set.
+ * private key.
  */
 export function insert_property(
   heap: Heap,
@@ -122,8 +122,7 @@ export function insert_property(
   key: Handle,
   flags: number,
   value: Handle,
-  is_setter: boolean = false,
-) {
+): Address {
   const reference = heap.allocate(
     HEAP_TYPES.PROPERTY,
     flags & PRIVATE ? 24 : 32,
@@ -131,11 +130,9 @@ export function insert_property(
   heap.write_u32(reference + PROPERTY.NEXT, object_properties(heap, object))
   set_property_flags(heap, reference, flags)
   heap.store_value(reference + PROPERTY.KEY, key)
-  heap.store_value(
-    reference + (is_setter ? PROPERTY.SETTER : PROPERTY.VALUE),
-    value,
-  )
+  heap.store_value(reference + PROPERTY.VALUE, value)
   set_object_properties(heap, object, reference)
+  return reference
 }
 
 /** Returns false when the property is non-configurable. */

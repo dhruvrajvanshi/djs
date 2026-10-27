@@ -64,7 +64,7 @@ const OPERANDS: Record<string, Operand[] | Formatter> = {
   SET_FUNCTION_NAME: ["reg", "reg", "literal"],
   GET_PROP: ["dst", "reg", "reg"],
   SET_PROP: ["reg", "reg", "reg"],
-  DEFINE_PROP: ["reg", "reg", "reg", "=flags", "=setter"],
+  DEFINE_PROP: ["reg", "reg", "reg", "=flags", "=kind"],
   DELETE_PROP: ["dst", "reg", "reg"],
   SET_PROTO: ["reg", "reg"],
   TO_PROPERTY_KEY: ["dst", "reg"],

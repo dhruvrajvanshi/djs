@@ -38,7 +38,7 @@ import {
 import { PROPERTY_FLAGS } from "../vm/storage/layout.ts"
 import { create_scope, declare_binding, resolve_binding } from "./scopes.ts"
 
-const { WRITABLE, ENUMERABLE, CONFIGURABLE, ACCESSOR } = PROPERTY_FLAGS
+const { WRITABLE, ENUMERABLE, CONFIGURABLE } = PROPERTY_FLAGS
 
 export interface SourceNode {
   span?: Span
@@ -2313,10 +2313,8 @@ function compile_expr_kind(
             object,
             key ?? constant(state, fn, name!),
             value,
-            kind === PROPERTY_KIND.VALUE
-              ? WRITABLE | ENUMERABLE | CONFIGURABLE
-              : ENUMERABLE | CONFIGURABLE | ACCESSOR,
-            kind === PROPERTY_KIND.SETTER ? 1 : 0,
+            WRITABLE | ENUMERABLE | CONFIGURABLE,
+            kind,
           )
           continue
         }
@@ -3088,15 +3086,7 @@ function fill_entry(
     key = property_key(state, fn, scope, entry.method.name)
     value = method_value(state, fn, scope, entry.method, key)
   }
-  emit(
-    fn,
-    OP.DEFINE_PROP,
-    object,
-    key,
-    value,
-    accessor ? flags | 16 : flags,
-    accessor === "Set" ? 1 : 0,
-  )
+  emit(fn, OP.DEFINE_PROP, object, key, value, flags, property_kind(accessor))
 }
 
 // Built-in properties default to non-enumerable (ECMA-262 clause 18).

@@ -12,7 +12,7 @@ import {
   write_undefined,
 } from "../storage/value.ts"
 import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
-import type { FunctionId } from "../../compiler/compile.ts"
+import type { FunctionId, PropertyKind } from "../../compiler/compile.ts"
 import { PROPERTY_KIND } from "../../compiler/compile.ts"
 import type { Opcode } from "../../compiler/bytecode.ts"
 import {
@@ -43,20 +43,24 @@ import {
 } from "../semantics/objects.ts"
 import {
   define_property,
-  define_value_property,
+  define_property_or_throw,
   delete_property,
-  get_private,
   get_property_value,
   has_private,
   has_properties,
   has_property,
-  init_private,
-  set_private,
+  private_field_add,
+  private_get,
+  private_method_or_accessor_add,
+  private_set,
   property_key,
   set_property_value,
   to_property_key,
 } from "../semantics/properties.ts"
-import type { PropertyKey } from "../semantics/properties.ts"
+import type {
+  PropertyDescriptor,
+  PropertyKey,
+} from "../semantics/properties.ts"
 import {
   instance_of,
   loose_equals,
@@ -87,7 +91,7 @@ import {
   construct_function,
 } from "./calls.ts"
 
-const { WRITABLE, ENUMERABLE, CONFIGURABLE, ACCESSOR } = PROPERTY_FLAGS
+const { WRITABLE, ENUMERABLE, CONFIGURABLE } = PROPERTY_FLAGS
 
 function check_properties(runtime: Runtime, value: Handle): Status {
   if (!has_properties(runtime, value))
@@ -95,7 +99,8 @@ function check_properties(runtime: Runtime, value: Handle): Status {
   return OK
 }
 
-function get_value(
+/** @see https://tc39.es/ecma262/#sec-getv */
+function get_v(
   runtime: Runtime,
   destination: Handle,
   object: Handle,
@@ -110,7 +115,7 @@ function close_iterator(runtime: Runtime, iterator: Handle): Status {
   return heap.handles.scope(() => {
     const method = heap.handles.local(),
       result = heap.handles.local()
-    if (get_value(runtime, method, iterator, "return") === THROW) return THROW
+    if (get_v(runtime, method, iterator, "return") === THROW) return THROW
     if (is_nullish(heap, method)) return OK
     if (call(runtime, result, method, iterator, []) === THROW) return THROW
     if (!is_object(heap, result))
@@ -147,11 +152,11 @@ function with_spread_arguments(
           "TypeError",
           "Iterator result is not an object",
         )
-      if (get_value(runtime, done, result, "done") === THROW) return THROW
+      if (get_v(runtime, done, result, "done") === THROW) return THROW
       if (truthy(runtime, done)) break
       const value = heap.handles.local()
       values.push(value)
-      if (get_value(runtime, value, result, "value") === THROW) return THROW
+      if (get_v(runtime, value, result, "value") === THROW) return THROW
     }
     return body([...fixed, ...values])
   })
@@ -203,28 +208,40 @@ function accessor_prefix(kind: number) {
       : ""
 }
 
-// Defines a literal's or a class's member: a value with the given attribute
-// flags, or a configurable accessor.
+// Decodes a member's `kind` and attribute `flags` from bytecode.
+function member_descriptor(
+  value: Handle,
+  kind: PropertyKind,
+  flags: number,
+): PropertyDescriptor {
+  const enumerable = Boolean(flags & ENUMERABLE),
+    configurable = Boolean(flags & CONFIGURABLE)
+  if (kind === PROPERTY_KIND.GETTER)
+    return { get: value, enumerable, configurable }
+  if (kind === PROPERTY_KIND.SETTER)
+    return { set: value, enumerable, configurable }
+  return {
+    value,
+    writable: Boolean(flags & WRITABLE),
+    enumerable,
+    configurable,
+  }
+}
+
 function define_member(
   runtime: Runtime,
   object: Handle,
   key: Handle,
   value: Handle,
-  kind: number,
+  kind: PropertyKind,
   flags: number,
 ) {
-  const name = property_key(runtime, key)
-  if (kind === PROPERTY_KIND.VALUE)
-    define_property(runtime, object, name, value, flags)
-  else
-    define_property(
-      runtime,
-      object,
-      name,
-      value,
-      (flags & (ENUMERABLE | CONFIGURABLE)) | ACCESSOR,
-      kind === PROPERTY_KIND.SETTER ? value : undefined,
-    )
+  define_property(
+    runtime,
+    object,
+    property_key(runtime, key),
+    member_descriptor(value, kind, flags),
+  )
 }
 
 // SetFunctionName (ECMA-262 10.2.9).
@@ -247,7 +264,10 @@ function set_function_name(
           : `[${to_string(runtime, description)}]`
     } else text = to_string(runtime, key)
     write_string(heap, name, prefix ? `${prefix} ${text}` : text)
-    define_property(runtime, target, "name", name, CONFIGURABLE)
+    define_property(runtime, target, "name", {
+      value: name,
+      configurable: true,
+    })
   })
 }
 
@@ -342,7 +362,7 @@ const op = {
     if (is_nullish(heap, iterable))
       return throw_error(runtime, "TypeError", "Value is not iterable")
     if (
-      get_value(
+      get_v(
         runtime,
         temporary,
         iterable,
@@ -359,7 +379,7 @@ const op = {
         "TypeError",
         "Result of Symbol.iterator is not an object",
       )
-    return get_value(runtime, next, iterator, "next")
+    return get_v(runtime, next, iterator, "next")
   },
   ITERATOR_NEXT(
     runtime: Runtime,
@@ -380,12 +400,12 @@ const op = {
         "TypeError",
         "Iterator result is not an object",
       )
-    if (get_value(runtime, operand, temporary, "done") === THROW) return THROW
+    if (get_v(runtime, operand, temporary, "done") === THROW) return THROW
     if (truthy(runtime, operand)) {
       frame.pc = bytecode_offset(done_target)
       return OK
     }
-    return get_value(runtime, destination, temporary, "value")
+    return get_v(runtime, destination, temporary, "value")
   },
   ITERATOR_CLOSE(
     runtime: Runtime,
@@ -428,7 +448,7 @@ const op = {
     if (enumerate === undefined) panic("for-in is not initialized")
     if (call(runtime, iterator, enumerate, undefined, [source]) === THROW)
       return THROW
-    return get_value(runtime, next, iterator, "next")
+    return get_v(runtime, next, iterator, "next")
   },
   LOAD_NEW_TARGET(heap: Heap, destination: Handle, fiber: Fiber, frame: Frame) {
     heap.copy_value(destination, frame.new_target)
@@ -454,7 +474,12 @@ const op = {
     create_array(runtime, destination, length)
     for (let index = 0; index < length; index++) {
       if (holes.includes(index)) continue
-      define_property(runtime, destination, String(index), elements(index))
+      define_property(runtime, destination, String(index), {
+        value: elements(index),
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      })
     }
   },
   DELETE_PROP(
@@ -483,7 +508,7 @@ const op = {
   ): Status {
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
-    return get_value(runtime, destination, object, name)
+    return get_v(runtime, destination, object, name)
   },
   SET_PROP(
     runtime: Runtime,
@@ -504,13 +529,18 @@ const op = {
     key: Handle,
     value: Handle,
     flags: number,
-    setter: Handle | undefined,
+    kind: PropertyKind,
     operand: Handle,
   ): Status {
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
     runtime.heap.copy_value(operand, value)
-    return define_value_property(runtime, object, name, operand, flags, setter)
+    return define_property_or_throw(
+      runtime,
+      object,
+      name,
+      member_descriptor(operand, kind, flags),
+    )
   },
   SET_PROTO(heap: Heap, object: Handle, prototype: Handle) {
     set_prototype(heap, object, prototype)
@@ -577,14 +607,12 @@ const op = {
     )
     create_object(runtime, temporary)
     heap.handles.scope(() => {
-      define_property(runtime, destination, "prototype", temporary, 0)
-      define_property(
-        runtime,
-        temporary,
-        "constructor",
-        destination,
-        WRITABLE | CONFIGURABLE,
-      )
+      define_property(runtime, destination, "prototype", { value: temporary })
+      define_property(runtime, temporary, "constructor", {
+        value: destination,
+        writable: true,
+        configurable: true,
+      })
       let next = 0
       for (const member of descriptor.members) {
         create_closure(
@@ -975,7 +1003,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             reg(b),
             reg(c),
             d,
-            e === 1 ? reg(c) : undefined,
+            e as PropertyKind,
             operand,
           )
           break
@@ -989,13 +1017,16 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           status = op.TO_PROPERTY_KEY(runtime, reg(a), reg(b))
           break
         case OP.INIT_PRIVATE:
-          status = init_private(runtime, reg(a), reg(b), reg(c), d === 1)
+          status =
+            d === 1
+              ? private_method_or_accessor_add(runtime, reg(a), reg(b), reg(c))
+              : private_field_add(runtime, reg(a), reg(b), reg(c))
           break
         case OP.SET_PRIVATE:
-          status = set_private(runtime, reg(a), reg(b), reg(c))
+          status = private_set(runtime, reg(a), reg(b), reg(c))
           break
         case OP.GET_PRIVATE:
-          status = get_private(runtime, reg(a), reg(b), reg(c))
+          status = private_get(runtime, reg(a), reg(b), reg(c))
           break
         case OP.HAS_PRIVATE:
           status = has_private(runtime, reg(a), reg(b), reg(c))
