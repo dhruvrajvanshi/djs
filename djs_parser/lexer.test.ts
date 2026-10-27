@@ -1,8 +1,9 @@
-import { test, expect } from "vitest"
+import { test } from "node:test"
+import assert from "node:assert"
 import { Lexer } from "./lexer.ts"
 import { TokenKind } from "djs_ast"
 
-test.each([
+const cases: [string, TokenKind[]][] = [
   ["", [TokenKind.EndOfFile]],
   [" ", [TokenKind.EndOfFile]],
   ["\n", [TokenKind.EndOfFile]],
@@ -16,10 +17,14 @@ test.each([
   ["#!/usr/bin/env node", [TokenKind.EndOfFile]],
   ["#!/usr/bin/env node\n123", [TokenKind.Number, TokenKind.EndOfFile]],
   [" #!", [TokenKind.Error]],
-])("Lex test", (input, kinds) => {
-  const lexer = Lexer(input)
-  for (const expected_kind of kinds) {
-    const token = lexer.next()
-    expect(token.kind).toBe(expected_kind)
-  }
-})
+]
+
+for (const [input, kinds] of cases) {
+  test("Lex test", () => {
+    const lexer = Lexer(input)
+    for (const expected_kind of kinds) {
+      const token = lexer.next()
+      assert.strictEqual(token.kind, expected_kind)
+    }
+  })
+}

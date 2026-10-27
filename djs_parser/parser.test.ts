@@ -1,21 +1,24 @@
-import { test, expect } from "vitest"
+import { test } from "node:test"
 import { Parser } from "./parser.ts"
 import {
   AssignOp,
   Expr,
   prettify_diagnostics,
   QualifiedName,
+  expr_to_sexpr,
   source_file_to_sexpr,
+  stmt_to_sexpr,
   Stmt,
   TypeAnnotation,
   type SourceFile,
 } from "djs_ast"
 import assert from "assert"
 import fs from "node:fs/promises"
+import { fileURLToPath } from "node:url"
 
 test("test_parse_var_expr", () => {
   const expr = parse_expr("x")
-  expect(expr).toMatchObject({
+  assert.partialDeepStrictEqual(expr_to_sexpr(expr), {
     kind: "Var",
   })
 })
@@ -28,10 +31,10 @@ test("parse error for missing parenthesis in if condition", () => {
       else z`,
   )
   const errors = source_file.errors
-  expect(errors.map((e) => `${e.span.start}: ${e.message}`).join("\n"))
-    .toMatchInlineSnapshot(`
-    "10: Expected '(' after 'if'"
-  `)
+  assert.strictEqual(
+    errors.map((e) => `${e.span.start}: ${e.message}`).join("\n"),
+    "10: Expected '(' after 'if'",
+  )
 
   assert.deepEqual(source_file_to_sexpr(source_file), {
     kind: "SourceFile",
@@ -76,11 +79,11 @@ test("parse error for missing parenthesis in if condition", () => {
 
 test("simple regex", () => {
   const source_file = parse_source_file(`/x/`)
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
 })
 test("division and regex mixed", () => {
   const source_file = parse_source_file("1 / 2 / /a/")
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
 })
 test("assignment bitwise or equal |=", () => {
   const expr = parse_expr("x |= 1")
@@ -94,7 +97,7 @@ test("function with if stmt", () => {
   }
   `
   const source_file = parse_source_file(source, "test.ts")
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
 })
 
 test("break statement with an identifier on the next line", () => {
@@ -107,7 +110,7 @@ test("break statement with an identifier on the next line", () => {
     }
   `
   const source_file = parse_source_file(source)
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
 })
 
 test("conditional operator", () => {
@@ -115,9 +118,9 @@ test("conditional operator", () => {
     a ? b : c
   `
   const source_file = parse_source_file(source)
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
   assert(source_file.stmts[0].kind === "Expr")
-  expect(source_file.stmts[0].expr.kind).toEqual("Ternary")
+  assert.deepStrictEqual(source_file.stmts[0].expr.kind, "Ternary")
 })
 
 test("default export expressions are preserved in the AST", () => {
@@ -125,39 +128,40 @@ test("default export expressions are preserved in the AST", () => {
     "export default { log: function(value) { return value; } };",
     "console.js",
   )
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "ExportDefault")
-  expect(stmt.value.kind).toBe("Object")
-  expect(source_file_to_sexpr(source_file)).toMatchObject({
+  assert.strictEqual(stmt.value.kind, "Object")
+  assert.partialDeepStrictEqual(source_file_to_sexpr(source_file), {
     stmts: [{ kind: "ExportDefault", value: { kind: "Object" } }],
   })
 })
 test("side-effect-only imports preserve the dependency specifier", () => {
   const source_file = parse_source_file("import './dependency.js';", "entry.js")
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "Import")
-  expect(stmt.module_specifier).toBe("'./dependency.js'")
-  expect(stmt.default_import).toBeNull()
-  expect(stmt.named_imports).toEqual([])
+  assert.strictEqual(stmt.module_specifier, "'./dependency.js'")
+  assert.strictEqual(stmt.default_import, null)
+  assert.deepStrictEqual(stmt.named_imports, [])
 })
 test("new.target supports member access and arrow bodies", () => {
-  expect(parse_expr("new.target.prototype")).toMatchObject({
-    kind: "Prop",
-    lhs: { kind: "NewTarget" },
-    property: { text: "prototype" },
-  })
-  expect(parse_expr("() => new.target")).toMatchObject({
+  assert.partialDeepStrictEqual(
+    expr_to_sexpr(parse_expr("new.target.prototype")),
+    {
+      kind: "Prop",
+      lhs: { kind: "NewTarget" },
+      property: { text: "prototype" },
+    },
+  )
+  assert.partialDeepStrictEqual(expr_to_sexpr(parse_expr("() => new.target")), {
     kind: "ArrowFn",
     body: { kind: "Expr", expr: { kind: "NewTarget" } },
   })
-  expect(
-    parse_source_file("new.other", "entry.js").errors.length,
-  ).toBeGreaterThan(0)
+  assert.ok(parse_source_file("new.other", "entry.js").errors.length > 0)
 })
 test("import.meta", () => {
-  expect(parse_expr("import.meta.url")).toMatchObject({
+  assert.partialDeepStrictEqual(expr_to_sexpr(parse_expr("import.meta.url")), {
     kind: "Prop",
     lhs: { kind: "ImportMeta" },
     property: { text: "url" },
@@ -168,14 +172,14 @@ test("async function declarations and expressions preserve their async flag", ()
     "async function f() {} const g = async function() {};",
     "entry.js",
   )
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
   const [decl, variable] = source_file.stmts
   assert(decl.kind === "Func")
-  expect(decl.func.is_async).toBe(true)
+  assert.strictEqual(decl.func.is_async, true)
   assert(variable.kind === "VarDecl")
   const expr = variable.decl.declarators[0].init
   assert(expr?.kind === "Func")
-  expect(expr.func.is_async).toBe(true)
+  assert.strictEqual(expr.func.is_async, true)
 })
 test("preserves leading trivia in type aliases", () => {
   const t = parse_type(`/* leading trivia comment */ Foo`)
@@ -208,7 +212,7 @@ if (process.env.CI) {
     }
     test262Paths.push(path)
   }
-  test("test262 baseline", { timeout: 5 * 60 * 1000 }, async () => {
+  test("test262 baseline", { timeout: 5 * 60 * 1000 }, async (t) => {
     const failed: string[] = []
     const successes: string[] = []
     for (const path of test262Paths) {
@@ -230,11 +234,18 @@ if (process.env.CI) {
       }
     }
 
-    await expect(successes.sort().join("\n")).toMatchFileSnapshot(
-      "./test_262_baseline.success.txt",
+    const serializers = [(value: string) => value]
+    t.assert.fileSnapshot(
+      successes.sort().join("\n"),
+      fileURLToPath(
+        new URL("./test_262_baseline.success.txt", import.meta.url),
+      ),
+      { serializers },
     )
-    await expect(failed.sort().join("\n")).toMatchFileSnapshot(
-      "./test_262_baseline.failed.txt",
+    t.assert.fileSnapshot(
+      failed.sort().join("\n"),
+      fileURLToPath(new URL("./test_262_baseline.failed.txt", import.meta.url)),
+      { serializers },
     )
   })
   function syntax_error_expected(source: string): boolean {
@@ -259,14 +270,14 @@ if (process.env.CI) {
 
 function parse_expr(input: string): Expr {
   const source_file = parse_source_file(input)
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "Expr")
   return stmt.expr
 }
 function parse_type(input: string): TypeAnnotation {
   const source_file = parse_source_file(`type Foo = ${input}`, "test.ts")
-  expect(source_file.errors).toEqual([])
+  assert.deepStrictEqual(source_file.errors, [])
   const stmt = source_file.stmts[0]
   assert(stmt.kind === "TypeAlias")
   return stmt.type_annotation
@@ -292,49 +303,49 @@ test("class members preserve static and private metadata and field initializers"
     set value(next) { this.#value = next; }
     static has(box) { return #value in box; }
   }`)
-  expect(parsed.errors).toEqual([])
+  assert.deepStrictEqual(parsed.errors, [])
   const stmt = parsed.stmts[0]
   assert(stmt.kind === "ClassDecl")
   const members = stmt.class_def.body.members
   assert(members[0].kind === "FieldDef")
-  expect(members[0].field.name.kind).toBe("Private")
-  expect(members[0].field.is_static).toBe(false)
-  expect(members[0].field.initializer?.kind).toBe("Number")
+  assert.strictEqual(members[0].field.name.kind, "Private")
+  assert.strictEqual(members[0].field.is_static, false)
+  assert.strictEqual(members[0].field.initializer?.kind, "Number")
   assert(members[1].kind === "MethodDef")
-  expect(members[1].method.is_static).toBe(true)
-  expect(members[1].method.name.kind).toBe("Private")
+  assert.strictEqual(members[1].method.is_static, true)
+  assert.strictEqual(members[1].method.name.kind, "Private")
   assert(members[2].kind === "FieldDef")
-  expect(members[2].field.is_static).toBe(true)
+  assert.strictEqual(members[2].field.is_static, true)
   assert(members[5].kind === "MethodDef")
   const returned = members[5].method.body.body.stmts[0]
   assert(returned.kind === "Return" && returned.value?.kind === "BinOp")
-  expect(returned.value.lhs.kind).toBe("PrivateName")
+  assert.strictEqual(returned.value.lhs.kind, "PrivateName")
 })
 
 test("keyword property names retain their spelling", () => {
   const expr = parse_expr("promise.catch")
   assert(expr.kind === "Prop")
-  expect(expr.property.text).toBe("catch")
+  assert.strictEqual(expr.property.text, "catch")
 })
 
 test("logical and binds more tightly than logical or", () => {
   const expr = parse_expr("a || b && c")
   assert(expr.kind === "BinOp")
-  expect(expr.operator).toBe("Or")
+  assert.strictEqual(expr.operator, "Or")
   assert(expr.rhs.kind === "BinOp")
-  expect(expr.rhs.operator).toBe("And")
+  assert.strictEqual(expr.rhs.operator, "And")
 })
 
 test("private names cannot be ordinary object keys", () => {
-  expect(
-    parse_source_file("const object = { #value: 1 };").errors.length,
-  ).toBeGreaterThan(0)
+  assert.ok(
+    parse_source_file("const object = { #value: 1 };").errors.length > 0,
+  )
 })
 
 test("export async function", () => {
   const source_file = parse_source_file("export async function f() {}")
-  expect(source_file.errors).toEqual([])
-  expect(source_file.stmts[0]).toMatchObject({
+  assert.deepStrictEqual(source_file.errors, [])
+  assert.partialDeepStrictEqual(stmt_to_sexpr(source_file.stmts[0]), {
     kind: "Func",
     is_exported: true,
     func: { is_async: true },
@@ -352,22 +363,25 @@ test("intrinsic decorators are retained on classes and methods", () => {
   `,
     "entry.js",
   )
-  expect(source.errors).toEqual([])
+  assert.deepStrictEqual(source.errors, [])
   const declaration = source.stmts[0]
   assert(declaration.kind === "ClassDecl")
-  expect(declaration.class_def.decorators).toHaveLength(1)
+  assert.strictEqual(declaration.class_def.decorators.length, 1)
   const [call, define] = declaration.class_def.body.members
   assert(call.kind === "MethodDef" && define.kind === "MethodDef")
-  expect(call.method.decorators).toHaveLength(1)
-  expect(call.method.is_static).toBe(true)
-  expect(define.method.is_static).toBe(false)
+  assert.strictEqual(call.method.decorators.length, 1)
+  assert.strictEqual(call.method.is_static, true)
+  assert.strictEqual(define.method.is_static, false)
   const exported = parse_source_file(
     "export @builtin({}) class Box {}",
     "entry.js",
   )
-  expect(exported.errors).toEqual([])
-  expect(parse_expr("(@builtin({name:'Box'}) class {})")).toMatchObject({
-    kind: "Paren",
-    expr: { kind: "Class" },
-  })
+  assert.deepStrictEqual(exported.errors, [])
+  assert.partialDeepStrictEqual(
+    expr_to_sexpr(parse_expr("(@builtin({name:'Box'}) class {})")),
+    {
+      kind: "Paren",
+      expr: { kind: "Class" },
+    },
+  )
 })
