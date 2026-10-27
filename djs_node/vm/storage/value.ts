@@ -44,14 +44,14 @@ export function heap_type_of(heap: Heap, value: Handle) {
     : 0
 }
 
-export function write_number(heap: Heap, handle: Handle, value: number) {
-  heap.handles.assert_handle(handle)
+export function write_number(heap: Heap, dest: Handle, value: number) {
+  heap.handles.assert_handle(dest)
   if (typeof value !== "number") panic("Expected a host number")
   if (Number.isNaN(value)) {
-    heap.handles.view.setUint32(handle * VALUE_BYTES, 0, true)
-    heap.handles.view.setUint32(handle * VALUE_BYTES + 4, NAN_HIGH, true)
+    heap.handles.view.setUint32(dest * VALUE_BYTES, 0, true)
+    heap.handles.view.setUint32(dest * VALUE_BYTES + 4, NAN_HIGH, true)
   } else {
-    heap.handles.view.setFloat64(handle * VALUE_BYTES, value, true)
+    heap.handles.view.setFloat64(dest * VALUE_BYTES, value, true)
   }
 }
 
@@ -61,16 +61,16 @@ export function read_number(heap: Heap, handle: Handle) {
   return heap.handles.view.getFloat64(handle * VALUE_BYTES, true)
 }
 
-export function write_undefined(heap: Heap, handle: Handle) {
-  write_tag(heap, handle, VALUE_TAGS.UNDEFINED)
+export function write_undefined(heap: Heap, dest: Handle) {
+  write_tag(heap, dest, VALUE_TAGS.UNDEFINED)
 }
 
-export function write_null(heap: Heap, handle: Handle) {
-  write_tag(heap, handle, VALUE_TAGS.NULL)
+export function write_null(heap: Heap, dest: Handle) {
+  write_tag(heap, dest, VALUE_TAGS.NULL)
 }
 
-export function write_boolean(heap: Heap, handle: Handle, value: boolean) {
-  write_tag(heap, handle, VALUE_TAGS.BOOLEAN, value ? 1 : 0)
+export function write_boolean(heap: Heap, dest: Handle, value: boolean) {
+  write_tag(heap, dest, VALUE_TAGS.BOOLEAN, value ? 1 : 0)
 }
 
 export function read_boolean(heap: Heap, handle: Handle) {
@@ -79,8 +79,8 @@ export function read_boolean(heap: Heap, handle: Handle) {
   return heap.handles.view.getUint32(handle * VALUE_BYTES, true) !== 0
 }
 
-export function write_uninitialized(heap: Heap, handle: Handle) {
-  write_tag(heap, handle, VALUE_TAGS.UNINITIALIZED)
+export function write_uninitialized(heap: Heap, dest: Handle) {
+  write_tag(heap, dest, VALUE_TAGS.UNINITIALIZED)
 }
 
 export function write_hole(heap: Heap, handle: Handle) {

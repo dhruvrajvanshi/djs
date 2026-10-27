@@ -5,11 +5,11 @@ import { get_ref, heap_type_of, set_ref } from "../storage/value.ts"
 import { BYTE_BUFFER, HEADER, HEAP_TYPES, STRING } from "../storage/layout.ts"
 import assert from "node:assert"
 
-export function write_string(heap: Heap, handle: Handle, text: string) {
-  heap.handles.assert_handle(handle)
+export function write_string(heap: Heap, destination: Handle, text: string) {
+  heap.handles.assert_handle(destination)
   if (typeof text !== "string") panic("Expected a host string")
   const reference = heap.allocate(HEAP_TYPES.STRING, 4 + text.length * 2)
-  set_ref(heap, handle, reference)
+  set_ref(heap, destination, reference)
   heap.write_u32(reference + STRING.LENGTH, text.length)
   for (let index = 0; index < text.length; index++) {
     heap.view.setUint16(
