@@ -1,6 +1,6 @@
 import { panic } from "../../utils.ts"
 import type { Heap } from "../storage/heap.ts"
-import type { Handle } from "../storage/value.ts"
+import type { Handle } from "../storage/heap.ts"
 import { set_ref, write_number } from "../storage/value.ts"
 import { HEAP_TYPES } from "../storage/layout.ts"
 import { write_string } from "./string.ts"

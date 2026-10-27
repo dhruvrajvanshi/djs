@@ -1,4 +1,4 @@
-import type { Handle } from "../storage/value.ts"
+import type { Handle } from "../storage/heap.ts"
 import { write_undefined } from "../storage/value.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import { write_string } from "../heap_types/string.ts"

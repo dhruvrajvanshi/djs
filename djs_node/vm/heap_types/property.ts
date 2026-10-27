@@ -1,5 +1,5 @@
-import type { Heap } from "../storage/heap.ts"
-import type { Address, Handle } from "../storage/value.ts"
+import type { Handle, Heap } from "../storage/heap.ts"
+import type { Address } from "../storage/value.ts"
 import { get_ref, heap_type_of } from "../storage/value.ts"
 import { HEAP_TYPES, OBJECT, PROPERTY } from "../storage/layout.ts"
 import { read_string } from "./string.ts"

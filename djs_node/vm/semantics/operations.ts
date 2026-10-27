@@ -1,6 +1,6 @@
 import { panic } from "../../utils.ts"
 import type { Literal } from "../../compiler/compile.ts"
-import type { Handle } from "../storage/value.ts"
+import type { Handle } from "../storage/heap.ts"
 import {
   VALUE_TAGS,
   get_ref,

@@ -1,7 +1,11 @@
 import { panic } from "../../utils.ts"
-import type { Heap } from "../storage/heap.ts"
-import type { Address, Handle } from "../storage/value.ts"
-import { get_ref, heap_type_of, set_ref } from "../storage/value.ts"
+import type { Heap, Handle } from "../storage/heap.ts"
+import {
+  get_ref,
+  heap_type_of,
+  set_ref,
+  type Address,
+} from "../storage/value.ts"
 import { HEAP_TYPES, STRING_OBJECT } from "../storage/layout.ts"
 import { set_prototype } from "./object.ts"
 

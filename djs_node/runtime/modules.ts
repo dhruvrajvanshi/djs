@@ -1,5 +1,4 @@
 import type { Brand } from "../utils.ts"
-import type { Handle, Persistent } from "../vm/storage/value.ts"
 import {
   VALUE_TAGS,
   heap_type_of,
@@ -47,6 +46,7 @@ import {
   drain_jobs,
   wait_for_completion,
 } from "./scheduler.ts"
+import type { Handle, Persistent } from "../vm/storage/heap.ts"
 
 const BUILTINS = new Map([
   ["djs:abstract", new URL("../stdlib/js/abstract.js", import.meta.url)],

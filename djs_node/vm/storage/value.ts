@@ -1,18 +1,9 @@
-import type { Brand } from "../../utils.ts"
 import { panic } from "../../utils.ts"
-import type { Heap } from "./heap.ts"
+import type { Handle, Heap } from "./heap.ts"
 import { HEADER } from "./layout.ts"
 
 /** Byte offset into the heap; invalidated when garbage collection moves objects. */
 export type Address = number
-
-/** Index of a slot in the handle table. Handles stay valid across collections. */
-export type Handle = Brand<number, "Handle">
-
-declare const lifetime: unique symbol
-
-/** A handle its owner releases explicitly; see HandleTable. */
-export type Persistent = Handle & { readonly [lifetime]: "persistent" }
 
 // Every guest value is an eight-byte, little-endian slot: a binary64 number,
 // or a NaN whose high word carries one of these tags.

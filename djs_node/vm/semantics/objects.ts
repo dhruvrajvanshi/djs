@@ -1,4 +1,4 @@
-import type { Handle } from "../storage/value.ts"
+import type { Handle } from "../storage/heap.ts"
 import { write_number } from "../storage/value.ts"
 import type { FunctionDescriptor } from "../../compiler/compile.ts"
 import type { Runtime } from "../../runtime/runtime.ts"

@@ -1,4 +1,4 @@
-import type { Handle, Persistent } from "../storage/value.ts"
+import type { Handle, Persistent } from "../storage/heap.ts"
 import { panic } from "../../utils.ts"
 import type { BytecodeOffset, RegisterIndex } from "../../compiler/bytecode.ts"
 import type { FunctionId } from "../../compiler/compile.ts"

@@ -1,4 +1,5 @@
-import type { Address, Handle } from "../storage/value.ts"
+import type { Address } from "../storage/value.ts"
+import type { Handle } from "../storage/heap.ts"
 import {
   VALUE_TAGS,
   get_ref,

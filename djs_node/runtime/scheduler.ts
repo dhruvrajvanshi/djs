@@ -1,4 +1,3 @@
-import type { Handle, Persistent } from "../vm/storage/value.ts"
 import { heap_type_of, write_number } from "../vm/storage/value.ts"
 import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import type { Runtime } from "./runtime.ts"
@@ -13,6 +12,7 @@ import { FIBER_STATE } from "../vm/execution/fiber.ts"
 import { create_call_fiber, dispose_fiber } from "../vm/execution/calls.ts"
 import { run_task } from "../vm/execution/interpreter.ts"
 import { panic } from "../utils.ts"
+import type { Handle, Persistent } from "../vm/storage/heap.ts"
 
 export interface Completion {
   id: number

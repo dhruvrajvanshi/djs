@@ -1,33 +1,39 @@
-import { panic } from "../../utils.ts"
-import type { Address, Handle } from "./value.ts"
+import { panic, type Brand } from "../../utils.ts"
+import type { Address } from "./value.ts"
 import { NAN_HIGH, VALUE_TAGS, VALUE_BYTES } from "./value.ts"
 import { HEADER, LAYOUTS } from "./layout.ts"
-import { HandleTable } from "./handles.ts"
 
 const FORWARDED = 0xffffffff
 
 const SEMISPACE_BYTES = 1024 * 1024
 
-function data_view(bytes: Uint8Array) {
-  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
-}
-
-/** Rewrite only reference payloads, preserving the value's tag and other bits. */
-function relocate_value(
-  view: DataView,
-  offset: number,
-  relocate: (reference: Address) => Address,
-) {
-  if (view.getUint32(offset + 4, true) === (NAN_HIGH | VALUE_TAGS.REF)) {
-    view.setUint32(offset, relocate(view.getUint32(offset, true)), true)
-  }
-}
+/**
+ * A handle is an index into a table of values managed by the heap.
+ * It is required because when the VM wants to manipulate JS values, it needs
+ * to notify the garbage collector somehow to keep these values alive.
+ *
+ * Handles are "re-pointed" automatically when a garbage collection moves
+ * the underlying value in memory.
+ *
+ * @example
+ * ```ts
+ * heap.handles.scope(() => {
+ *   const temp_value = heap.handles.local()
+ *   // do stuff with temp_value.
+ *   // ...
+ *   // temp_value is released from the handle table when the scope ends.
+ *   // it's no longer valid to use it after the scope ends.
+ * })
+ * ```
+ */
+export type Handle = Brand<number, "Handle">
 
 /**
- * A two-semispace copying heap and the handle table that roots it. Heap
- * objects are laid out as described in layout.ts; Heap knows nothing about
- * their JS meaning.
+ * Like a {@link Handle}, but it is released explicitly using {@link HandleTable.release}.
+ * Used for values that live for the whole program, or whose lifetime isn’t tied to a scope.
  */
+export type Persistent = Handle & { readonly [lifetime]: "persistent" }
+
 export class Heap {
   bytes: Uint8Array
   view: DataView
@@ -45,7 +51,6 @@ export class Heap {
     this.handles.copy(destination, source)
   }
 
-  /** Copies the value field at `address` into `handle`. */
   load_value(handle: Handle, address: Address) {
     this.handles.assert_handle(handle)
     this.handles.bytes.set(
@@ -54,7 +59,6 @@ export class Heap {
     )
   }
 
-  /** Copies `handle`'s value into the value field at `address`. */
   store_value(address: Address, handle: Handle) {
     this.handles.assert_handle(handle)
     this.bytes.set(
@@ -122,8 +126,6 @@ export class Heap {
     return cursor
   }
 
-  // Cheney collection uses forwarding headers in from-space and a scan cursor
-  // in to-space. No host collection retains guest references across allocations.
   collect() {
     const from_start = this.active_start
     const from_end = this.allocation_cursor
@@ -186,3 +188,118 @@ export class Heap {
     this.allocation_cursor = to_cursor
   }
 }
+
+function data_view(bytes: Uint8Array) {
+  return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+}
+
+function relocate_value(
+  view: DataView,
+  offset: number,
+  relocate: (reference: Address) => Address,
+) {
+  if (view.getUint32(offset + 4, true) === (NAN_HIGH | VALUE_TAGS.REF)) {
+    view.setUint32(offset, relocate(view.getUint32(offset, true)), true)
+  }
+}
+
+class HandleTable {
+  bytes: Uint8Array
+  view: DataView
+  in_use: Uint8Array
+  /** Free slot indices, most recently released last. */
+  private free: number[] = []
+  /** Local handles of the open scopes, innermost last. */
+  private locals: Handle[] = []
+  private scope_starts: number[] = []
+
+  constructor() {
+    const INITIAL_CAPACITY = 64
+    this.bytes = new Uint8Array(INITIAL_CAPACITY * VALUE_BYTES)
+    this.view = data_view(this.bytes)
+    this.in_use = new Uint8Array(INITIAL_CAPACITY)
+    for (let index = INITIAL_CAPACITY - 1; index >= 0; index--)
+      this.free.push(index)
+  }
+
+  assert_handle(handle: number): asserts handle is Handle {
+    if (!Number.isInteger(handle) || handle < 0 || this.in_use[handle] !== 1) {
+      panic(`Invalid handle: ${handle}`)
+    }
+  }
+
+  scope<T>(body: () => T): T {
+    this.scope_starts.push(this.locals.length)
+    try {
+      return body()
+    } finally {
+      const start = this.scope_starts.pop()!
+      while (this.locals.length > start) this.free_slot(this.locals.pop()!)
+    }
+  }
+
+  local(): Handle {
+    if (this.scope_starts.length === 0) panic("No open handle scope")
+    const handle = this.allocate()
+    this.locals.push(handle)
+    return handle
+  }
+
+  persistent(): Persistent {
+    return this.allocate() as Persistent
+  }
+
+  release(handle: Persistent) {
+    this.free_slot(handle)
+  }
+
+  copy(destination: Handle, source: Handle) {
+    this.assert_handle(destination)
+    this.assert_handle(source)
+    this.bytes.copyWithin(
+      destination * VALUE_BYTES,
+      source * VALUE_BYTES,
+      (source + 1) * VALUE_BYTES,
+    )
+  }
+
+  trace(visit: (view: DataView, offset: number) => void) {
+    for (let index = 0; index < this.in_use.length; index++)
+      if (this.in_use[index] === 1) visit(this.view, index * VALUE_BYTES)
+  }
+
+  private allocate(): Handle {
+    if (this.free.length === 0) this.grow()
+    const handle = this.free.pop()! as Handle
+    this.in_use[handle] = 1
+    this.view.setUint32(handle * VALUE_BYTES, 0, true)
+    this.view.setUint32(
+      handle * VALUE_BYTES + 4,
+      NAN_HIGH | VALUE_TAGS.UNDEFINED,
+      true,
+    )
+    return handle
+  }
+
+  private free_slot(handle: Handle) {
+    this.assert_handle(handle)
+    this.bytes.fill(0, handle * VALUE_BYTES, (handle + 1) * VALUE_BYTES)
+    this.in_use[handle] = 0
+    this.free.push(handle)
+  }
+
+  private grow() {
+    const capacity = this.in_use.length
+    const bytes = new Uint8Array(capacity * 2 * VALUE_BYTES)
+    bytes.set(this.bytes)
+    const in_use = new Uint8Array(capacity * 2)
+    in_use.set(this.in_use)
+    this.bytes = bytes
+    this.view = data_view(bytes)
+    this.in_use = in_use
+    for (let index = capacity * 2 - 1; index >= capacity; index--)
+      this.free.push(index)
+  }
+}
+
+declare const lifetime: unique symbol

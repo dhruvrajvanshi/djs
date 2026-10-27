@@ -1,5 +1,5 @@
 import { panic } from "../../utils.ts"
-import type { Handle, Persistent } from "../storage/value.ts"
+import type { Handle, Persistent } from "../storage/heap.ts"
 import {
   heap_type_of,
   read_boolean,

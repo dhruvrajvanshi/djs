@@ -1,4 +1,4 @@
-import type { Persistent } from "../vm/storage/value.ts"
+import type { Persistent } from "../vm/storage/heap.ts"
 import { Heap } from "../vm/storage/heap.ts"
 import type { Fiber } from "../vm/execution/fiber.ts"
 import type { NodeHost } from "../host/node.ts"

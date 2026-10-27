@@ -1,4 +1,4 @@
-import type { Handle } from "../storage/value.ts"
+import type { Handle } from "../storage/heap.ts"
 import {
   heap_type_of,
   set_ref,
