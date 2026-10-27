@@ -35,7 +35,10 @@ import {
   FUNCTION_DERIVED,
   encode_instructions,
 } from "./bytecode.ts"
+import { PROPERTY_FLAGS } from "../vm/storage/layout.ts"
 import { create_scope, declare_binding, resolve_binding } from "./scopes.ts"
+
+const { WRITABLE, ENUMERABLE, CONFIGURABLE, ACCESSOR } = PROPERTY_FLAGS
 
 export interface SourceNode {
   span?: Span
@@ -2310,7 +2313,9 @@ function compile_expr_kind(
             object,
             key ?? constant(state, fn, name!),
             value,
-            kind === PROPERTY_KIND.VALUE ? 7 : 6 | 16,
+            kind === PROPERTY_KIND.VALUE
+              ? WRITABLE | ENUMERABLE | CONFIGURABLE
+              : ENUMERABLE | CONFIGURABLE | ACCESSOR,
             kind === PROPERTY_KIND.SETTER ? 1 : 0,
           )
           continue

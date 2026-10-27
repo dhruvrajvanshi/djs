@@ -11,7 +11,11 @@ import {
   write_number,
   write_undefined,
 } from "../storage/value.ts"
-import { HEAP_TYPES } from "../storage/layout.ts"
+import {
+  HEAP_TYPES,
+  PROPERTY_FLAGS,
+  type PropertyFlags,
+} from "../storage/layout.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import {
   heap_string_code_unit_at,
@@ -48,6 +52,8 @@ import { panic } from "../../utils.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 
+const { WRITABLE, ENUMERABLE, CONFIGURABLE, PRIVATE, ACCESSOR } = PROPERTY_FLAGS
+
 export type { PropertyKey } from "../heap_types/property.ts"
 
 /** Values whose properties the VM can read without boxing. */
@@ -77,7 +83,7 @@ function array_index(name: string) {
 }
 
 export interface OwnProperty {
-  flags: number
+  flags: PropertyFlags
   property?: Address
   value?: string | number
 }
@@ -104,7 +110,7 @@ function virtual_property(
     const index = array_index(name)
     if (index >= 0 && index < length)
       return {
-        flags: 2,
+        flags: ENUMERABLE,
         value: String.fromCharCode(
           heap_string_code_unit_at(heap, reference, index),
         ),
@@ -115,7 +121,7 @@ function virtual_property(
     if (name === "length") return { flags: 0, value: bytes.length }
     const index = array_index(name)
     if (index >= 0 && index < bytes.length)
-      return { flags: 3, value: bytes[index] }
+      return { flags: WRITABLE | ENUMERABLE, value: bytes[index] }
   }
 }
 
@@ -174,7 +180,7 @@ export function load_property(
         if (descriptor.property)
           load_property_value(heap, destination, descriptor.property)
         else write_primitive(runtime, destination, descriptor.value)
-        return descriptor.flags & 16 ? 1 : 0
+        return descriptor.flags & ACCESSOR ? 1 : 0
       }
       const prototype = prototype_reference(runtime, current)
       if (!prototype) break
@@ -219,7 +225,7 @@ export function define_property(
   object: Handle,
   key: Handle,
   value: Handle,
-  flags: number = 7,
+  flags: PropertyFlags = WRITABLE | ENUMERABLE | CONFIGURABLE,
   setter?: Handle,
 ) {
   if (!try_define_property(runtime, object, key, value, flags, setter))
@@ -232,11 +238,11 @@ export function try_define_property(
   object: Handle,
   key: Handle,
   value: Handle,
-  flags: number = 7,
+  flags: PropertyFlags = WRITABLE | ENUMERABLE | CONFIGURABLE,
   setter?: Handle,
 ) {
   const { heap } = runtime
-  const name = flags & 8 ? undefined : property_key(runtime, key)
+  const name = flags & PRIVATE ? undefined : property_key(runtime, key)
   const virtual =
     name === undefined ? undefined : virtual_property(runtime, object, name)
   if (virtual) {
@@ -254,11 +260,11 @@ function ordinary_define_property(
   object: Handle,
   key: Handle,
   value: Handle,
-  flags: number = 7,
+  flags: PropertyFlags = WRITABLE | ENUMERABLE | CONFIGURABLE,
   setter?: Handle,
 ) {
   const { heap } = runtime
-  const private_key = Boolean(flags & 8)
+  const private_key = Boolean(flags & PRIVATE)
   const property = find_property(
     heap,
     object,
@@ -268,16 +274,17 @@ function ordinary_define_property(
   )
   if (property !== 0) {
     const previous_flags = property_flags(heap, property)
-    if (!(previous_flags & 4)) {
+    if (!(previous_flags & CONFIGURABLE)) {
       if (
-        (flags & (2 | 4 | 16)) !== (previous_flags & (2 | 16)) ||
-        (!(previous_flags & 1) && flags & 1)
+        (flags & (ENUMERABLE | CONFIGURABLE | ACCESSOR)) !==
+          (previous_flags & (ENUMERABLE | ACCESSOR)) ||
+        (!(previous_flags & WRITABLE) && flags & WRITABLE)
       )
         return false
-      if (previous_flags & 16 || !(previous_flags & 1)) {
+      if (previous_flags & ACCESSOR || !(previous_flags & WRITABLE)) {
         const same = heap.handles.scope(() => {
           const previous = heap.handles.local()
-          if (flags & 16 && setter !== undefined)
+          if (flags & ACCESSOR && setter !== undefined)
             load_property_setter(heap, previous, property)
           else load_property_value(heap, previous, property)
           return same_value(runtime, previous, value)
@@ -285,8 +292,8 @@ function ordinary_define_property(
         if (!same) return false
       }
     }
-    if (flags & 16) {
-      if (!(previous_flags & 16)) {
+    if (flags & ACCESSOR) {
+      if (!(previous_flags & ACCESSOR)) {
         set_property_flags(heap, property, flags)
         heap.handles.scope(() => {
           const empty = heap.handles.local()
@@ -301,7 +308,7 @@ function ordinary_define_property(
     }
     set_property_flags(heap, property, flags)
     store_property_value(heap, property, value)
-    if (previous_flags & 16) {
+    if (previous_flags & ACCESSOR) {
       heap.handles.scope(() => {
         const empty = heap.handles.local()
         store_property_setter(heap, property, empty)
@@ -324,7 +331,7 @@ function ordinary_define_property(
       normalized,
       flags,
       value,
-      Boolean(flags & 16 && setter !== undefined),
+      Boolean(flags & ACCESSOR && setter !== undefined),
     )
     return true
   })
@@ -400,13 +407,13 @@ export function set_property(
     while (true) {
       const descriptor = own_property(runtime, current, name)
       if (descriptor) {
-        if (descriptor.flags & 16) {
+        if (descriptor.flags & ACCESSOR) {
           load_property_setter(heap, setter, descriptor.property!)
           if (tag_of(heap, setter) === VALUE_TAGS.UNDEFINED)
             return throw_error(runtime, "TypeError", "Property has no setter")
           return OK
         }
-        if (!(descriptor.flags & 1))
+        if (!(descriptor.flags & WRITABLE))
           return throw_error(
             runtime,
             "TypeError",
@@ -426,7 +433,7 @@ export function set_property(
       object,
       key,
       value,
-      own ? own.flags : 7,
+      own ? own.flags : WRITABLE | ENUMERABLE | CONFIGURABLE,
       undefined,
       Boolean(own),
     )
@@ -466,13 +473,19 @@ export function private_property(
         "TypeError",
         "Private field is already initialized",
       )
-    define_property(runtime, object, key, value!, readonly ? 8 : 9)
+    define_property(
+      runtime,
+      object,
+      key,
+      value!,
+      readonly ? PRIVATE : PRIVATE | WRITABLE,
+    )
   } else {
     if (property === 0)
       return throw_error(runtime, "TypeError", "Invalid private field receiver")
     if (value === undefined) load_property_value(heap, destination, property)
     else {
-      if (!(property_flags(heap, property) & 1))
+      if (!(property_flags(heap, property) & WRITABLE))
         return throw_error(runtime, "TypeError", "Private method is readonly")
       store_property_value(heap, property, value)
     }
@@ -491,7 +504,7 @@ function own_property_keys(runtime: Runtime, object: Handle) {
   const key = heap.handles.local()
   let property = object_properties(heap, object)
   while (property) {
-    if (!(property_flags(heap, property) & 8)) {
+    if (!(property_flags(heap, property) & PRIVATE)) {
       load_property_key(heap, key, property)
       if (heap_type_of(heap, key) === HEAP_TYPES.SYMBOL) {
         const symbol = heap.handles.local()
@@ -532,11 +545,23 @@ export function ordinary_own_property_keys(
     for (let index = 0; index < ordered.length; index++) {
       write_string(heap, key, String(index))
       write_string(heap, value, ordered[index])
-      ordinary_define_property(runtime, destination, key, value, 7)
+      ordinary_define_property(
+        runtime,
+        destination,
+        key,
+        value,
+        WRITABLE | ENUMERABLE | CONFIGURABLE,
+      )
     }
     for (let index = 0; index < symbols.length; index++) {
       write_string(heap, key, String(ordered.length + index))
-      ordinary_define_property(runtime, destination, key, symbols[index], 7)
+      ordinary_define_property(
+        runtime,
+        destination,
+        key,
+        symbols[index],
+        WRITABLE | ENUMERABLE | CONFIGURABLE,
+      )
     }
   })
 }
@@ -560,7 +585,7 @@ export function get_own_property_descriptor(
     // Snapshot referenced values before allocating the result object.
     if (descriptor.property) {
       load_property_value(heap, value, descriptor.property)
-      if (descriptor.flags & 16)
+      if (descriptor.flags & ACCESSOR)
         load_property_setter(heap, setter, descriptor.property)
     } else if (typeof descriptor.value === "string")
       write_string(heap, value, descriptor.value!)
@@ -569,15 +594,15 @@ export function get_own_property_descriptor(
       write_number(heap, value, descriptor.value!)
     }
     create_object(runtime, destination)
-    write_string(heap, name, descriptor.flags & 16 ? "get" : "value")
+    write_string(heap, name, descriptor.flags & ACCESSOR ? "get" : "value")
     define_property(runtime, destination, name, value)
-    write_string(heap, name, descriptor.flags & 16 ? "set" : "writable")
-    if (!(descriptor.flags & 16))
-      write_boolean(heap, setter, Boolean(descriptor.flags & 1))
+    write_string(heap, name, descriptor.flags & ACCESSOR ? "set" : "writable")
+    if (!(descriptor.flags & ACCESSOR))
+      write_boolean(heap, setter, Boolean(descriptor.flags & WRITABLE))
     define_property(runtime, destination, name, setter)
     for (const [field, mask] of [
-      ["enumerable", 2],
-      ["configurable", 4],
+      ["enumerable", ENUMERABLE],
+      ["configurable", CONFIGURABLE],
     ] as [string, number][]) {
       write_string(heap, name, field)
       write_boolean(heap, value, Boolean(descriptor.flags & mask))
@@ -612,10 +637,10 @@ export function define_own_property(
       setter = heap.handles.local()
     const previous = own_property(runtime, object, property_key(runtime, key))
     let flags = previous?.flags ?? 0
-    if (flags & 16) flags &= ~1
+    if (flags & ACCESSOR) flags &= ~WRITABLE
     if (previous?.property) {
       load_property_value(heap, value, previous.property)
-      if (flags & 16) {
+      if (flags & ACCESSOR) {
         load_property_value(heap, getter, previous.property)
         load_property_setter(heap, setter, previous.property)
       }
@@ -665,7 +690,7 @@ export function define_own_property(
           "TypeError",
           "Accessor must be callable or undefined",
         )
-      if (!accessor && flags & 16) {
+      if (!accessor && flags & ACCESSOR) {
         const current = own_property(
           runtime,
           object,
@@ -673,30 +698,30 @@ export function define_own_property(
         )
         load_property_value(heap, getter, current!.property!)
       }
-      if (!(flags & 16) && !has_setter) write_undefined(heap, setter)
-      flags = (flags & ~1) | 16
+      if (!(flags & ACCESSOR) && !has_setter) write_undefined(heap, setter)
+      flags = (flags & ~WRITABLE) | ACCESSOR
     } else if (has_value || has_writable) {
-      if (flags & 16) {
-        flags &= ~16
+      if (flags & ACCESSOR) {
+        flags &= ~ACCESSOR
         if (!has_value) write_undefined(heap, value)
       }
       if (has_writable)
-        flags = truthy(runtime, writable) ? flags | 1 : flags & ~1
+        flags = truthy(runtime, writable) ? flags | WRITABLE : flags & ~WRITABLE
     }
     for (const [field_name, mask] of [
-      ["enumerable", 2],
-      ["configurable", 4],
+      ["enumerable", ENUMERABLE],
+      ["configurable", CONFIGURABLE],
     ] as [string, number][]) {
       const present = field(field_name, writable)
       if (present === THROW) return THROW
       if (present)
         flags = truthy(runtime, writable) ? flags | mask : flags & ~mask
     }
-    if (flags & 16) {
+    if (flags & ACCESSOR) {
       // Validate a non-configurable accessor's two fields before changing either.
       const current = own_property(runtime, object, property_key(runtime, key))
-      if (current && !(current.flags & 4)) {
-        if (flags !== (current.flags & ~1))
+      if (current && !(current.flags & CONFIGURABLE)) {
+        if (flags !== (current.flags & ~WRITABLE))
           return throw_error(runtime, "TypeError", "Cannot redefine property")
         load_property_value(heap, value, current!.property!)
         if (!same_reference(runtime, value, getter))
@@ -790,7 +815,7 @@ export function define_value_property(
   object: Handle,
   key: Handle,
   value: Handle,
-  flags: number = 7,
+  flags: number = WRITABLE | ENUMERABLE | CONFIGURABLE,
   setter?: Handle,
   value_only: boolean = false,
 ): Status {
@@ -809,16 +834,16 @@ export function define_value_property(
     write_string(
       heap,
       name,
-      flags & 16 ? (setter === undefined ? "get" : "set") : "value",
+      flags & ACCESSOR ? (setter === undefined ? "get" : "set") : "value",
     )
     define_property(runtime, descriptor, name, value)
     if (!value_only) {
       for (const [text, mask] of [
-        ["writable", 1],
-        ["enumerable", 2],
-        ["configurable", 4],
+        ["writable", WRITABLE],
+        ["enumerable", ENUMERABLE],
+        ["configurable", CONFIGURABLE],
       ] as [string, number][]) {
-        if (mask === 1 && flags & 16) continue
+        if (mask === WRITABLE && flags & ACCESSOR) continue
         write_string(heap, name, text)
         write_boolean(heap, field, Boolean(flags & mask))
         define_property(runtime, descriptor, name, field)

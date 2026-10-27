@@ -41,6 +41,20 @@ export const PROPERTY = Object.freeze({
   VALUE: 24,
   SETTER: 32,
 })
+/**
+ * Property attribute bits, stored in PROPERTY.FLAGS and carried by
+ * DEFINE_PROP. An ACCESSOR property holds a getter and setter instead of a
+ * value, and is never WRITABLE.
+ */
+export const PROPERTY_FLAGS = Object.freeze({
+  WRITABLE: 1,
+  ENUMERABLE: 2,
+  CONFIGURABLE: 4,
+  PRIVATE: 8,
+  ACCESSOR: 16,
+})
+export type PropertyFlags = number
+
 export const STRING = Object.freeze({ LENGTH: 8, UNITS: 12 })
 export const SYMBOL = Object.freeze({ DESCRIPTION: 8 })
 export const ENVIRONMENT = Object.freeze({

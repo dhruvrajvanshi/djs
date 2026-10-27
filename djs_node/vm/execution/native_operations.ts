@@ -12,7 +12,7 @@ import {
   write_number,
   write_undefined,
 } from "../storage/value.ts"
-import { HEAP_TYPES } from "../storage/layout.ts"
+import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
 import { INSTRUCTION_BYTES, NATIVE_MARKERS } from "../../compiler/bytecode.ts"
 import type { CompiledModule } from "../../compiler/compile.ts"
 import type { Frame } from "./fiber.ts"
@@ -82,6 +82,8 @@ import {
   clear_exception,
 } from "../semantics/errors.ts"
 import type { Status } from "../semantics/errors.ts"
+
+const { CONFIGURABLE } = PROPERTY_FLAGS
 
 export const NATIVE_CODE = 0xffffffff
 /** Built-in function objects run the steps stored by set_builtin_steps. */
@@ -442,10 +444,10 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
       set_builtin_steps(heap, result, behaviour, false)
       write_string(heap, key, "length")
       write_number(heap, value, function_length)
-      define_property(runtime, result, key, value, 4)
+      define_property(runtime, result, key, value, CONFIGURABLE)
       write_string(heap, key, "name")
       write_string(heap, value, function_name)
-      define_property(runtime, result, key, value, 4)
+      define_property(runtime, result, key, value, CONFIGURABLE)
       heap.copy_value(destination, result)
       return OK
     })

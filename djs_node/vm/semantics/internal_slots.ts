@@ -5,7 +5,7 @@ import {
   write_boolean,
   write_null,
 } from "../storage/value.ts"
-import { HEAP_TYPES } from "../storage/layout.ts"
+import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
 import {
   has_property_list,
@@ -26,6 +26,8 @@ import { create_object } from "./objects.ts"
 import { define_property } from "./properties.ts"
 import { OK, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
+
+const { WRITABLE, PRIVATE } = PROPERTY_FLAGS
 
 // The VM represents these slots itself; set_slot cannot change them.
 const VM_SLOTS = new Set([
@@ -157,6 +159,6 @@ export function init_slot(
   const key = slot_key(runtime, name)
   if (find_property(heap, object, key, true, true) !== 0)
     return throw_error(runtime, "TypeError", `Duplicate ${name} slot`)
-  define_property(runtime, object, key, value, 9)
+  define_property(runtime, object, key, value, PRIVATE | WRITABLE)
   return OK
 }

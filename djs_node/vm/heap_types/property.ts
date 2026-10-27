@@ -1,7 +1,12 @@
 import type { Handle, Heap } from "../storage/heap.ts"
 import type { Address } from "../storage/value.ts"
 import { get_ref, heap_type_of } from "../storage/value.ts"
-import { HEAP_TYPES, OBJECT, PROPERTY } from "../storage/layout.ts"
+import {
+  HEAP_TYPES,
+  OBJECT,
+  PROPERTY,
+  PROPERTY_FLAGS,
+} from "../storage/layout.ts"
 import { read_string } from "./string.ts"
 import {
   object_properties,
@@ -9,7 +14,8 @@ import {
   prototype_of_reference,
 } from "./object.ts"
 
-// Flag bits: 1 writable, 2 enumerable, 4 configurable, 8 private, 16 accessor.
+const { CONFIGURABLE, PRIVATE } = PROPERTY_FLAGS
+
 // An accessor keeps its getter in VALUE and its setter in SETTER.
 
 /** String keys compare by contents; symbol and private keys by identity. */
@@ -36,7 +42,7 @@ export function find_property(
     const key = heap.handles.local()
     while (true) {
       while (property !== 0) {
-        if (Boolean(property_flags(heap, property) & 8) === private_key) {
+        if (Boolean(property_flags(heap, property) & PRIVATE) === private_key) {
           load_property_key(heap, key, property)
           if (key_matches(heap, key, name)) return property
         }
@@ -118,7 +124,10 @@ export function insert_property(
   value: Handle,
   is_setter: boolean = false,
 ) {
-  const reference = heap.allocate(HEAP_TYPES.PROPERTY, flags & 8 ? 24 : 32)
+  const reference = heap.allocate(
+    HEAP_TYPES.PROPERTY,
+    flags & PRIVATE ? 24 : 32,
+  )
   heap.write_u32(reference + PROPERTY.NEXT, object_properties(heap, object))
   set_property_flags(heap, reference, flags)
   heap.store_value(reference + PROPERTY.KEY, key)
@@ -136,10 +145,10 @@ export function remove_property(heap: Heap, object: Handle, name: PropertyKey) {
   return heap.handles.scope(() => {
     const key = heap.handles.local()
     while (property) {
-      if (!(property_flags(heap, property) & 8)) {
+      if (!(property_flags(heap, property) & PRIVATE)) {
         load_property_key(heap, key, property)
         if (key_matches(heap, key, name)) {
-          if (!(property_flags(heap, property) & 4)) return false
+          if (!(property_flags(heap, property) & CONFIGURABLE)) return false
           const next = next_property(heap, property)
           if (previous) heap.write_u32(previous + PROPERTY.NEXT, next)
           else set_object_properties(heap, object, next)

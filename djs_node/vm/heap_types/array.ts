@@ -2,10 +2,12 @@ import { panic } from "../../utils.ts"
 import type { Heap } from "../storage/heap.ts"
 import type { Handle } from "../storage/heap.ts"
 import { set_ref, write_number } from "../storage/value.ts"
-import { HEAP_TYPES } from "../storage/layout.ts"
+import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
 import { write_string } from "./string.ts"
 import { set_prototype } from "./object.ts"
 import { insert_property } from "./property.ts"
+
+const { WRITABLE } = PROPERTY_FLAGS
 
 /** An undefined prototype means null. */
 export function allocate_array(
@@ -23,6 +25,6 @@ export function allocate_array(
       value = heap.handles.local()
     write_string(heap, key, "length")
     write_number(heap, value, length >>> 0)
-    insert_property(heap, destination, key, 1, value)
+    insert_property(heap, destination, key, WRITABLE, value)
   })
 }

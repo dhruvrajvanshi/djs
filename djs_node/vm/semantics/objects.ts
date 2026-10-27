@@ -1,4 +1,5 @@
 import type { Handle } from "../storage/heap.ts"
+import { PROPERTY_FLAGS } from "../storage/layout.ts"
 import { write_number } from "../storage/value.ts"
 import type { FunctionDescriptor } from "../../compiler/compile.ts"
 import type { Runtime } from "../../runtime/runtime.ts"
@@ -8,6 +9,8 @@ import { allocate_function } from "../heap_types/function.ts"
 import { allocate_array } from "../heap_types/array.ts"
 import { allocate_string_object } from "../heap_types/string_object.ts"
 import { define_property } from "./properties.ts"
+
+const { WRITABLE, CONFIGURABLE } = PROPERTY_FLAGS
 
 // Objects created here inherit from the realm's prototypes, which are absent
 // (null) only while the realm itself is being created.
@@ -45,10 +48,10 @@ export function create_function(
         value = heap.handles.local()
       write_string(heap, key, "length")
       write_number(heap, value, metadata.length)
-      define_property(runtime, destination, key, value, 4)
+      define_property(runtime, destination, key, value, CONFIGURABLE)
       write_string(heap, key, "name")
       write_string(heap, value, metadata.name)
-      define_property(runtime, destination, key, value, 4)
+      define_property(runtime, destination, key, value, CONFIGURABLE)
     })
   }
 }
@@ -85,7 +88,7 @@ export function create_arguments_object(
       length = heap.handles.local()
     write_string(heap, key, "length")
     write_number(heap, length, arguments_.length)
-    define_property(runtime, destination, key, length, 5)
+    define_property(runtime, destination, key, length, WRITABLE | CONFIGURABLE)
     for (let index = 0; index < arguments_.length; index++) {
       write_string(heap, key, String(index))
       define_property(runtime, destination, key, arguments_[index])

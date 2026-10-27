@@ -11,7 +11,7 @@ import {
   write_number,
   write_undefined,
 } from "../storage/value.ts"
-import { HEAP_TYPES } from "../storage/layout.ts"
+import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
 import type { FunctionId } from "../../compiler/compile.ts"
 import { PROPERTY_KIND } from "../../compiler/compile.ts"
 import type { Opcode } from "../../compiler/bytecode.ts"
@@ -80,6 +80,8 @@ import {
   construct_function,
   invoke_sync,
 } from "./calls.ts"
+
+const { WRITABLE, ENUMERABLE, CONFIGURABLE, ACCESSOR } = PROPERTY_FLAGS
 
 function check_properties(runtime: Runtime, value: Handle): Status {
   if (!has_properties(runtime, value))
@@ -235,7 +237,7 @@ function define_member(
       object,
       key,
       value,
-      (flags & 6) | 16,
+      (flags & (ENUMERABLE | CONFIGURABLE)) | ACCESSOR,
       kind === PROPERTY_KIND.SETTER ? value : undefined,
     )
 }
@@ -261,7 +263,7 @@ function set_function_name(
     } else text = to_string(runtime, key)
     write_string(heap, name, prefix ? `${prefix} ${text}` : text)
     write_string(heap, description, "name")
-    define_property(runtime, target, description, name, 4)
+    define_property(runtime, target, description, name, CONFIGURABLE)
   })
 }
 
@@ -652,7 +654,14 @@ const op = {
     let next = 0
     for (const { key, kind } of code.unit.object_templates[template].entries) {
       const name = key === null ? operands(next++) : code.constants[key]
-      define_member(runtime, destination, name, operands(next++), kind, 7)
+      define_member(
+        runtime,
+        destination,
+        name,
+        operands(next++),
+        kind,
+        WRITABLE | ENUMERABLE | CONFIGURABLE,
+      )
     }
   },
   CREATE_CLASS(
@@ -684,7 +693,13 @@ const op = {
       write_string(heap, key, "prototype")
       define_property(runtime, destination, key, temporary, 0)
       write_string(heap, key, "constructor")
-      define_property(runtime, temporary, key, destination, 5)
+      define_property(
+        runtime,
+        temporary,
+        key,
+        destination,
+        WRITABLE | CONFIGURABLE,
+      )
       let next = 0
       for (const member of descriptor.members) {
         create_closure(
@@ -707,7 +722,14 @@ const op = {
           )
         } else name = code.constants[member.key]
         const home = member.is_static ? destination : temporary
-        define_member(runtime, home, name, operand, member.kind, 5)
+        define_member(
+          runtime,
+          home,
+          name,
+          operand,
+          member.kind,
+          WRITABLE | CONFIGURABLE,
+        )
       }
     })
   },
