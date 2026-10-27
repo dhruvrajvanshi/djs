@@ -12,8 +12,13 @@ import {
   ordinary_own_property_keys,
   array_create,
   create_builtin_function,
+  get_own_property,
 } from "djs:native"
-import { get_prototype_from_constructor } from "djs:abstract"
+import {
+  get_prototype_from_constructor,
+  to_property_key,
+  to_object,
+} from "djs:abstract"
 import { is_object } from "./support.js"
 
 // 20.1.1 The Object Constructor
@@ -34,7 +39,7 @@ export const Object = well_known("%Object%", create_builtin_function, {
   // 20.1.2 Properties of the Object Constructor
   getOwnPropertySymbols(value) {
     if (value === null || value === undefined)
-      throw new TypeError("Cannot convert null or undefined")
+      throw new TypeError("Cannot convert null or undefined to object")
     const keys = ordinary_own_property_keys(Object(value))
     const symbols = array_create(0)
     let index = 0
@@ -43,6 +48,15 @@ export const Object = well_known("%Object%", create_builtin_function, {
       index = index + 1
     }
     return symbols
+  },
+
+  // 20.1.2.2 Object.getOwnPropertyDescriptor ( O, P )
+  getOwnPropertyDescriptor(value, property) {
+    if (value === null || value === undefined)
+      throw new TypeError("Cannot convert null or undefined to object")
+    const coerced = to_object(value)
+    const propertyKey = to_property_key(property)
+    return get_own_property(coerced, propertyKey)
   },
 
   prototype: attributes(

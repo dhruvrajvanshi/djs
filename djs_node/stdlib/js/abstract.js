@@ -53,6 +53,12 @@ export function to_object(value) {
   if (is_object(value)) return value
   return {}
 }
+// https://tc39.es/ecma262/#sec-topropertykey
+export function to_property_key(value) {
+  const key = to_primitive(value, "string")
+  if (typeof key === "symbol") return key
+  return to_string(key)
+}
 export function to_integer_or_infinity(value) {
   const number = to_number(value)
   if (number !== number || number === 0) return 0
