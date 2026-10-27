@@ -1,8 +1,9 @@
 import { panic } from "../../utils.ts"
 import type { Handle, Heap } from "../storage/heap.ts"
 import type { Address } from "../storage/value.ts"
-import { get_ref, set_ref } from "../storage/value.ts"
+import { get_ref, heap_type_of, set_ref } from "../storage/value.ts"
 import { BYTE_BUFFER, HEADER, HEAP_TYPES, STRING } from "../storage/layout.ts"
+import assert from "node:assert"
 
 export function write_string(heap: Heap, handle: Handle, text: string) {
   heap.handles.assert_handle(handle)
@@ -32,6 +33,7 @@ export function read_string(heap: Heap, handle: Handle) {
 }
 
 export function string_length(heap: Heap, value: Handle) {
+  assert(heap_type_of(heap, value) === HEAP_TYPES.STRING)
   return heap_string_length(heap, get_ref(heap, value))
 }
 

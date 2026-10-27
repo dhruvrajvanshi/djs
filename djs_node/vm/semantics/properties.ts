@@ -76,14 +76,20 @@ function array_index(name: string) {
     : -1
 }
 
-/** Physical properties point into the heap; virtual properties store host data. */
 export interface OwnProperty {
   flags: number
   property?: Address
   value?: string | number
 }
 
-// Virtual descriptors contain only host numbers/strings, never heap addresses.
+/**
+ * A virtual property represents a property that doesn't get stored directly as a separate
+ * slot in the object's storage.
+ * E.g. some_string[index]. It would be wasteful to store each index as a separate property,
+ *      so they are computed from the underlying string bytes rather than stored.
+ *
+ * String or byte buffer indices are also computed from the underlying buffers.
+ */
 function virtual_property(
   runtime: Runtime,
   object: Handle,
