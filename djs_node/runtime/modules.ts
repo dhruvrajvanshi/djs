@@ -17,7 +17,7 @@ import { compile_module, located_message } from "../compiler/compile.ts"
 import { read_string, write_string } from "../vm/heap_types/string.ts"
 import { create_environment } from "../vm/heap_types/environment.ts"
 import { is_object } from "../vm/heap_types/object.ts"
-import { get_property } from "../vm/semantics/properties.ts"
+import { load_property } from "../vm/semantics/properties.ts"
 import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import { create_function } from "../vm/semantics/objects.ts"
 import { load_binding, initialize_binding } from "../vm/semantics/bindings.ts"
@@ -613,7 +613,7 @@ function error_report(runtime: Runtime, value: Handle) {
     const key = heap.handles.local(),
       stack = heap.handles.local()
     write_string(heap, key, "stack")
-    const accessor = get_property(runtime, stack, value, key)
+    const accessor = load_property(runtime, stack, value, key)
     if (
       !accessor &&
       tag_of(heap, stack) === VALUE_TAGS.REF &&

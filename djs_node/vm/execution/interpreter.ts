@@ -45,7 +45,7 @@ import {
   define_property,
   define_value_property,
   delete_property,
-  get_property,
+  load_property,
   has_properties,
   has_property,
   private_property,
@@ -96,7 +96,7 @@ function get_value(
 ): Status {
   if (check_properties(runtime, object) === THROW) return THROW
   if (
-    get_property(runtime, destination, object, key) &&
+    load_property(runtime, destination, object, key) &&
     tag_of(runtime.heap, destination) !== VALUE_TAGS.UNDEFINED
   )
     return invoke_sync(runtime, destination, destination, object, [])
@@ -528,7 +528,7 @@ const op = {
     if (load_property_key(runtime, property_key, key) === THROW) return THROW
     if (check_properties(runtime, object) === THROW) return THROW
     if (
-      get_property(runtime, destination, object, property_key) &&
+      load_property(runtime, destination, object, property_key) &&
       tag_of(heap, destination) !== VALUE_TAGS.UNDEFINED
     )
       return call_function(runtime, fiber, destination, destination, object, [])

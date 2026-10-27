@@ -37,7 +37,7 @@ import {
   create_function,
   create_object,
 } from "../semantics/objects.ts"
-import { define_property, get_property } from "../semantics/properties.ts"
+import { define_property, load_property } from "../semantics/properties.ts"
 import { initialize_binding } from "../semantics/bindings.ts"
 import {
   OK,
@@ -367,7 +367,7 @@ export function settle_with_promise(
         ["reject", reject],
       ] as [string, Handle][]) {
         write_string(heap, key, name)
-        get_property(runtime, target, capability.result, key)
+        load_property(runtime, target, capability.result, key)
       }
     })
     return OK
@@ -548,7 +548,7 @@ export function construct_function(
       create_object(runtime, receiver)
       // Constructors in the supported subset have data-valued prototype properties.
       write_string(heap, key, "prototype")
-      get_property(runtime, prototype, new_target, key)
+      load_property(runtime, prototype, new_target, key)
       if (has_property_list(heap, prototype))
         set_prototype(heap, receiver, prototype)
     }

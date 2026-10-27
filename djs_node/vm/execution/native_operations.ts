@@ -63,7 +63,7 @@ import {
   define_property,
   delete_property,
   get_own_property_descriptor,
-  get_property,
+  load_property,
   has_properties,
   has_property,
   ordinary_own_property_keys,
@@ -471,11 +471,11 @@ const NATIVE_OPERATIONS: Record<string, NativeOperation> = {
         if (heap_type_of(heap, slots) !== HEAP_TYPES.ARRAY)
           return throw_error(runtime, "TypeError", "Expected slot names")
         write_string(heap, key, "length")
-        get_property(runtime, name, slots, key)
+        load_property(runtime, name, slots, key)
         const count = read_number(heap, name)
         for (let index = 0; index < count; index++) {
           write_string(heap, key, String(index))
-          get_property(runtime, name, slots, key)
+          load_property(runtime, name, slots, key)
           if (!is_string(heap, name))
             return throw_error(runtime, "TypeError", "Expected a slot name")
           if (

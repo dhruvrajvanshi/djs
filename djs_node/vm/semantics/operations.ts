@@ -20,7 +20,7 @@ import {
   has_property_list,
   prototype_of_reference,
 } from "../heap_types/object.ts"
-import { get_property } from "./properties.ts"
+import { load_property } from "./properties.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 import { OP } from "../../compiler/bytecode.ts"
@@ -52,10 +52,10 @@ export function to_string(runtime: Runtime, value: Handle): string {
             const key = heap.handles.local(),
               text = heap.handles.local()
             write_string(heap, key, "name")
-            get_property(runtime, text, value, key)
+            load_property(runtime, text, value, key)
             const name = to_string(runtime, text)
             write_string(heap, key, "message")
-            get_property(runtime, text, value, key)
+            load_property(runtime, text, value, key)
             return name + ": " + to_string(runtime, text)
           })
         }
@@ -228,7 +228,7 @@ export function instance_of(
     const key = heap.handles.local(),
       prototype = heap.handles.local()
     write_string(heap, key, "prototype")
-    get_property(runtime, prototype, right, key)
+    load_property(runtime, prototype, right, key)
     if (!has_property_list(heap, prototype))
       return throw_error(runtime, "TypeError", "Expected an object")
     let found = false

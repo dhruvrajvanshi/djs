@@ -157,7 +157,7 @@ function prototype_reference(runtime: Runtime, value: Handle): Address {
 }
 
 // Return an accessor flag; only the interpreter invokes guest getters.
-export function get_property(
+export function load_property(
   runtime: Runtime,
   destination: Handle,
   object: Handle,
@@ -628,7 +628,7 @@ export function define_own_property(
     function field(field_name: string, target: Handle) {
       write_string(heap, name, field_name)
       if (!has_property(runtime, descriptor, name)) return false
-      if (get_property(runtime, target, descriptor, name))
+      if (load_property(runtime, target, descriptor, name))
         return throw_error(
           runtime,
           "TypeError",
