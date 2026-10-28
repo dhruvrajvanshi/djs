@@ -1,4 +1,4 @@
-import type { Handle } from "../vm/storage/heap.ts"
+import type { JSValue } from "../vm/storage/heap.ts"
 import { VALUE_TAGS, heap_type_of, tag_of } from "../vm/storage/value.ts"
 import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import { read_string } from "../vm/heap_types/string.ts"
@@ -11,7 +11,7 @@ import { to_string } from "../vm/operations.ts"
 import type { Runtime } from "./runtime.ts"
 
 // The value's stack if it has one, since that already starts with its message.
-export function error_report(runtime: Runtime, value: Handle) {
+export function error_report(runtime: Runtime, value: JSValue) {
   const { heap } = runtime
   if (!is_object(heap, value)) return to_string(runtime, value)
   return heap.handles.scope(() => {

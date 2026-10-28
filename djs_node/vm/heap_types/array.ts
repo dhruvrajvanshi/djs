@@ -1,6 +1,6 @@
 import { panic } from "../../utils.ts"
 import type { Heap } from "../storage/heap.ts"
-import type { Handle } from "../storage/heap.ts"
+import type { JSValue } from "../storage/heap.ts"
 import { set_ref, write_number } from "../storage/value.ts"
 import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
 import { write_string } from "./string.ts"
@@ -12,9 +12,9 @@ const { WRITABLE } = PROPERTY_FLAGS
 /** An undefined prototype means null. */
 export function allocate_array(
   heap: Heap,
-  destination: Handle,
+  destination: JSValue,
   length: number,
-  prototype: Handle | undefined,
+  prototype: JSValue | undefined,
 ) {
   if (!Number.isInteger(length) || length < 0 || length > 0xffffffff)
     panic("Invalid array length")

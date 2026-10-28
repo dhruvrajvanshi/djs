@@ -1,4 +1,4 @@
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import {
   heap_type_of,
   set_ref,
@@ -38,7 +38,7 @@ const VM_SLOTS = new Set([
 ])
 
 // Other slots are private properties, keyed by one token object per name.
-function slot_key(runtime: Runtime, name: string): Handle {
+function slot_key(runtime: Runtime, name: string): JSValue {
   let key = runtime.realm.slot_keys.get(name)
   if (key === undefined) {
     key = runtime.heap.handles.persistent()
@@ -56,7 +56,7 @@ export function declare_slot(runtime: Runtime, name: string) {
   if (!VM_SLOTS.has(name)) slot_key(runtime, name)
 }
 
-export function has_slot(runtime: Runtime, object: Handle, name: string) {
+export function has_slot(runtime: Runtime, object: JSValue, name: string) {
   const { heap } = runtime
   if (!has_property_list(heap, object)) return false
   switch (name) {
@@ -73,8 +73,8 @@ export function has_slot(runtime: Runtime, object: Handle, name: string) {
 
 export function get_slot(
   runtime: Runtime,
-  destination: Handle,
-  object: Handle,
+  destination: JSValue,
+  object: JSValue,
   name: string,
 ): Status {
   const { heap } = runtime
@@ -110,9 +110,9 @@ export function get_slot(
 
 export function set_slot(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   name: string,
-  value: Handle,
+  value: JSValue,
 ): Status {
   const { heap } = runtime
   if (VM_SLOTS.has(name))
@@ -133,9 +133,9 @@ export function set_slot(
 /** Gives a new object a slot, including the slots the VM represents itself. */
 export function init_slot(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   name: string,
-  value: Handle,
+  value: JSValue,
 ): Status {
   const { heap } = runtime
   switch (name) {

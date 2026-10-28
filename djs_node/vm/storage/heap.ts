@@ -2,18 +2,34 @@ import { panic, type Brand } from "../../utils.ts"
 import type { Address } from "./value.ts"
 import { NAN_HIGH, VALUE_TAGS, VALUE_BYTES } from "./value.ts"
 import { HEADER, LAYOUTS, type HeapType } from "./layout.ts"
+import type { CallStack } from "./stack.ts"
 
 const FORWARDED = 0xffffffff
 
 const SEMISPACE_BYTES = 1024 * 1024
 
 /**
- * A handle is an index into a table of values managed by the heap.
- * It is required because when the VM wants to manipulate JS values, it needs
- * to notify the garbage collector somehow to keep these values alive.
- *
- * Handles are "re-pointed" automatically when a garbage collection moves
- * the underlying value in memory.
+ * A guest value the VM is holding: a {@link Handle}, or a value in a frame on
+ * the {@link CallStack}. The garbage collector traces both, so heap references in
+ * a JSValue are "re-pointed" automatically when a collection moves the
+ * objects they refer to.
+ */
+export interface JSValue {
+  readonly space: ValueSpace
+  readonly index: number
+}
+
+/** Storage made of eight-byte value slots, which a JSValue indexes. */
+export interface ValueSpace {
+  readonly bytes: Uint8Array
+  readonly view: DataView
+  /** Panics unless slot `index` holds a live value. */
+  assert_live(index: number): void
+}
+
+/**
+ * A JSValue in a table of values managed by the heap. The VM creates handles
+ * to keep values it is working with alive.
  *
  * @example
  * ```ts
@@ -26,7 +42,7 @@ const SEMISPACE_BYTES = 1024 * 1024
  * })
  * ```
  */
-export type Handle = Brand<number, "Handle">
+export type Handle = Brand<JSValue, "Handle">
 
 /**
  * Like a {@link Handle}, but it is released explicitly using {@link HandleTable.release}.
@@ -38,33 +54,44 @@ export class Heap {
   bytes: Uint8Array
   view: DataView
   readonly handles: HandleTable = new HandleTable()
+  /** The runtime's call stack, whose frames hold roots. */
+  private readonly stack: CallStack
   readonly semispace_bytes = SEMISPACE_BYTES
   active_start = 8
   allocation_cursor = 8
 
-  constructor() {
+  constructor(stack: CallStack) {
+    this.stack = stack
     this.bytes = new Uint8Array(8 + this.semispace_bytes * 2)
     this.view = data_view(this.bytes)
   }
 
-  copy_value(destination: Handle, source: Handle) {
-    this.handles.copy(destination, source)
-  }
-
-  load_value(handle: Handle, address: Address) {
-    this.handles.assert_handle(handle)
-    this.handles.bytes.set(
-      this.bytes.subarray(address, address + VALUE_BYTES),
-      handle * VALUE_BYTES,
+  copy_value(destination: JSValue, source: JSValue) {
+    assert_live(destination)
+    assert_live(source)
+    destination.space.bytes.set(
+      source.space.bytes.subarray(
+        source.index * VALUE_BYTES,
+        (source.index + 1) * VALUE_BYTES,
+      ),
+      destination.index * VALUE_BYTES,
     )
   }
 
-  store_value(address: Address, handle: Handle) {
-    this.handles.assert_handle(handle)
+  load_value(value: JSValue, address: Address) {
+    assert_live(value)
+    value.space.bytes.set(
+      this.bytes.subarray(address, address + VALUE_BYTES),
+      value.index * VALUE_BYTES,
+    )
+  }
+
+  store_value(address: Address, value: JSValue) {
+    assert_live(value)
     this.bytes.set(
-      this.handles.bytes.subarray(
-        handle * VALUE_BYTES,
-        (handle + 1) * VALUE_BYTES,
+      value.space.bytes.subarray(
+        value.index * VALUE_BYTES,
+        (value.index + 1) * VALUE_BYTES,
       ),
       address,
     )
@@ -160,6 +187,9 @@ export class Heap {
     this.handles.trace((view, offset) =>
       relocate_value(view, offset, copy_reference),
     )
+    this.stack.trace((view, offset) =>
+      relocate_value(view, offset, copy_reference),
+    )
     let scan = to_start
     while (scan < to_cursor) {
       const type = this.read_u32(scan + HEADER.TYPE) as HeapType
@@ -189,7 +219,11 @@ export class Heap {
   }
 }
 
-function data_view(bytes: Uint8Array) {
+export function assert_live(value: JSValue) {
+  value.space.assert_live(value.index)
+}
+
+export function data_view(bytes: Uint8Array) {
   return new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 }
 
@@ -203,10 +237,12 @@ function relocate_value(
   }
 }
 
-class HandleTable {
+class HandleTable implements ValueSpace {
   bytes: Uint8Array
   view: DataView
   in_use: Uint8Array
+  /** The handle for each slot, so a slot's handle is always the same object. */
+  private handles: Handle[] = []
   /** Free slot indices, most recently released last. */
   private free: number[] = []
   /** Local handles of the open scopes, innermost last. */
@@ -218,13 +254,12 @@ class HandleTable {
     this.bytes = new Uint8Array(INITIAL_CAPACITY * VALUE_BYTES)
     this.view = data_view(this.bytes)
     this.in_use = new Uint8Array(INITIAL_CAPACITY)
-    for (let index = INITIAL_CAPACITY - 1; index >= 0; index--)
-      this.free.push(index)
+    this.add_slots(0, INITIAL_CAPACITY)
   }
 
-  assert_handle(handle: number): asserts handle is Handle {
-    if (!Number.isInteger(handle) || handle < 0 || this.in_use[handle] !== 1) {
-      panic(`Invalid handle: ${handle}`)
+  assert_live(index: number) {
+    if (!Number.isInteger(index) || index < 0 || this.in_use[index] !== 1) {
+      panic(`Invalid handle: ${index}`)
     }
   }
 
@@ -253,14 +288,10 @@ class HandleTable {
     this.free_slot(handle)
   }
 
-  copy(destination: Handle, source: Handle) {
-    this.assert_handle(destination)
-    this.assert_handle(source)
-    this.bytes.copyWithin(
-      destination * VALUE_BYTES,
-      source * VALUE_BYTES,
-      (source + 1) * VALUE_BYTES,
-    )
+  /** The live handle for slot `index`. */
+  handle_at(index: number): Handle {
+    this.assert_live(index)
+    return this.handles[index]
   }
 
   trace(visit: (view: DataView, offset: number) => void) {
@@ -270,22 +301,29 @@ class HandleTable {
 
   private allocate(): Handle {
     if (this.free.length === 0) this.grow()
-    const handle = this.free.pop()! as Handle
-    this.in_use[handle] = 1
-    this.view.setUint32(handle * VALUE_BYTES, 0, true)
+    const index = this.free.pop()!
+    this.in_use[index] = 1
+    this.view.setUint32(index * VALUE_BYTES, 0, true)
     this.view.setUint32(
-      handle * VALUE_BYTES + 4,
+      index * VALUE_BYTES + 4,
       NAN_HIGH | VALUE_TAGS.UNDEFINED,
       true,
     )
-    return handle
+    return this.handles[index]
   }
 
   private free_slot(handle: Handle) {
-    this.assert_handle(handle)
-    this.bytes.fill(0, handle * VALUE_BYTES, (handle + 1) * VALUE_BYTES)
-    this.in_use[handle] = 0
-    this.free.push(handle)
+    assert_live(handle)
+    const { index } = handle
+    this.bytes.fill(0, index * VALUE_BYTES, (index + 1) * VALUE_BYTES)
+    this.in_use[index] = 0
+    this.free.push(index)
+  }
+
+  private add_slots(start: number, end: number) {
+    for (let index = start; index < end; index++)
+      this.handles.push({ space: this, index } as JSValue as Handle)
+    for (let index = end - 1; index >= start; index--) this.free.push(index)
   }
 
   private grow() {
@@ -297,8 +335,7 @@ class HandleTable {
     this.bytes = bytes
     this.view = data_view(bytes)
     this.in_use = in_use
-    for (let index = capacity * 2 - 1; index >= capacity; index--)
-      this.free.push(index)
+    this.add_slots(capacity, capacity * 2)
   }
 }
 

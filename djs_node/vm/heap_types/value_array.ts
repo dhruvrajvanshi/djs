@@ -1,13 +1,13 @@
 import { panic } from "../../utils.ts"
 import type { Heap } from "../storage/heap.ts"
-import type { Handle } from "../storage/heap.ts"
+import type { JSValue } from "../storage/heap.ts"
 import { VALUE_BYTES, get_ref, set_ref } from "../storage/value.ts"
 import { HEAP_TYPES, VALUE_ARRAY } from "../storage/layout.ts"
 
 export function create_value_array(
   heap: Heap,
-  destination: Handle,
-  values: Handle[],
+  destination: JSValue,
+  values: JSValue[],
 ) {
   const reference = heap.allocate(
     HEAP_TYPES.VALUE_ARRAY,
@@ -24,8 +24,8 @@ export function create_value_array(
 
 export function load_value_array_element(
   heap: Heap,
-  destination: Handle,
-  array: Handle,
+  destination: JSValue,
+  array: JSValue,
   index: number,
 ) {
   const reference = get_ref(heap, array)

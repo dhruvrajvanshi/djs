@@ -1,5 +1,5 @@
 import { panic } from "../utils.ts"
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import { write_undefined } from "./storage/value.ts"
 import type { Runtime } from "../runtime/runtime.ts"
 import { OK } from "./errors.ts"
@@ -18,12 +18,12 @@ export const RESUME_CODE = 0xfffffffe
  */
 export type NativeOperation = (
   runtime: Runtime,
-  destination: Handle,
-  arguments_: Handle[],
+  destination: JSValue,
+  arguments_: JSValue[],
 ) => Status
 
 /** A value exported by a native module, written once when the module loads. */
-export type NativeValue = (runtime: Runtime, destination: Handle) => void
+export type NativeValue = (runtime: Runtime, destination: JSValue) => void
 
 // Each module's operations, in one table. A name's position here is its
 // operation ID.
@@ -79,8 +79,8 @@ export function call_id() {
 export function call_native_operation(
   runtime: Runtime,
   id: number,
-  destination: Handle,
-  arguments_: Handle[],
+  destination: JSValue,
+  arguments_: JSValue[],
 ): Status {
   const operation = Object.values(native_operations())[id]
   if (operation === undefined) panic(`Invalid native operation ID: ${id}`)

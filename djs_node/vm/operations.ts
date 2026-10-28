@@ -1,6 +1,6 @@
 import { panic } from "../utils.ts"
 import type { Literal } from "../compiler/compile.ts"
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   get_ref,
@@ -25,7 +25,7 @@ import type { Status } from "./errors.ts"
 import { OP } from "../compiler/bytecode.ts"
 import type { Opcode } from "../compiler/bytecode.ts"
 
-export function to_string(runtime: Runtime, value: Handle): string {
+export function to_string(runtime: Runtime, value: JSValue): string {
   const { heap } = runtime
   switch (tag_of(heap, value)) {
     case VALUE_TAGS.UNDEFINED:
@@ -52,7 +52,7 @@ export function to_string(runtime: Runtime, value: Handle): string {
   }
 }
 
-export function truthy(runtime: Runtime, value: Handle) {
+export function truthy(runtime: Runtime, value: JSValue) {
   const { heap } = runtime
   switch (tag_of(heap, value)) {
     case VALUE_TAGS.UNDEFINED:
@@ -72,7 +72,7 @@ export function truthy(runtime: Runtime, value: Handle) {
   }
 }
 
-export function primitive(runtime: Runtime, value: Handle): Literal {
+export function primitive(runtime: Runtime, value: JSValue): Literal {
   const { heap } = runtime
   switch (tag_of(heap, value)) {
     case VALUE_TAGS.NUMBER:
@@ -94,7 +94,7 @@ export function primitive(runtime: Runtime, value: Handle): Literal {
 
 export function write_primitive(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   value: unknown,
 ) {
   const { heap } = runtime
@@ -105,7 +105,7 @@ export function write_primitive(
   else panic("Unsupported primitive result")
 }
 
-export function same_value(runtime: Runtime, left: Handle, right: Handle) {
+export function same_value(runtime: Runtime, left: JSValue, right: JSValue) {
   const { heap } = runtime
   if (tag_of(heap, left) !== tag_of(heap, right)) return false
   if (tag_of(heap, left) === VALUE_TAGS.REF) {
@@ -120,7 +120,7 @@ export function same_value(runtime: Runtime, left: Handle, right: Handle) {
 }
 
 // Host operators can only coerce primitives; objects must be converted first.
-function check_primitive(runtime: Runtime, value: Handle): Status {
+function check_primitive(runtime: Runtime, value: JSValue): Status {
   if (heap_type_of(runtime.heap, value) === HEAP_TYPES.SYMBOL)
     return throw_error(runtime, "TypeError", "Cannot convert a Symbol value")
   if (heap_type_of(runtime.heap, value) > HEAP_TYPES.STRING)
@@ -156,9 +156,9 @@ const PRIMITIVE_OPERATORS: Partial<
 
 export function primitive_operation(
   runtime: Runtime,
-  destination: Handle,
-  left: Handle,
-  right: Handle,
+  destination: JSValue,
+  left: JSValue,
+  right: JSValue,
   opcode: Opcode,
 ): Status {
   if (check_primitive(runtime, left) === THROW) return THROW
@@ -175,7 +175,12 @@ export function primitive_operation(
 }
 
 /** Objects and symbols are equal only to themselves. */
-function equals(runtime: Runtime, left: Handle, right: Handle, loose: boolean) {
+function equals(
+  runtime: Runtime,
+  left: JSValue,
+  right: JSValue,
+  loose: boolean,
+) {
   const { heap } = runtime
   if (
     heap_type_of(heap, left) > HEAP_TYPES.STRING ||
@@ -191,20 +196,20 @@ function equals(runtime: Runtime, left: Handle, right: Handle, loose: boolean) {
   return loose ? a == b : a === b
 }
 
-export function strict_equals(runtime: Runtime, left: Handle, right: Handle) {
+export function strict_equals(runtime: Runtime, left: JSValue, right: JSValue) {
   return equals(runtime, left, right, false)
 }
 
 /** For operands that ToPrimitive has already converted where `==` requires. */
-export function loose_equals(runtime: Runtime, left: Handle, right: Handle) {
+export function loose_equals(runtime: Runtime, left: JSValue, right: JSValue) {
   return equals(runtime, left, right, true)
 }
 
 export function instance_of(
   runtime: Runtime,
-  destination: Handle,
-  left: Handle,
-  right: Handle,
+  destination: JSValue,
+  left: JSValue,
+  right: JSValue,
 ): Status {
   const { heap } = runtime
   if (heap_type_of(heap, right) !== HEAP_TYPES.FUNCTION)
@@ -231,7 +236,11 @@ export function instance_of(
   })
 }
 
-export function type_of(runtime: Runtime, destination: Handle, source: Handle) {
+export function type_of(
+  runtime: Runtime,
+  destination: JSValue,
+  source: JSValue,
+) {
   const { heap } = runtime
   const tag = tag_of(heap, source)
   const type = heap_type_of(heap, source)
@@ -255,8 +264,8 @@ export function type_of(runtime: Runtime, destination: Handle, source: Handle) {
 /** NEGATE, TO_NUMBER and BIT_NOT, on a primitive operand. */
 export function numeric_unary_operation(
   runtime: Runtime,
-  destination: Handle,
-  source: Handle,
+  destination: JSValue,
+  source: JSValue,
   opcode: Opcode,
 ): Status {
   if (check_primitive(runtime, source) === THROW) return THROW

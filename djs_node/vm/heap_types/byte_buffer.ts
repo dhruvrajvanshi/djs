@@ -1,12 +1,12 @@
 import { panic } from "../../utils.ts"
 import type { Heap } from "../storage/heap.ts"
-import type { Handle } from "../storage/heap.ts"
+import type { JSValue } from "../storage/heap.ts"
 import { get_ref, set_ref } from "../storage/value.ts"
 import { BYTE_BUFFER, HEADER, HEAP_TYPES } from "../storage/layout.ts"
 
 export function create_byte_buffer(
   heap: Heap,
-  destination: Handle,
+  destination: JSValue,
   length: number,
 ) {
   if (!Number.isSafeInteger(length) || length < 0 || length > 0x7ffffff0)
@@ -17,7 +17,7 @@ export function create_byte_buffer(
 }
 
 // These views are temporary: moving GC invalidates their heap offsets.
-export function byte_buffer_view(heap: Heap, buffer: Handle) {
+export function byte_buffer_view(heap: Heap, buffer: JSValue) {
   const reference = get_ref(heap, buffer)
   if (heap.read_u32(reference + HEADER.TYPE) !== HEAP_TYPES.BYTE_BUFFER)
     panic("Expected a byte buffer")

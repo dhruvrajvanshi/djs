@@ -1,6 +1,6 @@
 import { panic } from "../utils.ts"
 import type { Heap } from "./storage/heap.ts"
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   is_nullish,
@@ -14,7 +14,7 @@ import {
 import { HEAP_TYPES, PROPERTY_FLAGS } from "./storage/layout.ts"
 import type { FunctionId, PropertyKind } from "../compiler/compile.ts"
 import { PROPERTY_KIND } from "../compiler/compile.ts"
-import type { Opcode } from "../compiler/bytecode.ts"
+import type { Opcode, RegisterIndex } from "../compiler/bytecode.ts"
 import {
   OP,
   FUNCTION_ENVIRONMENT,
@@ -75,23 +75,28 @@ import {
   load_binding,
   store_binding,
 } from "./bindings.ts"
-import { OK, THROW, throw_error, clear_exception } from "./errors.ts"
+import {
+  OK,
+  THROW,
+  clear_exception,
+  throw_error,
+  throw_value,
+  take_exception,
+} from "./errors.ts"
 import type { Status } from "./errors.ts"
-import { FIBER_STATE } from "./fiber.ts"
-import type { Fiber, FiberStatus, Frame } from "./fiber.ts"
+import type { Frame } from "./frame.ts"
 import {
   await_value,
   call,
   call_function,
   pop_frame,
-  settle_fiber,
   to_primitive,
   construct_function,
 } from "./calls.ts"
 
 const { WRITABLE, ENUMERABLE, CONFIGURABLE } = PROPERTY_FLAGS
 
-function check_properties(runtime: Runtime, value: Handle): Status {
+function check_properties(runtime: Runtime, value: JSValue): Status {
   if (!has_properties(runtime, value))
     return throw_error(runtime, "TypeError", "Expected an object")
   return OK
@@ -100,15 +105,15 @@ function check_properties(runtime: Runtime, value: Handle): Status {
 /** @see https://tc39.es/ecma262/#sec-getv */
 function get_v(
   runtime: Runtime,
-  destination: Handle,
-  object: Handle,
+  destination: JSValue,
+  object: JSValue,
   key: PropertyKey,
 ): Status {
   if (check_properties(runtime, object) === THROW) return THROW
   return get_property_value(runtime, destination, object, key)
 }
 
-function close_iterator(runtime: Runtime, iterator: Handle): Status {
+function close_iterator(runtime: Runtime, iterator: JSValue): Status {
   const { heap } = runtime
   return heap.handles.scope(() => {
     const method = heap.handles.local(),
@@ -129,9 +134,9 @@ function close_iterator(runtime: Runtime, iterator: Handle): Status {
 /** Calls `body` with `fixed` followed by the values `iterable` yields. */
 function with_spread_arguments(
   runtime: Runtime,
-  fixed: Handle[],
-  iterable: Handle,
-  body: (arguments_: Handle[]) => Status,
+  fixed: JSValue[],
+  iterable: JSValue,
+  body: (arguments_: JSValue[]) => Status,
 ): Status {
   const { heap } = runtime
   return heap.handles.scope(() => {
@@ -139,7 +144,7 @@ function with_spread_arguments(
       next = heap.handles.local(),
       result = heap.handles.local(),
       done = heap.handles.local()
-    const values: Handle[] = []
+    const values: JSValue[] = []
     if (op.GET_ITERATOR(runtime, iterator, next, iterable, result) === THROW)
       return THROW
     while (true) {
@@ -162,8 +167,8 @@ function with_spread_arguments(
 
 function create_block_environment(
   heap: Heap,
-  destination: Handle,
-  parent: Handle,
+  destination: JSValue,
+  parent: JSValue,
   code: LinkedCode,
   function_id: FunctionId,
   block: number,
@@ -180,10 +185,10 @@ function create_block_environment(
 /** Copies the operands, converting objects with ToPrimitive. */
 function to_primitives(
   runtime: Runtime,
-  left_destination: Handle,
-  right_destination: Handle,
-  left: Handle,
-  right: Handle,
+  left_destination: JSValue,
+  right_destination: JSValue,
+  left: JSValue,
+  right: JSValue,
   hint?: "string" | "number",
 ): Status {
   const { heap } = runtime
@@ -208,7 +213,7 @@ function accessor_prefix(kind: number) {
 
 // Decodes a member's `kind` and attribute `flags` from bytecode.
 function member_descriptor(
-  value: Handle,
+  value: JSValue,
   kind: PropertyKind,
   flags: number,
 ): PropertyDescriptor {
@@ -228,9 +233,9 @@ function member_descriptor(
 
 function define_member(
   runtime: Runtime,
-  object: Handle,
-  key: Handle,
-  value: Handle,
+  object: JSValue,
+  key: JSValue,
+  value: JSValue,
   kind: PropertyKind,
   flags: number,
 ) {
@@ -245,8 +250,8 @@ function define_member(
 // SetFunctionName (ECMA-262 10.2.9).
 function set_function_name(
   runtime: Runtime,
-  target: Handle,
-  key: Handle,
+  target: JSValue,
+  key: JSValue,
   prefix: string,
 ) {
   const { heap } = runtime
@@ -272,11 +277,11 @@ function set_function_name(
 function create_closure(
   runtime: Runtime,
   frame: Frame,
-  destination: Handle,
+  destination: JSValue,
   code: LinkedCode,
   code_id: CodeId,
   function_id: FunctionId,
-  env: Handle,
+  env: JSValue,
 ) {
   const fn = code.unit.functions[function_id]
   const lexical = fn.flags & 4
@@ -294,48 +299,48 @@ function create_closure(
 }
 
 const op = {
-  LOAD_CONST(heap: Heap, destination: Handle, constant: Handle) {
+  LOAD_CONST(heap: Heap, destination: JSValue, constant: JSValue) {
     heap.copy_value(destination, constant)
   },
-  MOVE(heap: Heap, destination: Handle, source: Handle) {
+  MOVE(heap: Heap, destination: JSValue, source: JSValue) {
     heap.copy_value(destination, source)
   },
   LOAD_BINDING(
     runtime: Runtime,
-    destination: Handle,
-    env: Handle,
+    destination: JSValue,
+    env: JSValue,
     depth: number,
     slot: number,
-    temporary: Handle,
+    temporary: JSValue,
   ): Status {
     environment_at(runtime.heap, temporary, env, depth)
     return load_binding(runtime, destination, temporary, slot)
   },
   INIT_BINDING(
     runtime: Runtime,
-    env: Handle,
+    env: JSValue,
     depth: number,
     slot: number,
-    value: Handle,
-    temporary: Handle,
+    value: JSValue,
+    temporary: JSValue,
   ) {
     environment_at(runtime.heap, temporary, env, depth)
     initialize_binding(runtime, temporary, slot, value)
   },
   STORE_BINDING(
     runtime: Runtime,
-    env: Handle,
+    env: JSValue,
     depth: number,
     slot: number,
-    value: Handle,
-    temporary: Handle,
+    value: JSValue,
+    temporary: JSValue,
   ): Status {
     environment_at(runtime.heap, temporary, env, depth)
     return store_binding(runtime, temporary, slot, value)
   },
   LOAD_GLOBAL(
     runtime: Runtime,
-    destination: Handle,
+    destination: JSValue,
     name: string,
     allow_unresolved: boolean,
   ): Status {
@@ -351,10 +356,10 @@ const op = {
   // Iteration ops call guest methods synchronously, like coercions.
   GET_ITERATOR(
     runtime: Runtime,
-    iterator: Handle,
-    next: Handle,
-    iterable: Handle,
-    temporary: Handle,
+    iterator: JSValue,
+    next: JSValue,
+    iterable: JSValue,
+    temporary: JSValue,
   ): Status {
     const { heap } = runtime
     if (is_nullish(heap, iterable))
@@ -381,14 +386,13 @@ const op = {
   },
   ITERATOR_NEXT(
     runtime: Runtime,
-    fiber: Fiber,
     frame: Frame,
-    destination: Handle,
-    iterator: Handle,
-    next: Handle,
+    destination: JSValue,
+    iterator: JSValue,
+    next: JSValue,
     done_target: number,
-    temporary: Handle,
-    operand: Handle,
+    temporary: JSValue,
+    operand: JSValue,
   ): Status {
     const { heap } = runtime
     if (call(runtime, temporary, next, iterator, []) === THROW) return THROW
@@ -407,7 +411,7 @@ const op = {
   },
   ITERATOR_CLOSE(
     runtime: Runtime,
-    iterator: Handle,
+    iterator: JSValue,
     throwing: boolean,
   ): Status {
     const status = close_iterator(runtime, iterator)
@@ -418,27 +422,27 @@ const op = {
   },
   CREATE_REGEXP(
     runtime: Runtime,
-    destination: Handle,
-    pattern: Handle,
-    flags: Handle,
+    destination: JSValue,
+    pattern: JSValue,
+    flags: JSValue,
   ): Status {
     const create = runtime.realm.abstract_operation("RegExpCreate")
     return call(runtime, destination, create, undefined, [pattern, flags])
   },
   COPY_DATA_PROPERTIES(
     runtime: Runtime,
-    object: Handle,
-    source: Handle,
-    temporary: Handle,
+    object: JSValue,
+    source: JSValue,
+    temporary: JSValue,
   ): Status {
     const copy = runtime.realm.abstract_operation("CopyDataProperties")
     return call(runtime, temporary, copy, undefined, [object, source])
   },
   GET_FOR_IN_ITERATOR(
     runtime: Runtime,
-    iterator: Handle,
-    next: Handle,
-    source: Handle,
+    iterator: JSValue,
+    next: JSValue,
+    source: JSValue,
   ): Status {
     const enumerate = runtime.realm.abstract_operation(
       "EnumerateObjectProperties",
@@ -447,13 +451,13 @@ const op = {
       return THROW
     return get_v(runtime, next, iterator, "next")
   },
-  LOAD_NEW_TARGET(heap: Heap, destination: Handle, fiber: Fiber, frame: Frame) {
+  LOAD_NEW_TARGET(heap: Heap, destination: JSValue, frame: Frame) {
     heap.copy_value(destination, frame.new_target)
   },
   TO_PROPERTY_KEY(
     runtime: Runtime,
-    destination: Handle,
-    source: Handle,
+    destination: JSValue,
+    source: JSValue,
   ): Status {
     const key = to_property_key(runtime, source)
     if (key === undefined) return THROW
@@ -463,8 +467,8 @@ const op = {
   },
   CREATE_ARRAY(
     runtime: Runtime,
-    destination: Handle,
-    elements: (index: number) => Handle,
+    destination: JSValue,
+    elements: (index: number) => JSValue,
     length: number,
     holes: readonly number[],
   ) {
@@ -481,9 +485,9 @@ const op = {
   },
   DELETE_PROP(
     runtime: Runtime,
-    destination: Handle,
-    object: Handle,
-    key: Handle,
+    destination: JSValue,
+    object: JSValue,
+    key: JSValue,
   ): Status {
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
@@ -499,9 +503,9 @@ const op = {
   },
   GET_PROP(
     runtime: Runtime,
-    destination: Handle,
-    object: Handle,
-    key: Handle,
+    destination: JSValue,
+    object: JSValue,
+    key: JSValue,
   ): Status {
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
@@ -509,10 +513,10 @@ const op = {
   },
   SET_PROP(
     runtime: Runtime,
-    object: Handle,
-    key: Handle,
-    value: Handle,
-    operand: Handle,
+    object: JSValue,
+    key: JSValue,
+    value: JSValue,
+    operand: JSValue,
   ): Status {
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
@@ -522,12 +526,12 @@ const op = {
   },
   DEFINE_PROP(
     runtime: Runtime,
-    object: Handle,
-    key: Handle,
-    value: Handle,
+    object: JSValue,
+    key: JSValue,
+    value: JSValue,
     flags: number,
     kind: PropertyKind,
-    operand: Handle,
+    operand: JSValue,
   ): Status {
     const name = to_property_key(runtime, key)
     if (name === undefined) return THROW
@@ -539,15 +543,15 @@ const op = {
       member_descriptor(operand, kind, flags),
     )
   },
-  SET_PROTO(heap: Heap, object: Handle, prototype: Handle) {
+  SET_PROTO(heap: Heap, object: JSValue, prototype: JSValue) {
     set_prototype(heap, object, prototype)
   },
   CREATE_OBJECT(
     runtime: Runtime,
-    destination: Handle,
+    destination: JSValue,
     code: LinkedCode,
     template: number,
-    operands: (index: number) => Handle,
+    operands: (index: number) => JSValue,
   ) {
     create_object(runtime, destination)
     let next = 0
@@ -566,14 +570,14 @@ const op = {
   CREATE_CLASS(
     runtime: Runtime,
     frame: Frame,
-    destination: Handle,
+    destination: JSValue,
     code: LinkedCode,
     code_id: CodeId,
     class_id: number,
-    keys: (index: number) => Handle,
-    env: Handle,
-    temporary: Handle,
-    operand: Handle,
+    keys: (index: number) => JSValue,
+    env: JSValue,
+    temporary: JSValue,
+    operand: JSValue,
   ) {
     const { heap } = runtime
     const descriptor = code.unit.classes[class_id]
@@ -629,8 +633,8 @@ const op = {
   },
   SET_FUNCTION_NAME(
     runtime: Runtime,
-    target: Handle,
-    key: Handle,
+    target: JSValue,
+    key: JSValue,
     prefix: string,
   ) {
     set_function_name(runtime, target, key, prefix)
@@ -638,42 +642,32 @@ const op = {
   CREATE_CLOSURE(
     runtime: Runtime,
     frame: Frame,
-    destination: Handle,
+    destination: JSValue,
     code: LinkedCode,
     code_id: CodeId,
     function_id: FunctionId,
-    env: Handle,
+    env: JSValue,
   ) {
     create_closure(runtime, frame, destination, code, code_id, function_id, env)
   },
   CALL(
     runtime: Runtime,
-    fiber: Fiber,
-    destination: Handle,
-    callee: Handle,
-    receiver: Handle,
-    arguments_: Handle[],
+    destination: JSValue,
+    callee: JSValue,
+    receiver: JSValue,
+    arguments_: JSValue[],
   ): Status {
-    return call_function(
-      runtime,
-      fiber,
-      destination,
-      callee,
-      receiver,
-      arguments_,
-    )
+    return call_function(runtime, destination, callee, receiver, arguments_)
   },
   CONSTRUCT(
     runtime: Runtime,
-    fiber: Fiber,
-    destination: Handle,
-    callee: Handle,
-    new_target: Handle,
-    arguments_: Handle[],
+    destination: JSValue,
+    callee: JSValue,
+    new_target: JSValue,
+    arguments_: JSValue[],
   ): Status {
     return construct_function(
       runtime,
-      fiber,
       destination,
       callee,
       arguments_,
@@ -682,7 +676,7 @@ const op = {
         : new_target,
     )
   },
-  BIND_THIS(runtime: Runtime, frame: Frame, value: Handle): Status {
+  BIND_THIS(runtime: Runtime, frame: Frame, value: JSValue): Status {
     if (tag_of(runtime.heap, frame.this_value) !== VALUE_TAGS.UNINITIALIZED)
       return throw_error(
         runtime,
@@ -694,11 +688,11 @@ const op = {
   },
   PUSH_ENV(
     heap: Heap,
-    env: Handle,
+    env: JSValue,
     code: LinkedCode,
     function_id: FunctionId,
     block: number,
-    temporary: Handle,
+    temporary: JSValue,
   ) {
     create_block_environment(heap, temporary, env, code, function_id, block)
     heap.copy_value(env, temporary)
@@ -707,34 +701,30 @@ const op = {
   // giving each loop iteration fresh bindings.
   COPY_ENV(
     heap: Heap,
-    env: Handle,
+    env: JSValue,
     code: LinkedCode,
     function_id: FunctionId,
     block: number,
-    temporary: Handle,
-    operand: Handle,
+    temporary: JSValue,
+    operand: JSValue,
   ) {
     environment_at(heap, operand, env, 1)
     create_block_environment(heap, temporary, operand, code, function_id, block)
     copy_environment_bindings(heap, temporary, env)
     heap.copy_value(env, temporary)
   },
-  POP_ENV(heap: Heap, env: Handle, depth: number, temporary: Handle) {
+  POP_ENV(heap: Heap, env: JSValue, depth: number, temporary: JSValue) {
     environment_at(heap, temporary, env, depth)
     heap.copy_value(env, temporary)
   },
-  // The handlers below return true when run_interpreter must stop.
-  RETURN(runtime: Runtime, fiber: Fiber, value: Handle): boolean {
-    return_value(runtime, fiber, value)
-    return fiber.status === FIBER_STATE.DONE
+  RETURN(runtime: Runtime, value: JSValue): Status {
+    return return_value(runtime, value)
   },
-  AWAIT(runtime: Runtime, fiber: Fiber, destination: Handle, value: Handle) {
-    await_value(runtime, fiber, destination, value)
-    return true
+  AWAIT(runtime: Runtime, destination: RegisterIndex, value: JSValue): Status {
+    return await_value(runtime, destination, value)
   },
-  THROW(runtime: Runtime, fiber: Fiber, value: Handle): boolean {
-    throw_value(runtime, fiber, value)
-    return fiber.status === FIBER_STATE.FAILED
+  THROW(runtime: Runtime, value: JSValue): Status {
+    return throw_value(runtime, value)
   },
   THROW_ERROR(runtime: Runtime, type: string, message: string): Status {
     return throw_error(runtime, type, message)
@@ -745,22 +735,22 @@ const op = {
   JUMP_IF(frame: Frame, condition: boolean, target: number) {
     if (condition) frame.pc = bytecode_offset(target)
   },
-  JUMP_AND_LINK(heap: Heap, frame: Frame, link: Handle, target: number) {
+  JUMP_AND_LINK(heap: Heap, frame: Frame, link: JSValue, target: number) {
     write_number(heap, link, frame.pc)
     frame.pc = bytecode_offset(target)
   },
-  JUMP_INDIRECT(heap: Heap, frame: Frame, link: Handle) {
+  JUMP_INDIRECT(heap: Heap, frame: Frame, link: JSValue) {
     frame.pc = bytecode_offset(read_number(heap, link))
   },
   // `+` converts objects with no hint; the other operators prefer numbers.
   PRIMITIVE_OPERATOR(
     runtime: Runtime,
     opcode: Opcode,
-    destination: Handle,
-    left: Handle,
-    right: Handle,
-    temporary: Handle,
-    operand: Handle,
+    destination: JSValue,
+    left: JSValue,
+    right: JSValue,
+    temporary: JSValue,
+    operand: JSValue,
   ): Status {
     const hint = opcode === OP.ADD ? undefined : "number"
     if (to_primitives(runtime, temporary, operand, left, right, hint) === THROW)
@@ -770,11 +760,11 @@ const op = {
   EQUALITY(
     runtime: Runtime,
     opcode: Opcode,
-    destination: Handle,
-    left: Handle,
-    right: Handle,
-    temporary: Handle,
-    operand: Handle,
+    destination: JSValue,
+    left: JSValue,
+    right: JSValue,
+    temporary: JSValue,
+    operand: JSValue,
   ): Status {
     const { heap } = runtime
     let equal
@@ -802,9 +792,9 @@ const op = {
   },
   IN(
     runtime: Runtime,
-    destination: Handle,
-    left: Handle,
-    right: Handle,
+    destination: JSValue,
+    left: JSValue,
+    right: JSValue,
   ): Status {
     const { heap } = runtime
     if (!is_object(heap, right))
@@ -821,9 +811,9 @@ const op = {
   NUMERIC_UNARY(
     runtime: Runtime,
     opcode: Opcode,
-    destination: Handle,
-    source: Handle,
-    operand: Handle,
+    destination: JSValue,
+    source: JSValue,
+    operand: JSValue,
   ): Status {
     runtime.heap.copy_value(operand, source)
     if (
@@ -833,7 +823,7 @@ const op = {
       return THROW
     return numeric_unary_operation(runtime, destination, operand, opcode)
   },
-  TO_STRING(runtime: Runtime, destination: Handle, source: Handle): Status {
+  TO_STRING(runtime: Runtime, destination: JSValue, source: JSValue): Status {
     const { heap } = runtime
     heap.copy_value(destination, source)
     if (
@@ -850,7 +840,7 @@ const op = {
     write_string(heap, destination, to_string(runtime, destination))
     return OK
   },
-  LOAD_THIS(runtime: Runtime, destination: Handle, frame: Frame): Status {
+  LOAD_THIS(runtime: Runtime, destination: JSValue, frame: Frame): Status {
     if (tag_of(runtime.heap, frame.this_value) === VALUE_TAGS.UNINITIALIZED)
       return throw_error(runtime, "ReferenceError", UNBOUND_THIS_MESSAGE)
     runtime.heap.copy_value(destination, frame.this_value)
@@ -861,21 +851,18 @@ const op = {
 const UNBOUND_THIS_MESSAGE =
   "Must call super constructor in derived class before accessing 'this'"
 
-export function run_interpreter(runtime: Runtime, fiber: Fiber) {
+/**
+ * Runs the frames above the frame at offset `base` (NO_FRAME for an empty
+ * stack) until none are left. Returns THROW if an exception unwinds down to
+ * `base`.
+ */
+export function run_interpreter(runtime: Runtime, base: number): Status {
   const { heap } = runtime
-  // Widened so TS doesn't keep the narrowed status across calls that change it.
-  fiber.status = FIBER_STATE.RUNNING as FiberStatus
-  heap.handles.scope(() => {
+  return heap.handles.scope(() => {
     const temporary = heap.handles.local(),
       operand = heap.handles.local()
-    if (fiber.take_await_rejection()) {
-      throw_value(runtime, fiber, fiber.error)
-      if (fiber.status === FIBER_STATE.FAILED) return
-    }
-    // run_task preserves run-to-completion across these bounded slices.
-    for (let slice = 0; slice < 10000; slice++) {
-      const frame = fiber.frame
-      if (frame === null) panic("No active frame")
+    while (runtime.stack.fp !== base) {
+      const frame = runtime.current_frame!
       const code_id = frame.code_id
       const function_id = frame.function_id
       const code = runtime.loader.code[code_id]
@@ -902,7 +889,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
           status = op.BIND_THIS(runtime, frame, reg(a))
           break
         case OP.LOAD_NEW_TARGET:
-          op.LOAD_NEW_TARGET(heap, reg(a), fiber, frame)
+          op.LOAD_NEW_TARGET(heap, reg(a), frame)
           break
         case OP.LOAD_GLOBAL:
           status = op.LOAD_GLOBAL(
@@ -1019,7 +1006,6 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
         case OP.CALL:
           status = op.CALL(
             runtime,
-            fiber,
             reg(a),
             reg(b),
             reg(c),
@@ -1029,7 +1015,6 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
         case OP.CONSTRUCT:
           status = op.CONSTRUCT(
             runtime,
-            fiber,
             reg(a),
             reg(b),
             reg(c),
@@ -1042,7 +1027,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             Array.from({ length: e }, (_, index) => reg(d + index)),
             reg(d + e),
             (arguments_) =>
-              op.CALL(runtime, fiber, reg(a), reg(b), reg(c), arguments_),
+              op.CALL(runtime, reg(a), reg(b), reg(c), arguments_),
           )
           break
         case OP.CONSTRUCT_SPREAD:
@@ -1051,7 +1036,7 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             Array.from({ length: e }, (_, index) => reg(d + index)),
             reg(d + e),
             (arguments_) =>
-              op.CONSTRUCT(runtime, fiber, reg(a), reg(b), reg(c), arguments_),
+              op.CONSTRUCT(runtime, reg(a), reg(b), reg(c), arguments_),
           )
           break
         case OP.RETURN:
@@ -1067,13 +1052,13 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
             )
             break
           }
-          if (op.RETURN(runtime, fiber, reg(a))) return
+          status = op.RETURN(runtime, reg(a))
           break
         case OP.AWAIT:
-          if (op.AWAIT(runtime, fiber, reg(a), reg(b))) return
+          status = op.AWAIT(runtime, register_index(a), reg(b))
           break
         case OP.THROW:
-          if (op.THROW(runtime, fiber, reg(a))) return
+          status = op.THROW(runtime, reg(a))
           break
         case OP.THROW_ERROR:
           status = op.THROW_ERROR(
@@ -1118,7 +1103,6 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
         case OP.ITERATOR_NEXT:
           status = op.ITERATOR_NEXT(
             runtime,
-            fiber,
             frame,
             reg(a),
             reg(b),
@@ -1194,35 +1178,13 @@ export function run_interpreter(runtime: Runtime, fiber: Fiber) {
         default:
           panic(`Unknown opcode: ${opcode}`)
       }
-      if (status === THROW) {
-        throw_value(runtime, fiber, runtime.pending_exception)
-        clear_exception(runtime)
-        if (fiber.status === FIBER_STATE.FAILED) return
-      }
+      if (status === THROW && unwind(runtime, base) === THROW) return THROW
       // The helper handles must not retain environments after the instruction.
       write_undefined(heap, temporary)
       write_undefined(heap, operand)
     }
-    fiber.status = FIBER_STATE.READY
+    return OK
   })
-}
-
-export function run_task(runtime: Runtime, fiber: Fiber) {
-  runtime.running.push(fiber)
-  try {
-    while (
-      fiber.status === FIBER_STATE.READY ||
-      fiber.status === FIBER_STATE.RUNNING
-    )
-      run_interpreter(runtime, fiber)
-  } finally {
-    runtime.running.pop()
-  }
-  if (
-    fiber.settle &&
-    (fiber.status === FIBER_STATE.DONE || fiber.status === FIBER_STATE.FAILED)
-  )
-    settle_fiber(runtime, fiber)
 }
 
 // Restores the environment of the frame's code at the handler, which is the
@@ -1242,20 +1204,22 @@ function restore_environment(
     environment_at(runtime.heap, env, env, 1)
 }
 
-// Unwinds frames to the innermost exception handler covering the throwing
-// instruction, which is the one before each frame's pc.
-function throw_value(runtime: Runtime, fiber: Fiber, source: Handle) {
+/**
+ * Throws the pending exception at the top frame: unwinds frames above `base`
+ * to the innermost exception handler covering the throwing instruction, which
+ * is the one before each frame's pc. A frame that settles a promise rejects it
+ * instead of unwinding further. Returns THROW, with the exception pending
+ * again, if it unwinds down to `base`.
+ */
+export function unwind(runtime: Runtime, base: number): Status {
   const { heap } = runtime
-  heap.handles.scope(() => {
-    const value = heap.handles.local()
-    heap.copy_value(value, source)
+  return heap.handles.scope(() => {
+    const value = heap.handles.local(),
+      ignored = heap.handles.local()
+    take_exception(runtime, value)
     while (true) {
-      const frame = fiber.frame
-      if (frame === null) {
-        heap.copy_value(fiber.error, value)
-        fiber.status = FIBER_STATE.FAILED
-        return
-      }
+      if (runtime.stack.fp === base) return throw_value(runtime, value)
+      const frame = runtime.current_frame!
       const pc = frame.pc - INSTRUCTION_BYTES
       const handler = runtime.loader.code[frame.code_id].unit.functions[
         frame.function_id
@@ -1264,24 +1228,34 @@ function throw_value(runtime: Runtime, fiber: Fiber, source: Handle) {
         restore_environment(runtime, frame, handler.environment)
         heap.copy_value(frame.register(register_index(handler.register)), value)
         frame.pc = bytecode_offset(handler.target)
-        return
+        return OK
       }
-      pop_frame(runtime, fiber)
+      if (frame.capability) {
+        const { reject } = frame.capability
+        const status = call(runtime, ignored, reject, undefined, [value])
+        pop_frame(runtime)
+        return status
+      }
+      pop_frame(runtime)
     }
   })
 }
 
-function return_value(runtime: Runtime, fiber: Fiber, source: Handle) {
+function return_value(runtime: Runtime, source: JSValue): Status {
   const { heap } = runtime
-  const frame = fiber.frame!
-  const caller = frame.caller
-  heap.handles.scope(() => {
-    const value = heap.handles.local()
+  const frame = runtime.current_frame!
+  return heap.handles.scope(() => {
+    const value = heap.handles.local(),
+      ignored = heap.handles.local()
     heap.copy_value(value, source)
     if (frame.is_construct_call && !is_object(heap, value))
       heap.copy_value(value, frame.this_value)
-    heap.copy_value(caller === null ? fiber.result : frame.destination!, value)
-    pop_frame(runtime, fiber)
-    if (caller === null) fiber.status = FIBER_STATE.DONE
+    let status: Status = OK
+    if (frame.capability) {
+      const { resolve } = frame.capability
+      status = call(runtime, ignored, resolve, undefined, [value])
+    } else heap.copy_value(frame.destination!, value)
+    pop_frame(runtime)
+    return status
   })
 }
