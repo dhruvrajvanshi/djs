@@ -81,7 +81,7 @@ const OBJECT_LAYOUT: Layout = {
   values: [],
 }
 
-export const LAYOUTS: Readonly<Record<number, Layout>> = Object.freeze({
+export const LAYOUTS: Readonly<Record<HeapType, Layout>> = Object.freeze({
   [HEAP_TYPES.STRING]: { min_payload_bytes: 4, refs: [], values: [] },
   [HEAP_TYPES.SYMBOL]: {
     min_payload_bytes: 8,

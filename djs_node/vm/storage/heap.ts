@@ -1,7 +1,7 @@
 import { panic, type Brand } from "../../utils.ts"
 import type { Address } from "./value.ts"
 import { NAN_HIGH, VALUE_TAGS, VALUE_BYTES } from "./value.ts"
-import { HEADER, LAYOUTS } from "./layout.ts"
+import { HEADER, LAYOUTS, type HeapType } from "./layout.ts"
 
 const FORWARDED = 0xffffffff
 
@@ -83,7 +83,7 @@ export class Heap {
     this.write_u32(offset + 4, NAN_HIGH | VALUE_TAGS.UNDEFINED)
   }
 
-  allocate(type: number, payload_bytes: number): Address {
+  allocate(type: HeapType, payload_bytes: number): Address {
     const layout = LAYOUTS[type]
     if (layout === undefined) panic(`Unknown heap type: ${type}`)
     if (
@@ -162,7 +162,7 @@ export class Heap {
     )
     let scan = to_start
     while (scan < to_cursor) {
-      const type = this.read_u32(scan + HEADER.TYPE)
+      const type = this.read_u32(scan + HEADER.TYPE) as HeapType
       const size = this.read_u32(scan + HEADER.SIZE)
       const layout = LAYOUTS[type]
       if (layout === undefined) panic(`Unknown heap type: ${type}`)
