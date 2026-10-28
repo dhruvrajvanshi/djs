@@ -3,7 +3,7 @@
  * Stdlib implementation uses this module for low level interactions with
  */
 import type { Heap } from "../vm/storage/heap.ts"
-import type { Handle, Persistent } from "../vm/storage/heap.ts"
+import type { JSValue, Persistent } from "../vm/storage/heap.ts"
 import {
   VALUE_TAGS,
   heap_type_of,
@@ -19,7 +19,7 @@ import {
 import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import { INSTRUCTION_BYTES } from "../compiler/bytecode.ts"
 import type { CompiledModule } from "../compiler/compile.ts"
-import type { Frame } from "../vm/fiber.ts"
+import type { Frame } from "../vm/frame.ts"
 import { fileURLToPath } from "node:url"
 import type { Runtime } from "../runtime/runtime.ts"
 import {
@@ -570,7 +570,7 @@ export const VM_VALUES: Record<string, NativeValue> = {
 // Returns -1 after raising, since valid arguments are never negative.
 export function integer_argument(
   runtime: Runtime,
-  value: Handle,
+  value: JSValue,
   name: string,
   maximum: number = Number.MAX_SAFE_INTEGER,
 ) {
@@ -592,7 +592,11 @@ export function integer_argument(
 }
 
 // Returns undefined after raising.
-export function string_argument(runtime: Runtime, value: Handle, name: string) {
+export function string_argument(
+  runtime: Runtime,
+  value: JSValue,
+  name: string,
+) {
   if (
     value === undefined ||
     heap_type_of(runtime.heap, value) !== HEAP_TYPES.STRING
@@ -611,12 +615,10 @@ const STDLIB_DIRECTORY = fileURLToPath(new URL("../stdlib/", import.meta.url))
  */
 export function stack_trace(runtime: Runtime) {
   const lines = []
-  for (let i = runtime.running.length - 1; i >= 0; i--) {
-    for (let frame = runtime.running[i].frame; frame; frame = frame.caller) {
-      const { unit } = runtime.loader.code[frame.code_id]
-      if (lines.length === 0 && unit.path.startsWith(STDLIB_DIRECTORY)) continue
-      lines.push(`\n    at ${frame_location(unit, frame)}`)
-    }
+  for (let frame = runtime.current_frame; frame; frame = frame.caller) {
+    const { unit } = runtime.loader.code[frame.code_id]
+    if (lines.length === 0 && unit.path.startsWith(STDLIB_DIRECTORY)) continue
+    lines.push(`\n    at ${frame_location(unit, frame)}`)
   }
   return lines.join("")
 }
@@ -630,7 +632,7 @@ const OBJECT_KINDS: Partial<Record<number, string>> = {
   [HEAP_TYPES.FUNCTION]: "function",
 }
 
-function function_argument(runtime: Runtime, value: Handle, name: string) {
+function function_argument(runtime: Runtime, value: JSValue, name: string) {
   if (
     value === undefined ||
     heap_type_of(runtime.heap, value) !== HEAP_TYPES.FUNCTION
@@ -643,11 +645,11 @@ function function_argument(runtime: Runtime, value: Handle, name: string) {
 
 function register<Name extends string>(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   slots: Map<Name, Persistent>,
   names: readonly string[],
   name: string,
-  fn: Handle,
+  fn: JSValue,
 ) {
   if (runtime.realm.frozen)
     return throw_error(runtime, "TypeError", "The realm is frozen")
@@ -663,11 +665,11 @@ function register<Name extends string>(
   return OK
 }
 
-function is_string(heap: Heap, value: Handle) {
+function is_string(heap: Heap, value: JSValue) {
   return value !== undefined && heap_type_of(heap, value) === HEAP_TYPES.STRING
 }
 
-function is_prototype(heap: Heap, value: Handle | undefined) {
+function is_prototype(heap: Heap, value: JSValue | undefined) {
   return (
     value !== undefined &&
     (tag_of(heap, value) === VALUE_TAGS.NULL || has_property_list(heap, value))
@@ -677,7 +679,7 @@ function is_prototype(heap: Heap, value: Handle | undefined) {
 // Reads `name` only if `object` has it as an own data property, so the
 // stdlib's option and slot objects can't pick up properties a program added
 // to %Object.prototype%.
-function own_value(runtime: Runtime, object: Handle, name: string) {
+function own_value(runtime: Runtime, object: JSValue, name: string) {
   const descriptor = get_own_property_descriptor(runtime, object, name)
   return descriptor?.value
 }

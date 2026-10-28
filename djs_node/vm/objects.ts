@@ -1,4 +1,4 @@
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import { write_number } from "./storage/value.ts"
 import type { FunctionDescriptor } from "../compiler/compile.ts"
 import type { Runtime } from "../runtime/runtime.ts"
@@ -12,19 +12,19 @@ import { define_property } from "./properties.ts"
 // Objects created here inherit from the realm's prototypes, which are absent
 // (null) only while the realm itself is being created.
 
-export function create_object(runtime: Runtime, destination: Handle) {
+export function create_object(runtime: Runtime, destination: JSValue) {
   allocate_object(runtime.heap, destination, runtime.realm.object_prototype)
 }
 
 export function create_function(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   code_id: number,
   function_id: number,
-  environment?: Handle,
+  environment?: JSValue,
   flags: number = 0,
-  receiver?: Handle,
-  new_target?: Handle,
+  receiver?: JSValue,
+  new_target?: JSValue,
   metadata?: Pick<FunctionDescriptor, "name" | "length">,
 ) {
   const { heap } = runtime
@@ -59,9 +59,9 @@ export function create_function(
 /** An omitted prototype selects %Array.prototype%. */
 export function create_array(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   length: number,
-  prototype: Handle | undefined = runtime.realm.array_prototype,
+  prototype: JSValue | undefined = runtime.realm.array_prototype,
 ) {
   allocate_array(runtime.heap, destination, length, prototype)
 }
@@ -69,17 +69,17 @@ export function create_array(
 /** An omitted prototype selects %String.prototype%. */
 export function create_string_object(
   runtime: Runtime,
-  destination: Handle,
-  value: Handle,
-  prototype: Handle | undefined = runtime.realm.string_prototype,
+  destination: JSValue,
+  value: JSValue,
+  prototype: JSValue | undefined = runtime.realm.string_prototype,
 ) {
   allocate_string_object(runtime.heap, destination, value, prototype)
 }
 
 export function create_arguments_object(
   runtime: Runtime,
-  destination: Handle,
-  arguments_: Handle[],
+  destination: JSValue,
+  arguments_: JSValue[],
 ) {
   const { heap } = runtime
   create_object(runtime, destination)

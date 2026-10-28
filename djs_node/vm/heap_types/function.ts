@@ -1,5 +1,5 @@
 import type { Heap } from "../storage/heap.ts"
-import type { Handle } from "../storage/heap.ts"
+import type { JSValue } from "../storage/heap.ts"
 import { get_ref, set_ref } from "../storage/value.ts"
 import { FUNCTION, HEAP_TYPES } from "../storage/layout.ts"
 import type { FunctionId } from "../../compiler/compile.ts"
@@ -11,14 +11,14 @@ export const BUILTIN_CONSTRUCTOR = 32
 /** An undefined prototype means null. */
 export function allocate_function(
   heap: Heap,
-  destination: Handle,
-  prototype: Handle | undefined,
+  destination: JSValue,
+  prototype: JSValue | undefined,
   code_id: number,
   function_id: number,
-  environment?: Handle,
+  environment?: JSValue,
   flags: number = 0,
-  receiver?: Handle,
-  new_target?: Handle,
+  receiver?: JSValue,
+  new_target?: JSValue,
 ) {
   const reference = heap.allocate(HEAP_TYPES.FUNCTION, 48)
   set_ref(heap, destination, reference)
@@ -35,23 +35,23 @@ export function allocate_function(
     heap.store_value(reference + FUNCTION.NEW_TARGET, new_target)
 }
 
-export function function_code_id(heap: Heap, callee: Handle): CodeId {
+export function function_code_id(heap: Heap, callee: JSValue): CodeId {
   return heap.read_u32(get_ref(heap, callee) + FUNCTION.CODE) as CodeId
 }
 
-export function function_id(heap: Heap, callee: Handle): FunctionId {
+export function function_id(heap: Heap, callee: JSValue): FunctionId {
   return heap.read_u32(get_ref(heap, callee) + FUNCTION.ID) as FunctionId
 }
 
-export function function_flags(heap: Heap, callee: Handle): number {
+export function function_flags(heap: Heap, callee: JSValue): number {
   return heap.read_u32(get_ref(heap, callee) + FUNCTION.FLAGS)
 }
 
 /** Stores a built-in function's specification steps (ECMA-262 10.3). */
 export function set_builtin_steps(
   heap: Heap,
-  callee: Handle,
-  steps: Handle,
+  callee: JSValue,
+  steps: JSValue,
   constructor: boolean,
 ) {
   const reference = get_ref(heap, callee)
@@ -65,8 +65,8 @@ export function set_builtin_steps(
 
 export function load_builtin_steps(
   heap: Heap,
-  destination: Handle,
-  callee: Handle,
+  destination: JSValue,
+  callee: JSValue,
 ) {
   const steps = heap.read_u32(get_ref(heap, callee) + FUNCTION.STEPS)
   if (steps !== 0) set_ref(heap, destination, steps)
@@ -75,24 +75,24 @@ export function load_builtin_steps(
 
 export function load_function_environment(
   heap: Heap,
-  destination: Handle,
-  callee: Handle,
+  destination: JSValue,
+  callee: JSValue,
 ) {
   heap.load_value(destination, get_ref(heap, callee) + FUNCTION.ENVIRONMENT)
 }
 
 export function load_function_receiver(
   heap: Heap,
-  destination: Handle,
-  callee: Handle,
+  destination: JSValue,
+  callee: JSValue,
 ) {
   heap.load_value(destination, get_ref(heap, callee) + FUNCTION.RECEIVER)
 }
 
 export function load_function_new_target(
   heap: Heap,
-  destination: Handle,
-  callee: Handle,
+  destination: JSValue,
+  callee: JSValue,
 ) {
   heap.load_value(destination, get_ref(heap, callee) + FUNCTION.NEW_TARGET)
 }

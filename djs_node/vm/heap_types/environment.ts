@@ -1,5 +1,5 @@
 import { panic } from "../../utils.ts"
-import type { Handle, Heap } from "../storage/heap.ts"
+import type { JSValue, Heap } from "../storage/heap.ts"
 import type { Address } from "../storage/value.ts"
 import {
   VALUE_TAGS,
@@ -14,8 +14,8 @@ import { ENVIRONMENT, HEAP_TYPES } from "../storage/layout.ts"
 
 export function create_environment(
   heap: Heap,
-  destination: Handle,
-  parent: Handle | undefined,
+  destination: JSValue,
+  parent: JSValue | undefined,
   binding_count: number,
   scope_id: number,
 ) {
@@ -42,8 +42,8 @@ function slot_offset(reference: Address, slot: number) {
 
 export function copy_environment_bindings(
   heap: Heap,
-  destination: Handle,
-  source: Handle,
+  destination: JSValue,
+  source: JSValue,
 ) {
   const count = environment_binding_count(heap, source)
   heap.handles.scope(() => {
@@ -57,8 +57,8 @@ export function copy_environment_bindings(
 
 export function environment_at(
   heap: Heap,
-  destination: Handle,
-  environment: Handle,
+  destination: JSValue,
+  environment: JSValue,
   depth: number,
 ) {
   heap.copy_value(destination, environment)
@@ -72,15 +72,15 @@ export function environment_at(
     panic("Invalid lexical environment")
 }
 
-export function environment_binding_count(heap: Heap, environment: Handle) {
+export function environment_binding_count(heap: Heap, environment: JSValue) {
   return heap.read_u32(get_ref(heap, environment) + ENVIRONMENT.COUNT)
 }
 
-export function environment_scope_id(heap: Heap, environment: Handle) {
+export function environment_scope_id(heap: Heap, environment: JSValue) {
   return heap.read_u32(get_ref(heap, environment) + ENVIRONMENT.SCOPE)
 }
 
-function checked_slot_offset(heap: Heap, environment: Handle, slot: number) {
+function checked_slot_offset(heap: Heap, environment: JSValue, slot: number) {
   if (slot >= environment_binding_count(heap, environment))
     panic("Invalid binding slot")
   return slot_offset(get_ref(heap, environment), slot)
@@ -88,8 +88,8 @@ function checked_slot_offset(heap: Heap, environment: Handle, slot: number) {
 
 export function load_environment_slot(
   heap: Heap,
-  destination: Handle,
-  environment: Handle,
+  destination: JSValue,
+  environment: JSValue,
   slot: number,
 ) {
   heap.load_value(destination, checked_slot_offset(heap, environment, slot))
@@ -97,16 +97,16 @@ export function load_environment_slot(
 
 export function store_environment_slot(
   heap: Heap,
-  environment: Handle,
+  environment: JSValue,
   slot: number,
-  value: Handle,
+  value: JSValue,
 ) {
   heap.store_value(checked_slot_offset(heap, environment, slot), value)
 }
 
 export function environment_slot_uninitialized(
   heap: Heap,
-  environment: Handle,
+  environment: JSValue,
   slot: number,
 ) {
   return heap.handles.scope(() => {

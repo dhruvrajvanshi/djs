@@ -1,5 +1,5 @@
 import { panic } from "../../utils.ts"
-import type { Handle, Heap } from "../storage/heap.ts"
+import type { JSValue, Heap } from "../storage/heap.ts"
 import type { Address } from "../storage/value.ts"
 import {
   VALUE_TAGS,
@@ -18,8 +18,8 @@ import {
 /** Allocates an ordinary object; an undefined prototype means null. */
 export function allocate_object(
   heap: Heap,
-  destination: Handle,
-  prototype: Handle | undefined,
+  destination: JSValue,
+  prototype: JSValue | undefined,
 ) {
   set_ref(heap, destination, heap.allocate(HEAP_TYPES.OBJECT, 8))
   if (prototype !== undefined)
@@ -30,28 +30,28 @@ export function allocate_object(
 }
 
 /** Values the guest sees as objects. */
-export function is_object(heap: Heap, value: Handle) {
+export function is_object(heap: Heap, value: JSValue) {
   const type = heap_type_of(heap, value)
   return is_object_type(type) || type === HEAP_TYPES.BYTE_BUFFER
 }
 
 /** Objects with an ordinary property list and prototype slot. */
-export function has_property_list(heap: Heap, value: Handle) {
+export function has_property_list(heap: Heap, value: JSValue) {
   return is_object_type(heap_type_of(heap, value))
 }
 
-function object_reference(heap: Heap, object: Handle): Address {
+function object_reference(heap: Heap, object: JSValue): Address {
   if (!has_property_list(heap, object)) panic("Expected an object")
   return get_ref(heap, object)
 }
 
-export function object_properties(heap: Heap, object: Handle): Address {
+export function object_properties(heap: Heap, object: JSValue): Address {
   return heap.read_u32(object_reference(heap, object) + OBJECT.PROPERTIES)
 }
 
 export function set_object_properties(
   heap: Heap,
-  object: Handle,
+  object: JSValue,
   property: Address,
 ) {
   heap.write_u32(object_reference(heap, object) + OBJECT.PROPERTIES, property)
@@ -59,7 +59,7 @@ export function set_object_properties(
 
 export function object_prototype_reference(
   heap: Heap,
-  object: Handle,
+  object: JSValue,
 ): Address {
   return heap.read_u32(object_reference(heap, object) + OBJECT.PROTOTYPE)
 }
@@ -69,15 +69,15 @@ export function prototype_of_reference(heap: Heap, reference: Address) {
   return heap.read_u32(reference + OBJECT.PROTOTYPE)
 }
 
-export function set_prototype(heap: Heap, object: Handle, prototype: Handle) {
+export function set_prototype(heap: Heap, object: JSValue, prototype: JSValue) {
   if (!try_set_prototype(heap, object, prototype)) panic("Cyclic prototype")
 }
 
 /** Returns false when the change would create a prototype cycle. */
 export function try_set_prototype(
   heap: Heap,
-  object: Handle,
-  prototype: Handle,
+  object: JSValue,
+  prototype: JSValue,
 ) {
   const target = object_reference(heap, object)
   const reference =
@@ -93,6 +93,6 @@ export function try_set_prototype(
   return true
 }
 
-export function mark_error_object(heap: Heap, object: Handle) {
+export function mark_error_object(heap: Heap, object: JSValue) {
   heap.write_u32(object_reference(heap, object) + HEADER.TYPE, HEAP_TYPES.ERROR)
 }

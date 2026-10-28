@@ -1,4 +1,4 @@
-import type { Handle, Heap } from "../storage/heap.ts"
+import type { JSValue, Heap } from "../storage/heap.ts"
 import type { Address } from "../storage/value.ts"
 import { get_ref, heap_type_of } from "../storage/value.ts"
 import {
@@ -19,9 +19,9 @@ const { CONFIGURABLE, PRIVATE } = PROPERTY_FLAGS
 // An accessor keeps its getter in VALUE and its setter in SETTER.
 
 /** String keys compare by contents; symbol and private keys by identity. */
-export type PropertyKey = string | Handle
+export type PropertyKey = string | JSValue
 
-function key_matches(heap: Heap, key: Handle, name: PropertyKey) {
+function key_matches(heap: Heap, key: JSValue, name: PropertyKey) {
   return typeof name === "string"
     ? heap_type_of(heap, key) === HEAP_TYPES.STRING &&
         read_string(heap, key) === name
@@ -31,7 +31,7 @@ function key_matches(heap: Heap, key: Handle, name: PropertyKey) {
 /** Property addresses are temporary; load values into handles before allocating. */
 export function find_property(
   heap: Heap,
-  object: Handle,
+  object: JSValue,
   name: PropertyKey,
   own: boolean = false,
   private_key: boolean = false,
@@ -74,7 +74,7 @@ export function set_property_flags(
 
 export function load_property_key(
   heap: Heap,
-  destination: Handle,
+  destination: JSValue,
   property: Address,
 ) {
   heap.load_value(destination, property + PROPERTY.KEY)
@@ -82,7 +82,7 @@ export function load_property_key(
 
 export function load_property_value(
   heap: Heap,
-  destination: Handle,
+  destination: JSValue,
   property: Address,
 ) {
   heap.load_value(destination, property + PROPERTY.VALUE)
@@ -91,14 +91,14 @@ export function load_property_value(
 export function store_property_value(
   heap: Heap,
   property: Address,
-  value: Handle,
+  value: JSValue,
 ) {
   heap.store_value(property + PROPERTY.VALUE, value)
 }
 
 export function load_property_setter(
   heap: Heap,
-  destination: Handle,
+  destination: JSValue,
   property: Address,
 ) {
   heap.load_value(destination, property + PROPERTY.SETTER)
@@ -107,7 +107,7 @@ export function load_property_setter(
 export function store_property_setter(
   heap: Heap,
   property: Address,
-  setter: Handle,
+  setter: JSValue,
 ) {
   heap.store_value(property + PROPERTY.SETTER, setter)
 }
@@ -118,10 +118,10 @@ export function store_property_setter(
  */
 export function insert_property(
   heap: Heap,
-  object: Handle,
-  key: Handle,
+  object: JSValue,
+  key: JSValue,
   flags: number,
-  value: Handle,
+  value: JSValue,
 ): Address {
   const reference = heap.allocate(
     HEAP_TYPES.PROPERTY,
@@ -136,7 +136,11 @@ export function insert_property(
 }
 
 /** Returns false when the property is non-configurable. */
-export function remove_property(heap: Heap, object: Handle, name: PropertyKey) {
+export function remove_property(
+  heap: Heap,
+  object: JSValue,
+  name: PropertyKey,
+) {
   let previous = 0
   let property = object_properties(heap, object)
   return heap.handles.scope(() => {

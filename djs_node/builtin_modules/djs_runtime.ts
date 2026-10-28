@@ -3,7 +3,7 @@
  * This is the layer which the node:* stdlib is implemented on top of
  * aside from `djs:vm`, which provides basic JS stuff.
  */
-import type { Handle } from "../vm/storage/heap.ts"
+import type { JSValue } from "../vm/storage/heap.ts"
 import { heap_type_of, write_undefined } from "../vm/storage/value.ts"
 import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import type { Runtime } from "../runtime/runtime.ts"
@@ -181,7 +181,7 @@ export const RUNTIME_OPERATIONS: Record<string, NativeOperation> = {
   },
 }
 
-function is_string(runtime: Runtime, value: Handle) {
+function is_string(runtime: Runtime, value: JSValue) {
   return (
     value !== undefined &&
     heap_type_of(runtime.heap, value) === HEAP_TYPES.STRING
@@ -190,9 +190,9 @@ function is_string(runtime: Runtime, value: Handle) {
 
 function host_operation(
   runtime: Runtime,
-  destination: Handle,
-  resolve: Handle,
-  reject: Handle,
+  destination: JSValue,
+  resolve: JSValue,
+  reject: JSValue,
   run_sync: () => unknown,
   run_async: () => Promise<unknown>,
   options: OperationOptions,
@@ -220,7 +220,7 @@ function host_operation(
   return OK
 }
 
-function check_callbacks(runtime: Runtime, resolve: Handle, reject: Handle) {
+function check_callbacks(runtime: Runtime, resolve: JSValue, reject: JSValue) {
   const { heap } = runtime
   if (
     resolve === undefined ||

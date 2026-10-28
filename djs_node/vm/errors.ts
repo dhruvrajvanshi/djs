@@ -1,4 +1,4 @@
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import { write_undefined } from "./storage/value.ts"
 import type { Runtime } from "../runtime/runtime.ts"
 import { write_string } from "./heap_types/string.ts"
@@ -33,7 +33,7 @@ export function throw_error(
  */
 export function create_error(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   name: string,
   message: string,
 ) {
@@ -60,12 +60,12 @@ export function create_error(
   })
 }
 
-export function throw_value(runtime: Runtime, value: Handle): typeof THROW {
+export function throw_value(runtime: Runtime, value: JSValue): typeof THROW {
   runtime.heap.copy_value(runtime.pending_exception, value)
   return THROW
 }
 
-export function take_exception(runtime: Runtime, destination: Handle) {
+export function take_exception(runtime: Runtime, destination: JSValue) {
   runtime.heap.copy_value(destination, runtime.pending_exception)
   clear_exception(runtime)
 }

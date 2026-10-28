@@ -1,5 +1,5 @@
 import { panic } from "../../utils.ts"
-import type { Heap, Handle } from "../storage/heap.ts"
+import type { Heap, JSValue } from "../storage/heap.ts"
 import {
   get_ref,
   heap_type_of,
@@ -12,13 +12,13 @@ import { set_prototype } from "./object.ts"
 /** An undefined prototype means null. */
 export function allocate_string_object(
   heap: Heap,
-  destination: Handle,
-  value: Handle,
-  prototype: Handle | undefined,
+  destination: JSValue,
+  value: JSValue,
+  prototype: JSValue | undefined,
 ) {
   if (heap_type_of(heap, value) !== HEAP_TYPES.STRING)
     panic("Expected a string")
-  // Handle the source separately when the destination aliases the argument.
+  // JSValue the source separately when the destination aliases the argument.
   heap.handles.scope(() => {
     const source = heap.handles.local()
     heap.copy_value(source, value)
@@ -30,8 +30,8 @@ export function allocate_string_object(
 
 export function string_object_set_value(
   heap: Heap,
-  object: Handle,
-  value: Handle,
+  object: JSValue,
+  value: JSValue,
 ) {
   if (heap_type_of(heap, value) !== HEAP_TYPES.STRING)
     panic("Expected a string")
@@ -39,7 +39,7 @@ export function string_object_set_value(
 }
 
 /** The string itself, or a String object's [[StringData]]. */
-export function string_value(heap: Heap, destination: Handle, value: Handle) {
+export function string_value(heap: Heap, destination: JSValue, value: JSValue) {
   if (heap_type_of(heap, value) === HEAP_TYPES.STRING)
     heap.copy_value(destination, value)
   else if (heap_type_of(heap, value) === HEAP_TYPES.STRING_OBJECT)
@@ -48,7 +48,7 @@ export function string_value(heap: Heap, destination: Handle, value: Handle) {
 }
 
 /** Heap reference of a string or a String object's string, otherwise 0. */
-export function string_reference(heap: Heap, value: Handle): Address {
+export function string_reference(heap: Heap, value: JSValue): Address {
   const type = heap_type_of(heap, value)
   if (type === HEAP_TYPES.STRING) return get_ref(heap, value)
   if (type === HEAP_TYPES.STRING_OBJECT)

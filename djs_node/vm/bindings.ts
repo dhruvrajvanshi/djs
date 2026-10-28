@@ -1,5 +1,5 @@
 import { panic } from "../utils.ts"
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import { VALUE_TAGS, tag_of } from "./storage/value.ts"
 import type { Runtime } from "../runtime/runtime.ts"
 import {
@@ -11,14 +11,14 @@ import {
 import { OK, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 
-function scope_of(runtime: Runtime, environment: Handle) {
+function scope_of(runtime: Runtime, environment: JSValue) {
   return runtime.loader.scopes[environment_scope_id(runtime.heap, environment)]
 }
 
 export function load_binding(
   runtime: Runtime,
-  destination: Handle,
-  environment: Handle,
+  destination: JSValue,
+  environment: JSValue,
   slot: number,
 ): Status {
   const { heap } = runtime
@@ -42,9 +42,9 @@ export function load_binding(
 
 export function initialize_binding(
   runtime: Runtime,
-  environment: Handle,
+  environment: JSValue,
   slot: number,
-  source: Handle,
+  source: JSValue,
 ) {
   const { heap } = runtime
   const scope = scope_of(runtime, environment)
@@ -57,9 +57,9 @@ export function initialize_binding(
 
 export function store_binding(
   runtime: Runtime,
-  environment: Handle,
+  environment: JSValue,
   slot: number,
-  source: Handle,
+  source: JSValue,
 ): Status {
   const { heap } = runtime
   const scope = scope_of(runtime, environment)

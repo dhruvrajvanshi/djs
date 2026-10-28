@@ -27,21 +27,14 @@ import {
   NATIVE_CODE,
 } from "../vm/native_operations.ts"
 import type { NativeModule } from "../vm/native_operations.ts"
-import { panic } from "../utils.ts"
 import type { HostError } from "../host/node.ts"
-import { FIBER_STATE } from "../vm/fiber.ts"
-import {
-  create_fiber,
-  dispose_fiber,
-  settle_with_promise,
-} from "../vm/calls.ts"
-import { run_task } from "../vm/interpreter.ts"
+import { start_module_body, run_module_body } from "../vm/calls.ts"
 import {
   drain_completions,
   drain_jobs,
   wait_for_completion,
 } from "./scheduler.ts"
-import type { Handle, Persistent } from "../vm/storage/heap.ts"
+import type { JSValue, Persistent } from "../vm/storage/heap.ts"
 
 const BUILTINS = new Map([
   ["node:console", new URL("../stdlib/node/console.js", import.meta.url)],
@@ -549,31 +542,36 @@ export function evaluate_realm_module(
 ) {
   if (!start_evaluation(module, ancestors)) return
   const chain = new Set(ancestors).add(module.id)
-  let fiber
+  const { heap } = runtime
+  let guest_error = false
   try {
     for (const id of module.dependencies)
       evaluate_realm_module(runtime, runtime.loader.modules[id], chain)
-    fiber = create_fiber(runtime, module.code_id!, module.environment)
-    run_task(runtime, fiber)
-    if (fiber.status === FIBER_STATE.FAILED)
-      throw new Error(error_report(runtime, fiber.error))
-    if (fiber.status !== FIBER_STATE.DONE)
-      panic("Stdlib modules must evaluate synchronously")
+    const status = heap.handles.scope(() =>
+      run_module_body(
+        runtime,
+        heap.handles.local(),
+        module.code_id!,
+        module.environment,
+      ),
+    )
+    if (status === THROW) {
+      take_exception(runtime, module.error)
+      guest_error = true
+      throw new Error(error_report(runtime, module.error))
+    }
     module.status = MODULE_STATE.EVALUATED
-    write_undefined(runtime.heap, module.error)
+    write_undefined(heap, module.error)
   } catch (error) {
     module.status = MODULE_STATE.ERRORED
-    if (fiber) runtime.heap.copy_value(module.error, fiber.error)
-    else write_string(runtime.heap, module.error, error.message)
+    if (!guest_error) write_string(heap, module.error, error.message)
     throw error
-  } finally {
-    if (fiber) dispose_fiber(runtime, fiber)
   }
 }
 
 /**
  * Evaluates a program module and its dependencies. Like an async function
- * call, the module's fiber settles a promise when it finishes. This runs
+ * call, the module's frame settles a promise when it finishes. This runs
  * jobs and host operations until that promise rejects, or until it is
  * fulfilled and nothing is left to run.
  */
@@ -587,18 +585,22 @@ export async function evaluate_module(
   const { heap } = runtime
   // Not a local handle: evaluation awaits, and scopes can't span an await.
   const promise = heap.handles.persistent()
-  let fiber
   let guest_error = false
   try {
     for (const id of module.dependencies)
       await evaluate_module(runtime, runtime.loader.modules[id], chain)
-    fiber = create_fiber(runtime, module.code_id!, module.environment)
-    if (settle_with_promise(runtime, fiber, promise) === THROW) {
+    if (
+      start_module_body(
+        runtime,
+        promise,
+        module.code_id!,
+        module.environment,
+      ) === THROW
+    ) {
       take_exception(runtime, module.error)
       guest_error = true
       throw new UncaughtException(error_report(runtime, module.error))
     }
-    run_task(runtime, fiber)
     await run_event_loop(runtime, promise)
     if (promise_state(runtime, promise) === "rejected") {
       get_slot(runtime, module.error, promise, "[[PromiseResult]]")
@@ -614,7 +616,6 @@ export async function evaluate_module(
     if (!guest_error) write_string(heap, module.error, error.message)
     throw error
   } finally {
-    if (fiber) dispose_fiber(runtime, fiber)
     heap.handles.release(promise)
   }
 }
@@ -622,7 +623,7 @@ export async function evaluate_module(
 /** A guest exception that escaped module evaluation. */
 export class UncaughtException extends Error {}
 
-function promise_state(runtime: Runtime, promise: Handle) {
+function promise_state(runtime: Runtime, promise: JSValue) {
   return runtime.heap.handles.scope(() => {
     const state = runtime.heap.handles.local()
     get_slot(runtime, state, promise, "[[PromiseState]]")
@@ -630,7 +631,7 @@ function promise_state(runtime: Runtime, promise: Handle) {
   })
 }
 
-async function run_event_loop(runtime: Runtime, promise: Handle) {
+async function run_event_loop(runtime: Runtime, promise: JSValue) {
   const { scheduler } = runtime
   while (true) {
     drain_completions(runtime)
@@ -653,7 +654,7 @@ export function read_export(
   runtime: Runtime,
   module: ModuleRecord,
   name: string,
-  destination: Handle,
+  destination: JSValue,
 ) {
   const binding = module.exports.get(name)
   if (binding === undefined) throw new SyntaxError(`Missing export: ${name}`)

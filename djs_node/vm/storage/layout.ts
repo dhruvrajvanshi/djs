@@ -15,6 +15,7 @@ export const HEAP_TYPES = Object.freeze({
   ARRAY: 9,
   STRING_OBJECT: 10,
   SYMBOL: 13,
+  SUSPENDED_FRAME: 14,
 })
 export type HeapType = (typeof HEAP_TYPES)[keyof typeof HEAP_TYPES]
 
@@ -65,6 +66,20 @@ export const ENVIRONMENT = Object.freeze({
 })
 export const VALUE_ARRAY = Object.freeze({ LENGTH: 8, VALUES: 16 })
 export const BYTE_BUFFER = Object.freeze({ LENGTH: 8, BYTES: 12 })
+/**
+ * A frame detached from the call stack at `await`. COUNT values follow: the
+ * frame's values from FRAME.ENVIRONMENT on, registers included.
+ */
+export const SUSPENDED_FRAME = Object.freeze({
+  COUNT: 8,
+  PC: 12,
+  CODE: 16,
+  FUNCTION: 20,
+  FLAGS: 24,
+  /** Nonzero once a resume function has put the frame back on the stack. */
+  RESUMED: 28,
+  VALUES: 32,
+})
 
 export interface Layout {
   min_payload_bytes: number
@@ -119,6 +134,12 @@ export const LAYOUTS: Readonly<Record<HeapType, Layout>> = Object.freeze({
     value_run: { count: VALUE_ARRAY.LENGTH, start: VALUE_ARRAY.VALUES },
   },
   [HEAP_TYPES.BYTE_BUFFER]: { min_payload_bytes: 4, refs: [], values: [] },
+  [HEAP_TYPES.SUSPENDED_FRAME]: {
+    min_payload_bytes: 24,
+    refs: [],
+    values: [],
+    value_run: { count: SUSPENDED_FRAME.COUNT, start: SUSPENDED_FRAME.VALUES },
+  },
 })
 
 export function is_object_type(type: number) {

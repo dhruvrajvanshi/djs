@@ -8,11 +8,10 @@ import { define_property } from "../vm/properties.ts"
 import { create_object } from "../vm/objects.ts"
 import { write_primitive } from "../vm/operations.ts"
 import { error_report } from "./error_report.ts"
-import { FIBER_STATE } from "../vm/fiber.ts"
-import { create_call_fiber, dispose_fiber } from "../vm/calls.ts"
-import { run_task } from "../vm/interpreter.ts"
+import { THROW, take_exception } from "../vm/errors.ts"
+import { call } from "../vm/calls.ts"
 import { panic } from "../utils.ts"
-import type { Handle, Persistent } from "../vm/storage/heap.ts"
+import type { JSValue, Persistent } from "../vm/storage/heap.ts"
 
 export interface Completion {
   id: number
@@ -99,8 +98,8 @@ function notify(runtime: Runtime) {
 
 export function enqueue_job(
   runtime: Runtime,
-  callee: Handle,
-  argument?: Handle,
+  callee: JSValue,
+  argument?: JSValue,
 ) {
   const { heap, scheduler } = runtime
   if (
@@ -121,7 +120,7 @@ export function enqueue_job(
 }
 
 export interface OperationOptions {
-  buffer?: Handle
+  buffer?: JSValue
   offset?: number
   length?: number
   syscall?: string
@@ -130,8 +129,8 @@ export interface OperationOptions {
 
 export function start_operation(
   runtime: Runtime,
-  resolve: Handle,
-  reject: Handle,
+  resolve: JSValue,
+  reject: JSValue,
   begin: () => unknown | PromiseLike<unknown>,
   { buffer, offset = 0, length = 0, syscall, path }: OperationOptions = {},
 ) {
@@ -171,7 +170,7 @@ export function start_operation(
 
 export function operation_error(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   error: HostError,
   syscall?: string,
   path?: string,
@@ -200,7 +199,7 @@ export function operation_error(
 /** Host results are primitives or flat records of primitives, such as lstat's. */
 export function write_host_value(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   value: unknown,
 ) {
   if (value === null || typeof value !== "object")
@@ -267,22 +266,16 @@ export function drain_jobs(runtime: Runtime) {
   const { heap, scheduler } = runtime
   while (scheduler.has_jobs()) {
     const { callee, value, has_argument } = scheduler.take_job()!
-    let job
     try {
-      job = create_call_fiber(
-        runtime,
-        callee,
-        undefined,
-        has_argument ? [value] : [],
-      )
-      run_task(runtime, job)
-      if (job.status === FIBER_STATE.FAILED)
-        throw new Error(error_report(runtime, job.error))
-      // Await reactions resume their fiber as part of the current microtask.
-      for (const active of runtime.fibers)
-        if (active.status === FIBER_STATE.READY) run_task(runtime, active)
+      heap.handles.scope(() => {
+        const result = heap.handles.local()
+        const arguments_ = has_argument ? [value] : []
+        if (call(runtime, result, callee, undefined, arguments_) === THROW) {
+          take_exception(runtime, result)
+          throw new Error(error_report(runtime, result))
+        }
+      })
     } finally {
-      if (job) dispose_fiber(runtime, job)
       heap.handles.release(callee)
       heap.handles.release(value)
     }

@@ -1,5 +1,5 @@
 import type { Address } from "./storage/value.ts"
-import type { Handle } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   get_ref,
@@ -64,10 +64,10 @@ export type { PropertyKey } from "./heap_types/property.ts"
  * @see https://tc39.es/ecma262/#sec-property-descriptor-specification-type
  */
 export interface PropertyDescriptor {
-  value?: Handle
+  value?: JSValue
   writable?: boolean
-  get?: Handle
-  set?: Handle
+  get?: JSValue
+  set?: JSValue
   enumerable?: boolean
   configurable?: boolean
 }
@@ -83,7 +83,7 @@ export function is_data_descriptor(descriptor: PropertyDescriptor) {
 }
 
 /** Values whose properties the VM can read without boxing. */
-export function has_properties(runtime: Runtime, value: Handle) {
+export function has_properties(runtime: Runtime, value: JSValue) {
   const type = heap_type_of(runtime.heap, value)
   return (
     type === HEAP_TYPES.STRING ||
@@ -93,7 +93,7 @@ export function has_properties(runtime: Runtime, value: Handle) {
 }
 
 /** The key for a primitive value. Objects need `to_property_key`. */
-export function property_key(runtime: Runtime, key: Handle): PropertyKey {
+export function property_key(runtime: Runtime, key: JSValue): PropertyKey {
   const { heap } = runtime
   if (heap_type_of(heap, key) === HEAP_TYPES.SYMBOL) return key
   if (is_object(heap, key)) panic("Object keys need to_property_key")
@@ -107,7 +107,7 @@ export function property_key(runtime: Runtime, key: Handle): PropertyKey {
  */
 export function to_property_key(
   runtime: Runtime,
-  key: Handle,
+  key: JSValue,
 ): PropertyKey | undefined {
   const { heap } = runtime
   if (!is_object(heap, key)) return property_key(runtime, key)
@@ -146,7 +146,7 @@ interface OwnProperty {
  */
 function virtual_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   name: PropertyKey,
 ): OwnProperty | undefined {
   const { heap } = runtime
@@ -175,7 +175,7 @@ function virtual_property(
 
 function own_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   name: PropertyKey,
 ): OwnProperty | undefined {
   const { heap } = runtime
@@ -195,7 +195,7 @@ function own_property(
 }
 
 // Strings and symbols inherit from the realm's prototypes.
-function prototype_reference(runtime: Runtime, value: Handle): Address {
+function prototype_reference(runtime: Runtime, value: JSValue): Address {
   const { heap, realm } = runtime
   const type = heap_type_of(heap, value)
   const prototype =
@@ -212,7 +212,7 @@ function prototype_reference(runtime: Runtime, value: Handle): Address {
 
 function inherited_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   name: PropertyKey,
 ): OwnProperty | undefined {
   const { heap } = runtime
@@ -254,7 +254,7 @@ function descriptor_of(
 /** @see https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-getownproperty-p */
 export function get_own_property_descriptor(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
 ): PropertyDescriptor | undefined {
   return descriptor_of(runtime, own_property(runtime, object, key))
@@ -263,7 +263,7 @@ export function get_own_property_descriptor(
 /** The descriptor of the property `object` has or inherits. */
 export function get_property_descriptor(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
 ): PropertyDescriptor | undefined {
   return descriptor_of(runtime, inherited_property(runtime, object, key))
@@ -272,8 +272,8 @@ export function get_property_descriptor(
 /** @see https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-get-p-receiver */
 export function get_property_value(
   runtime: Runtime,
-  destination: Handle,
-  object: Handle,
+  destination: JSValue,
+  object: JSValue,
   key: PropertyKey,
 ): Status {
   const { heap } = runtime
@@ -291,7 +291,7 @@ export function get_property_value(
 
 export function has_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
 ) {
   return inherited_property(runtime, object, key) !== undefined
@@ -300,7 +300,7 @@ export function has_property(
 /** Returns false when the property is non-configurable. */
 export function delete_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
 ) {
   if (virtual_property(runtime, object, key)) return false
@@ -314,7 +314,7 @@ export function delete_property(
  */
 export function define_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
   descriptor: PropertyDescriptor,
 ) {
@@ -328,7 +328,7 @@ export function define_property(
  */
 export function define_own_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
   descriptor: PropertyDescriptor,
 ): boolean | undefined {
@@ -341,7 +341,7 @@ export function define_own_property(
 /** @see https://tc39.es/ecma262/#sec-definepropertyorthrow */
 export function define_property_or_throw(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
   descriptor: PropertyDescriptor,
 ): Status {
@@ -355,7 +355,7 @@ export function define_property_or_throw(
 /** @see https://tc39.es/ecma262/#sec-ordinarydefineownproperty */
 export function ordinary_define_own_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
   descriptor: PropertyDescriptor,
 ): boolean {
@@ -398,7 +398,7 @@ export function ordinary_define_own_property(
  */
 function validate_and_apply_property_descriptor(
   runtime: Runtime,
-  object: Handle | undefined,
+  object: JSValue | undefined,
   key: PropertyKey,
   extensible: boolean,
   descriptor: PropertyDescriptor,
@@ -486,7 +486,7 @@ function validate_and_apply_property_descriptor(
  */
 function store_own_property(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
   descriptor: PropertyDescriptor,
 ) {
@@ -518,9 +518,9 @@ function store_own_property(
 /** @see https://tc39.es/ecma262/#sec-ordinary-object-internal-methods-and-internal-slots-set-p-v-receiver */
 export function set_property_value(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
   key: PropertyKey,
-  value: Handle,
+  value: JSValue,
 ): Status {
   const { heap } = runtime
   if (heap_type_of(heap, object) === HEAP_TYPES.BYTE_BUFFER) {
@@ -577,7 +577,7 @@ export function set_property_value(
   })
 }
 
-function find_private(runtime: Runtime, object: Handle, key: Handle) {
+function find_private(runtime: Runtime, object: JSValue, key: JSValue) {
   if (!has_property_list(runtime.heap, object)) {
     throw_error(runtime, "TypeError", "Expected an object")
     return undefined
@@ -593,9 +593,9 @@ function find_private(runtime: Runtime, object: Handle, key: Handle) {
 /** @see https://tc39.es/ecma262/#sec-privateget */
 export function private_get(
   runtime: Runtime,
-  destination: Handle,
-  object: Handle,
-  key: Handle,
+  destination: JSValue,
+  object: JSValue,
+  key: JSValue,
 ): Status {
   const property = find_private(runtime, object, key)
   if (property === undefined) return THROW
@@ -606,9 +606,9 @@ export function private_get(
 /** @see https://tc39.es/ecma262/#sec-privateset */
 export function private_set(
   runtime: Runtime,
-  object: Handle,
-  key: Handle,
-  value: Handle,
+  object: JSValue,
+  key: JSValue,
+  value: JSValue,
 ): Status {
   const property = find_private(runtime, object, key)
   if (property === undefined) return THROW
@@ -620,9 +620,9 @@ export function private_set(
 
 function private_element_add(
   runtime: Runtime,
-  object: Handle,
-  key: Handle,
-  value: Handle,
+  object: JSValue,
+  key: JSValue,
+  value: JSValue,
   flags: PropertyFlags,
 ): Status {
   const { heap } = runtime
@@ -641,9 +641,9 @@ function private_element_add(
 /** @see https://tc39.es/ecma262/#sec-privatefieldadd */
 export function private_field_add(
   runtime: Runtime,
-  object: Handle,
-  key: Handle,
-  value: Handle,
+  object: JSValue,
+  key: JSValue,
+  value: JSValue,
 ): Status {
   return private_element_add(runtime, object, key, value, PRIVATE | WRITABLE)
 }
@@ -651,9 +651,9 @@ export function private_field_add(
 /** @see https://tc39.es/ecma262/#sec-privatemethodoraccessoradd */
 export function private_method_or_accessor_add(
   runtime: Runtime,
-  object: Handle,
-  key: Handle,
-  method: Handle,
+  object: JSValue,
+  key: JSValue,
+  method: JSValue,
 ): Status {
   return private_element_add(runtime, object, key, method, PRIVATE)
 }
@@ -661,9 +661,9 @@ export function private_method_or_accessor_add(
 /** `#key in object` */
 export function has_private(
   runtime: Runtime,
-  destination: Handle,
-  object: Handle,
-  key: Handle,
+  destination: JSValue,
+  object: JSValue,
+  key: JSValue,
 ): Status {
   const { heap } = runtime
   if (heap_type_of(heap, object) === HEAP_TYPES.BYTE_BUFFER) {
@@ -688,10 +688,10 @@ export function has_private(
  * Own string keys in property order, followed by symbol keys. The symbols are
  * local handles in the caller's scope, since creating the result moves them.
  */
-export function own_property_keys(runtime: Runtime, object: Handle) {
+export function own_property_keys(runtime: Runtime, object: JSValue) {
   const { heap } = runtime
   const names = []
-  const symbols: Handle[] = []
+  const symbols: JSValue[] = []
   const key = heap.handles.local()
   let property = object_properties(heap, object)
   while (property) {
@@ -724,8 +724,8 @@ export function own_property_keys(runtime: Runtime, object: Handle) {
 
 export function ordinary_own_property_keys(
   runtime: Runtime,
-  destination: Handle,
-  object: Handle,
+  destination: JSValue,
+  object: JSValue,
 ) {
   const { heap } = runtime
   heap.handles.scope(() => {
@@ -758,7 +758,7 @@ export function ordinary_own_property_keys(
  */
 export function from_property_descriptor(
   runtime: Runtime,
-  destination: Handle,
+  destination: JSValue,
   descriptor: PropertyDescriptor | undefined,
   // null for a descriptor only the stdlib sees, so that reading its absent
   // fields can't reach %Object.prototype%.
@@ -805,7 +805,7 @@ export function from_property_descriptor(
  */
 export function to_property_descriptor(
   runtime: Runtime,
-  object: Handle,
+  object: JSValue,
 ): PropertyDescriptor | undefined {
   const { heap } = runtime
   if (!is_object(heap, object)) {
@@ -858,8 +858,8 @@ export function to_property_descriptor(
 // Returns undefined after raising.
 function invoke_define(
   runtime: Runtime,
-  method: Handle,
-  object: Handle,
+  method: JSValue,
+  object: JSValue,
   key: PropertyKey,
   descriptor: PropertyDescriptor,
 ): boolean | undefined {
@@ -890,7 +890,7 @@ function invoke_define(
 
 // Array exotic objects define properties through the [[DefineOwnProperty]]
 // the stdlib registers for "array"; other objects are ordinary.
-function exotic_define_own_property(runtime: Runtime, object: Handle) {
+function exotic_define_own_property(runtime: Runtime, object: JSValue) {
   if (heap_type_of(runtime.heap, object) !== HEAP_TYPES.ARRAY) return undefined
   return runtime.realm.internal_method("array [[DefineOwnProperty]]")
 }

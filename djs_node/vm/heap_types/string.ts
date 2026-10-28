@@ -1,12 +1,13 @@
 import { panic } from "../../utils.ts"
-import type { Handle, Heap } from "../storage/heap.ts"
+import type { JSValue, Heap } from "../storage/heap.ts"
+import { assert_live } from "../storage/heap.ts"
 import type { Address } from "../storage/value.ts"
 import { get_ref, heap_type_of, set_ref } from "../storage/value.ts"
 import { BYTE_BUFFER, HEADER, HEAP_TYPES, STRING } from "../storage/layout.ts"
 import assert from "node:assert"
 
-export function write_string(heap: Heap, destination: Handle, text: string) {
-  heap.handles.assert_handle(destination)
+export function write_string(heap: Heap, destination: JSValue, text: string) {
+  assert_live(destination)
   if (typeof text !== "string") panic("Expected a host string")
   const reference = heap.allocate(HEAP_TYPES.STRING, 4 + text.length * 2)
   set_ref(heap, destination, reference)
@@ -20,7 +21,7 @@ export function write_string(heap: Heap, destination: Handle, text: string) {
   }
 }
 
-export function read_string(heap: Heap, handle: Handle) {
+export function read_string(heap: Heap, handle: JSValue) {
   const reference = get_ref(heap, handle)
   const length = heap_string_length(heap, reference)
   let text = ""
@@ -32,7 +33,7 @@ export function read_string(heap: Heap, handle: Handle) {
   return text
 }
 
-export function string_length(heap: Heap, value: Handle) {
+export function string_length(heap: Heap, value: JSValue) {
   assert(heap_type_of(heap, value) === HEAP_TYPES.STRING)
   return heap_string_length(heap, get_ref(heap, value))
 }
@@ -44,7 +45,7 @@ export function heap_string_length(heap: Heap, reference: Address) {
   return heap.read_u32(reference + STRING.LENGTH)
 }
 
-export function string_code_unit_at(heap: Heap, value: Handle, index: number) {
+export function string_code_unit_at(heap: Heap, value: JSValue, index: number) {
   return heap_string_code_unit_at(heap, get_ref(heap, value), index)
 }
 
@@ -61,8 +62,8 @@ export function heap_string_code_unit_at(
 
 export function slice_string(
   heap: Heap,
-  destination: Handle,
-  value: Handle,
+  destination: JSValue,
+  value: JSValue,
   start: number,
   end: number,
 ) {
@@ -91,8 +92,8 @@ export function slice_string(
 /** Copies code units `start` to `end` of a byte buffer holding little-endian UTF-16. */
 export function string_from_utf16(
   heap: Heap,
-  destination: Handle,
-  buffer: Handle,
+  destination: JSValue,
+  buffer: JSValue,
   start: number,
   end: number,
 ) {

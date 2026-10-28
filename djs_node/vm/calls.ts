@@ -1,5 +1,5 @@
 import { panic } from "../utils.ts"
-import type { Handle, Persistent } from "./storage/heap.ts"
+import type { JSValue } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   heap_type_of,
@@ -12,7 +12,8 @@ import {
   write_uninitialized,
 } from "./storage/value.ts"
 import { HEAP_TYPES } from "./storage/layout.ts"
-import { FUNCTION_DERIVED } from "../compiler/bytecode.ts"
+import { FUNCTION_DERIVED, register_index } from "../compiler/bytecode.ts"
+import type { RegisterIndex } from "../compiler/bytecode.ts"
 import type { BindingLocation, FunctionId } from "../compiler/compile.ts"
 import type { Runtime } from "../runtime/runtime.ts"
 import type { CodeId } from "../runtime/modules.ts"
@@ -53,7 +54,7 @@ import {
   take_exception,
 } from "./errors.ts"
 import type { Status } from "./errors.ts"
-import { FIBER_STATE, Fiber, Frame } from "./fiber.ts"
+import { Frame } from "./frame.ts"
 import {
   BUILTIN_CODE,
   NATIVE_CODE,
@@ -61,21 +62,52 @@ import {
   call_id,
   call_native_operation,
 } from "./native_operations.ts"
-import { run_task } from "./interpreter.ts"
+import {
+  create_suspended_frame,
+  is_resumed,
+  restore_frame,
+  save_frame,
+} from "./heap_types/suspended_frame.ts"
+import { run_interpreter, unwind } from "./interpreter.ts"
 
-export function create_fiber(
+/** Runs a module's top-level code to completion and writes its result. */
+export function run_module_body(
   runtime: Runtime,
+  destination: JSValue,
   code_id: CodeId,
-  environment: Handle,
-): Fiber {
-  const fiber = new Fiber(
-    runtime.fibers.length,
-    runtime.heap.handles.persistent(),
-    runtime.heap.handles.persistent(),
+  environment: JSValue,
+): Status {
+  const base = runtime.stack.fp
+  if (
+    push_frame(
+      runtime,
+      code_id,
+      runtime.loader.code[code_id].unit.entry,
+      environment,
+      undefined,
+      [],
+      destination,
+    ) === THROW
   )
-  push_frame(
+    return THROW
+  return run_interpreter(runtime, base)
+}
+
+/**
+ * Starts a module's top-level code, which may await, and writes the %Promise%
+ * it settles when it finishes. Returns once the code first awaits or finishes.
+ */
+export function start_module_body(
+  runtime: Runtime,
+  promise: JSValue,
+  code_id: CodeId,
+  environment: JSValue,
+): Status {
+  const capability = create_promise_capability(runtime, promise)
+  if (capability === undefined) return THROW
+  const base = runtime.stack.fp
+  const status = push_frame(
     runtime,
-    fiber,
     code_id,
     runtime.loader.code[code_id].unit.entry,
     environment,
@@ -83,47 +115,47 @@ export function create_fiber(
     [],
     null,
   )
-  runtime.fibers.push(fiber)
-  return fiber
+  if (status === OK)
+    runtime.current_frame!.set_capability(capability.resolve, capability.reject)
+  runtime.heap.handles.release(capability.resolve)
+  runtime.heap.handles.release(capability.reject)
+  if (status === THROW) return THROW
+  return run_interpreter(runtime, base)
 }
 
 function push_frame(
   runtime: Runtime,
-  fiber: Fiber,
   code_id: CodeId,
   function_id: FunctionId,
-  environment: Handle,
-  receiver: Handle | undefined,
-  arguments_: Handle[],
-  destination: Handle | null,
-  new_target?: Handle,
-) {
+  environment: JSValue,
+  receiver: JSValue | undefined,
+  arguments_: JSValue[],
+  destination: JSValue | null,
+  new_target?: JSValue,
+): Status {
   const { heap } = runtime
   const fn = runtime.loader.code[code_id].unit.functions[function_id]
   if (!fn) panic("Invalid function descriptor")
-  // The frame owns these handles; pop_frame releases them.
-  const env = heap.handles.persistent()
-  const this_value = heap.handles.persistent()
-  heap.copy_value(env, environment)
-  if (receiver !== undefined) heap.copy_value(this_value, receiver)
-  const target = heap.handles.persistent()
-  if (new_target !== undefined) heap.copy_value(target, new_target)
-  const registers: Persistent[] = []
-  for (let index = 0; index < fn.slot_count; index++)
-    registers.push(heap.handles.persistent())
-  const frame = new Frame({
-    caller: fiber.frame,
+  const frame = Frame.push(
+    runtime,
     code_id,
     function_id,
-    destination: destination,
-    environment: env,
-    this_value: this_value,
-    new_target: target,
-    registers,
-  })
-  const bind = (location: BindingLocation, value: Handle) => {
+    fn.slot_count,
+    destination,
+  )
+  if (frame === undefined)
+    return throw_error(
+      runtime,
+      "RangeError",
+      "Maximum call stack size exceeded",
+    )
+  const env = frame.environment
+  heap.copy_value(env, environment)
+  if (receiver !== undefined) heap.copy_value(frame.this_value, receiver)
+  if (new_target !== undefined) heap.copy_value(frame.new_target, new_target)
+  const bind = (location: BindingLocation, value: JSValue) => {
     if ("register" in location)
-      heap.copy_value(registers[location.register], value)
+      heap.copy_value(frame.register(register_index(location.register)), value)
     else initialize_binding(runtime, env, location.slot, value)
   }
   const { arguments_slot, parameters, rest } = fn
@@ -151,40 +183,25 @@ function push_frame(
       bind(rest, array)
     }
   })
-  fiber.frame = frame
+  return OK
 }
 
-export function pop_frame(runtime: Runtime, fiber: Fiber) {
-  const frame = fiber.frame!
-  const { handles } = runtime.heap
-  for (const register of frame.registers) handles.release(register)
-  handles.release(frame.environment)
-  handles.release(frame.this_value)
-  handles.release(frame.new_target)
-  fiber.frame = frame.caller
+export function pop_frame(runtime: Runtime) {
+  runtime.stack.pop()
 }
 
-export function dispose_fiber(runtime: Runtime, fiber: Fiber) {
-  if (fiber.status === FIBER_STATE.DISPOSED) return
-  while (fiber.frame !== null) pop_frame(runtime, fiber)
-  const { handles } = runtime.heap
-  handles.release(fiber.result)
-  handles.release(fiber.error)
-  if (fiber.settle) {
-    handles.release(fiber.settle.resolve)
-    handles.release(fiber.settle.reject)
-    fiber.settle = undefined
-  }
-  fiber.status = FIBER_STATE.DISPOSED
-}
-
+/**
+ * Starts a call to `callee`. Guest functions get a frame on top of the stack,
+ * which the interpreter then runs; other callees finish here. On THROW, the
+ * exception is to be thrown at the top frame, which is a resumed frame when
+ * `callee` resumes one with a rejection.
+ */
 export function call_function(
   runtime: Runtime,
-  fiber: Fiber,
-  destination: Handle,
-  callee: Handle,
-  receiver: Handle | undefined,
-  arguments_: Handle[],
+  destination: JSValue,
+  callee: JSValue,
+  receiver: JSValue | undefined,
+  arguments_: JSValue[],
 ): Status {
   const { heap } = runtime
   if (
@@ -194,41 +211,16 @@ export function call_function(
     return throw_error(runtime, "TypeError", "Value is not callable")
   const code_id = function_code_id(heap, callee),
     function_id = callee_function_id(heap, callee)
-  if (code_id === RESUME_CODE) {
-    heap.handles.scope(() => {
-      const captured = heap.handles.local(),
-        value = heap.handles.local()
-      load_function_environment(heap, captured, callee)
-      load_value_array_element(heap, value, captured, 0)
-      const target = read_number(heap, value) as Handle
-      load_value_array_element(heap, value, captured, 1)
-      resume_fiber(
-        runtime,
-        runtime.fibers[function_id],
-        target,
-        arguments_[0],
-        read_boolean(heap, value),
-      )
-      write_undefined(heap, destination)
-    })
-    return OK
-  }
+  if (code_id === RESUME_CODE)
+    return resume_suspended_frame(runtime, destination, callee, arguments_[0])
   if (code_id === BUILTIN_CODE)
-    return enter_builtin(
-      runtime,
-      fiber,
-      destination,
-      callee,
-      receiver,
-      arguments_,
-    )
+    return enter_builtin(runtime, destination, callee, receiver, arguments_)
   if (code_id === NATIVE_CODE && function_id === call_id())
     return heap.handles.scope(() => {
       const list = argument_list(runtime, arguments_[2])
       if (list === undefined) return THROW
       return call_function(
         runtime,
-        fiber,
         destination,
         arguments_[0],
         arguments_[1],
@@ -245,24 +237,16 @@ export function call_function(
       receiver,
       arguments_,
     )
-  return enter_function(
-    runtime,
-    fiber,
-    destination,
-    callee,
-    receiver,
-    arguments_,
-  )
+  return enter_function(runtime, destination, callee, receiver, arguments_)
 }
 
 function enter_function(
   runtime: Runtime,
-  fiber: Fiber,
-  destination: Handle,
-  callee: Handle,
-  receiver: Handle | undefined,
-  arguments_: Handle[],
-  target?: Handle,
+  destination: JSValue | null,
+  callee: JSValue,
+  receiver: JSValue | undefined,
+  arguments_: JSValue[],
+  target?: JSValue,
 ): Status {
   const { heap } = runtime
   const code_id = function_code_id(heap, callee),
@@ -290,9 +274,8 @@ function enter_function(
       fn.binding_count,
       runtime.loader.code[code_id].scope_ids[function_id],
     )
-    push_frame(
+    return push_frame(
       runtime,
-      fiber,
       code_id,
       function_id,
       environment,
@@ -301,13 +284,12 @@ function enter_function(
       destination,
       new_target,
     )
-    return OK
   })
 }
 
 // The elements of the array `list` given to `call`, read as own properties so
 // that nothing a program changes on %Array.prototype% is involved.
-function argument_list(runtime: Runtime, list: Handle | undefined) {
+function argument_list(runtime: Runtime, list: JSValue | undefined) {
   const { heap } = runtime
   if (list === undefined || tag_of(heap, list) === VALUE_TAGS.UNDEFINED)
     return []
@@ -319,7 +301,7 @@ function argument_list(runtime: Runtime, list: Handle | undefined) {
     heap,
     get_own_property_descriptor(runtime, list, "length")!.value!,
   )
-  const result: Handle[] = []
+  const result: JSValue[] = []
   for (let index = 0; index < length; index++) {
     const value = heap.handles.local()
     const element = get_own_property_descriptor(runtime, list, String(index))
@@ -337,8 +319,8 @@ function argument_list(runtime: Runtime, list: Handle | undefined) {
  */
 export function to_primitive(
   runtime: Runtime,
-  destination: Handle,
-  source: Handle,
+  destination: JSValue,
+  source: JSValue,
   hint?: "string" | "number",
 ): Status {
   const operation = runtime.realm.abstract_operation("ToPrimitive")
@@ -354,161 +336,115 @@ export function to_primitive(
 
 /**
  * Runs `callee` to completion and writes its result. This is how VM operations
- * run guest code (getters, setters, coercions); only the interpreter's CALL
- * continues a call on the current fiber instead.
+ * run guest code (getters, setters, coercions); the interpreter's CALL
+ * continues the call in its own loop instead.
  */
 export function call(
   runtime: Runtime,
-  destination: Handle,
-  callee: Handle,
-  receiver: Handle | undefined,
-  args: Handle[],
+  destination: JSValue,
+  callee: JSValue,
+  receiver: JSValue | undefined,
+  args: JSValue[],
 ): Status {
-  const fiber = create_call_fiber(runtime, callee, receiver, args)
-  try {
-    run_task(runtime, fiber)
-    if (fiber.status === FIBER_STATE.FAILED)
-      return throw_value(runtime, fiber.error)
-    if (fiber.status !== FIBER_STATE.DONE)
-      panic("Internal operations must complete synchronously")
-    runtime.heap.copy_value(destination, fiber.result)
-    return OK
-  } finally {
-    dispose_fiber(runtime, fiber)
-  }
+  const base = runtime.stack.fp
+  const status = call_function(runtime, destination, callee, receiver, args)
+  if (status === THROW && unwind(runtime, base) === THROW) return THROW
+  return run_interpreter(runtime, base)
 }
 
 /**
- * Makes `fiber` settle a new %Promise%, written to `promise`, when it
- * finishes. Async function calls and module evaluations both work this way.
+ * Creates a new %Promise%, written to `promise`, and returns its resolving
+ * functions, which the caller releases.
  */
-export function settle_with_promise(
-  runtime: Runtime,
-  fiber: Fiber,
-  promise: Handle,
-): Status {
+function create_promise_capability(runtime: Runtime, promise: JSValue) {
   const new_capability = runtime.realm.abstract_operation(
     "NewPromiseCapability",
   )
   const { heap } = runtime
-  const capability = create_call_fiber(runtime, new_capability, undefined, [])
-  try {
-    run_task(runtime, capability)
-    if (capability.status === FIBER_STATE.FAILED)
-      return throw_value(runtime, capability.error)
-    // The fiber owns these until dispose_fiber releases them.
-    const resolve = heap.handles.persistent(),
-      reject = heap.handles.persistent()
-    fiber.settle = { resolve, reject }
+  const resolve = heap.handles.persistent(),
+    reject = heap.handles.persistent()
+  const status = heap.handles.scope(() => {
+    const record = heap.handles.local()
+    if (call(runtime, record, new_capability, undefined, []) === THROW)
+      return THROW
     for (const [name, target] of [
       ["promise", promise],
       ["resolve", resolve],
       ["reject", reject],
-    ] as [string, Handle][])
-      if (
-        get_property_value(runtime, target, capability.result, name) === THROW
-      )
+    ] as [string, JSValue][])
+      if (get_property_value(runtime, target, record, name) === THROW)
         return THROW
     return OK
-  } finally {
-    dispose_fiber(runtime, capability)
-  }
+  })
+  if (status === OK) return { resolve, reject }
+  heap.handles.release(resolve)
+  heap.handles.release(reject)
+  return undefined
 }
 
-// Each async call runs in its own fiber, so AWAIT suspends only that call.
+// The body runs in the caller's interpreter loop, so the promise is written
+// before it starts. An exception before the frame exists rejects it.
 function call_async_function(
   runtime: Runtime,
-  destination: Handle,
-  callee: Handle,
-  receiver: Handle | undefined,
-  arguments_: Handle[],
+  destination: JSValue,
+  callee: JSValue,
+  receiver: JSValue | undefined,
+  arguments_: JSValue[],
 ): Status {
-  const fiber = create_empty_fiber(runtime)
-  if (settle_with_promise(runtime, fiber, destination) === THROW) {
-    dispose_fiber(runtime, fiber)
-    return THROW
-  }
-  if (
-    enter_function(
-      runtime,
-      fiber,
-      fiber.result,
-      callee,
-      receiver,
-      arguments_,
-    ) === THROW
-  ) {
-    take_exception(runtime, fiber.error)
-    fiber.status = FIBER_STATE.FAILED
-  }
-  run_task(runtime, fiber)
-  return OK
+  const capability = create_promise_capability(runtime, destination)
+  if (capability === undefined) return THROW
+  const { heap } = runtime
+  let status = enter_function(runtime, null, callee, receiver, arguments_)
+  if (status === OK)
+    runtime.current_frame!.set_capability(capability.resolve, capability.reject)
+  else
+    status = heap.handles.scope(() => {
+      const error = heap.handles.local(),
+        ignored = heap.handles.local()
+      take_exception(runtime, error)
+      return call(runtime, ignored, capability.reject, undefined, [error])
+    })
+  heap.handles.release(capability.resolve)
+  heap.handles.release(capability.reject)
+  return status
 }
 
-export function settle_fiber(runtime: Runtime, fiber: Fiber) {
-  const { resolve, reject } = fiber.settle!
-  const fulfilled = fiber.status === FIBER_STATE.DONE
-  let settlement
-  try {
-    settlement = create_call_fiber(
-      runtime,
-      fulfilled ? resolve : reject,
-      undefined,
-      [fulfilled ? fiber.result : fiber.error],
-    )
-    run_task(runtime, settlement)
-  } finally {
-    if (settlement) dispose_fiber(runtime, settlement)
-    dispose_fiber(runtime, fiber)
-  }
-}
-
-function create_empty_fiber(runtime: Runtime): Fiber {
-  const fiber = new Fiber(
-    runtime.fibers.length,
-    runtime.heap.handles.persistent(),
-    runtime.heap.handles.persistent(),
-  )
-  runtime.fibers.push(fiber)
-  return fiber
-}
-
-export function create_call_fiber(
+// Puts the suspended frame a resume function carries back on top of the
+// stack, with the awaited value in the AWAIT's destination register, or as an
+// exception thrown there. Resume functions come in pairs and only the first
+// call resumes.
+function resume_suspended_frame(
   runtime: Runtime,
-  callee: Handle,
-  receiver: Handle | undefined,
-  arguments_: Handle[],
-): Fiber {
-  const fiber = create_empty_fiber(runtime)
-  if (
-    call_function(
-      runtime,
-      fiber,
-      fiber.result,
-      callee,
-      receiver,
-      arguments_,
-    ) === THROW
-  ) {
-    take_exception(runtime, fiber.error)
-    fiber.status = FIBER_STATE.FAILED
-  } else if (fiber.frame === null) fiber.status = FIBER_STATE.DONE
-  return fiber
-}
-
-export function resume_fiber(
-  runtime: Runtime,
-  fiber: Fiber,
-  destination: Handle,
-  argument: Handle | undefined,
-  rejected: boolean,
-) {
-  if (fiber.status !== FIBER_STATE.WAITING) return
-  if (argument !== undefined)
-    runtime.heap.copy_value(rejected ? fiber.error : destination, argument)
-  else write_undefined(runtime.heap, rejected ? fiber.error : destination)
-  fiber.await_rejected = rejected
-  fiber.status = FIBER_STATE.READY
+  destination: JSValue,
+  callee: JSValue,
+  argument: JSValue | undefined,
+): Status {
+  const { heap } = runtime
+  write_undefined(heap, destination)
+  return heap.handles.scope(() => {
+    const captured = heap.handles.local(),
+      suspended = heap.handles.local(),
+      rejected = heap.handles.local(),
+      register = heap.handles.local(),
+      value = heap.handles.local()
+    load_function_environment(heap, captured, callee)
+    load_value_array_element(heap, suspended, captured, 0)
+    load_value_array_element(heap, rejected, captured, 1)
+    load_value_array_element(heap, register, captured, 2)
+    if (is_resumed(heap, suspended)) return OK
+    if (argument !== undefined) heap.copy_value(value, argument)
+    const fp = restore_frame(heap, runtime.stack, suspended)
+    if (fp === undefined)
+      return throw_error(
+        runtime,
+        "RangeError",
+        "Maximum call stack size exceeded",
+      )
+    if (read_boolean(heap, rejected)) return throw_value(runtime, value)
+    const index = register_index(read_number(heap, register))
+    heap.copy_value(new Frame(runtime, fp).register(index), value)
+    return OK
+  })
 }
 
 // [[Call]] and [[Construct]] of built-in function objects (ECMA-262 10.3.1,
@@ -516,12 +452,11 @@ export function resume_fiber(
 // no receiver, and the steps return the new object.
 function enter_builtin(
   runtime: Runtime,
-  fiber: Fiber,
-  destination: Handle,
-  callee: Handle,
-  receiver: Handle | undefined,
-  arguments_: Handle[],
-  new_target?: Handle,
+  destination: JSValue,
+  callee: JSValue,
+  receiver: JSValue | undefined,
+  arguments_: JSValue[],
+  new_target?: JSValue,
 ): Status {
   return runtime.heap.handles.scope(() => {
     const steps = runtime.heap.handles.local()
@@ -529,7 +464,6 @@ function enter_builtin(
       panic("Built-in function has no steps")
     return enter_function(
       runtime,
-      fiber,
       destination,
       steps,
       receiver,
@@ -541,11 +475,10 @@ function enter_builtin(
 
 export function construct_function(
   runtime: Runtime,
-  fiber: Fiber,
-  destination: Handle,
-  callee: Handle,
-  arguments_: Handle[],
-  new_target: Handle = callee,
+  destination: JSValue,
+  callee: JSValue,
+  arguments_: JSValue[],
+  new_target: JSValue = callee,
 ): Status {
   const { heap } = runtime
   if (heap_type_of(heap, callee) !== HEAP_TYPES.FUNCTION)
@@ -557,7 +490,6 @@ export function construct_function(
       return throw_error(runtime, "TypeError", "Value is not a constructor")
     return enter_builtin(
       runtime,
-      fiber,
       destination,
       callee,
       undefined,
@@ -599,9 +531,8 @@ export function construct_function(
       fn.binding_count,
       scope_ids[id],
     )
-    push_frame(
+    const status = push_frame(
       runtime,
-      fiber,
       code,
       id,
       environment,
@@ -610,56 +541,64 @@ export function construct_function(
       destination,
       new_target,
     )
-    fiber.frame!.is_construct_call = true
-    return OK
+    if (status === OK) runtime.current_frame!.is_construct_call = true
+    return status
   })
 }
 
-function resume_function(
+function create_resume_function(
   runtime: Runtime,
-  destination: Handle,
-  fiber: Fiber,
-  awaiting: Handle,
+  destination: JSValue,
+  suspended: JSValue,
+  awaiting: RegisterIndex,
   rejected: boolean,
 ) {
   const { heap } = runtime
   heap.handles.scope(() => {
-    const target = heap.handles.local(),
-      flag = heap.handles.local(),
+    const flag = heap.handles.local(),
+      register = heap.handles.local(),
       captured = heap.handles.local()
-    write_number(heap, target, awaiting)
     write_boolean(heap, flag, rejected)
-    create_value_array(heap, captured, [target, flag])
-    create_function(runtime, destination, RESUME_CODE, fiber.id, captured, 2)
+    write_number(heap, register, awaiting)
+    create_value_array(heap, captured, [suspended, flag, register])
+    create_function(runtime, destination, RESUME_CODE, 0, captured, 2)
   })
 }
 
+/**
+ * Moves the top frame off the stack into a suspended frame until the promise
+ * for `source` settles, at which point a resume function puts it back on top.
+ * If registering the resume functions throws, the frame stays on top to handle
+ * it.
+ */
 export function await_value(
   runtime: Runtime,
-  fiber: Fiber,
-  destination: Handle,
-  source: Handle,
-) {
+  destination: RegisterIndex,
+  source: JSValue,
+): Status {
+  const frame = runtime.current_frame!
+  if (!frame.capability)
+    panic("Only async functions and program modules can await")
   const await_promise = runtime.realm.abstract_operation("Await")
   const { heap } = runtime
-  fiber.status = FIBER_STATE.WAITING
-  heap.handles.scope(() => {
-    const fulfilled = heap.handles.local(),
-      rejected = heap.handles.local()
-    let registration
-    try {
-      resume_function(runtime, fulfilled, fiber, destination, false)
-      resume_function(runtime, rejected, fiber, destination, true)
-      registration = create_call_fiber(runtime, await_promise, undefined, [
+  return heap.handles.scope(() => {
+    const suspended = heap.handles.local(),
+      fulfilled = heap.handles.local(),
+      rejected = heap.handles.local(),
+      ignored = heap.handles.local()
+    create_suspended_frame(heap, suspended, frame.register_count)
+    create_resume_function(runtime, fulfilled, suspended, destination, false)
+    create_resume_function(runtime, rejected, suspended, destination, true)
+    if (
+      call(runtime, ignored, await_promise, undefined, [
         source,
         fulfilled,
         rejected,
-      ])
-      run_task(runtime, registration)
-      if (registration.status === FIBER_STATE.FAILED)
-        resume_fiber(runtime, fiber, destination, registration.error, true)
-    } finally {
-      if (registration) dispose_fiber(runtime, registration)
-    }
+      ]) === THROW
+    )
+      return THROW
+    save_frame(heap, runtime.stack, suspended, frame.fp)
+    pop_frame(runtime)
+    return OK
   })
 }
