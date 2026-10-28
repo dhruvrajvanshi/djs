@@ -1,28 +1,28 @@
-import type { Handle } from "../storage/heap.ts"
+import type { Handle } from "./storage/heap.ts"
 import {
   heap_type_of,
   set_ref,
   write_boolean,
   write_null,
-} from "../storage/value.ts"
-import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
+} from "./storage/value.ts"
+import { HEAP_TYPES, PROPERTY_FLAGS } from "./storage/layout.ts"
+import type { Runtime } from "../runtime/runtime.ts"
 import {
   has_property_list,
   mark_error_object,
   object_prototype_reference,
   try_set_prototype,
-} from "../heap_types/object.ts"
+} from "./heap_types/object.ts"
 import {
   find_property,
   insert_property,
   load_property_value,
   store_property_value,
-} from "../heap_types/property.ts"
+} from "./heap_types/property.ts"
 import {
   string_object_set_value,
   string_value,
-} from "../heap_types/string_object.ts"
+} from "./heap_types/string_object.ts"
 import { create_object } from "./objects.ts"
 import { OK, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"

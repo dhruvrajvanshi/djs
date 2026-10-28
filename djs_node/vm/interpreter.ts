@@ -1,6 +1,6 @@
-import { panic } from "../../utils.ts"
-import type { Heap } from "../storage/heap.ts"
-import type { Handle } from "../storage/heap.ts"
+import { panic } from "../utils.ts"
+import type { Heap } from "./storage/heap.ts"
+import type { Handle } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   is_nullish,
@@ -10,11 +10,11 @@ import {
   write_boolean,
   write_number,
   write_undefined,
-} from "../storage/value.ts"
-import { HEAP_TYPES, PROPERTY_FLAGS } from "../storage/layout.ts"
-import type { FunctionId, PropertyKind } from "../../compiler/compile.ts"
-import { PROPERTY_KIND } from "../../compiler/compile.ts"
-import type { Opcode } from "../../compiler/bytecode.ts"
+} from "./storage/value.ts"
+import { HEAP_TYPES, PROPERTY_FLAGS } from "./storage/layout.ts"
+import type { FunctionId, PropertyKind } from "../compiler/compile.ts"
+import { PROPERTY_KIND } from "../compiler/compile.ts"
+import type { Opcode } from "../compiler/bytecode.ts"
 import {
   OP,
   FUNCTION_ENVIRONMENT,
@@ -23,23 +23,23 @@ import {
   decode_instruction,
   register_index,
   bytecode_offset,
-} from "../../compiler/bytecode.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
-import type { CodeId, LinkedCode } from "../../runtime/modules.ts"
-import { write_string } from "../heap_types/string.ts"
-import { load_symbol_description } from "../heap_types/symbol.ts"
-import { is_object, set_prototype } from "../heap_types/object.ts"
+} from "../compiler/bytecode.ts"
+import type { Runtime } from "../runtime/runtime.ts"
+import type { CodeId, LinkedCode } from "../runtime/modules.ts"
+import { write_string } from "./heap_types/string.ts"
+import { load_symbol_description } from "./heap_types/symbol.ts"
+import { is_object, set_prototype } from "./heap_types/object.ts"
 import {
   copy_environment_bindings,
   create_environment,
   environment_at,
   environment_scope_id,
-} from "../heap_types/environment.ts"
+} from "./heap_types/environment.ts"
 import {
   create_array,
   create_function,
   create_object,
-} from "../semantics/objects.ts"
+} from "./objects.ts"
 import {
   define_property,
   define_property_or_throw,
@@ -55,11 +55,11 @@ import {
   property_key,
   set_property_value,
   to_property_key,
-} from "../semantics/properties.ts"
+} from "./properties.ts"
 import type {
   PropertyDescriptor,
   PropertyKey,
-} from "../semantics/properties.ts"
+} from "./properties.ts"
 import {
   instance_of,
   loose_equals,
@@ -69,14 +69,14 @@ import {
   to_string,
   truthy,
   type_of,
-} from "../semantics/operations.ts"
+} from "./operations.ts"
 import {
   initialize_binding,
   load_binding,
   store_binding,
-} from "../semantics/bindings.ts"
-import { OK, THROW, throw_error, clear_exception } from "../semantics/errors.ts"
-import type { Status } from "../semantics/errors.ts"
+} from "./bindings.ts"
+import { OK, THROW, throw_error, clear_exception } from "./errors.ts"
+import type { Status } from "./errors.ts"
 import { FIBER_STATE } from "./fiber.ts"
 import type { Fiber, FiberStatus, Frame } from "./fiber.ts"
 import {

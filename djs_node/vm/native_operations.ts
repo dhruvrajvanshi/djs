@@ -1,11 +1,11 @@
-import { panic } from "../../utils.ts"
-import type { Handle } from "../storage/heap.ts"
-import { write_undefined } from "../storage/value.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
-import { OK } from "../semantics/errors.ts"
-import type { Status } from "../semantics/errors.ts"
-import { VM_PRIMITIVES, VM_VALUES } from "../../builtin_modules/djs_vm.ts"
-import { RUNTIME_OPERATIONS } from "../../builtin_modules/djs_runtime.ts"
+import { panic } from "../utils.ts"
+import type { Handle } from "./storage/heap.ts"
+import { write_undefined } from "./storage/value.ts"
+import type { Runtime } from "../runtime/runtime.ts"
+import { OK } from "./errors.ts"
+import type { Status } from "./errors.ts"
+import { VM_PRIMITIVES, VM_VALUES } from "../builtin_modules/djs_vm.ts"
+import { RUNTIME_OPERATIONS } from "../builtin_modules/djs_runtime.ts"
 
 export const NATIVE_CODE = 0xffffffff
 /** Built-in function objects run the steps stored by set_builtin_steps. */

@@ -17,10 +17,10 @@ import {
 import type { OperationOptions } from "../runtime/scheduler.ts"
 import { read_string, write_string } from "../vm/heap_types/string.ts"
 import { byte_buffer_view } from "../vm/heap_types/byte_buffer.ts"
-import { OK, THROW, throw_error, throw_value } from "../vm/semantics/errors.ts"
-import type { Status } from "../vm/semantics/errors.ts"
+import { OK, THROW, throw_error, throw_value } from "../vm/errors.ts"
+import type { Status } from "../vm/errors.ts"
 import { integer_argument, string_argument } from "./djs_vm.ts"
-import type { NativeOperation } from "../vm/execution/native_operations.ts"
+import type { NativeOperation } from "../vm/native_operations.ts"
 
 export const RUNTIME_OPERATIONS: Record<string, NativeOperation> = {
   /**

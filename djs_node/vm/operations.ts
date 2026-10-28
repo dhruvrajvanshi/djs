@@ -1,6 +1,6 @@
-import { panic } from "../../utils.ts"
-import type { Literal } from "../../compiler/compile.ts"
-import type { Handle } from "../storage/heap.ts"
+import { panic } from "../utils.ts"
+import type { Literal } from "../compiler/compile.ts"
+import type { Handle } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   get_ref,
@@ -11,19 +11,19 @@ import {
   write_boolean,
   write_number,
   write_undefined,
-} from "../storage/value.ts"
-import { HEAP_TYPES, is_object_type } from "../storage/layout.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
-import { read_string, write_string } from "../heap_types/string.ts"
+} from "./storage/value.ts"
+import { HEAP_TYPES, is_object_type } from "./storage/layout.ts"
+import type { Runtime } from "../runtime/runtime.ts"
+import { read_string, write_string } from "./heap_types/string.ts"
 import {
   has_property_list,
   prototype_of_reference,
-} from "../heap_types/object.ts"
+} from "./heap_types/object.ts"
 import { get_property_value } from "./properties.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
-import { OP } from "../../compiler/bytecode.ts"
-import type { Opcode } from "../../compiler/bytecode.ts"
+import { OP } from "../compiler/bytecode.ts"
+import type { Opcode } from "../compiler/bytecode.ts"
 
 export function to_string(runtime: Runtime, value: Handle): string {
   const { heap } = runtime

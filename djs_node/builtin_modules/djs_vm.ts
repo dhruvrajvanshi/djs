@@ -19,7 +19,7 @@ import {
 import { HEAP_TYPES } from "../vm/storage/layout.ts"
 import { INSTRUCTION_BYTES } from "../compiler/bytecode.ts"
 import type { CompiledModule } from "../compiler/compile.ts"
-import type { Frame } from "../vm/execution/fiber.ts"
+import type { Frame } from "../vm/fiber.ts"
 import { fileURLToPath } from "node:url"
 import type { Runtime } from "../runtime/runtime.ts"
 import {
@@ -52,7 +52,7 @@ import {
   function_flags,
   set_builtin_steps,
 } from "../vm/heap_types/function.ts"
-import { create_function } from "../vm/semantics/objects.ts"
+import { create_function } from "../vm/objects.ts"
 import { allocate_array } from "../vm/heap_types/array.ts"
 import { allocate_string_object } from "../vm/heap_types/string_object.ts"
 import {
@@ -67,23 +67,23 @@ import {
   own_property_keys,
   to_property_descriptor,
   to_property_key,
-} from "../vm/semantics/properties.ts"
+} from "../vm/properties.ts"
 import {
   has_slot,
   get_slot,
   set_slot,
   init_slot,
-} from "../vm/semantics/internal_slots.ts"
-import { OK, THROW, throw_error } from "../vm/semantics/errors.ts"
+} from "../vm/internal_slots.ts"
+import { OK, THROW, throw_error } from "../vm/errors.ts"
 import {
   BUILTIN_CODE,
   NATIVE_CODE,
   RESUME_CODE,
-} from "../vm/execution/native_operations.ts"
+} from "../vm/native_operations.ts"
 import type {
   NativeOperation,
   NativeValue,
-} from "../vm/execution/native_operations.ts"
+} from "../vm/native_operations.ts"
 import {
   ABSTRACT_OPERATIONS,
   INTERNAL_METHODS,

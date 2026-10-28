@@ -1,5 +1,5 @@
-import { panic } from "../../utils.ts"
-import type { Handle, Persistent } from "../storage/heap.ts"
+import { panic } from "../utils.ts"
+import type { Handle, Persistent } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   heap_type_of,
@@ -10,14 +10,14 @@ import {
   write_number,
   write_undefined,
   write_uninitialized,
-} from "../storage/value.ts"
-import { HEAP_TYPES } from "../storage/layout.ts"
-import { FUNCTION_DERIVED } from "../../compiler/bytecode.ts"
-import type { BindingLocation, FunctionId } from "../../compiler/compile.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
-import type { CodeId } from "../../runtime/modules.ts"
-import { write_string } from "../heap_types/string.ts"
-import { has_property_list, set_prototype } from "../heap_types/object.ts"
+} from "./storage/value.ts"
+import { HEAP_TYPES } from "./storage/layout.ts"
+import { FUNCTION_DERIVED } from "../compiler/bytecode.ts"
+import type { BindingLocation, FunctionId } from "../compiler/compile.ts"
+import type { Runtime } from "../runtime/runtime.ts"
+import type { CodeId } from "../runtime/modules.ts"
+import { write_string } from "./heap_types/string.ts"
+import { has_property_list, set_prototype } from "./heap_types/object.ts"
 import {
   BUILTIN_CONSTRUCTOR,
   function_code_id,
@@ -27,32 +27,32 @@ import {
   load_function_environment,
   load_function_new_target,
   load_function_receiver,
-} from "../heap_types/function.ts"
-import { create_environment } from "../heap_types/environment.ts"
+} from "./heap_types/function.ts"
+import { create_environment } from "./heap_types/environment.ts"
 import {
   create_value_array,
   load_value_array_element,
-} from "../heap_types/value_array.ts"
+} from "./heap_types/value_array.ts"
 import {
   create_arguments_object,
   create_array,
   create_function,
   create_object,
-} from "../semantics/objects.ts"
+} from "./objects.ts"
 import {
   define_property,
   get_own_property_descriptor,
   get_property_value,
-} from "../semantics/properties.ts"
-import { initialize_binding } from "../semantics/bindings.ts"
+} from "./properties.ts"
+import { initialize_binding } from "./bindings.ts"
 import {
   OK,
   THROW,
   throw_error,
   throw_value,
   take_exception,
-} from "../semantics/errors.ts"
-import type { Status } from "../semantics/errors.ts"
+} from "./errors.ts"
+import type { Status } from "./errors.ts"
 import { FIBER_STATE, Fiber, Frame } from "./fiber.ts"
 import {
   BUILTIN_CODE,

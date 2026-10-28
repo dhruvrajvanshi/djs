@@ -1,5 +1,5 @@
-import type { Address } from "../storage/value.ts"
-import type { Handle } from "../storage/heap.ts"
+import type { Address } from "./storage/value.ts"
+import type { Handle } from "./storage/heap.ts"
 import {
   VALUE_TAGS,
   get_ref,
@@ -9,29 +9,29 @@ import {
   tag_of,
   write_boolean,
   write_undefined,
-} from "../storage/value.ts"
+} from "./storage/value.ts"
 import {
   HEAP_TYPES,
   PROPERTY_FLAGS,
   type PropertyFlags,
-} from "../storage/layout.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
+} from "./storage/layout.ts"
+import type { Runtime } from "../runtime/runtime.ts"
 import {
   heap_string_code_unit_at,
   heap_string_length,
   read_string,
   write_string,
-} from "../heap_types/string.ts"
-import { byte_buffer_view } from "../heap_types/byte_buffer.ts"
-import { string_reference } from "../heap_types/string_object.ts"
+} from "./heap_types/string.ts"
+import { byte_buffer_view } from "./heap_types/byte_buffer.ts"
+import { string_reference } from "./heap_types/string_object.ts"
 import {
   allocate_object,
   has_property_list,
   is_object,
   object_properties,
   object_prototype_reference,
-} from "../heap_types/object.ts"
-import type { PropertyKey } from "../heap_types/property.ts"
+} from "./heap_types/object.ts"
+import type { PropertyKey } from "./heap_types/property.ts"
 import {
   find_property,
   insert_property,
@@ -44,17 +44,17 @@ import {
   set_property_flags,
   store_property_setter,
   store_property_value,
-} from "../heap_types/property.ts"
+} from "./heap_types/property.ts"
 import { create_array, create_object } from "./objects.ts"
 import { same_value, to_string, truthy, write_primitive } from "./operations.ts"
-import { call, to_primitive } from "../execution/calls.ts"
-import { panic } from "../../utils.ts"
+import { call, to_primitive } from "./calls.ts"
+import { panic } from "../utils.ts"
 import { OK, THROW, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 
 const { WRITABLE, ENUMERABLE, CONFIGURABLE, PRIVATE, ACCESSOR } = PROPERTY_FLAGS
 
-export type { PropertyKey } from "../heap_types/property.ts"
+export type { PropertyKey } from "./heap_types/property.ts"
 
 /**
  * A property's attributes and contents, as handles in the caller's handle

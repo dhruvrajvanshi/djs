@@ -1,8 +1,8 @@
-import type { Handle, Persistent } from "../storage/heap.ts"
-import { panic } from "../../utils.ts"
-import type { BytecodeOffset, RegisterIndex } from "../../compiler/bytecode.ts"
-import type { FunctionId } from "../../compiler/compile.ts"
-import type { CodeId } from "../../runtime/modules.ts"
+import type { Handle, Persistent } from "./storage/heap.ts"
+import { panic } from "../utils.ts"
+import type { BytecodeOffset, RegisterIndex } from "../compiler/bytecode.ts"
+import type { FunctionId } from "../compiler/compile.ts"
+import type { CodeId } from "../runtime/modules.ts"
 
 export const FIBER_STATE = Object.freeze({
   READY: 0,

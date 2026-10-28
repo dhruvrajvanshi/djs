@@ -13,29 +13,29 @@ import { fileURLToPath, pathToFileURL } from "node:url"
 import { compile_module, located_message } from "../compiler/compile.ts"
 import { read_string, write_string } from "../vm/heap_types/string.ts"
 import { create_environment } from "../vm/heap_types/environment.ts"
-import { create_function } from "../vm/semantics/objects.ts"
-import { load_binding, initialize_binding } from "../vm/semantics/bindings.ts"
-import { declare_slot, get_slot } from "../vm/semantics/internal_slots.ts"
+import { create_function } from "../vm/objects.ts"
+import { load_binding, initialize_binding } from "../vm/bindings.ts"
+import { declare_slot, get_slot } from "../vm/internal_slots.ts"
 import {
   THROW,
   clear_exception,
   take_exception,
-} from "../vm/semantics/errors.ts"
+} from "../vm/errors.ts"
 import { error_report } from "./error_report.ts"
 import {
   native_modules,
   NATIVE_CODE,
-} from "../vm/execution/native_operations.ts"
-import type { NativeModule } from "../vm/execution/native_operations.ts"
+} from "../vm/native_operations.ts"
+import type { NativeModule } from "../vm/native_operations.ts"
 import { panic } from "../utils.ts"
 import type { HostError } from "../host/node.ts"
-import { FIBER_STATE } from "../vm/execution/fiber.ts"
+import { FIBER_STATE } from "../vm/fiber.ts"
 import {
   create_fiber,
   dispose_fiber,
   settle_with_promise,
-} from "../vm/execution/calls.ts"
-import { run_task } from "../vm/execution/interpreter.ts"
+} from "../vm/calls.ts"
+import { run_task } from "../vm/interpreter.ts"
 import {
   drain_completions,
   drain_jobs,

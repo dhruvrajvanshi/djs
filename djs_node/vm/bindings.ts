@@ -1,13 +1,13 @@
-import { panic } from "../../utils.ts"
-import type { Handle } from "../storage/heap.ts"
-import { VALUE_TAGS, tag_of } from "../storage/value.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
+import { panic } from "../utils.ts"
+import type { Handle } from "./storage/heap.ts"
+import { VALUE_TAGS, tag_of } from "./storage/value.ts"
+import type { Runtime } from "../runtime/runtime.ts"
 import {
   environment_scope_id,
   environment_slot_uninitialized,
   load_environment_slot,
   store_environment_slot,
-} from "../heap_types/environment.ts"
+} from "./heap_types/environment.ts"
 import { OK, throw_error } from "./errors.ts"
 import type { Status } from "./errors.ts"
 

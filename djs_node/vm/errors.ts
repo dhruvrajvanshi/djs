@@ -1,11 +1,11 @@
-import type { Handle } from "../storage/heap.ts"
-import { write_undefined } from "../storage/value.ts"
-import type { Runtime } from "../../runtime/runtime.ts"
-import { write_string } from "../heap_types/string.ts"
-import { allocate_object, mark_error_object } from "../heap_types/object.ts"
+import type { Handle } from "./storage/heap.ts"
+import { write_undefined } from "./storage/value.ts"
+import type { Runtime } from "../runtime/runtime.ts"
+import { write_string } from "./heap_types/string.ts"
+import { allocate_object, mark_error_object } from "./heap_types/object.ts"
 import { define_property } from "./properties.ts"
-import { stack_trace } from "../../builtin_modules/djs_vm.ts"
-import { panic } from "../../utils.ts"
+import { stack_trace } from "../builtin_modules/djs_vm.ts"
+import { panic } from "../utils.ts"
 
 /**
  * Operations that guest code can observe failing return a Status. On THROW,

@@ -6,8 +6,8 @@ import { is_object } from "../vm/heap_types/object.ts"
 import {
   get_property_descriptor,
   is_data_descriptor,
-} from "../vm/semantics/properties.ts"
-import { to_string } from "../vm/semantics/operations.ts"
+} from "../vm/properties.ts"
+import { to_string } from "../vm/operations.ts"
 import type { Runtime } from "./runtime.ts"
 
 // The value's stack if it has one, since that already starts with its message.

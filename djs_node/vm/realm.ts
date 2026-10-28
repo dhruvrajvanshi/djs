@@ -16,13 +16,13 @@ import {
   create_array,
   create_function,
   create_string_object,
-} from "./semantics/objects.ts"
-import { define_property } from "./semantics/properties.ts"
+} from "./objects.ts"
+import { define_property } from "./properties.ts"
 import { panic } from "../utils.ts"
 import {
   NATIVE_CODE,
   native_operation_id,
-} from "./execution/native_operations.ts"
+} from "./native_operations.ts"
 
 export const WELL_KNOWN_SYMBOLS = Object.freeze([
   "asyncIterator",
